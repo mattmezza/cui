@@ -55,6 +55,7 @@ def source_files(root):
                  'bindings/node/skeleton-presentation.cjs',
                  'bindings/node/time-field-localized.cjs', 'bindings/node/time_field_localized_internal.h', 'bindings/rust/src/shadows.rs', 'bindings/rust/src/slider_model.rs',
                  'bindings/go/cui/time_localized.go', 'bindings/go/cui/time_localized_ffi.h',
+                 'bindings/go/cui/skeleton_presentation.go',
                  'bindings/rust/src/time_localized.rs',
                  'bindings/go/cui/part_shadows.go', 'bindings/go/cui/slider_model.go', 'bindings/rust/src/part_shadows.rs'))
     paths.add(root / 'bindings/rust/build.rs')

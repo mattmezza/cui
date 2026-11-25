@@ -161,3 +161,8 @@ See [typed root shadow authoring](BRIDGE_SHADOWS.md) for the six-kind implementa
 For bounded semantic ROOT/MAIN/indicator/track/thumb authoring, read
 [typed part shadows](BRIDGE_PART_SHADOWS.md). Slider has no thumb; owner topology,
 whole-group naming and separate reset are explicit parts of that contract.
+
+## Responsive loading placeholders
+
+The [responsive Skeleton guide](GO_SKELETON.md) includes a native profile UI
+that replaces decorative placeholders with loaded content.

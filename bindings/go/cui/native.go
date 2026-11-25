@@ -344,6 +344,8 @@ static cui_bridge_status go_part_query(cui_bridge_app *a,cui_bridge_node n,uint3
 #undef SHADOW_DYNAMIC
 #undef SHADOW_STATIC
 
+#include "skeleton_presentation_ffi.h"
+
 static int bridge_open(const char *path) {
  if (bridge_initialized) return 0;
 #if defined(CUI_GO_STATIC)
@@ -351,6 +353,7 @@ static int bridge_open(const char *path) {
 #define STATIC_LOAD(name, ret, params, args) fp_##name = cui_bridge_##name;
  API(STATIC_LOAD, STATIC_LOAD)
 #undef STATIC_LOAD
+ go_skeleton_initialize();
  bridge_initialized = 1;
  return 0;
  }
@@ -375,6 +378,7 @@ static int bridge_open(const char *path) {
  API(LOAD, LOAD)
 #undef LOAD
  bridge_lib = lib;
+ go_skeleton_initialize();
  bridge_initialized = 1;
  return 0;
 }
@@ -441,6 +445,7 @@ type Options struct {
 }
 type Node struct {
 	timeLocalized                        *TimeFieldConfig
+	skeletonConfig                       *SkeletonConfig
 	timeChange                           func(TimeFieldChange)
 	slider                               *sliderNode
 	kind                                 int
@@ -1522,6 +1527,7 @@ func (a *App) Mount(root *Node) error {
 	}
 	seen := map[*Node]bool{}
 	keys := map[string]bool{}
+	usesResponsiveSkeleton := false
 	var visit func(*Node, int) error
 	visit = func(n *Node, d int) error {
 		if n == nil || seen[n] || n.app != nil || n.removed {
@@ -1583,6 +1589,7 @@ func (a *App) Mount(root *Node) error {
 		if n.err != nil {
 			return n.err
 		}
+		usesResponsiveSkeleton = usesResponsiveSkeleton || n.skeletonConfig != nil
 		if n.key == "" {
 			n.key = fmt.Sprintf("go-%p", n)
 		}
@@ -1619,6 +1626,9 @@ func (a *App) Mount(root *Node) error {
 	if err := visit(root, 1); err != nil {
 		return err
 	}
+	if usesResponsiveSkeleton && C.go_skeleton_supported() == 0 {
+		return ErrSkeletonPresentationUnavailable
+	}
 	if e := a.timePreflight(root); e != nil {
 		return e
 	}
@@ -1643,6 +1653,11 @@ func (a *App) Mount(root *Node) error {
 		n.app = a
 		n.handle = h
 		a.nodes[keyID(h)] = n
+		if n.skeletonConfig != nil {
+			if e := n.configureMountedSkeleton(*n.skeletonConfig); e != nil {
+				return e
+			}
+		}
 		if n.hasSettingsQuery {
 			p := cs(n.settingsQuery)
 			e := result(C.go_settings_set_query(a.ptr, h, p))
@@ -2678,6 +2693,10 @@ func Marker(key, text string) *Node    { return &Node{kind: 38, key: key, text: 
 func Shimmer(key, text string) *Node   { return &Node{kind: 39, key: key, text: text} }
 func (n *Node) VisualSize(width, height float32) *Node {
 	if n.err != nil {
+		return n
+	}
+	if n.skeletonConfig != nil {
+		n.err = errors.New("use Skeleton configuration to size a responsive Skeleton")
 		return n
 	}
 	if !(n.kind == 30 || n.kind == 32 || n.kind == 33 || n.kind == 35 || n.kind == 36 || n.kind == 46 || n.kind == 50 || n.kind == 51 || n.kind == 52 || n.kind == 53 || n.kind == 54 || n.kind == 56 || n.kind == 58 || n.kind == 60 || n.kind == 61 || n.kind == 64 || n.kind == 65 || n.kind == 66 || n.kind == 67 || n.kind == 68 || n.kind == 69 || n.kind == 70 || n.kind == 71 || n.kind == 72 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 78 || n.kind == 79 || n.kind == 80) || !finite(width) || !finite(height) || width < 0 || height < 0 || width > 4096 || height > 4096 {
@@ -3940,4 +3959,105 @@ func (a *App) SupportsLocalizedTimeField() (bool, error) {
 		return false, e
 	}
 	return C.go_time_supported() != 0, nil
+}
+
+// SupportsSkeletonPresentation reports whether the active bridge exposes
+// all of responsive Skeleton V1 with compatible record sizes.
+func (a *App) SupportsSkeletonPresentation() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_skeleton_supported() != 0, nil
+}
+
+func (n *Node) configureMountedSkeleton(c SkeletonConfig) error {
+	supported, err := n.app.SupportsSkeletonPresentation()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrSkeletonPresentationUnavailable
+	}
+	var flags C.uint32_t
+	if c.Secondary {
+		flags |= C.CUI_BRIDGE_SKELETON_SECONDARY
+	}
+	if c.CustomColor {
+		flags |= C.CUI_BRIDGE_SKELETON_CUSTOM_COLOR
+	}
+	if c.ReducedMotion {
+		flags |= C.CUI_BRIDGE_SKELETON_REDUCED_MOTION
+	}
+	r := C.cui_bridge_skeleton_config_v1{
+		struct_size: C.sizeof_cui_bridge_skeleton_config_v1, schema_version: C.CUI_BRIDGE_SKELETON_V1,
+		flags: flags, width_mode: C.uint32_t(c.WidthMode), width: C.float(c.Width),
+		height: C.float(c.Height), max_width: C.float(c.MaxWidth), radius: C.float(c.Radius),
+		duration: C.float(c.Duration), background_rgba: C.uint32_t(c.BackgroundRGBA),
+	}
+	return result(C.go_skeleton_configure(n.app.ptr, n.handle, &r))
+}
+
+// SkeletonConfig returns a copy of the authored responsive configuration.
+func (n *Node) SkeletonConfig() (SkeletonConfig, error) {
+	if n == nil || n.removed || n.skeletonConfig == nil {
+		return SkeletonConfig{}, errors.New("node has no responsive Skeleton configuration")
+	}
+	if n.app == nil {
+		return *n.skeletonConfig, nil
+	}
+	if err := n.app.check(); err != nil {
+		return SkeletonConfig{}, err
+	}
+	r := C.cui_bridge_skeleton_config_v1{
+		struct_size: C.sizeof_cui_bridge_skeleton_config_v1, schema_version: C.CUI_BRIDGE_SKELETON_V1,
+	}
+	if err := result(C.go_skeleton_get_config(n.app.ptr, n.handle, &r)); err != nil {
+		return SkeletonConfig{}, err
+	}
+	c := SkeletonConfig{
+		WidthMode: SkeletonWidthMode(r.width_mode), Width: float32(r.width), Height: float32(r.height),
+		MaxWidth: float32(r.max_width), Radius: float32(r.radius), Duration: float32(r.duration),
+		BackgroundRGBA: uint32(r.background_rgba), Secondary: r.flags&C.CUI_BRIDGE_SKELETON_SECONDARY != 0,
+		CustomColor:   r.flags&C.CUI_BRIDGE_SKELETON_CUSTOM_COLOR != 0,
+		ReducedMotion: r.flags&C.CUI_BRIDGE_SKELETON_REDUCED_MOTION != 0,
+	}
+	const knownFlags = C.CUI_BRIDGE_SKELETON_SECONDARY | C.CUI_BRIDGE_SKELETON_CUSTOM_COLOR | C.CUI_BRIDGE_SKELETON_REDUCED_MOTION
+	if r.struct_size != C.sizeof_cui_bridge_skeleton_config_v1 ||
+		r.schema_version != C.CUI_BRIDGE_SKELETON_V1 || r.flags&^knownFlags != 0 || c.validate() != nil {
+		return SkeletonConfig{}, errors.New("invalid copied Skeleton configuration")
+	}
+	return c, nil
+}
+
+// SkeletonPresentation reads the most recent sample from a mounted responsive
+// Skeleton. The bool is false when no current sample is available.
+func (n *Node) SkeletonPresentation() (SkeletonPresentation, bool, error) {
+	if n == nil || n.app == nil || n.removed || n.skeletonConfig == nil {
+		return SkeletonPresentation{}, false, errors.New("presentation requires a mounted responsive Skeleton")
+	}
+	if err := n.app.check(); err != nil {
+		return SkeletonPresentation{}, false, err
+	}
+	r := C.cui_bridge_skeleton_presentation_v1{
+		struct_size: C.sizeof_cui_bridge_skeleton_presentation_v1, schema_version: C.CUI_BRIDGE_SKELETON_V1,
+	}
+	code := C.go_skeleton_get_presentation(n.app.ptr, n.handle, &r)
+	if code == C.CUI_BRIDGE_EMPTY {
+		return SkeletonPresentation{}, false, nil
+	}
+	if err := result(code); err != nil {
+		return SkeletonPresentation{}, false, err
+	}
+	p := SkeletonPresentation{
+		FrameSequence: uint64(r.frame_sequence), CoreTime: float64(r.core_time),
+		NextWakeSeconds: float64(r.next_wake_seconds), Phase: float32(r.phase), Opacity: float32(r.opacity),
+	}
+	if r.struct_size != C.sizeof_cui_bridge_skeleton_presentation_v1 ||
+		r.schema_version != C.CUI_BRIDGE_SKELETON_V1 || p.FrameSequence == 0 ||
+		!(p.CoreTime >= 0) || math.IsInf(p.CoreTime, 0) ||
+		(p.NextWakeSeconds != 0 && (!(p.NextWakeSeconds > p.CoreTime) || math.IsInf(p.NextWakeSeconds, 0))) ||
+		!(p.Phase >= 0 && p.Phase <= 1 && p.Opacity >= .5 && p.Opacity <= 1) {
+		return SkeletonPresentation{}, false, errors.New("invalid copied Skeleton presentation")
+	}
+	return p, true, nil
 }

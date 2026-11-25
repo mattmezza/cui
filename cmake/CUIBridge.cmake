@@ -70,6 +70,37 @@ add_test(NAME bridge_python_skeleton_example COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/skeleton_profile.py)
 option(CUI_BRIDGE_NATIVE_TESTS "Register opt-in Linux invisible native binding checks" OFF)
+option(CUI_GO_SKELETON_TESTS "Check responsive Skeleton authoring with Go on Linux" OFF)
+if(CUI_GO_SKELETON_TESTS)
+ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "Go Skeleton provider tests currently support Linux only")
+ endif()
+ find_program(CUI_GO_SKELETON_EXECUTABLE go REQUIRED)
+ set(_cui_go_env GOMAXPROCS=1 GOFLAGS=-p=1 GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local)
+ function(cui_go_skeleton_test suffix library unsupported)
+  add_test(NAME bridge_go_skeleton_${suffix} COMMAND ${CMAKE_COMMAND} -E env
+   ${_cui_go_env} CUI_BRIDGE_LIBRARY=${library} CUI_TEST_UNSUPPORTED_SKELETON=${unsupported}
+   ${CUI_GO_SKELETON_EXECUTABLE} ${ARGN})
+  set_tests_properties(bridge_go_skeleton_${suffix} PROPERTIES
+   WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/go" RUN_SERIAL TRUE TIMEOUT 600)
+ endfunction()
+ cui_go_skeleton_test(dynamic $<TARGET_FILE:cui_bridge> 0
+  test -tags cui_dynamic ./cui -count=1 -run "^TestResponsiveSkeleton")
+ cui_go_skeleton_test(static "" 0 test ./cui -count=1 -run "^TestResponsiveSkeleton")
+ cui_go_skeleton_test(example "" 0 run ./examples/skeleton_profile)
+ foreach(provider LEGACY PARTIAL)
+  set(CUI_GO_SKELETON_${provider}_LIBRARY "" CACHE FILEPATH "Optional Go Skeleton ${provider} provider")
+  if(CUI_GO_SKELETON_${provider}_LIBRARY)
+   string(TOLOWER ${provider} suffix)
+   cui_go_skeleton_test(${suffix} "${CUI_GO_SKELETON_${provider}_LIBRARY}" 1
+    test -tags cui_dynamic ./cui -count=1 -run "^TestResponsiveSkeletonOptionalProvider$")
+  endif()
+ endforeach()
+ if(CUI_BRIDGE_NATIVE_TESTS)
+  cui_go_skeleton_test(native $<TARGET_FILE:cui_bridge> 0
+   run -tags cui_dynamic ./examples/skeleton_profile --font ${CUI_TEST_FONT} --smoke)
+ endif()
+endif()
 if(CUI_BRIDGE_NATIVE_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR NOT TARGET cui_sdl3 OR NOT CUI_TEST_FONT)
   message(FATAL_ERROR "Binding native checks require Linux, SDL/text adapters and CUI_TEST_FONT")

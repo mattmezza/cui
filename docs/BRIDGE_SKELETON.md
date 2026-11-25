@@ -74,9 +74,9 @@ The API group is additive. Dynamic callers can probe
 `cui_bridge_skeleton_versions()` for V1 and confirm both record sizes before
 calling the new exports. Existing unconfigured nodes retain their dimensions,
 colors, and motion. Once configured, use the V1 configuration to change size.
-The [Python](PYTHON_SKELETON.md) and [JavaScript and TypeScript](NODE_SKELETON.md)
-responsive builders use this optional route. Go and Rust builders still use
-the legacy route. Built-in easing is available through this bridge. Direct C composition
+The [Python](PYTHON_SKELETON.md), [JavaScript and TypeScript](NODE_SKELETON.md),
+and [Go](GO_SKELETON.md) responsive builders use this optional route. The Rust
+builder exposes the legacy route. Built-in easing is available through this bridge. Direct C composition
 also supports custom easing and the full Core box descriptor.
 
 The [headless software fixture](../tests/unit/test_bridge_skeleton.c) creates

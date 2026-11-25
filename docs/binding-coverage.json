@@ -361,7 +361,6 @@
         {
           "header": "include/cui/cui_bridge.h",
           "languages": [
-            "go",
             "rust"
           ],
           "types": [
@@ -373,7 +372,7 @@
             "cui_bridge_skeleton_get_config_v1",
             "cui_bridge_skeleton_get_presentation_v1"
           ],
-          "note": "The optional C bridge and Python, JavaScript and TypeScript facades own responsive sizing, theme paint and motion. Go and Rust still expose the legacy route."
+          "note": "The optional C bridge and Python, JavaScript, TypeScript and Go facades own responsive sizing, theme paint and motion. Rust exposes the legacy route."
         },
         {
           "header": "include/cui/cui_skeleton_presentation.h",
@@ -1231,22 +1230,24 @@
     "go_rust_static_receipt": "docs/validation/time-field-static-root.json"
   },
   "skeleton_palette_and_presentation": {
-    "scope": "Additive C palette/fixed-painter and own-root responsive APIs; focused native/distribution proof. This does not upgrade legacy builder coverage.",
+    "scope": "Direct C palette and custom easing APIs, plus optional responsive presentation through the retained C bridge.",
     "public_headers": [
       "include/cui/cui_skeleton_palette.h",
       "include/cui/cui_skeleton_presentation.h"
     ],
     "languages": {
-      "python": "documented_omission",
-      "javascript": "documented_omission",
-      "typescript": "documented_omission",
-      "go": "documented_omission",
+      "python": "tested_subset",
+      "javascript": "tested_subset",
+      "typescript": "tested_subset",
+      "go": "tested_subset",
       "rust": "documented_omission"
     },
-    "legacy": "All five language builders retain their existing phase-based Skeleton route; palette, motion/easing and responsive presentation options are not exposed.",
+    "legacy": "Existing builders keep their fixed-size Skeleton route. Current Python, JavaScript, TypeScript and Go builders also provide responsive sizing, preset/secondary/custom paint and owned motion through the optional bridge. Direct palette lookup, custom easing and full box refinement remain C APIs.",
     "guides": [
       "docs/SKELETON_PALETTE.md",
-      "docs/SKELETON_RESPONSIVE.md"
+      "docs/SKELETON_RESPONSIVE.md",
+      "docs/BRIDGE_SKELETON.md",
+      "docs/GO_SKELETON.md"
     ],
     "receipts": [
       "docs/validation/skeleton-palette-root.json",

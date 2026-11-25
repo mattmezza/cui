@@ -44,9 +44,12 @@ The reducer supports:
   legacy wheel steps use 32 pixels. Relative factor is `exp(dy * .002)`, with
   the exponent bounded to ±20. A host normally negates DOM `deltaY` so upward
   wheel movement zooms in.
-- Core touch gestures: one contact pans, two contacts pan and pinch. Pinch
-  scale is relative to the preceding event. Pan runs before zoom at the new
-  contact center, preserving the data under the old center at the moved center.
+- Core touch gestures: one contact pans, two contacts pan and pinch. The
+  first single-contact pan includes movement from touch-down once the contact
+  crosses the 8-logical-pixel tap threshold. Later events report incremental
+  deltas. Pinch scale is relative to the preceding event. Pan runs before zoom
+  at the new contact center, preserving the data under the old center at the
+  moved center.
 - Disabled or modal-blocked surfaces reject navigation. Plain mouse drag and
   plain wheel do not change the viewport.
 
@@ -79,9 +82,10 @@ pointer capture loss, and prevent browser Ctrl-wheel zoom only for a claimed
 plot surface. The gallery's Plot-only wheel branch leaves ordinary page wheel
 scrolling unchanged, denies modal/disabled claims, and queues a precise
 Ctrl-scroll event for authoritative Core dispatch. Touch remains in the shared
-Core contact/gesture path; opted-in surfaces keep page-pan fallback from
-stealing their gestures. Native callers use the same reducer with adapter input;
-this change does not add a new native-device validation claim.
+Core contact/gesture path. Enabled Plot touch pan and pinch stay on the
+viewport. A single-finger drag over the disabled Plot scrolls the page and
+preserves the plot domain. Native callers use the same reducer with adapter
+input. Physical touch-device coverage remains open.
 
 `tests/unit/test_plot.c` checks exact two-axis anchors, pan/pinch composition,
 reset, span/domain limits, logarithmic reversed ranges, transactional overflow,
@@ -90,7 +94,9 @@ cancellation, plain-wheel preservation, and modal rejection.
 `tests/web/test_plot_interactions.py` uses real Chromium mouse input and CDP
 touch contacts. It verifies exact projected mouse/touch deltas and wheel anchors,
 two-contact pinch, capture loss, cancellation and next tap, disabled behavior,
-and changes to painted data for all seven gallery shapes. Configuration inputs
+slow movement through the tap threshold, and changes to painted data for all
+seven gallery shapes. `tests/web/test_touch_page_navigation.py` checks that
+mobile page scrolling remains available over the disabled Plot. Configuration inputs
 and read-only domain/pixel observations are allowed; component actions do not
 invoke exported model reducers. Chromium automation is not physical iOS,
 Android, pen, or native touch-device coverage.

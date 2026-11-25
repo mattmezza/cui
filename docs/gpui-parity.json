@@ -7739,7 +7739,19 @@
           "evidence": []
         },
         {
-          "name": "zoom/hover/selection",
+          "name": "ordered mouse and touch viewport navigation and mobile page ownership",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_core.c",
+            "tests/unit/test_plot.c",
+            "tests/web/test_plot_interactions.py",
+            "tests/web/test_touch_page_navigation.py",
+            "docs/PLOT_INTERACTIONS.md"
+          ],
+          "scope": "Shift-primary drag, Ctrl-wheel and two-contact zoom anchors, slow single-contact pan through the tap threshold, cancellation, and disabled viewport yielding to browser page scroll. Physical touch and general nested viewport boundary arbitration remain open."
+        },
+        {
+          "name": "complete zoom/hover/selection composition",
           "status": "not_started",
           "evidence": []
         },

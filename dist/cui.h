@@ -9601,6 +9601,10 @@ static bool cui_core_touch(cui_context *ui, cui_event *e, cui_id *target, cui_id
                 dx *= 0.5f;
                 dy *= 0.5f;
                 ui->contacts[partner].dragging = true;
+            } else if (start) {
+                /* The first pan includes movement inside the tap radius. */
+                dx = distance_x;
+                dy = distance_y;
             }
             ui->contacts[slot].dragging = true;
             cui_core_clear_capture(ui);

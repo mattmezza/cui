@@ -164,6 +164,20 @@ def run_cases(a):
         assert next(t for t in a.texts() if t.startswith('Domain:')) != before, 'Opt-in plot pinch failed to change domain'
     a.case('Plot', 'opt-in pan and two-contact pinch stay owned by viewport', plot)
 
+    def disabled_plot():
+        a.configure('disabled', True)
+        try:
+            align_canvas(a)
+            point = a.point(a.target('Projected sine wave', 20), .5, .6)
+            before_page = a.page.evaluate('scrollY')
+            before_domain = next(t for t in a.texts() if t.startswith('Domain:'))
+            swipe(a, point, -65)
+            assert a.page.evaluate('scrollY') > before_page+25, 'Disabled plot trapped page pan'
+            assert next(t for t in a.texts() if t.startswith('Domain:')) == before_domain
+        finally:
+            a.configure('disabled', False)
+    a.case('Plot', 'disabled viewport yields a one-contact drag to page scroll', disabled_plot)
+
     def modal():
         align_canvas(a)
         a.tap(a.target('Edit preferences', 1))

@@ -3142,6 +3142,38 @@ static void test_touch_viewport(void) {
     cui_end_frame(ui);
     cui_destroy(ui);
 }
+static void test_touch_viewport_pan_threshold(void) {
+    cui_context *ui = make();
+    begin(ui);
+    viewport(ui, true, false);
+    cui_end_frame(ui);
+
+    touch(ui, CUI_EVENT_POINTER_DOWN, 1, 20, 25);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 1, 23, 21);
+    begin(ui);
+    const cui_event *events = cui_frame_events(ui, NULL);
+    assert(events[1].type == CUI_EVENT_POINTER_MOVE);
+    viewport(ui, true, false);
+    cui_end_frame(ui);
+
+    touch(ui, CUI_EVENT_POINTER_MOVE, 1, 26, 17);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 1, 26, 14);
+    touch(ui, CUI_EVENT_POINTER_UP, 1, 26, 14);
+    begin(ui);
+    events = cui_frame_events(ui, NULL);
+    assert(events[0].type == CUI_EVENT_GESTURE && cui_event_target(ui, 0) == 1);
+    assert(events[0].scroll_phase == CUI_SCROLL_PHASE_STARTED && events[0].dx == 6 &&
+           events[0].dy == -8 && events[0].gesture_scale == 1);
+    assert(events[1].type == CUI_EVENT_GESTURE &&
+           events[1].scroll_phase == CUI_SCROLL_PHASE_MOVED && events[1].dx == 0 &&
+           events[1].dy == -3);
+    assert(events[2].type == CUI_EVENT_GESTURE &&
+           events[2].scroll_phase == CUI_SCROLL_PHASE_ENDED && events[2].dx == 0 &&
+           events[2].dy == 0);
+    viewport(ui, true, false);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
 static void test_touch_extreme_coordinates(void) {
     cui_context *ui = make();
     begin(ui);
@@ -3641,6 +3673,7 @@ int main(void) {
     test_touch_lifecycle();
     test_touch_scroll_chain();
     test_touch_viewport();
+    test_touch_viewport_pan_threshold();
     test_font_metrics();
     test_family_text_pipeline();
     test_styled_text_pipeline();

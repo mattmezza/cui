@@ -1,6 +1,6 @@
 # CUI beta roadmap
 
-Updated: **2026-11-25** · Status: **working alpha; beta scope unfinished**.
+Updated: **2026-11-26** · Status: **working alpha; beta scope unfinished**.
 
 **Goal:** complete and verify all **78 frozen component families**, plus the
 requested native, language-binding, documentation and website capabilities.
@@ -13,7 +13,7 @@ use the checklists below to track acceptance and delivery.
 | --- | --- |
 | Public release | **v0.1.0-alpha.5**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.5) |
 | Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
-| Public website | Interactive WASM gallery and docs at alpha.5. Revision `57aeb20b` passed [Pages verification](https://github.com/mattmezza/cui/actions/runs/45688971148). |
+| Public website | Interactive WASM gallery and docs at alpha.5. The live site reports source revision `3106a5bb`, which passed [Pages verification](https://github.com/mattmezza/cui/actions/runs/45691841974). |
 | Working source | Alpha.5 released from `57aeb20b`. Hosted CI, native bindings, browser and installed-artifact checks pass. Full parity remains open. |
 | Packages | Alpha.5 GitHub assets and verified Go module. PyPI, npm and crates.io publication remain open. |
 
@@ -117,7 +117,7 @@ Check reported regressions against the current gallery as each slice lands.
 | 6 | Button / Checkbox / Radio / Switch / Slider | Check the shared size scale and hover, pressed, focus, disabled and loading states where applicable. Extend typed activation and value coverage in the bindings while preserving existing C callback timing. |
 | 6 | Input / Textarea | Verify word movement, line movement, caret/selection visibility and IME placement across wrapped or scrolled content. Keep new Editor features lower priority. |
 | 7 | DatePicker / TimeField | Exercise direct year selection, localized formatting and range bounds with keyboard and touch. The ordered TimeField gallery has Chromium evidence for composition, preview-edge navigation and named accessible values. Complete physical native and accessibility action validation. [Focus routing](docs/design/TIME_FIELD_FOCUS_ROUTING.md) |
-| 7 | Chart / Plot | Chromium verifies continuous Chart strokes for all three curves at desktop/mobile widths and 1×/2× display scales. Verify Plot pan/pinch/zoom ownership when the viewport cannot use the gesture. |
+| 7 | Chart / Plot | Chromium verifies continuous Chart strokes for all three curves at desktop/mobile widths and 1×/2× display scales. Chromium also verifies Plot mouse/touch zoom, slow touch pan and page scroll over the disabled viewport. Physical touch and boundary handoff for enabled plots with limited axes remain open. |
 
 ### Component gaps to close
 

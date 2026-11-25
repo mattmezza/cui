@@ -121,6 +121,24 @@ def run(a):
         near(after[0][1]-after[0][0], 100)
     a.case('Plot', 'actual one-contact pan moves both data axes', touch_pan)
 
+    def slow_touch_pan():
+        target = setup(a)
+        point = a.point(target, .5, .6)
+        before, page = domains(a), a.page.evaluate('scrollY')
+        a.dispatch('touchStart', [point])
+        a.dispatch('touchMove', [{**point, 'x': point['x']+2, 'y': point['y']-3}])
+        assert domains(a) == before  # Still inside the tap radius.
+        for step in range(2, 7):
+            a.dispatch('touchMove', [{**point, 'x': point['x']+2*step,
+                                     'y': point['y']-3*step}])
+        a.dispatch('touchEnd', [])
+        after = domains(a)
+        near(after[0][0]-before[0][0], -12*100/(target['f'][3]-40))
+        near(after[1][0]-before[1][0], -18*2.4/130)
+        near(a.page.evaluate('scrollY'), page)
+    a.case('Plot', 'slow single-contact pan keeps the full displacement after the tap radius',
+           slow_touch_pan)
+
     def pinch():
         target = setup(a)
         center = a.point(target, .5, .5)

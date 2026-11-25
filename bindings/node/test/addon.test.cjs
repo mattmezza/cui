@@ -49,6 +49,15 @@ async function main() {
   assert.throws(()=>native.setMatrix(app,table,['Name'],[['extra','cell']]),/match headers/);
   assert.throws(()=>native.setMatrix(app,table,Array(17).fill('header'),[]),/array length/);
   assert.equal(native.getMatrixCell(app,table,0,0),'Alex');
+  if (native.supportsKeyedDataTable()) {
+    assert.throws(() => native.setMatrixKeyed(app, table, ['Name'], [['Empty key']], []),
+      /one row key/);
+    assert.throws(() => native.setMatrixKeyed(app, table, ['Name'], [['Bad key']], [2 ** 32]),
+      /unsigned integer/);
+    assert.throws(() => native.setMatrixKeyed(app, table, ['Name'], [['A'], ['B']], [1, 1]),
+      /invalid argument/);
+    assert.equal(native.getMatrixCell(app, table, 0, 0), 'Alex');
+  }
   assert.throws(()=>native.setSelectionMode(app,table,0xffffffff),/invalid argument/);
   native.removeNode(app,chart);
   assert.throws(()=>native.getChart(app,chart,0),/stale handle/);

@@ -1346,18 +1346,55 @@ static napi_value get_plot(napi_env env, napi_callback_info info) {
         return NULL;
     return result;
 }
+static int optional_bridge_symbol(void *target, size_t size, const char *name);
+typedef cui_bridge_status (*data_table_set_keyed_fn)(cui_bridge_app *, cui_bridge_node,
+                                                     const char *const *, uint32_t,
+                                                     const char *const *, const uint32_t *,
+                                                     uint32_t);
+
+static data_table_set_keyed_fn data_table_set_keyed_symbol(void) {
+    data_table_set_keyed_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_data_table_set_keyed");
+    return set;
+}
+
+static napi_value supports_keyed_data_table(napi_env env, napi_callback_info info) {
+    (void)info;
+    napi_value result;
+    return napi_get_boolean(env, data_table_set_keyed_symbol() != NULL, &result) == napi_ok ? result
+                                                                                            : NULL;
+}
+
 static napi_value set_matrix(napi_env env, napi_callback_info info) {
-    napi_value v[4], entry, row;
+    napi_value v[5], entry, row;
+    size_t argc = sizeof v / sizeof v[0];
+    void *keyed;
     js_app *app;
     js_node *node;
-    uint32_t columns, rows, len;
+    uint32_t columns, rows, len, keys[32];
     char *headers[16] = {0}, *cells[512] = {0};
     cui_bridge_status code = CUI_BRIDGE_OK;
-    if (!args(env, info, 4, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+    if (napi_get_cb_info(env, info, &argc, v, NULL, &keyed) != napi_ok || argc < (keyed ? 5u : 4u))
+        return fail(env, "missing argument");
+    if (!app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
         !array_count(env, v[2], 16, &columns) || !array_count(env, v[3], 32, &rows))
         return NULL;
     if (!columns)
         return fail(env, "matrix requires headers");
+    data_table_set_keyed_fn set_keyed = NULL;
+    if (keyed) {
+        set_keyed = data_table_set_keyed_symbol();
+        if (!set_keyed)
+            return fail(env, "keyed DataTable replacement is unavailable in this bridge");
+        if (!array_count(env, v[4], 32, &len))
+            return NULL;
+        if (len != rows)
+            return fail(env, "expected one row key per matrix row");
+        for (uint32_t r = 0; r < rows; r++)
+            if (napi_get_element(env, v[4], r, &entry) != napi_ok ||
+                !uint_arg(env, entry, &keys[r]))
+                return NULL;
+    }
     for (uint32_t i = 0; i < columns; i++) {
         if (napi_get_element(env, v[2], i, &entry) != napi_ok ||
             !string_arg(env, entry, &headers[i]))
@@ -1374,8 +1411,11 @@ static napi_value set_matrix(napi_env env, napi_callback_info info) {
                 !string_arg(env, entry, &cells[r * columns + col]))
                 goto cleanup;
     }
-    code = cui_bridge_data_table_set(app->bridge, node->node, (const char *const *)headers, columns,
-                                     (const char *const *)cells, rows);
+    code = set_keyed
+               ? set_keyed(app->bridge, node->node, (const char *const *)headers, columns,
+                           (const char *const *)cells, keys, rows)
+               : cui_bridge_data_table_set(app->bridge, node->node, (const char *const *)headers,
+                                           columns, (const char *const *)cells, rows);
 cleanup:
     for (uint32_t i = 0; i < 16; i++)
         free(headers[i]);
@@ -2174,6 +2214,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setPlot", set_plot, 0);
     EXPORT("getPlot", get_plot, 0);
     EXPORT("setMatrix", set_matrix, 0);
+    EXPORT("setMatrixKeyed", set_matrix, 1);
+    EXPORT("supportsKeyedDataTable", supports_keyed_data_table, 0);
     EXPORT("getMatrixCell", get_matrix_cell, 0);
     EXPORT("getMatrixState", matrix_state, 0);
     EXPORT("matrixCellBounds", matrix_bounds, 0);

@@ -41,6 +41,19 @@ function validateDate(year,month,day) {
   const leap=year%4===0 && (year%100!==0 || year%400===0);
   if(day>[31,leap?29:28,31,30,31,30,31,31,30,31,30,31][month-1])throw new TypeError('invalid date');
 }
+function requiresKeyedTable(node) {
+  return node.matrixValue?.[2] !== undefined || node.childrenValue.some(requiresKeyedTable);
+}
+function applyTableData(node, [headers, rows, rowKeys]) {
+  const app = node.owner;
+  if (rowKeys === undefined) {
+    native.setMatrix(app.handle, node[NODE], headers, rows);
+    return;
+  }
+  if (!app.supports_keyed_data_table())
+    throw new Error('keyed DataTable replacement is unavailable in this bridge');
+  native.setMatrixKeyed(app.handle, node[NODE], headers, rows, rowKeys);
+}
 class Node {
   constructor(kind, text) {
     this.kind = kind; this.textValue = text; this.parent = null; this.owner = null;
@@ -257,7 +270,36 @@ class Node {
   current_datum(index) {if(this.kind!==69 || !Number.isInteger(index)||index<0||index>=64)throw new TypeError('invalid datum index');if(this.owner)return native.getChart(this.owner.handle,this[NODE],index);if(!this.chartDataValue[index])throw new RangeError('missing datum');return [...this.chartDataValue[index]];}
   plot_points(points) {if(this.kind!==72 || !Array.isArray(points)||points.length>256||points.some(p=>!Array.isArray(p)||p.length!==2||p.some(v=>!Number.isFinite(v)||Math.abs(v)>16384)))throw new TypeError('invalid plot points');const copied=points.map(p=>[...p]);if(this.owner)native.setPlot(this.owner.handle,this[NODE],copied);this.plotPointsValue=copied;return this;}
   current_point(index) {if(this.kind!==72 || !Number.isInteger(index)||index<0||index>=256)throw new TypeError('invalid point index');if(this.owner)return native.getPlot(this.owner.handle,this[NODE],index);if(!this.plotPointsValue[index])throw new RangeError('missing point');return [...this.plotPointsValue[index]];}
-  table_data(headers,rows) {const text=v=>typeof v==='string'&&!v.includes('\0')&&Buffer.byteLength(v)<=128;if(this.kind!==71||!Array.isArray(headers)||headers.length<1||headers.length>16||headers.some(v=>!text(v))||!Array.isArray(rows)||rows.length>32||rows.some(r=>!Array.isArray(r)||r.length!==headers.length||r.some(v=>!text(v))))throw new TypeError('invalid table matrix');const copied=[headers.slice(),rows.map(r=>r.slice())];if(this.owner)native.setMatrix(this.owner.handle,this[NODE],...copied);this.matrixValue=copied;return this;}
+  table_data(headers, rows, rowKeys) {
+    if (this.kind !== 71 || !Array.isArray(headers) || headers.length < 1 ||
+        headers.length > 16 || !Array.isArray(rows) || rows.length > 32)
+      throw new TypeError('invalid table matrix');
+    const text = value => typeof value === 'string' && !value.includes('\0') &&
+      Buffer.byteLength(value) <= 128;
+    const copiedHeaders = Array.from({length: headers.length}, (_, index) => headers[index]);
+    if (!copiedHeaders.every(text)) throw new TypeError('invalid table matrix');
+    const copiedRows = Array.from({length: rows.length}, (_, index) => {
+      const row = rows[index];
+      if (!Array.isArray(row) || row.length !== copiedHeaders.length)
+        throw new TypeError('invalid table matrix');
+      const cells = Array.from({length: copiedHeaders.length}, (_, column) => row[column]);
+      if (!cells.every(text)) throw new TypeError('invalid table matrix');
+      return cells;
+    });
+    let keys;
+    if (rowKeys !== undefined) {
+      if (!Array.isArray(rowKeys) || rowKeys.length !== copiedRows.length)
+        throw new TypeError('rowKeys must contain one distinct nonzero uint32 per row');
+      keys = Array.from({length: copiedRows.length}, (_, index) => rowKeys[index]);
+      if (keys.some(key => !Number.isInteger(key) || key < 1 || key > 0xffffffff) ||
+          new Set(keys).size !== keys.length)
+        throw new TypeError('rowKeys must contain one distinct nonzero uint32 per row');
+    }
+    const copied = [copiedHeaders, copiedRows, keys];
+    if (this.owner) applyTableData(this, copied);
+    this.matrixValue = copied;
+    return this;
+  }
   current_cell(row,column) {if(this.kind!==71||![row,column].every(v=>Number.isInteger(v)&&v>=0&&v<=0xffffffff))throw new TypeError('invalid cell');if(this.owner)return native.getMatrixCell(this.owner.handle,this[NODE],row,column);if(!this.matrixValue||!this.matrixValue[1][row]||column>=this.matrixValue[0].length)throw new RangeError('missing cell');return this.matrixValue[1][row][column];}
   selection_mode(value) {const modes={row:0,column:1,cell:2};if(this.kind!==71||!Object.hasOwn(modes,value))throw new TypeError('invalid table selection mode');if(this.owner)native.setSelectionMode(this.owner.handle,this[NODE],modes[value]);this.selectionModeValue=modes[value];return this;}
   table_state() {if(this.kind!==71||!this.owner)throw new TypeError('mounted DataTable required');return native.getMatrixState(this.owner.handle,this[NODE]);}
@@ -384,6 +426,8 @@ class App {
     this._alive();
     if (this.root) throw new Error('app already has a root');
     if (!(root instanceof Node) || root.parent || root.owner || ![1,2,76].includes(root.kind)) throw new TypeError('root must be an unattached row, column or root_view');
+    if (!this.supports_keyed_data_table() && requiresKeyedTable(root))
+      throw new Error('keyed DataTable replacement is unavailable in this bridge');
     skeletons.preflight(this, root);
     sliderModels.preflight(this, root);
     localizedTimes.preflight(this, root);
@@ -418,7 +462,7 @@ class App {
       if(node.kind===72)native.setPlot(this.handle,node[NODE],node.plotPointsValue);
       if(node.kind===71)native.setSelectionMode(this.handle,node[NODE],node.selectionModeValue);
       if(node.kind===75 && node.openSet)native.setOpen(this.handle,node[NODE],node.openValue?1:0);
-      if(node.kind===71 && node.matrixValue)native.setMatrix(this.handle,node[NODE],...node.matrixValue);
+      if (node.kind === 71 && node.matrixValue) applyTableData(node, node.matrixValue);
       if(node.kind===67)native.setTextFormat(this.handle,node[NODE],node.textFormatValue);
       if(node.questionFlags)native.questionConfig(this.handle,node[NODE],...node.questionFlags.map(v=>v?1:0));
       if(node.panelValue!==null)native.setValue(this.handle,node[NODE],node.panelValue);
@@ -555,6 +599,10 @@ class App {
   icon_catalog_entry(index) { return icons.catalogEntry(this, index); }
   query_icon(name) { return icons.query(this, name); }
   copy_icon_asset(name) { return icons.copyAsset(this, name); }
+  supports_keyed_data_table() {
+    this._alive();
+    return typeof native.supportsKeyedDataTable === 'function' && native.supportsKeyedDataTable();
+  }
   supports_skeleton_presentation() { return skeletons.supports(this); }
   supports_localized_time_field(){return localizedTimes.supports(this);}
   enable_localized_time_fields(capacity=4096){return localizedTimes.enable(this,capacity);}

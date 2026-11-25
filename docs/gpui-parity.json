@@ -7343,6 +7343,15 @@
           ]
         },
         {
+          "name": "JavaScript and TypeScript retained DataTable keyed updates",
+          "status": "tested",
+          "evidence": [
+            "bindings/node/test/keyed-data-table.test.cjs",
+            "bindings/node/examples/data-table-live.cjs",
+            "bindings/typescript/examples/data_table_live.ts"
+          ]
+        },
+        {
           "name": "caller-owned page requests and viewport retention",
           "status": "tested",
           "evidence": [

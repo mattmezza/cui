@@ -360,3 +360,26 @@ if(CUI_NODE_TSC_EXECUTABLE)
   ${CMAKE_CURRENT_SOURCE_DIR}/test/run-icon-badge-types.py --tsc "${CUI_NODE_TSC_EXECUTABLE}"
   --node "${NODE_EXECUTABLE}" --output ${CMAKE_CURRENT_BINARY_DIR}/icon-badge-types)
 endif()
+
+add_test(NAME node_keyed_data_table COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} --test
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/keyed-data-table.test.cjs)
+if(TARGET cui_node_icon_alpha4)
+ add_test(NAME node_keyed_data_table_alpha4 COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_icon_alpha4> CUI_KEYED_DATA_TABLE_LEGACY=1
+  ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/keyed-data-table.test.cjs)
+endif()
+add_test(NAME node_keyed_data_table_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/data-table-live.cjs)
+if(CUI_BRIDGE_NATIVE_TESTS)
+ add_test(NAME node_keyed_data_table_native COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> SDL_RENDER_DRIVER=software ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/data-table-live.cjs "${CUI_TEST_FONT}" --smoke)
+endif()
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_keyed_data_table_types COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> "${Python3_EXECUTABLE}"
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-keyed-data-table-types.py --tsc "${CUI_NODE_TSC_EXECUTABLE}"
+  --node "${NODE_EXECUTABLE}" --output ${CMAKE_CURRENT_BINARY_DIR}/keyed-data-table-types)
+endif()

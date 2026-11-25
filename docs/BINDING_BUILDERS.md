@@ -179,6 +179,54 @@ The Icon and Badge inbox demonstrates shared SVG, nested controls and
 layout that stays in place as a callback clears a count.
 [JavaScript and TypeScript inbox](NODE_ICON_BADGE.md).
 
+## Keep a JavaScript or TypeScript DataTable's scroll position during updates
+
+Pass the row keys as the third argument to `table_data`.
+
+```javascript
+const {data_table} = require('./bindings/node/index.cjs');
+
+const headers = ['Subject', 'Sender'];
+const rows = [['Release notes', 'Build team'], ['Design review', 'Morgan']];
+const inbox = data_table('inbox').table_data(headers, rows, [203, 204]);
+
+// Apply on the UI thread after mounting, for example from an on_click callback.
+inbox.table_data(headers, [['New message', 'Workspace'], ...rows], [301, 203, 204]);
+```
+
+Attach the array to both the initial data and later replacements. The builder
+copies headers, cells, and keys. Use one distinct integer from 1 through
+4,294,967,295 per row, with the same key wherever that logical row appears.
+The limits are 32 rows, 16 columns, and 128 UTF-8 bytes per string.
+`table_state().row` and change events report the selected key.
+Look up cells and layout bounds by zero-based matrix indices.
+
+`app.supports_keyed_data_table()` checks the addon and shared bridge. Older
+providers still support `table_data(headers, rows)` with one-based positional
+keys and reset behavior. An explicit keyed request on an older provider
+throws before changing the current table or attaching a new tree.
+
+After [building the addon](#javascript-and-typescript-build-and-launch), run
+the [JavaScript inbox](../bindings/node/examples/data-table-live.cjs) from the
+repository root. It opens no window by default and verifies that the visible
+row stays in place after the **Load latest** button inserts two messages.
+Pass a font path as the first argument for an interactive SDL window.
+
+```sh
+export CUI_NODE_ADDON="$PWD/build-node/cui.node"
+node bindings/node/examples/data-table-live.cjs
+```
+
+The [TypeScript inbox](../bindings/typescript/examples/data_table_live.ts)
+uses the same API. With an existing TypeScript compiler, this command checks
+the declarations and runs the compiled example with the addon above.
+
+```sh
+python bindings/node/test/run-keyed-data-table-types.py \
+  --tsc "$(command -v tsc)" --node "$(command -v node)" \
+  --output build-node/keyed-data-table-types
+```
+
 ## Styling, state and callbacks
 
 Buttons support primary, secondary, outline and ghost variants, disabled state,

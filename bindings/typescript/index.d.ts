@@ -34,7 +34,7 @@ export class App {
   constructor(options?: AppOptions);
   set_window_visible(visible: boolean): this;
   window_visible(): boolean;
-  mount(root: Row | Column): this;
+  mount(root: Row | Column | RootView): this;
   pointer(phase: PointerPhase, x: number, y: number): this;
   key(phase: KeyPhase, key: Key, modifiers?: number, repeat?: boolean): this;
   text_input(text: string): this;
@@ -186,7 +186,19 @@ export function editor(key?: string,text?: string): Editor;
 export interface Chart extends Label {chart_data(data: Array<[string,number]>): this; chart_kind(kind: 'line'|'area'|'bar'|'pie'): this; current_datum(index: number): [string,number]; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Table extends Label, Composite {visual_size(width: number,height: number): this}
 export interface DataTableState {row: number; column: number; sortColumn: number; sortDirection: number}
-export interface DataTable extends Label {table_data(headers: string[],rows: string[][]): this; current_cell(row: number,column: number): string; table_state(): DataTableState; table_cell_bounds(row: number,column: number): Bounds; table_header_bounds(column: number): Bounds; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface DataTable extends Label {
+  /** Supply stable nonzero uint32 row keys to preserve the viewport on replacement. */
+  table_data(headers: readonly string[], rows: readonly (readonly string[])[], rowKeys?: readonly number[]): this;
+  selection_mode(mode: 'row' | 'column' | 'cell'): this;
+  current_cell(row: number, column: number): string;
+  table_state(): DataTableState;
+  table_cell_bounds(row: number, column: number): Bounds;
+  table_header_bounds(column: number): Bounds;
+  visual_size(width: number, height: number): this;
+  disabled(value?: boolean): this;
+  on_change(callback: (event: ChangeEvent) => void): this;
+}
+export interface App {supports_keyed_data_table(): boolean}
 export interface Plot extends Label {plot_points(points: Array<[number,number]>): this; current_point(index: number): [number,number]; visual_size(width: number,height: number): this}
 export function chart(key?: string,text?: string): Chart;
 export function table(key?: string,text?: string): Table;

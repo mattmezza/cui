@@ -38,6 +38,11 @@ window gains focus, remapping starts after the adapter receives a key event
 reporting Shift. The adapter preserves simultaneous axes, fractional ticks,
 and the signs supplied by SDL, including natural scrolling.
 
+The Shift flag is appended after the SDL V2 guards. Compile-only Linux x86_64
+and WASM32 probes preserve the 37 original field offsets, guard offsets,
+alignment and constructor allocation size of the
+[measured guard layout](validation/sdl-v2-guard-layout.json).
+
 `tests/integration/test_sdl_tabs_wheel.c` passes window-addressed SDL events
 through the wait/poll path on private X11. It verifies that Shift-wheel moves
 the first tab by 40 units and consumes the delta, that release in the same

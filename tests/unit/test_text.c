@@ -729,7 +729,7 @@ static void geometry(cui_font *font) {
            CUI_TEXT_LAYOUT_INVALID);
     assert(reverse_count == 991 && !memcmp(selected, reversed, sizeof selected));
     cui_text_layout_destroy(layout);
-    const char *samples[] = {"á", "ffi", "a‍️͏b", "‎"};
+    const char *samples[] = {"á", "ffi", "a‍️͏b", "\xe2\x80\x8e"};
     for (size_t s = 0; s < sizeof samples / sizeof samples[0]; ++s) {
         assert(cui_font_layout_line(font, string(samples[s]), 24, (cui_text_style){0}, CUI_BIDI_LTR,
                                     0, SIZE_MAX, NULL, &layout) == CUI_TEXT_LAYOUT_OK);
@@ -862,8 +862,8 @@ int main(void) {
     reference(font, face, hb, string("abc שָׁלוֹם 123 السَّلَامُ"), CUI_BIDI_AUTO_LTR, 0, SIZE_MAX);
     reference(font, face, hb, string("ל‍ا‌مَ️͏"), CUI_BIDI_RTL, 0, SIZE_MAX);
     reference(font, face, hb, string("אבג العربية"), CUI_BIDI_RTL, 0, SIZE_MAX);
-    reference(font, face, hb, string("abc ⁧العربية 12 אבג⁩ (xy)"), CUI_BIDI_AUTO_LTR,
-              0, SIZE_MAX);
+    reference(font, face, hb, string("abc \xe2\x81\xa7العربية 12 אבג\xe2\x81\xa9 (xy)"),
+              CUI_BIDI_AUTO_LTR, 0, SIZE_MAX);
     reference(font, face, hb, string("אבג ab (123) العربية"), CUI_BIDI_AUTO_LTR, 4, 8);
     reference(font, face, hb, string("אבג ab (123) العربية"), CUI_BIDI_AUTO_LTR, 12, SIZE_MAX);
     reference(font, face, hb, string("ffi á office"), CUI_BIDI_LTR, 0, SIZE_MAX);

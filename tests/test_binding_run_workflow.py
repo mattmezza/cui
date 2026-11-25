@@ -95,12 +95,20 @@ class WorkflowTests(unittest.TestCase):
 
     def test_filtered_bridge_jobs_build_new_test_executables(self):
         source = (ROOT / '.github/workflows/ci.yml').read_text()
-        for job in ('node-builders', 'go-rust-builders'):
+        required_targets = {
+            'node-builders': ('all', 'test_bridge_stepper_visual', 'test_bridge_shadows',
+                              'test_bridge_part_shadows', 'test_bridge_avatar_style'),
+            'go-rust-builders': ('test_bridge_window_visibility', 'test_bridge_stepper_visual',
+                                 'test_bridge_shadows', 'test_bridge_skeleton', 'test_bridge_badge',
+                                 'test_bridge_icon_presentation', 'test_bridge_data_table_capacity',
+                                 'test_bridge_data_table_capacity_allocations'),
+        }
+        for job, targets in required_targets.items():
             section = source.split('  ' + job + ':', 1)[1]
             section = re.split(r'\n  [a-zA-Z][\w-]*:', section, maxsplit=1)[0]
             build = re.search(r'cmake --build [^\n]+--target ([^\n]+)', section)
             self.assertIsNotNone(build)
-            for target in ('test_bridge_window_visibility', 'test_bridge_stepper_visual', 'test_bridge_shadows'):
+            for target in targets:
                 with self.subTest(job=job, target=target):
                     self.assertIn(target, build.group(1).split())
 
@@ -111,6 +119,8 @@ class WorkflowTests(unittest.TestCase):
         command = next(line for line in section.splitlines() if 'bindings/node/test/shadows.types.ts' in line)
         self.assertIn('typescript@5.8.3', command)
         self.assertIn('--noEmit --strict', command)
+        self.assertIn('bindings/node/test/keyed-data-table.types.ts', command)
+        self.assertIn('bindings/node/test/data-table-paging.types.ts', command)
 
     def test_every_literal_run_block_is_valid_bash(self):
         # This workflow deliberately uses only multiline literal shell blocks.

@@ -51,13 +51,13 @@ struct cui_sdl3 {
     size_t glyph_bytes;
     uint64_t clock, hits, misses, frame, frame_ticks;
     bool frame_clock_started, event_pending, callback_mode;
-    bool wheel_shift;
     bool motion_pending;
     cui_event motion;
     SDL_Event pending_event;
     char *clipboard;
     SDL_Cursor *cursors[CUI_CURSOR_HELP + 1];
     bool v2_busy, v2_faulted;
+    bool wheel_shift;
 };
 static bool sdl_v2_blocked(const cui_sdl3 *s) {
     return s && (s->v2_busy || s->v2_faulted);

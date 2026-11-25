@@ -62,7 +62,8 @@ jobs:
           path: build/web
   browser-checks:
     needs: build
-    runs-on: ubuntu-latest
+    # Keep the runner compatible with the pinned Playwright and Chromium.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:

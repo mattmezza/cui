@@ -61,10 +61,16 @@ def main():
                    XDG_CACHE_HOME=str(clean / "runtime-cache"))
         (consumer / "go.mod").write_text("module cui-package-smoke\n\ngo 1.23\n\nrequire github.com/mattmezza/cui/bindings/go v0.1.0-alpha.5\n")
         shutil.copy2(ROOT / "tests/packaging/go_smoke.go", consumer / "main.go")
+        (consumer / "appointments").mkdir()
+        shutil.copy2(ROOT / "bindings/go/examples/time_field_localized/main.go",
+                     consumer / "appointments/main.go")
         subprocess.run(["go", "mod", "download", "all"], cwd=consumer, env=env, check=True)
         binary = clean / "go-smoke"
         tags = "cui_dynamic" if args.go_dynamic else "cui_native" if args.native else ""
         subprocess.run(["go", "build", "-tags", tags, "-o", str(binary), "."], cwd=consumer, env=env, check=True)
+        appointments = clean / "go-appointments"
+        subprocess.run(["go", "build", "-tags", tags, "-o", str(appointments), "./appointments"],
+                       cwd=consumer, env=env, check=True)
         # Static executables carry CUI; dynamic artifacts carry an embedded bridge.
         (clean / "go-modules").rename(clean / "unused-go-modules")
         blocked = clean / "blocked-toolchain"
@@ -75,6 +81,7 @@ def main():
             executable.chmod(0o755)
         runtime_env = dict(env, PATH=str(blocked) + os.pathsep + env["PATH"])
         subprocess.run([str(binary)], cwd=clean, env=runtime_env, check=True)
+        subprocess.run([str(appointments)], cwd=clean, env=runtime_env, check=True)
         # Repeat independent consumers; dynamic cache creation must serialize writes.
         if args.go_dynamic: shutil.rmtree(clean / "runtime-cache")
         go_runtime = runtime_env
@@ -101,12 +108,18 @@ def main():
         (rust / "Cargo.toml").write_text('[package]\nname="cui-package-smoke"\nversion="0.0.0"\nedition="2021"\n'
             + '[dependencies]\ncui-builders = {path="' + str(unpacked) + '"' + features + '}\n')
         shutil.copy2(ROOT / "tests/packaging/rust_smoke.rs", rust / "src/main.rs")
+        (rust / "src/bin").mkdir()
+        shutil.copy2(ROOT / "bindings/rust/examples/time_field_localized.rs",
+                     rust / "src/bin/appointments.rs")
         env["CARGO_TARGET_DIR"] = str(clean / "cargo-target")
         subprocess.run(["cargo", "build", "--offline"], cwd=rust, env=env, check=True)
         rust_binary = clean / "rust-smoke"
         shutil.copy2(clean / "cargo-target/debug/cui-package-smoke", rust_binary)
+        rust_appointments = clean / "rust-appointments"
+        shutil.copy2(clean / "cargo-target/debug/appointments", rust_appointments)
         (clean / "cargo-target").rename(clean / "unused-cargo-target")
         (clean / "crates").rename(clean / "unused-crates")
         subprocess.run([str(rust_binary)], cwd=clean, env=runtime_env, check=True)
+        subprocess.run([str(rust_appointments)], cwd=clean, env=runtime_env, check=True)
 if __name__ == "__main__":
     main()

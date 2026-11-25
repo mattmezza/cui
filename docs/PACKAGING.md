@@ -215,6 +215,12 @@ exits; wrap their invocation in `xvfb-run -a env -u WAYLAND_DISPLAY`.
 The installed artifact tests use clean temporary consumers without checkout or
 library-path overrides, exercise real frames/callbacks, and block compiler tools
 at runtime. Python native validation also checks captured Button pixels.
+The package checks run the authored localized TimeField examples headlessly,
+including applied edits and copied observations.
+[Python example](PYTHON_TIME_FIELD_LOCALIZED.md) ·
+[JavaScript and TypeScript examples](NODE_TIME_FIELD_LOCALIZED.md#use-the-packaged-examples) ·
+[Go and Rust examples](GO_RUST_TIME_FIELD_LOCALIZED.md#use-the-packaged-examples).
+
 The text smoke includes `✓`; fonts must cover submitted text. This host validates
 `/usr/share/fonts/Adwaita/AdwaitaMono-Regular.ttf`; plain NotoSans lacks that glyph
 here. Missing glyph errors remain visible. Full workspace examples and supported

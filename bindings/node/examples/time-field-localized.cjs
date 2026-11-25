@@ -26,6 +26,22 @@ module.exports={appointments};
 if(require.main===module){
   const native=process.argv.includes('--native');
   const ui=appointments(native?{backend:'sdl',fontPath:process.env.CUI_TEST_FONT,initiallyHidden:process.argv.includes('--hidden')}:{backend:'headless'});
-  try{if(native)ui.app.run();else{ui.app.step();console.log('Authored English/Arabic localized TimeFields',ui.english.current_time(),ui.arabic.current_time());}}
-  finally{ui.app.dispose();}
+  try {
+    if (native) {
+      ui.app.run();
+    } else {
+      ui.app.step_only();
+      ui.app.step_only();
+      const box = ui.english.bounds();
+      const x = box.x + box.width / 5;
+      const y = box.y + box.height / 2;
+      ui.app.pointer('down', x, y).pointer('up', x, y).text_input('10:15:30').step();
+      const observed = ui.applied[0];
+      if (ui.applied.length !== 1 || observed.value.join(':') !== '10:15:30')
+        throw new Error('Expected one applied TimeField change');
+      console.log('Applied English:', observed.value, 'Arabic:', ui.arabic.current_time());
+    }
+  } finally {
+    ui.app.dispose();
+  }
 }

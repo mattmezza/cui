@@ -1,35 +1,37 @@
-# Unreleased Python localized TimeField
+# Python localized TimeField
 
-Focused worker validation and sixteen configured root CTest entries pass,
-including fifteen localized methods against actual current, old and partial
-providers, the headless authored example and existing Python regressions. Canonical resource,
-usage and installed-skill gates remain pending; no package or native-interactive
-validation is claimed.
-The C bridge has separate focused proof; see [bridge contract and limits](BRIDGE_TIME_FIELD_LOCALIZED.md).
-Existing scalar `time_field(...).time_value(...).on_change(...)` remains unchanged
-and usable with older libraries. JS/TS, Go and Rust localized authoring remain
-unimplemented; direct foreign C state/style and pure parser/formatter records are
-not exposed by this Python subset.
+The alpha.5 wheel supports localized TimeField authoring. The packaged example
+applies English and Arabic edits, receives two copied change notifications,
+rejects an out-of-range value and clears validation. The source suite also
+exercises current, old and partial bridge providers.
+[Bridge contract and limits](BRIDGE_TIME_FIELD_LOCALIZED.md).
 
 The [complete authored example](../bindings/bridge/examples/time_field_localized.py)
 creates independent English/H23 and Arabic/H12 fields, current-value summary,
 read-only, disabled, inclusive-bounds and clear-validation controls. Default mode
-composes and edits the actual UI headlessly. `--font` shares that same tree and
-handlers with the existing native SDL runner, without scripted input. Neither
-mode has runtime proof for the Python layer yet.
+composes and edits the UI headlessly. `--font` launches the same tree in SDL
+for manual use. Interactive validation remains open.
 
-Intended commands, using a matching existing built bridge (no installation):
+Copy the example to `appointments.py` and install the Linux x86-64 wheel in
+an empty virtual environment. [Alpha.5 wheel and release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.5).
+
+```sh
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install --no-index /path/to/cui_bridge-0.1.0a5-py3-none-linux_x86_64.whl
+python appointments.py
+```
+
+These commands select a matching bridge from a source checkout.
 
 ```sh
 PYTHONPATH=bindings/python CUI_BRIDGE_LIBRARY=/absolute/path/libcui_bridge.so python bindings/bridge/examples/time_field_localized.py
 PYTHONPATH=bindings/python CUI_BRIDGE_LIBRARY=/absolute/path/libcui_bridge.so python bindings/bridge/examples/time_field_localized.py --font /absolute/path/font.ttf
 ```
 
-The second is an intentional interactive launch, not an automated desktop test.
-No native launch has been executed here. Automated checks must run through
-`python scripts/test_local.py --build-dir build` in a private display, with the
-integrator registering `bindings/python/test_time_field.py` and the windowless
-example. Existing Python3 and ctypes suffice; no new dependency is introduced.
+Automated native checks use `python scripts/test_local.py --build-dir build`
+in a private display. For shipped package checks, the headless example runs
+through `scripts/test_binding_packages.py` using the installed wheel.
 
 ## Owned configuration and actual C editing
 

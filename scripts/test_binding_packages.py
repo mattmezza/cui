@@ -175,14 +175,26 @@ def main():
         subprocess.run([str(python), "-m", "pip", "install", "--no-index", str(wheel)], cwd=clean, env=env, check=True)
         shutil.copy2(ROOT / "tests/packaging/python_smoke.py", clean / "python_smoke.py")
         subprocess.run([str(python), "python_smoke.py"], cwd=clean, env=env, check=True)
+        shutil.copy2(ROOT / "bindings/bridge/examples/time_field_localized.py",
+                     clean / "appointments.py")
+        subprocess.run([str(python), "appointments.py"], cwd=clean, env=env, check=True)
         (clean / "package.json").write_text('{"name":"cui-local-package-smoke","version":"0.0.0","private":true}')
         tarball = next(artifacts.glob("*.tgz"))
         subprocess.run(["npm", "install", "--no-audit", "--no-fund", str(tarball)], cwd=clean, env=env, check=True)
         shutil.copy2(ROOT / "tests/packaging/node_smoke.cjs", clean / "node_smoke.cjs")
         subprocess.run(["node", "node_smoke.cjs"], cwd=clean, env=env, check=True)
+        node_example = (ROOT / "bindings/node/examples/time-field-localized.cjs").read_text(encoding="utf-8")
+        (clean / "appointments.cjs").write_text(
+            node_example.replace("require('..')", "require('@cui/native')", 1), encoding="utf-8")
+        subprocess.run(["node", "appointments.cjs"], cwd=clean, env=env, check=True)
         subprocess.run(["npm", "install", "--save-dev", "--no-audit", "--no-fund", "--ignore-scripts", "typescript@5.8.3"], cwd=clean, env=env, check=True)
         shutil.copy2(ROOT / "tests/packaging/typescript_smoke.cts", clean / "typescript_smoke.cts")
-        subprocess.run(["node", "node_modules/typescript/bin/tsc", "--strict", "--noEmit", "--module", "NodeNext",
-                        "--moduleResolution", "NodeNext", "--target", "ES2022", "typescript_smoke.cts"], cwd=clean, env=env, check=True)
+        ts_example = (ROOT / "bindings/typescript/examples/time_field_localized.ts").read_text(encoding="utf-8")
+        (clean / "typed-appointments.cts").write_text(
+            ts_example.replace("'../../node/index.cjs'", "'@cui/native'", 1), encoding="utf-8")
+        subprocess.run(["node", "node_modules/typescript/bin/tsc", "--strict", "--module", "NodeNext",
+                        "--moduleResolution", "NodeNext", "--target", "ES2022", "typescript_smoke.cts",
+                        "typed-appointments.cts"], cwd=clean, env=env, check=True)
+        subprocess.run(["node", "typed-appointments.cjs"], cwd=clean, env=env, check=True)
 if __name__ == "__main__":
     main()

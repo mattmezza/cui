@@ -1,22 +1,38 @@
 # JavaScript/TypeScript localized TimeField
 
-Unreleased authoring over the integrated localized C bridge. Strict root C11
-build and all 81 configured Node checks pass, including 20 localized checks,
-actual old/missing providers, real English/Arabic UI and TypeScript 5.8.3.
+The alpha.5 npm tarball supports localized TimeField authoring. Headless
+JavaScript and TypeScript examples apply an edit and observe the copied
+value from the installed package. The source suite also checks old and partial
+providers with TypeScript 5.8.3.
 See the [root receipt](validation/localized-facades-root.json) and retained
 [worker history](validation/node-localized-time-field-worker.json).
 The existing `time_field()` remains legacy kind 55. `localized_time_field()` is a
 distinct subclass using that same kind and the bridge-owned localized editor.
-Python and dynamic Go/Rust also have focused root acceptance. Static/package,
-native interactive and broader platform acceptance remain separate; these
-results establish no full 78-family parity.
+Native interactive acceptance remains open.
 
 Complete authored UI sources are
 [JavaScript](../bindings/node/examples/time-field-localized.cjs) and
 [TypeScript](../bindings/typescript/examples/time_field_localized.ts). They nest
 English 24-hour and Arabic 12-hour widgets in Row/Column UI with real clear,
-read-only, disabled and bounds controls. Locale tokens are explicit values, not
-OS locale lookup. No foreign callback runs inside Core and no JS reducer exists.
+read-only, disabled and bounds controls. Explicit locale tokens drive the C
+editor. The addon drains copied observations after the native frame.
+
+## Use the packaged examples
+
+In a new directory, copy the JavaScript source to `appointments.cjs` and
+replace `require('..')` with `require('@cui/native')`. Copy the TypeScript
+source to `typed-appointments.cts` and replace its import path with
+`'@cui/native'`. Both examples run one edit headlessly.
+[Alpha.5 Linux tarball and release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.5).
+
+```sh
+npm init -y
+npm install /path/to/cui-native-0.1.0-alpha.5.tgz
+node appointments.cjs
+npm install --save-dev typescript@5.8.3
+node node_modules/typescript/bin/tsc --strict --module NodeNext --target ES2022 typed-appointments.cts
+node typed-appointments.cjs
+```
 
 Call `app.supports_localized_time_field()` before opting in. The addon resolves all
 ten symbols as one optional group, checks version bit 0 and exact 616/80/64 native

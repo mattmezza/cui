@@ -1209,12 +1209,12 @@
     "example": "bindings/bridge/examples/time_field_localized.c",
     "scope": "Owned localized config/state/value and copied applied aggregate time changes; no controlled receipts, no callbacks inside Core. Default legacy scalar route unchanged.",
     "limitations": [
-      "Focused root receipts cover C/Python/Node and dynamic Go/Rust. Full-suite regression, installed packages and native interactive acceptance remain open.",
+      "Focused root receipts cover C/Python/Node and dynamic Go/Rust. Released alpha.5 wheel, npm tarball, Go module and Rust crate have headless localized examples in scripts/test_binding_packages.py and scripts/test_compiled_binding_packages.py. Native interactive acceptance remains open.",
       "Default/shared WASM unsupported; same existing native TLS and explicit unshared policy as controlled Slider.",
       "Global segment Tab remains a source-focus parity exception. The direct C widget offers optional IME composition and a preedit view. The bridge and its foreign facades omit both. Clipboard and physical AT remain open."
     ],
     "python_source_checkpoint": {
-      "implementation": "Integrated Python facade passes sixteen configured root CTest entries, including fifteen localized methods with actual current/old/partial DSOs and the authored headless example. Canonical/installed-skill refresh and publication remain pending; native interactive execution unverified.",
+      "implementation": "Integrated Python facade passes sixteen configured root CTest entries with current, old and partial providers. The released alpha.5 wheel passes the authored headless example. Native interactive execution remains open.",
       "module": "bindings/python/cui_bridge/time_field_localized.py",
       "guide": "docs/PYTHON_TIME_FIELD_LOCALIZED.md",
       "test": "bindings/python/test_time_field.py",
@@ -1224,12 +1224,12 @@
     "go_rust_dynamic_checkpoint": {
       "guide": "docs/GO_RUST_TIME_FIELD_LOCALIZED.md",
       "receipt": "docs/validation/time-field-go-rust-dynamic.json",
-      "scope": "Integrated source and durable runner pass root configured current/old/partial dynamic provider checks, strict copied records, callbacks and actual authored examples. Bundled-source static consumers also pass separately. Package/MSRV/native/true-failed-frame facade gates remain open."
+      "scope": "Current, old and partial dynamic providers and bundled-source static consumers pass their focused gates. Alpha.5 Go and Rust package examples pass headlessly. Minimum supported Rust, interactive native and true-failed-frame facade gates remain open."
     },
     "node_typescript_checkpoint": {
       "guide": "docs/NODE_TIME_FIELD_LOCALIZED.md",
       "receipt": "docs/validation/node-localized-time-field-worker.json",
-      "scope": "Integrated unreleased source passes strict root build and all81 configured Node entries, including20 localized checks and strict TS runtime; packages and native interactive acceptance remain open."
+      "scope": "Strict root build and all 81 configured Node checks pass, including 20 localized checks. The alpha.5 npm tarball passes headless JavaScript and strict TypeScript examples. Native interactive acceptance remains open."
     },
     "root_receipt": "docs/validation/localized-facades-root.json",
     "go_rust_static_receipt": "docs/validation/time-field-static-root.json"

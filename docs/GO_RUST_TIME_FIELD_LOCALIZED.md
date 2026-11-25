@@ -1,14 +1,37 @@
-# Go and Rust localized TimeField (focused dynamic proof, unreleased)
+# Go and Rust localized TimeField
 
 This additive authoring slice is based on root `8a402c2b`. Focused Linux dynamic
 Go/Rust compile, private-wrapper tests and both authored examples passed; see
 [the exact receipt](validation/time-field-go-rust-dynamic.json). Root configured dynamic acceptance now passes for current/old/partial providers
 and both actual authored examples; see the [root receipt](validation/localized-facades-root.json).
-Bundled-source static acceptance now also passes; installed-package gates remain open.
+The released alpha.5 Go module and Rust crate also run the localized examples
+headlessly using the bundled source SDK. Interactive native acceptance and
+the minimum supported Rust toolchain check for these examples remain open.
 The authoritative C contract is [BRIDGE_TIME_FIELD_LOCALIZED.md](BRIDGE_TIME_FIELD_LOCALIZED.md)
 and `include/cui/cui_bridge.h`. Existing scalar TimeField APIs stay unchanged.
-This does not bind direct Base/Styled options, drafts, clipboard/IME policy or
-claim full source focus/accessibility parity.
+Direct Base/Styled options, drafts, clipboard and IME remain C APIs.
+
+## Use the packaged examples
+
+In a new Go module, copy [the Go example](../bindings/go/examples/time_field_localized/main.go)
+to `main.go`, then require the versioned dependency and run the example.
+For offline installs, use the released Go source proxy archive.
+[Go module and proxy instructions](PACKAGING.md#go-local-module-proxy-and-executable).
+
+```sh
+go mod init example.com/appointments
+go get github.com/mattmezza/cui/bindings/go/cui@v0.1.0-alpha.5
+go run .
+```
+
+Extract the alpha.5 Rust crate and run its included example. Cargo compiles
+the bundled C bridge. [Alpha.5 crate and release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.5).
+
+```sh
+tar -xzf /path/to/cui-builders-0.1.0-alpha.5.crate
+cd cui-builders-0.1.0-alpha.5
+cargo run --offline --example time_field_localized
+```
 
 The new modules are `bindings/go/cui/time_localized.go` and
 `bindings/rust/src/time_localized.rs`. They copy an exact V1 configuration616,
@@ -130,10 +153,8 @@ read-only/disabled/bounds/clear, Go wrong-thread/close/panic and Rust panic/no-h
 count also passed. Initial no-callback failures remain in the receipt. Scripted
 input first completes two ordinary frames and checks result admission; a minute-only
 field center is a separator, so the script clicks its first-quarter textbox.
-Still required: real later-failed-frame copied observations at the facade boundary,
-additional schema-poison providers, native run unwind, MSRV/installed-package and
-installed-package acceptance and fresh generated-consumer checks after further API changes. No full
-binding/source-family parity follows from these focused checks.
+Remaining checks include later-failed-frame observations at the facade boundary,
+additional schema-poison providers, native run unwind and minimum supported Rust.
 
 
 The final decoder gate separately validates applied changes and latest results:
@@ -236,4 +257,4 @@ offline harness10/10, Go201.24s and Rust97.76s, including compilation, owned wir
 and real authored UI tests/examples. ELF dependency inspection found no shared
 CUI bridge in any of the five artifacts. System libraries remain dynamic.
 See [root static receipt](validation/time-field-static-root.json). Native
-interactive, MSRV and installed-package acceptance remain open.
+interactive and per-example MSRV checks remain open.

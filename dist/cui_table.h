@@ -153,7 +153,8 @@ typedef cui_str (*cui_table_label_fn)(void *, size_t row, cui_id column);
 typedef void (*cui_table_cell_fn)(cui_context *, const cui_theme *, void *, size_t row,
                                   cui_id column);
 /* Additive scalar, column, action/context and exact multi-set observers: include
- * cui_table_events.h. */
+ * cui_table_events.h. Ordinary wheel steps move 48 logical pixels. Hosts that
+ * supply logical pixels set cui_event.scroll_precise. */
 cui_table_result cui_table_reduce(cui_context *, cui_id, cui_table_model *, cui_table_state *,
                                   cui_table_options);
 void cui_table_submit_root(cui_context *, cui_id, cui_table_model *, cui_table_state *,
@@ -475,6 +476,16 @@ static float trailing_width(cui_table_options o) {
     if (!o.render_trailing)
         return 0;
     return isfinite(o.trailing_width) && o.trailing_width > 0 ? fminf(o.trailing_width, 4096) : 12;
+}
+static float cui_table_scroll_max_x(const cui_table_model *m, cui_table_options o) {
+    float total = 0;
+    for (size_t c = cui_table_fixed_columns(m); c < m->columns; c++)
+        total += m->cols[c].width;
+    const float available = fmaxf(1, viewport_width(o) - cui_table_fixed_width(m));
+    return fmaxf(0, total + trailing_width(o) - available);
+}
+static float cui_table_scroll_max_y(const cui_table_model *m, cui_table_options o) {
+    return fmaxf(0, (float)m->count * row_height(o) - height(o));
 }
 bool cui_table_group_headers_valid(const cui_table_model *m, cui_table_options o) {
     if (!m || o.group_header_count > 16 || (!o.group_headers && o.group_header_count))
@@ -1114,6 +1125,40 @@ static cui_component_event_metadata cui_table_event_metadata(cui_context *ui, cu
     metadata.target = id;
     return metadata;
 }
+
+static bool cui_table_wheel_axis(float *offset, float delta, float step, float maximum) {
+    if (!isfinite(delta) || delta == 0)
+        return false;
+    float before = isfinite(*offset) ? fminf(maximum, fmaxf(0, *offset)) : 0;
+    *offset = fminf(maximum, fmaxf(0, before - delta * step));
+    return *offset != before;
+}
+
+static void cui_table_scroll_wheel(cui_context *ui, cui_id id, const cui_table_model *m,
+                                   cui_table_state *s, cui_table_options o, size_t index,
+                                   cui_id target, const cui_event *event) {
+    cui_id body = cui_table_body_id(id);
+    if ((target != body && target != id) || cui_event_consumed(ui, index))
+        return;
+    /* Match the default Scrollable rate for wheel steps. Precise host and
+     * touch deltas already describe logical pixels. */
+    float step = event->scroll_precise ? 1 : 48;
+    bool changed = false;
+    if (event->dx != 0)
+        changed = cui_table_wheel_axis(&s->scroll_x, event->dx, step, cui_table_scroll_max_x(m, o));
+    if (target == body)
+        changed |=
+            cui_table_wheel_axis(&s->scroll_y, event->dy, step, cui_table_scroll_max_y(m, o));
+    if (changed) {
+        cui_consume_event(ui, index);
+    } else if (cui_defer_scroll_event(ui, index, target) && target == body &&
+               cui_event_target(ui, index) == id) {
+        /* The grid and body share their horizontal offset. A refused body
+         * delta can reach the grid through the previous frame's hit snapshot. */
+        cui_defer_scroll_event(ui, index, id);
+    }
+}
+
 static cui_table_result cui_table_reduce_common(cui_context *ui, cui_id id, cui_table_model *m,
                                                 cui_table_state *s, cui_table_options o,
                                                 const cui_table_event_handler *handler,
@@ -1189,7 +1234,12 @@ static cui_table_result cui_table_reduce_common(cui_context *ui, cui_id id, cui_
     cui_id previous = 0;
     bool reveal = false;
     for (size_t e = 0; e < count && !o.disabled && !o.loading; e++) {
-        cui_id target = cui_event_target(ui, e), activation = cui_event_activation(ui, e);
+        cui_id target = cui_event_target(ui, e);
+        if (ev[e].type == CUI_EVENT_SCROLL) {
+            cui_table_scroll_wheel(ui, id, m, s, o, e, target, &ev[e]);
+            continue;
+        }
+        cui_id activation = cui_event_activation(ui, e);
         cui_table_input_observer input_observer = {ui, id, e, ev[e], handler, events};
         cui_table_selection_observer selection_observer = {
             ui, id, e, ev[e], handler, events, set_handler, workspace, 0};
@@ -1450,25 +1500,12 @@ static cui_table_result cui_table_reduce_common(cui_context *ui, cui_id id, cui_
                 }
             }
         }
-        if (ev[e].type == CUI_EVENT_SCROLL && isfinite(ev[e].dy) &&
-            target == cui_table_body_id(id)) {
-            s->scroll_y -= ev[e].dy;
-            if (isfinite(ev[e].dx))
-                s->scroll_x -= ev[e].dx;
-        }
     }
-    float total = 0;
-    for (size_t e = 0; e < count && !o.disabled && !o.loading; e++)
-        if (ev[e].type == CUI_EVENT_SCROLL && cui_event_target(ui, e) == id && isfinite(ev[e].dx))
-            s->scroll_x -= ev[e].dx;
     size_t fixed = cui_table_fixed_columns(m);
-    for (size_t p = fixed; p < m->columns; p++)
-        total += m->cols[p].width;
-    total += trailing_width(o);
     float width = isfinite(o.width) && o.width > 0 ? o.width : 480;
     float available = fmaxf(1, width - cui_table_fixed_width(m) - cui_table_row_header_width(o));
     s->scroll_x =
-        isfinite(s->scroll_x) ? fmaxf(0, fminf(s->scroll_x, fmaxf(0, total - available))) : 0;
+        isfinite(s->scroll_x) ? fmaxf(0, fminf(s->scroll_x, cui_table_scroll_max_x(m, o))) : 0;
     if (reveal && cui_table_row_index(m, s->cursor_row, &r) &&
         (cui_focused(ui) == cui_table_cell_id(id, s->cursor_row, s->cursor_column) ||
          cui_focused(ui) == cui_table_row_header_id(id, s->cursor_row))) {
@@ -1655,24 +1692,18 @@ void cui_table_submit_root(cui_context *ui, cui_id id, cui_table_model *m, cui_t
     o = view_options(m, o);
     if (!ui || !m || !s)
         return;
-    cui_table_view columns = cui_table_column_viewport(m, s->scroll_x, viewport_width(o), 0);
-    float width = isfinite(o.width) && o.width > 0 ? o.width : 480;
     cui_interact(ui, id, CUI_ROLE_GRID,
                  o.accessible_name.length ? o.accessible_name : cui_string("Data table"),
                  o.disabled || o.loading, false, 0);
     cui_set_tab_stop(ui, id, false);
-    cui_set_semantic_details(
-        ui, id,
-        (cui_semantic_details){.row_count = (unsigned)m->count,
-                               .column_count = (unsigned)m->columns,
-                               .multiselectable = o.multiple_selection,
-                               .busy = o.loading,
-                               .scrollable = true,
-                               .scroll_x = s->scroll_x,
-                               .scroll_max_x =
-                                   fmaxf(0, columns.total + trailing_width(o) -
-                                                fmaxf(1, width - cui_table_fixed_width(m) -
-                                                             cui_table_row_header_width(o)))});
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.row_count = (unsigned)m->count,
+                                                    .column_count = (unsigned)m->columns,
+                                                    .multiselectable = o.multiple_selection,
+                                                    .busy = o.loading,
+                                                    .scrollable = true,
+                                                    .scroll_x = s->scroll_x,
+                                                    .scroll_max_x = cui_table_scroll_max_x(m, o)});
 }
 void cui_table_submit_header_column(cui_context *ui, cui_id id, cui_table_model *m,
                                     cui_table_state *s, cui_table_options o, size_t c) {
@@ -1740,20 +1771,13 @@ void cui_table_submit_body_root(cui_context *ui, cui_id id, cui_table_model *m, 
     cui_interact(ui, body, CUI_ROLE_ROWGROUP, cui_string("Rows"), o.disabled || o.loading, false,
                  0);
     cui_set_tab_stop(ui, body, false);
-    cui_table_view allrows = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), 0);
-    cui_table_view allcols = cui_table_column_viewport(m, s->scroll_x, viewport_width(o), 0);
-    float width = isfinite(o.width) && o.width > 0 ? o.width : 480;
-    cui_set_semantic_details(
-        ui, body,
-        (cui_semantic_details){.parent = id,
-                               .scrollable = true,
-                               .scroll_y = s->scroll_y,
-                               .scroll_x = s->scroll_x,
-                               .scroll_max_y = fmaxf(0, allrows.total - height(o)),
-                               .scroll_max_x =
-                                   fmaxf(0, allcols.total + trailing_width(o) -
-                                                fmaxf(1, width - cui_table_fixed_width(m) -
-                                                             cui_table_row_header_width(o)))});
+    cui_set_semantic_details(ui, body,
+                             (cui_semantic_details){.parent = id,
+                                                    .scrollable = true,
+                                                    .scroll_y = s->scroll_y,
+                                                    .scroll_x = s->scroll_x,
+                                                    .scroll_max_y = cui_table_scroll_max_y(m, o),
+                                                    .scroll_max_x = cui_table_scroll_max_x(m, o)});
 }
 void cui_table_submit_row(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
                           cui_table_options o, size_t r) {

@@ -858,8 +858,9 @@ static void virtual_scene(void) {
     assert(fabsf(first.y - 27) < .01f);
     cui_focus(ui, cui_table_cell_id(10, 5001, 10));
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 10, .y = 100}));
-    assert(
-        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 10, .y = 100, .dy = -100}));
+    assert(cui_queue_event(
+        ui, (cui_event){
+                .type = CUI_EVENT_SCROLL, .x = 10, .y = 100, .dy = -100, .scroll_precise = true}));
     scene(ui, m, &s, o);
     assert(s.scroll_y == 160105);
     s.scroll_y = 160005;
@@ -926,6 +927,74 @@ static void custom_row_backgrounds(void) {
     }
     cui_destroy(ui);
 }
+static void nested_wheel_frame(cui_context *ui, cui_table_model *model, cui_table_state *state,
+                               cui_table_options options, cui_scroll_state *parent) {
+    cui_theme theme = cui_theme_light();
+    cui_scroll_options scroll = {.width = 350,
+                                 .height = 250,
+                                 .content_height = 600,
+                                 .vertical = true,
+                                 .hide_scrollbars = true};
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    assert(cui_scrollable_begin(ui, 99, &theme, parent, scroll));
+    assert(cui_data_table(ui, 10, &theme, model, state, options, NULL, NULL, NULL).error ==
+           CUI_TABLE_OK);
+    cui_scrollable_end_ex(ui, 99, &theme, parent, scroll);
+    (void)cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+
+static void wheel_units(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256, .max_commands = 512});
+    cui_table_model *model = cui_table_create(40);
+    assert(ui && model);
+    cui_table_row rows[40];
+    for (size_t r = 0; r < 40; ++r)
+        rows[r] = (cui_table_row){.key = r + 1, .label = cui_string("Inbox message")};
+    cui_table_column columns[] = {{.key = 101, .label = cui_string("Sender"), .width = 140},
+                                  {.key = 102, .label = cui_string("Subject"), .width = 260}};
+    assert(cui_table_bind(model, rows, 40, columns, 2) == CUI_TABLE_OK);
+    cui_table_options options = {.width = 240, .height = 128, .row_height = 32};
+    cui_table_state state = {0};
+    (void)scene(ui, model, &state, options);
+    cui_event scroll = {.type = CUI_EVENT_SCROLL, .x = 12, .y = 85, .dy = -1};
+    assert(cui_queue_event(ui, scroll));
+    cui_table_result result = scene(ui, model, &state, options);
+    assert(state.scroll_y == 48 && state.scroll_x == 0);
+    assert(result.rows.begin == 1 && cui_event_consumed(ui, 0));
+
+    scroll.scroll_precise = true;
+    scroll.dx = -6.5f;
+    scroll.dy = -3.25f;
+    assert(cui_queue_event(ui, scroll));
+    (void)scene(ui, model, &state, options);
+    assert(state.scroll_y == 51.25f && state.scroll_x == 6.5f && cui_event_consumed(ui, 0));
+
+    scroll = (cui_event){.type = CUI_EVENT_SCROLL, .x = 12, .y = 16, .dx = -2, .dy = -1};
+    assert(cui_queue_event(ui, scroll));
+    (void)scene(ui, model, &state, options);
+    assert(state.scroll_x == 102.5f && state.scroll_y == 51.25f && cui_event_consumed(ui, 0));
+
+    options.disabled = true;
+    assert(cui_queue_event(ui, scroll));
+    (void)scene(ui, model, &state, options);
+    assert(state.scroll_x == 102.5f && state.scroll_y == 51.25f && !cui_event_consumed(ui, 0));
+
+    options.disabled = false;
+    cui_scroll_state parent = {0};
+    const float limit = 40 * options.row_height - options.height;
+    state.scroll_y = limit - 20;
+    nested_wheel_frame(ui, model, &state, options, &parent);
+    scroll = (cui_event){.type = CUI_EVENT_SCROLL, .x = 12, .y = 85, .dy = -1};
+    assert(cui_queue_event(ui, scroll) && cui_queue_event(ui, scroll));
+    nested_wheel_frame(ui, model, &state, options, &parent);
+    assert(state.scroll_y == limit && parent.y == 48);
+    assert(cui_event_target(ui, 0) == cui_table_body_id(10) && cui_event_consumed(ui, 0));
+    assert(cui_event_target(ui, 1) == 99 && cui_event_consumed(ui, 1));
+
+    cui_table_destroy(model);
+    cui_destroy(ui);
+}
 #endif
 int main(void) {
 #ifndef CUI_TABLE_BASE_ONLY
@@ -945,6 +1014,7 @@ int main(void) {
     sort_header_graphics();
     static_tables();
     virtual_scene();
+    wheel_units();
     pointer_resize();
     horizontal_virtualization();
     pinned_geometry();

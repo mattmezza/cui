@@ -67,6 +67,14 @@ column indices, and total grid counts. Indices are one based data indices and
 exclude the header. IDs are stable keyed hashes; applications must avoid hash/ID
 collisions with other controls as required by the core.
 
+DataTable uses the same default as Scrollable: one ordinary wheel tick moves
+48 logical pixels. Touch panning and host events with `scroll_precise = true`
+move by their supplied logical pixel deltas, including fractional values.
+Hosts that supplied pixel deltas to DataTable before this fix should set
+`scroll_precise`. Wheel events over headers can scroll horizontally. The body
+can scroll on both axes. DataTable consumes a delta that moves either axis and
+offers later refused deltas at the edge to a scrollable ancestor.
+
 Custom leaf-header, group-header, row-header, whole-row and trailing-column render hooks use option userdata. Group headers accept up to sixteen levels of bounded spans. Every level must cover all data columns exactly, and no group may cross the fixed-column boundary; `cui_table_group_headers_valid` lets applications validate a configuration before rendering. Group cells expose column-header semantics at their first column; the callback receives the complete span. Whole-row callbacks run only for virtualized rows and can add row-level decoration or content before the cells. The optional trailing column uses a caller-selected width (12 logical pixels by default) and participates in horizontal scroll extent; its callback runs for each header level, the leaf header and visible rows. Loading replaces body rows with a busy status and suppresses input/load requests; empty and loading placeholders have optional render hooks and accessible default labels.
 
 Set `scrollbars` to reserve scrollbar gutters only when an axis overflows. `bar_thickness` controls their logical thickness. The drawing-free reducer delegates keyboard, track and thumb behavior to the reusable Scroll base primitive, while the styled table paints the same scrollbar state. The grid and scrollbar semantics share the table as their scroll owner. Applications that build a custom renderer can use `cui_table_scroll_layout` to obtain the reduced viewport and scroll maxima.

@@ -7202,6 +7202,14 @@
             "tests/unit/test_table.c",
             "docs/validation/gcc-table-dropdown.txt"
           ]
+        },
+        {
+          "name": "wheel step and precise deltas with nested boundary handoff",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_table.c",
+            "docs/TABLE.md"
+          ]
         }
       ],
       "upstream_doc": {

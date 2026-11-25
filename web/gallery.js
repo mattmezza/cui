@@ -3,7 +3,7 @@ import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
 import {createCuiMeshRenderer} from "./modules/cui_mesh.js";
 import {paintGradientText} from "./modules/cui_text_paint.js";
-import {selectedUsage,virtualInboxUsage} from "./modules/cui_usage.js";
+import {selectedUsage,virtualInboxUsage,liveDataTableUsage} from "./modules/cui_usage.js";
 import {resizableUsage} from "./modules/cui_resizable_usage.js";
 import {stepperUsage} from "./modules/cui_stepper_usage.js";
 import {spinnerUsage} from "./modules/cui_spinner_usage.js";
@@ -1117,6 +1117,8 @@ function render(){
  if(selected.name==='Resizable')$('snippet').textContent=resizableUsage($('resizable-nested').checked);
  if(selected.name==='VirtualList')$('snippet').textContent=
   $('virtual-axis').value==='2'?virtualInboxUsage:snippets.VirtualList;
+ if(selected.name==='DataTable')$('snippet').textContent=
+  $('table-mode').value==='4'?liveDataTableUsage:snippets.DataTable;
  if(selected.name==='Stepper') {
   for(const k of ['density','icons','design'])$('stepper-'+k).parentElement.hidden=$('stepper-mode').value==='0';
   $('snippet').textContent=stepperUsage(...stepperValues(),$('disabled').checked);

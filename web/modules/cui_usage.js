@@ -4,6 +4,26 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
  'CUI_DESIGN_2XL', 'CUI_DESIGN_3XL', 'CUI_DESIGN_4XL', 'CUI_DESIGN_5XL',
  'CUI_DESIGN_6XL', 'CUI_DESIGN_7XL', 'CUI_DESIGN_8XL', 'CUI_DESIGN_9XL'];
 
+export const liveDataTableUsage = `#include <cui/cui_table.h>
+
+/* On the UI thread, before drawing. Keep the new rows and columns alive
+ * while the model borrows them. Capture before editing the current rows. */
+cui_table_error update_live_data_table(cui_table_model *model, cui_table_state *state,
+    cui_table_options options, const cui_table_row *rows, size_t count,
+    cui_table_column *columns, size_t column_count) {
+    cui_table_row_anchor anchor = cui_table_capture_row_anchor(model, state->scroll_y, options);
+    cui_table_error result = cui_table_bind(model, rows, count, columns, column_count);
+    if (result == CUI_TABLE_OK)
+        state->scroll_y = cui_table_restore_row_anchor(model, anchor, options);
+    return result;
+}
+
+/* Inside a frame, with the same stable table ID and options across updates. */
+cui_table_result draw_live_data_table(cui_context *ui, cui_id id, const cui_theme *theme,
+    cui_table_model *model, cui_table_state *state, cui_table_options options) {
+    return cui_data_table(ui, id, theme, model, state, options, NULL, NULL, NULL);
+}`;
+
 export const virtualInboxUsage = `#include <cui/cui_virtual_scroll.h>
 
 /* Retain list and state. Supply the updated key order before drawing.

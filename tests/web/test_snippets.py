@@ -157,19 +157,19 @@ static void draw_profile(cui_context *ui) { (void)ui; }
         f'{common.replace("cui_theme theme = {0};", "" ) if story == "Theme" else common}'
         f'{extra.get(story, "")}\n{snippets[story]}\n}}'
         for story in compiled) + '\n'
-    inbox = subprocess.check_output(['node', '--input-type=module', '-e', '''
+    live_examples = subprocess.check_output(['node', '--input-type=module', '-e', r'''
         import {readFileSync} from 'node:fs';
         const encoded = readFileSync(process.argv[1]).toString('base64');
-        const {virtualInboxUsage} = await import('data:text/javascript;base64,' + encoded);
-        process.stdout.write(virtualInboxUsage);
+        const {virtualInboxUsage, liveDataTableUsage} = await import('data:text/javascript;base64,' + encoded);
+        process.stdout.write([virtualInboxUsage, liveDataTableUsage].join('\n'));
     ''', str(ROOT / 'web/modules/cui_usage.js')], text=True)
     with tempfile.TemporaryDirectory() as directory:
         source = Path(directory) / 'snippets.c'
-        source.write_text(code + '\n' + inbox)
+        source.write_text(code + '\n' + live_examples)
         subprocess.run(['cc', '-std=c11', '-fsyntax-only', '-Wall', '-Wextra',
                         '-Werror', '-Wno-unused-variable', '-Wno-unused-parameter',
                         '-I', str(ROOT / 'include'), str(source)], check=True)
-    print(f'PASS: {len(stories)} gallery stories covered; {len(compiled) + 1} displayed excerpts compile')
+    print(f'PASS: {len(stories)} gallery stories covered; {len(compiled) + 2} displayed excerpts compile')
 
 
 if __name__ == '__main__':

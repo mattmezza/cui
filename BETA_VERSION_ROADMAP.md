@@ -96,15 +96,15 @@ subsets. Detailed ledgers and headers remain authoritative.
 
 ### Next component slices
 
-Continue with the live DataTable gallery example. Verify reported regressions
-against the current gallery as each slice lands. Ship the verified builders with
-the next release.
+Verify Resizable, Sidebar, Sheet and Tabs together in the native starter next.
+Check reported regressions against the current gallery as each slice lands.
+Ship the verified builders with the next release.
 
 | Order | Component | Next outcome |
 | --- | --- | --- |
 | 1 | Icon / Badge / Skeleton | Publish the verified SVG and Badge builders and responsive Skeleton example. Check custom artwork, an interactive Badge child, and the loading-to-content transition from installed consumers and the deployed gallery. |
 | 2 | VideoPlayer / Video | The C player and WASM gallery have capability-gated mute and volume, with Chromium proof for keyboard and touch, decoded audio and player-only fullscreen. The optional native FFV1/PCM example applies gain after rendering and passes all 22 private-display/SDL dummy audio checks. Deployment, physical audio and broader codecs remain open. [Player guide](docs/VIDEO_PLAYER.md) · [native sound example](examples/video_player_audio/README.md) |
-| 3 | DataTable | Opt-in C scroll anchors preserve the first visible row and its offset on rebind. The 1,000- and 10,000-row private-X11 inbox checks preserve selection, position and focus, with same-frame hover and Down navigation after a prepend. Headless tests cover append/load-more and removed keys. Gallery integration and binding exposure remain open. [Live update API](docs/TABLE.md#keep-the-visible-row-during-a-live-update) |
+| 3 | DataTable | Opt-in C scroll anchors preserve the first visible row and its offset on rebind. The 1,000- and 10,000-row private-X11 inbox checks preserve selection, position and focus, with same-frame hover and Down navigation after a prepend. Chromium verifies the **Live updates** gallery example with copyable C code, focus and selection during a timed arrival, and cancellation when switching modes. Publishing and foreign builder exposure remain open. [Live update API](docs/TABLE.md#keep-the-visible-row-during-a-live-update) |
 | 3 | VirtualList | The WASM gallery has a variable-height **Live inbox** example with copyable C usage. Prepending and resizing above the viewport preserve the first visible item and its offset. Removing it moves the replacement to the top where scroll bounds allow. Release and foreign builder support remain open. [Live update guide](docs/VIRTUAL_LIST.md#preserve-position-during-live-updates) |
 | 3 | Table | Deploy the independent header background and alternating-row controls. Headless Chromium already verifies both themes and DataTable's stripes, keyed selection, sorting and scrolling. [Table colors](docs/TABLE.md#row-and-header-colors) |
 | 4 | Sidebar / Sheet | Starter headless checks pass for body-only scrolling, pinned account controls and focus transfer across the breakpoint with an open account menu. Short Settings pages stay usable by wheel, injected touch and keyboard. Verify the published starter matches these checks. |

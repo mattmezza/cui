@@ -134,6 +134,9 @@ Capture the first visible row before mutating or replacing the current borrowed
 rows. After a successful bind, restore the scroll position before the next
 submission. Use the corresponding table options at each step so both helpers
 account for the body viewport and any scrollbar gutters.
+If the styled table inherits scrollbar settings from its theme, set
+`options.scrollbar_style` to that style before calculating offsets, and set
+`options.scrollbars` when the effective style shows or auto-hides the bars.
 
 ```c
 /* Between frames. next_rows and columns stay live while bound. */
@@ -156,6 +159,14 @@ policy remain application-controlled, so a deliberate change such as sorting can
 choose a new scroll position. Supply valid replacement arrays to avoid changing
 the current borrowed rows on a failed bind. Foreign builders do not expose
 this workflow yet.
+
+Choose **Live updates** in the DataTable gallery and scroll partway down.
+**Receive a file** schedules one update two seconds later, giving you time to
+focus a cell before the file arrives. The gallery prepends the file by default
+and respects any active sort. The selected cell and visible row stay in place
+while the model rebinds. Changing examples or disabling the preview cancels
+the pending update. The example demonstrates the UI-thread rebind step using a
+local timer.
 
 Custom leaf-header, group-header, row-header, whole-row and trailing-column render hooks use option userdata. Group headers accept up to sixteen levels of bounded spans. Every level must cover all data columns exactly, and no group may cross the fixed-column boundary; `cui_table_group_headers_valid` lets applications validate a configuration before rendering. Group cells expose column-header semantics at their first column; the callback receives the complete span. Whole-row callbacks run only for virtualized rows and can add row-level decoration or content before the cells. The optional trailing column uses a caller-selected width (12 logical pixels by default) and participates in horizontal scroll extent; its callback runs for each header level, the leaf header and visible rows. Loading replaces body rows with a busy status and suppresses input/load requests; empty and loading placeholders have optional render hooks and accessible default labels.
 

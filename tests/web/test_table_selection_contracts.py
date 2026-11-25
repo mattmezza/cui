@@ -104,6 +104,60 @@ def check_data_table_appearance(audit):
     assert cell_pixel(audit, first_column(audit, 30, 4)) == stripe_color
 
 
+def check_live_data_table(audit):
+    def visible_cells():
+        body = audit.target('Rows', 34)
+        top, bottom = body['f'][2], body['f'][2] + body['f'][4]
+        cells = [cell for cell in audit.snapshot() if cell['f'][0] == 30 and cell['f'][23] == 1
+                 and cell['f'][2] < bottom and cell['f'][2] + cell['f'][4] > top]
+        return body, sorted(cells, key=lambda cell: cell['f'][22])
+
+    audit.configure('table-mode', 4)
+    assert 'cui_table_restore_row_anchor' in audit.page.locator('#snippet').text_content()
+    assert audit.target('Workspace files', 31)['f'][24] == 1000
+    audit.drag(audit.target('Rows', 34), 0, -44, rx=.15, ry=.6)
+    body, cells = visible_cells()
+    first, selected, successor = cells[:3]
+    assert abs(body['f'][19] - 44) < .2
+    assert first['f'][22] == 2
+
+    audit.tap(audit.target('Receive a file', 1))
+    assert audit.target('File arriving…', 1)['f'][5]
+    audit.tap(selected)
+    assert audit.value(selected, 11) == 1 and audit.value(selected, 7) == 1
+    audit.page.wait_for_function('''() => {
+        const e = cuiGallery.exports;
+        return Array.from({length:e.gallery_semantic_count()}, (_,i)=>i)
+            .some(i=>e.gallery_semantic(i,0)===31 && e.gallery_semantic(i,24)===1001);
+    }''')
+    updated, cells = visible_cells()
+    assert cells[0]['id'] == first['id'] and cells[0]['f'][22] == first['f'][22] + 1
+    assert abs(cells[0]['f'][2] - first['f'][2]) < .2
+    assert abs(updated['f'][19] - body['f'][19] - 32) < .2
+    assert audit.value(selected, 11) == 1 and audit.value(selected, 7) == 1
+    audit.page.keyboard.press('ArrowDown')
+    audit.page.wait_for_function('''id => {
+        const e = cuiGallery.exports;
+        return Array.from({length:e.gallery_semantic_count()}, (_,i)=>i)
+            .some(i=>String(e.gallery_semantic_id(i))===id && e.gallery_semantic(i,11));
+    }''', arg=successor['id'])
+    assert audit.value(successor, 7) == 1
+
+    audit.page.set_viewport_size({'width':390, 'height':844})
+    audit.configure('disabled', True)
+    assert audit.target('Receive a file', 1)['f'][5]
+    audit.tap(audit.target('Receive a file', 1))
+    assert audit.page.evaluate('cuiGallery.exports.gallery_next_wake()') == 0
+    audit.configure('disabled', False)
+    audit.tap(audit.target('Receive a file', 1))
+    assert audit.target('File arriving…', 1)['f'][5]
+    audit.configure('table-mode', 0)
+    assert audit.page.evaluate('cuiGallery.exports.gallery_next_wake()') == 0
+    audit.configure('table-mode', 4)
+    assert audit.target('Workspace files', 31)['f'][24] == 1000
+    audit.target('Receive a file', 1)
+
+
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--directory',type=Path,default=Path('build/web'));p.add_argument('--chromium');args=p.parse_args()
  class Handler(SimpleHTTPRequestHandler):
@@ -156,6 +210,7 @@ def main():
    appearance = Audit(browser,f'http://127.0.0.1:{server.server_port}')
    check_table_appearance(appearance)
    check_data_table_appearance(appearance)
+   check_live_data_table(appearance)
    assert appearance.page.evaluate('cuiGallery.exports.gallery_error()') == 0
    assert not appearance.errors, appearance.errors
    browser.close()

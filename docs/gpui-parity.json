@@ -7243,6 +7243,7 @@
           "evidence": [
             "tests/unit/test_table.c",
             "tests/integration/test_sdl_inbox_hover.c",
+            "tests/web/test_table_selection_contracts.py",
             "docs/TABLE.md"
           ],
           "limitations": [

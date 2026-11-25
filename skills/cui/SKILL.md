@@ -342,7 +342,9 @@ long inboxes. See the measured SDL workload in `docs/PERFORMANCE.md`.
 For live DataTable updates in C, capture with `cui_table_capture_row_anchor`
 before changing the borrowed rows. After a successful bind, assign the result
 of `cui_table_restore_row_anchor` to `state.scroll_y`. Pass the corresponding
-table options. Selection stays keyed. Foreign builders lack these helpers.
+table options, including the effective scrollbar style. Selection stays keyed.
+See the **Live updates** gallery example and `docs/TABLE.md`. Foreign builders
+lack the C row-anchor helpers.
 For variable-height VirtualList updates in C, capture an anchor before
 rebuilding keys or changing heights and restore it before the next draw.
 Retain the within-row offset for surviving keys. Clear it if a removed item's

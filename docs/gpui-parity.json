@@ -5692,6 +5692,7 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_resizable.c",
+        "tests/integration/test_sdl_resizable.c",
         "tests/web/test_resizable_drag.py",
         "tests/web/test_resizable_repeated_drag.py",
         "tests/web/test_resizable_nested_gallery.py"
@@ -5699,10 +5700,11 @@
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
+        "linux_x11": "tested_partial",
         "browser": "tested_partial"
       },
       "limitations": [
-        "Caller-bounded panels, constraints, nesting, persistence, captured drag and keyboard handles tested. Actual-WASM browser audits cover repeated release/regrab, desktop DPR1/2, touch390/DPR2, responsive pane geometry and clamps, plus a nested explorer/code/console composition with independent capture and cross-axis sizing. Native window/GPU interaction and arbitrary consumer composition remain unaudited. Edge pill follows ancestor clipping; motion duration/easing supplied explicitly; no native source drag-payload adapter or full family parity claim."
+        "Caller-bounded panels, constraints, nesting, persistence, captured drag and keyboard handles tested. WASM browser audits cover repeated release/regrab, desktop DPR 1/2, 390 px touch at DPR 2, responsive pane geometry and clamps, and nested capture. Private X11 SDL software tests use injected mouse, keyboard and touch events. Physical devices, other window systems, hardware paths and arbitrary consumer compositions remain open. Edge pills follow ancestor clipping, motion duration is explicit, and the source drag-payload adapter remains unimplemented."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5738,6 +5740,14 @@
             "tests/web/test_resizable_nested_gallery.py",
             "web/gallery.c",
             "web/modules/cui_resizable_usage.js",
+            "docs/RESIZABLE.md"
+          ]
+        },
+        {
+          "name": "native SDL pane geometry, paint and completion during captured pointer, touch and keyboard resize",
+          "status": "tested",
+          "evidence": [
+            "tests/integration/test_sdl_resizable.c",
             "docs/RESIZABLE.md"
           ]
         }

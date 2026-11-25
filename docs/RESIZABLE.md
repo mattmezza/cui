@@ -123,6 +123,21 @@ complete native API equivalence.
 
 The gallery demonstrates a small workspace with selectable files, a read-only code preview, contrasting pane backgrounds and live pane dimensions. Drag the divider or focus it and press arrow keys; the browser checks both the retained sizes and the visible pane widths/positions. The vertical mode demonstrates the same model with pane heights.
 
-Repeated release/regrab, DPR 1/2 desktop and 390 px touch dragging, keyboard sizing and responsive clamps are verified by the focused browser tests; see `docs/RESIZABLE_BROWSER_REAUDIT.md`. A pane already at its minimum/maximum cannot move farther in that direction. Keep the sum of visible minima at or below the available extent and the sum of maxima at or above it: an infeasible container cannot provide the requested resizing range. The current gallery uses a responsive maximum for its flexible editor pane. Native window/GPU interaction remains a separate audit.
+The focused browser tests verify repeated release/regrab, DPR 1/2 desktop and
+390 px touch dragging, keyboard sizing and responsive clamps. See
+[the browser audit](RESIZABLE_BROWSER_REAUDIT.md). A pane already at its
+minimum or maximum cannot move farther in that direction. Keep the sum of
+visible minima at or below the available extent and the sum of maxima at or
+above it so the group can provide the requested resizing range. The gallery
+uses a responsive maximum for its flexible editor pane.
+
+The native SDL_Renderer regression (`tests/integration/test_sdl_resizable.c`)
+passes window-addressed mouse, key and finger events through SDL on private
+X11. It presents a software-rendered frame at each step and checks both pane
+bounds and the submitted fills in that frame. It covers both axes, drag
+capture beyond the hit band, min/max clamping, release and regrab in the
+opposite direction, keyboard sizing, and one callback per completed resize.
+Physical touch devices, other window systems, and hardware-renderer paths
+remain open.
 
 Select **Nested editor / console** in the gallery for a horizontal explorer/workspace split containing an independent vertical code/console split. Each group retains its own state, slots and IDs. The inner cross size uses the outer pane size after outer input reduction, so horizontal resizing updates both inner widths in the same frame. The existing two-pane example remains the default. Switching mode clears both models; the vertical-layout toggle applies only to the default example. The copied C example initializes both states once and documents the borrowed theme/content lifetimes. Both local and whole-preview disabled controls explicitly disable both groups.

@@ -1951,8 +1951,8 @@
         "cui_resizable_slot"
       ],
       "state_ownership": "Caller retains state, slots and panel descriptors.",
-      "interaction": "cui_resizable_resize_fn observes size changes; panel content composes controls.",
-      "usage": "Initialize slot storage, submit panel descriptors each frame and save sizes after resize events.",
+      "interaction": "Mouse and touch drag the handle. The focused separator responds to arrow keys. cui_resizable_resize_fn observes completed resizes.",
+      "usage": "Initialize slot storage, submit panel descriptors within a feasible combined min/max range every frame and save sizes after completed resizes.",
       "docs": [
         "docs/RESIZABLE.md"
       ],

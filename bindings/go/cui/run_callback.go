@@ -11,6 +11,7 @@ import (
 
 type runState struct {
 	app        *App
+	afterFrame func(*App) error
 	err        error
 	panicValue any
 	panicked   bool
@@ -30,6 +31,9 @@ func goBridgeAfterFrame(user C.uintptr_t) (status C.int) {
 	_, state.err = state.app.Dispatch()
 	if errors.Is(state.err, ErrClosed) {
 		state.err = nil
+	}
+	if state.err == nil && !state.app.closeRequested && state.afterFrame != nil {
+		state.err = state.afterFrame(state.app)
 	}
 	completed = true
 	if state.err != nil {

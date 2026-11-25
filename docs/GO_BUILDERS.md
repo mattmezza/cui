@@ -177,9 +177,61 @@ go run ./examples/data_table_live
 The bundled native route on Linux uses
 `go run -tags cui_native ./examples/data_table_live --font /path/to/font.ttf`.
 For an existing SDL shared bridge, set `CUI_BRIDGE_LIBRARY` to its absolute
-path and use `-tags cui_dynamic` instead. The examples here use a local
-arrival. The Go builders currently expose keyed replacement.
-[Paging support](BRIDGE_COMPONENTS.md#load-another-datatable-page)
+path and use `-tags cui_dynamic` instead. This example uses a local arrival.
+[Paged inbox](#page-a-go-datatable)
+
+## Page a Go DataTable
+
+`app.SupportsDataTablePaging()` checks for all V1 exports and the expected
+record size. Use `LoadMore(threshold)` on a builder with column headers.
+To mount the same tree on a provider without paging, clear its opt-in with
+`ConfigureLoadMore(false, 0)` before mounting. Ordinary DataTables remain usable.
+
+```go
+inbox := cui.DataTable("inbox").
+    TableDataKeyed(headers, initialRows, initialKeys).
+    LoadMore(0)
+
+// After mounting and stepping, on the UI thread.
+request, ok, err := inbox.PollLoadMore()
+if err != nil {
+    return err
+}
+if ok {
+    if err := inbox.ConfigureLoadMore(false, 0); err != nil {
+        return err
+    }
+    // Queue work using your request generation and service cursor.
+    submitPage(request)
+}
+```
+
+The remaining-row threshold may be 0 through 32. With 0, demand is raised
+when the visible window reaches the last row. Start with headers and empty
+rows to request the initial page. `PollLoadMore()` consumes one copied
+`DataTableLoadMore` or reports no record. The copy includes the `uint64` frame
+sequence, row count, half-open visible range, last local row key and capacity.
+The regular callback queue is independent.
+
+Keep one request in flight while the current rows remain interactive. Use
+your own generation and service cursor to reject stale results, then apply
+accepted pages on the UI thread with `SetTableKeyed`. Enable paging again
+if more data is available. The bridge holds up to 32 rows.
+
+The synchronous `app.RunWith(.016, afterFrame)` hook receives the app after
+regular callbacks for each successful native frame. A request to close or
+dispose during dispatch skips the hook. Return an error to stop the loop.
+Drain completed work from a channel without blocking the UI thread. Manual
+loops can poll after `Step`.
+
+From `bindings/go`, run the [offline inbox](../bindings/go/examples/data_table_paging/main.go).
+It verifies selection during loading, retry, stale-response rejection and
+scroll retention when appending the final page.
+
+```sh
+go run ./examples/data_table_paging
+go run -tags cui_native ./examples/data_table_paging --font /path/to/font.ttf
+```
 
 ## Packaged build-time CUI bridge
 

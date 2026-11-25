@@ -373,7 +373,7 @@ func (a *App) DispatchTimeFieldChanges() (int, error) {
 	a.timeDispatching = true
 	defer func() { a.timeDispatching = false }()
 	count := 0
-	for !a.closed && !a.timeClosing {
+	for !a.closed && !a.closeRequested {
 		c, ok, e := a.PollTimeFieldChange()
 		if e != nil {
 			return count, e

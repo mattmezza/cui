@@ -156,38 +156,81 @@ if(CUI_GO_SKELETON_TESTS)
    run -tags cui_dynamic ./examples/skeleton_profile --font ${CUI_TEST_FONT} --smoke)
  endif()
 endif()
-option(CUI_GO_KEYED_DATA_TABLE_TESTS "Check keyed DataTable authoring with Go on Linux" OFF)
+option(CUI_GO_KEYED_DATA_TABLE_TESTS "Check keyed DataTable authoring and paging with Go on Linux" OFF)
 if(CUI_GO_KEYED_DATA_TABLE_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR "Go keyed DataTable provider tests currently support Linux only")
  endif()
  find_program(CUI_GO_KEYED_DATA_TABLE_EXECUTABLE go REQUIRED)
  set(CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY "" CACHE FILEPATH "Optional existing bridge without keyed tables")
- function(cui_go_keyed_data_table_test suffix library legacy)
-  add_test(NAME bridge_go_keyed_data_table_${suffix} COMMAND ${CMAKE_COMMAND} -E env
+ function(cui_go_data_table_test name library legacy)
+  add_test(NAME bridge_go_${name} COMMAND ${CMAKE_COMMAND} -E env
    GOMAXPROCS=1 GOFLAGS=-p=1 GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local
    CUI_BRIDGE_LIBRARY=${library} CUI_KEYED_DATA_TABLE_LEGACY=${legacy} SDL_RENDER_DRIVER=software
    ${CUI_GO_KEYED_DATA_TABLE_EXECUTABLE} ${ARGN})
-  set_tests_properties(bridge_go_keyed_data_table_${suffix} PROPERTIES
+  set_tests_properties(bridge_go_${name} PROPERTIES
    WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/go" RUN_SERIAL TRUE TIMEOUT 600)
  endfunction()
- cui_go_keyed_data_table_test(dynamic $<TARGET_FILE:cui_bridge> 0
+ cui_go_data_table_test(keyed_data_table_dynamic $<TARGET_FILE:cui_bridge> 0
   test -tags cui_dynamic ./cui -count=1 -run "^Test(KeyedDataTable|DataTable)$")
- cui_go_keyed_data_table_test(static "" 0
+ cui_go_data_table_test(keyed_data_table_static "" 0
   test ./cui -count=1 -run "^Test(KeyedDataTable|DataTable)$")
- cui_go_keyed_data_table_test(example "" 0 run ./examples/data_table_live)
+ cui_go_data_table_test(keyed_data_table_example "" 0 run ./examples/data_table_live)
+ cui_go_data_table_test(data_table_paging_dynamic $<TARGET_FILE:cui_bridge> 0
+  test -tags cui_dynamic ./cui -count=1 -run "^TestDataTablePaging(EmptyAndOwnerThread)?$")
+ cui_go_data_table_test(data_table_paging_static "" 0
+  test ./cui -count=1 -run "^TestDataTablePaging(EmptyAndOwnerThread)?$")
+ cui_go_data_table_test(data_table_paging_example "" 0 run ./examples/data_table_paging)
+ add_library(cui_go_paging_fixture SHARED ${CUI_BRIDGE_ROOT}/bindings/tests/data_table_paging_provider.c)
+ target_include_directories(cui_go_paging_fixture PRIVATE ${CUI_BRIDGE_ROOT}/include)
+ target_link_libraries(cui_go_paging_fixture PRIVATE "-Wl,--no-as-needed" cui_bridge "-Wl,--as-needed")
+ cui_warnings(cui_go_paging_fixture)
+ foreach(mode exact frame reserved window visible capacity key size)
+  cui_go_data_table_test(data_table_paging_${mode} $<TARGET_FILE:cui_go_paging_fixture> 0
+   test -tags cui_dynamic ./cui -count=1 -run "^TestDataTablePaging(Fallback|Protocol)$")
+  set_property(TEST bridge_go_data_table_paging_${mode} PROPERTY
+   ENVIRONMENT "CUI_DATA_TABLE_PAGING_FIXTURE=${mode}")
+ endforeach()
  if(CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY)
   if(NOT EXISTS "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}")
    message(FATAL_ERROR "CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY must name an existing bridge")
   endif()
-  cui_go_keyed_data_table_test(legacy "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}" 1
+  cui_go_data_table_test(keyed_data_table_legacy "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}" 1
    test -tags cui_dynamic ./cui -count=1 -run "^Test(KeyedDataTableLegacyProvider|DataTable)$")
-  cui_go_keyed_data_table_test(legacy_bundled "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}" 1
+  cui_go_data_table_test(keyed_data_table_legacy_bundled "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}" 1
    test ./cui -count=1 -run "^Test(KeyedDataTableLegacyProvider|DataTable)$")
+  cui_go_data_table_test(data_table_paging_legacy "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}" 1
+   test -tags cui_dynamic ./cui -count=1 -run "^TestDataTablePagingFallback$")
+  cui_go_data_table_test(data_table_paging_legacy_bundled "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}" 1
+   test ./cui -count=1 -run "^TestDataTablePagingFallback$")
+  set_tests_properties(bridge_go_data_table_paging_legacy bridge_go_data_table_paging_legacy_bundled
+   PROPERTIES ENVIRONMENT "CUI_DATA_TABLE_PAGING_FIXTURE=legacy")
+  set(_go_paging_provider_dir "${CMAKE_CURRENT_BINARY_DIR}/go-data-table-paging-legacy")
+  file(MAKE_DIRECTORY "${_go_paging_provider_dir}")
+  file(CREATE_LINK "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}"
+   "${_go_paging_provider_dir}/libcui_bridge.so" SYMBOLIC)
+  add_library(cui_go_partial_paging_fixture SHARED ${CUI_BRIDGE_ROOT}/bindings/tests/data_table_paging_provider.c)
+  target_include_directories(cui_go_partial_paging_fixture PRIVATE ${CUI_BRIDGE_ROOT}/include)
+  target_compile_definitions(cui_go_partial_paging_fixture PRIVATE CUI_TEST_PARTIAL_PAGING_PROVIDER)
+  target_link_libraries(cui_go_partial_paging_fixture PRIVATE "-Wl,--no-as-needed"
+   "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}" "-Wl,--as-needed")
+  set_target_properties(cui_go_partial_paging_fixture PROPERTIES BUILD_RPATH "${_go_paging_provider_dir}")
+  cui_warnings(cui_go_partial_paging_fixture)
+  cui_go_data_table_test(data_table_paging_partial $<TARGET_FILE:cui_go_partial_paging_fixture> 1
+   test -tags cui_dynamic ./cui -count=1 -run "^TestDataTablePagingFallback$")
+  set_property(TEST bridge_go_data_table_paging_partial PROPERTY
+   ENVIRONMENT "CUI_DATA_TABLE_PAGING_FIXTURE=partial")
  endif()
  if(CUI_BRIDGE_NATIVE_TESTS)
-  cui_go_keyed_data_table_test(native $<TARGET_FILE:cui_bridge> 0
+  cui_go_data_table_test(keyed_data_table_native $<TARGET_FILE:cui_bridge> 0
    run -tags cui_dynamic ./examples/data_table_live --font ${CUI_TEST_FONT} --smoke)
+  cui_go_data_table_test(data_table_paging_native $<TARGET_FILE:cui_bridge> 0
+   run -tags cui_dynamic ./examples/data_table_paging --font ${CUI_TEST_FONT} --smoke)
+  cui_go_data_table_test(data_table_paging_native_bundled "" 0
+   run -tags cui_native ./examples/data_table_paging --font ${CUI_TEST_FONT} --smoke)
+  cui_go_data_table_test(data_table_paging_run $<TARGET_FILE:cui_bridge> 0
+   test -tags cui_dynamic ./cui -count=1 -run "^TestNativeRun(Lifecycle|AfterFrame)$")
+  set_property(TEST bridge_go_data_table_paging_run PROPERTY ENVIRONMENT "CUI_TEST_FONT=${CUI_TEST_FONT}")
  endif()
 endif()
 

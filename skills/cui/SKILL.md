@@ -380,7 +380,9 @@ the current rows interactive. See **Paged inbox** and the paging guide in
 `docs/BRIDGE_COMPONENTS.md`. Python and JS/TS use `configure_load_more` and
 `poll_load_more` after checking `app.supports_data_table_paging()`. JS/TS
 demand has a `bigint` frame sequence. See offline inboxes and loop options in
-`docs/BINDING_BUILDERS.md`. Go and Rust omit this poll.
+`docs/BINDING_BUILDERS.md`. Go uses `LoadMore`, `ConfigureLoadMore` and
+`PollLoadMore` after checking `SupportsDataTablePaging`. See the inbox and
+owner-thread `RunWith` hook in `docs/GO_BUILDERS.md`. Rust omits this poll.
 For variable-height VirtualList updates in C, capture an anchor before
 rebuilding keys or changing heights and restore it before the next draw.
 Retain the within-row offset for surviving keys. Clear it if a removed item's

@@ -352,20 +352,44 @@ typedef cui_bridge_status (*data_table_keyed_fn)(cui_bridge_app *, cui_bridge_no
  const char *const *, uint32_t, const char *const *, const uint32_t *, uint32_t);
 static data_table_keyed_fn table_keyed;
 
+_Static_assert(sizeof(cui_bridge_data_table_load_more_v1) == 32, "DataTable paging V1 wire size");
+static struct {
+ uint32_t (*size)(void);
+ cui_bridge_status (*configure)(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t);
+ cui_bridge_status (*poll)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                          cui_bridge_data_table_load_more_v1 *);
+} table_paging;
+static int table_paging_supported;
+
+static void go_data_table_load_symbol(void *destination, size_t size, const char *name) {
+#if defined(_WIN32)
+ FARPROC symbol = GetProcAddress((HMODULE)bridge_lib, name);
+#else
+ void *symbol = dlsym(bridge_lib, name);
+#endif
+ if (symbol && sizeof symbol == size)
+  memcpy(destination, &symbol, size);
+}
+
 static void go_data_table_initialize(void) {
  if (!bridge_lib) {
 #if defined(CUI_GO_STATIC)
   table_keyed = cui_bridge_data_table_set_keyed;
+  table_paging.size = cui_bridge_data_table_load_more_size_v1;
+  table_paging.configure = cui_bridge_data_table_configure_load_more_v1;
+  table_paging.poll = cui_bridge_data_table_poll_load_more_v1;
 #endif
-  return;
+ } else {
+  go_data_table_load_symbol(&table_keyed, sizeof table_keyed, "cui_bridge_data_table_set_keyed");
+  go_data_table_load_symbol(&table_paging.size, sizeof table_paging.size,
+                            "cui_bridge_data_table_load_more_size_v1");
+  go_data_table_load_symbol(&table_paging.configure, sizeof table_paging.configure,
+                            "cui_bridge_data_table_configure_load_more_v1");
+  go_data_table_load_symbol(&table_paging.poll, sizeof table_paging.poll,
+                            "cui_bridge_data_table_poll_load_more_v1");
  }
-#if defined(_WIN32)
- FARPROC symbol = GetProcAddress((HMODULE)bridge_lib, "cui_bridge_data_table_set_keyed");
-#else
- void *symbol = dlsym(bridge_lib, "cui_bridge_data_table_set_keyed");
-#endif
- if (symbol && sizeof symbol == sizeof table_keyed)
-  memcpy(&table_keyed, &symbol, sizeof table_keyed);
+ table_paging_supported = table_paging.size && table_paging.configure && table_paging.poll &&
+                          table_paging.size() == sizeof(cui_bridge_data_table_load_more_v1);
 }
 
 static int go_data_table_keyed_supported(void) {
@@ -377,6 +401,22 @@ static cui_bridge_status go_data_table_set_keyed(cui_bridge_app *app, cui_bridge
  const uint32_t *row_keys, uint32_t rows) {
  return table_keyed ? table_keyed(app, node, headers, columns, cells, row_keys, rows)
                     : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+
+static int go_data_table_paging_supported(void) {
+ return table_paging_supported;
+}
+
+static cui_bridge_status go_data_table_configure_load_more(cui_bridge_app *app,
+ cui_bridge_node node, uint32_t enabled, uint32_t threshold) {
+ return table_paging_supported ? table_paging.configure(app, node, enabled, threshold)
+                               : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+
+static cui_bridge_status go_data_table_poll_load_more(cui_bridge_app *app,
+ cui_bridge_node node, cui_bridge_data_table_load_more_v1 *out) {
+ return table_paging_supported ? table_paging.poll(app, node, sizeof(*out), out)
+                               : CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
 
 static int bridge_open(const char *path) {
@@ -463,16 +503,17 @@ import (
 )
 
 type App struct {
-	timeEnabled, timeDispatching, timeClosing bool
-	timeCapacity                              uint32
-	sliderNamespace                           *sliderNamespace
-	sliderDispatching, sliderClosing          bool
-	ptr                                       *C.cui_bridge_app
-	thread                                    C.bridge_thread_token
-	root                                      *Node
-	nodes                                     map[uint64]*Node
-	closed                                    bool
-	running                                   bool
+	timeEnabled, timeDispatching     bool
+	closeRequested                   bool
+	timeCapacity                     uint32
+	sliderNamespace                  *sliderNamespace
+	sliderDispatching, sliderClosing bool
+	ptr                              *C.cui_bridge_app
+	thread                           C.bridge_thread_token
+	root                             *Node
+	nodes                            map[uint64]*Node
+	closed                           bool
+	running                          bool
 }
 type Options struct {
 	InitiallyHidden          bool
@@ -535,6 +576,8 @@ type Node struct {
 	tableRows                            [][]string
 	tableRowKeys                         []uint32
 	hasTableData                         bool
+	tableLoadMore                        bool
+	tableLoadMoreThreshold               uint32
 	tableSelectionMode                   uint32
 	hasTableSelectionMode                bool
 	plotPoints                           []PlotPoint
@@ -1158,7 +1201,7 @@ func (a *App) Close() error {
 		}
 	}
 	a.sliderClosing = true
-	a.timeClosing = true
+	a.closeRequested = true
 	a.ptr = nil
 	a.closed = true
 	if !a.running {
@@ -1172,7 +1215,7 @@ func (a *App) RequestClose() error {
 	}
 	e := result(C.go_request_close(a.ptr))
 	if e == nil {
-		a.timeClosing = true
+		a.closeRequested = true
 	}
 	if e == nil && a.sliderNamespace != nil {
 		a.sliderClosing = true
@@ -1586,6 +1629,14 @@ func (a *App) Mount(root *Node) error {
 		if n.tableRowKeys != nil && C.go_data_table_keyed_supported() == 0 {
 			return ErrKeyedDataTableUnavailable
 		}
+		if n.tableLoadMore {
+			if C.go_data_table_paging_supported() == 0 {
+				return ErrDataTablePagingUnavailable
+			}
+			if !n.hasTableData {
+				return errors.New("DataTable paging requires column headers")
+			}
+		}
 		if d > 128 {
 			return errors.New("tree too deep")
 		}
@@ -1774,6 +1825,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.hasTableData {
 			if e := n.setTable(n.tableHeaders, n.tableRows, n.tableRowKeys); e != nil {
+				return e
+			}
+		}
+		if n.tableLoadMore {
+			if e := n.ConfigureLoadMore(true, n.tableLoadMoreThreshold); e != nil {
 				return e
 			}
 		}
@@ -2365,7 +2421,7 @@ func (a *App) Dispatch() (int, error) {
 				}
 				count += n
 			}
-			if a.timeEnabled && !a.closed && !a.timeClosing {
+			if a.timeEnabled && !a.closed && !a.closeRequested {
 				n, e := a.DispatchTimeFieldChanges()
 				return count + n, e
 			}
@@ -2390,6 +2446,13 @@ func (a *App) Dispatch() (int, error) {
 // Run owns native event pumping, including live resize. dt is retained for
 // compatibility; native scheduling supplies actual frame timing.
 func (a *App) Run(dt float32) error {
+	return a.RunWith(dt, nil)
+}
+
+// RunWith calls afterFrame on the owner thread after each successful native
+// frame and regular dispatch. Closing during dispatch skips the hook.
+// Returning an error stops the runner and returns that error to the caller.
+func (a *App) RunWith(dt float32, afterFrame func(*App) error) error {
 	if a != nil && (a.sliderDispatching || a.timeDispatching) {
 		return errors.New("Run unavailable during typed dispatch")
 	}
@@ -2405,7 +2468,7 @@ func (a *App) Run(dt float32) error {
 	if a.running {
 		return errors.New("app is already running")
 	}
-	state := &runState{app: a}
+	state := &runState{app: a, afterFrame: afterFrame}
 	handle := cgo.NewHandle(state)
 	defer handle.Delete()
 	a.running = true
@@ -2419,7 +2482,7 @@ func (a *App) Run(dt float32) error {
 	if state.panicked {
 		panic(state.panicValue)
 	}
-	if state.err != nil && !errors.Is(state.err, ErrClosed) {
+	if state.err != nil {
 		return state.err
 	}
 	if code == C.CUI_BRIDGE_CLOSED {
@@ -3090,6 +3153,95 @@ func (a *App) SupportsKeyedDataTable() (bool, error) {
 		return false, err
 	}
 	return C.go_data_table_keyed_supported() != 0, nil
+}
+
+// DataTableLoadMore is a copied near-end request. The visible index range is
+// half-open. LastRowKey is zero when the table has no rows.
+type DataTableLoadMore struct {
+	FrameSequence            uint64
+	RowCount                 uint32
+	VisibleBegin, VisibleEnd uint32
+	LastRowKey, Capacity     uint32
+}
+
+// ErrDataTablePagingUnavailable indicates that the active bridge lacks the
+// complete and compatible V1 paging API.
+var ErrDataTablePagingUnavailable = errors.New("DataTable paging is unavailable in this bridge")
+
+// SupportsDataTablePaging reports whether the active bridge supports V1 paging.
+func (a *App) SupportsDataTablePaging() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_data_table_paging_supported() != 0, nil
+}
+
+// LoadMore opts into DataTable paging using the remaining-row threshold.
+func (n *Node) LoadMore(threshold uint32) *Node {
+	if n.err == nil {
+		n.err = n.ConfigureLoadMore(true, threshold)
+	}
+	return n
+}
+
+// ConfigureLoadMore enables or disables paging. A mounted DataTable must have
+// column headers, even when empty. The app owns any in-flight request.
+func (n *Node) ConfigureLoadMore(enabled bool, threshold uint32) error {
+	if n == nil || n.kind != 71 || n.removed {
+		return errors.New("paging requires a live DataTable")
+	}
+	if threshold > 32 {
+		return errors.New("DataTable paging threshold must be in 0..32")
+	}
+	if n.app != nil {
+		supported, err := n.app.SupportsDataTablePaging()
+		if err != nil {
+			return err
+		}
+		if !supported {
+			return ErrDataTablePagingUnavailable
+		}
+		if err := result(C.go_data_table_configure_load_more(n.app.ptr, n.handle,
+			C.uint32_t(btoi(enabled)), C.uint32_t(threshold))); err != nil {
+			return err
+		}
+	}
+	n.tableLoadMore, n.tableLoadMoreThreshold = enabled, threshold
+	return nil
+}
+
+// PollLoadMore consumes one demand raised by a successful frame. Its copy
+// stays valid after removal or close. A false return means there is no demand.
+// Polling leaves the regular callback queue untouched.
+func (n *Node) PollLoadMore() (DataTableLoadMore, bool, error) {
+	if n == nil || n.kind != 71 || n.app == nil || n.removed {
+		return DataTableLoadMore{}, false, errors.New("polling requires a mounted DataTable")
+	}
+	supported, err := n.app.SupportsDataTablePaging()
+	if err != nil {
+		return DataTableLoadMore{}, false, err
+	}
+	if !supported {
+		return DataTableLoadMore{}, false, ErrDataTablePagingUnavailable
+	}
+	var wire C.cui_bridge_data_table_load_more_v1
+	status := C.go_data_table_poll_load_more(n.app.ptr, n.handle, &wire)
+	if status == C.CUI_BRIDGE_EMPTY {
+		return DataTableLoadMore{}, false, nil
+	}
+	if err := result(status); err != nil {
+		return DataTableLoadMore{}, false, err
+	}
+	if wire.reserved != 0 || wire.frame == 0 || wire.visible_begin > wire.visible_end ||
+		wire.visible_end > wire.row_count || wire.row_count >= wire.capacity ||
+		(wire.row_count == 0) != (wire.last_row_key == 0) {
+		return DataTableLoadMore{}, false, errors.New("malformed DataTable load-more record")
+	}
+	return DataTableLoadMore{
+		FrameSequence: uint64(wire.frame), RowCount: uint32(wire.row_count),
+		VisibleBegin: uint32(wire.visible_begin), VisibleEnd: uint32(wire.visible_end),
+		LastRowKey: uint32(wire.last_row_key), Capacity: uint32(wire.capacity),
+	}, true, nil
 }
 
 type TableSelectionMode uint32

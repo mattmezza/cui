@@ -78,7 +78,7 @@
       "omissions": [
         {
           "header": "include/cui/cui_bridge.h",
-          "languages": ["go", "rust"],
+          "languages": ["rust"],
           "types": [
             "cui_bridge_badge_config_v1",
             "cui_bridge_badge_result_v1"
@@ -88,7 +88,7 @@
             "cui_bridge_badge_configure_v1",
             "cui_bridge_badge_get_result_v1"
           ],
-          "note": "C, Python, JavaScript and TypeScript support configured Badge children and owned SVG. Go and Rust expose the scalar text pill."
+          "note": "C, Python, JavaScript, TypeScript and Go support configured Badge children and owned SVG. Rust exposes the scalar text pill."
         }
       ]
     },
@@ -246,7 +246,7 @@
       "omissions": [
         {
           "header": "include/cui/cui_bridge.h",
-          "languages": ["go", "rust"],
+          "languages": ["rust"],
           "types": [
             "cui_bridge_icon_options_v1",
             "cui_bridge_icon_result_v1"
@@ -255,14 +255,14 @@
             "cui_bridge_icon_configure_node_v1",
             "cui_bridge_icon_get_node_result_v1"
           ],
-          "note": "C, Python, JavaScript and TypeScript support owned resources and retained Icon configuration. Go and Rust use named Icons."
+          "note": "C, Python, JavaScript, TypeScript and Go support owned resources and retained Icon configuration. Rust uses named Icons."
         },
         {
           "header": "include/cui/cui_icon.h",
           "languages": ["python", "javascript", "typescript", "go", "rust"],
           "types": ["cui_icon_loader_fn"],
           "symbols": ["cui_icon_set_path", "cui_icon_set_name"],
-          "note": "Direct C accepts arbitrary loader callbacks. Python, JavaScript and TypeScript path sources use a resource-local map of copied SVG data."
+          "note": "Direct C accepts arbitrary loader callbacks. Python, JavaScript, TypeScript and Go path sources use a resource-local map of copied SVG data."
         }
       ]
     },
@@ -1202,7 +1202,7 @@
       "bindings/rust/examples/slider_model.rs"
     ]
   },
-  "language_builder_node_kinds_scope": "80 shared legacy kinds; Python, Node/TypeScript and Go additionally expose controlled Slider kind81 when the full optional API group is available.",
+  "language_builder_node_kinds_scope": "80 shared legacy kinds; Python, Node/TypeScript and Go additionally expose configured Badge kind82 when its optional API group is available. Controlled Slider kind81 support is tracked separately.",
   "rust_source_build": {
     "scope": "Matching bundled Linux source SDK build; dynamic library override skips CMake source compilation.",
     "parallelism": "Positive Cargo NUM_JOBS selects explicit CMake -j count; invalid/missing standalone value falls back to1. Use Cargo -j1 or CARGO_BUILD_JOBS=1 for serial work.",
@@ -1287,7 +1287,7 @@
       "go": "tested_subset",
       "rust": "documented_omission"
     },
-    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript, TypeScript and Go expose owned SVG resources and catalog/cache utilities. Python, JavaScript and TypeScript also provide configured retained Icon and Badge with copied results and indicator geometry. See the guides for optional provider support.",
+    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript, TypeScript and Go expose owned SVG resources and catalog/cache utilities, plus configured retained Icon and Badge with copied results and indicator geometry. See the guides for optional provider support.",
     "guide": "docs/BRIDGE_ICON_RESOURCES.md",
     "presentation_guide": "docs/BRIDGE_ICON_PRESENTATION.md",
     "badge_guide": "docs/BRIDGE_BADGE.md",
@@ -1295,6 +1295,7 @@
     "node_resources_guide": "docs/NODE_ICON_RESOURCES.md",
     "node_components_guide": "docs/NODE_ICON_BADGE.md",
     "go_resources_guide": "docs/GO_ICON_RESOURCES.md",
+    "go_components_guide": "docs/GO_ICON_BADGE.md",
     "receipt": "docs/validation/bridge-icon-resources-root.json"
   }
 }

@@ -5,10 +5,11 @@ It draws through the ordinary [C Badge component](BADGE.md) and places the
 indicator without moving the content. A count of zero hides the indicator.
 Children still produce their own events through the ordinary bridge queue.
 
-The optional V1 factory is available in working source. Python, JavaScript and TypeScript can
-author the configured variant. Go and Rust offer the standalone text pill.
+The optional V1 factory is available in working source. Python, JavaScript,
+TypeScript and Go can author the configured variant. Rust offers the standalone text pill.
 The new C kind uses a dedicated factory to admit children.
-[Python guide](PYTHON_ICON_BADGE.md) · [Node and TypeScript guide](NODE_ICON_BADGE.md).
+[Python guide](PYTHON_ICON_BADGE.md) · [Node and TypeScript guide](NODE_ICON_BADGE.md) ·
+[Go guide](GO_ICON_BADGE.md).
 
 ## Add an unread indicator
 

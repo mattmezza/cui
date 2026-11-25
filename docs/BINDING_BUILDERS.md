@@ -160,6 +160,7 @@ and [public header](../include/cui/cui_bridge.h) for capacities and status codes
 real component trees in their own language and dispatch copied native events.
 The [Go SVG resource guide](GO_ICON_RESOURCES.md) shows how to prepare artwork
 with the bundled build or a compatible shared bridge.
+The [Go inbox](GO_ICON_BADGE.md) uses those resources in configured Icons and Badges.
 The older [C-host examples](LANGUAGE_BINDINGS.md) remain useful for embedding an
 existing C-authored application.
 

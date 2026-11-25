@@ -60,5 +60,5 @@ fmt.Printf("Rasterized %dx%d\n", mask.Width, mask.Height)
   share one handle. Call `Close` for early release. App shutdown releases
   outstanding resources. Deferred foreign SVG loader callbacks are unavailable.
 
-This source API covers resource operations. Configured retained Icon and Badge
-builders for Go are tracked in the [beta roadmap](../BETA_VERSION_ROADMAP.md).
+To attach the same resource to multiple widgets and handle child events, see
+the [retained Icon and Badge inbox](GO_ICON_BADGE.md).

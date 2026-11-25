@@ -48,6 +48,8 @@ Grouped components use `Item` children. RadioGroup, Tabs, Select, and ComboBox e
 
 Use the [Go SVG resource guide](GO_ICON_RESOURCES.md) to prepare copied coverage
 masks from embedded artwork or app-owned SVG and manage the resource cache.
+See the [retained inbox guide](GO_ICON_BADGE.md) for shared artwork and configured
+Badge indicators around clickable children.
 
 Select uses a name and placeholder; ComboBox uses a label and editable query. Their options are `Item` children. `App.Text(combo)` reads the current query.
 

@@ -80,33 +80,45 @@ add_test(NAME bridge_python_icon_badge_example COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/icon_badge_inbox.py)
 option(CUI_BRIDGE_NATIVE_TESTS "Register opt-in Linux invisible native binding checks" OFF)
-option(CUI_GO_ICON_TESTS "Check owned Icon resources with Go on Linux" OFF)
+option(CUI_GO_ICON_TESTS "Check owned Icon resources and retained Icon/Badge with Go on Linux" OFF)
 if(CUI_GO_ICON_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  message(FATAL_ERROR "Go Icon resource provider tests currently support Linux only")
+  message(FATAL_ERROR "Go Icon and Badge provider tests currently support Linux only")
  endif()
  find_program(CUI_GO_ICON_EXECUTABLE go REQUIRED)
- function(cui_go_icon_test suffix library unsupported)
+ function(cui_go_icon_test suffix library unsupported presentation)
   add_test(NAME bridge_go_icon_${suffix} COMMAND ${CMAKE_COMMAND} -E env
    GOMAXPROCS=1 GOFLAGS=-p=1 GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local
    CUI_BRIDGE_LIBRARY=${library} CUI_TEST_ICON_RESOURCE_UNSUPPORTED=${unsupported}
+   CUI_TEST_ICON_BADGE_PROVIDER=${presentation}
    ${CUI_GO_ICON_EXECUTABLE} ${ARGN})
   set_tests_properties(bridge_go_icon_${suffix} PROPERTIES
    WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/go" RUN_SERIAL TRUE TIMEOUT 600)
  endfunction()
- cui_go_icon_test(dynamic $<TARGET_FILE:cui_bridge> 0
-  test -tags cui_dynamic ./cui -count=1 -run "^TestIcon(Resource|AndMessage)")
- cui_go_icon_test(static "" 0 test ./cui -count=1 -run "^TestIcon(Resource|AndMessage)")
- cui_go_icon_test(example "" 0 run ./examples/icon_resource)
+ cui_go_icon_test(dynamic $<TARGET_FILE:cui_bridge> 0 current
+  test -tags cui_dynamic ./cui -count=1 -run "^Test(Icon(Resource|AndMessage)|Configured(Icon|Badge))")
+ cui_go_icon_test(static "" 0 current
+  test ./cui -count=1 -run "^Test(Icon(Resource|AndMessage)|Configured(Icon|Badge))")
+ cui_go_icon_test(example "" 0 current run ./examples/icon_resource)
+ cui_go_icon_test(inbox "" 0 current run ./examples/icon_badge_inbox)
  set(CUI_GO_ICON_LEGACY_LIBRARY "" CACHE FILEPATH "Optional pre-resource Go bridge provider")
  if(CUI_GO_ICON_LEGACY_LIBRARY)
-  cui_go_icon_test(legacy "${CUI_GO_ICON_LEGACY_LIBRARY}" 1
-   test -tags cui_dynamic ./cui -count=1 -run "^TestIcon(ResourceOptionalProvider|AndMessage)$")
+  cui_go_icon_test(legacy "${CUI_GO_ICON_LEGACY_LIBRARY}" 1 legacy
+   test -tags cui_dynamic ./cui -count=1 -run "^Test(Icon(ResourceOptionalProvider|AndMessage)|ConfiguredIconBadgeProvider)$")
  endif()
  set(CUI_GO_ICON_ALPHA4_LIBRARY "" CACHE FILEPATH "Optional published alpha.4 Go bridge provider")
  if(CUI_GO_ICON_ALPHA4_LIBRARY)
-  cui_go_icon_test(alpha4 "${CUI_GO_ICON_ALPHA4_LIBRARY}" 0
-   test -tags cui_dynamic ./cui -count=1 -run "^TestIcon(Resource|AndMessage)")
+  cui_go_icon_test(alpha4 "${CUI_GO_ICON_ALPHA4_LIBRARY}" 0 alpha4
+   test -tags cui_dynamic ./cui -count=1 -run "^Test(Icon(Resource|AndMessage)|ConfiguredIconBadgeProvider)")
+ endif()
+ set(CUI_GO_ICON_PARTIAL_BADGE_LIBRARY "" CACHE FILEPATH "Optional Go bridge provider with an incomplete Badge group")
+ if(CUI_GO_ICON_PARTIAL_BADGE_LIBRARY)
+  cui_go_icon_test(partial_badge "${CUI_GO_ICON_PARTIAL_BADGE_LIBRARY}" 0 partial-badge
+   test -tags cui_dynamic ./cui -count=1 -run "^TestConfiguredIconBadgeProvider$")
+ endif()
+ if(CUI_BRIDGE_NATIVE_TESTS)
+  cui_go_icon_test(native $<TARGET_FILE:cui_bridge> 0 current
+   run -tags cui_dynamic ./examples/icon_badge_inbox --font ${CUI_TEST_FONT} --smoke)
  endif()
 endif()
 option(CUI_GO_SKELETON_TESTS "Check responsive Skeleton authoring with Go on Linux" OFF)

@@ -507,6 +507,6 @@ alpha.4 resource API. `docs/BRIDGE_BADGE.md` covers the optional C container and
 its child events, artwork and indicator result. Keep resources on the app's owner
 thread. Python supports those resources and retained builders. Run the Python
 inbox example from `docs/PYTHON_ICON_BADGE.md` or use the JavaScript and TypeScript
-builders in `docs/NODE_ICON_BADGE.md`. Go can prepare and copy masks with
-`docs/GO_ICON_RESOURCES.md`. Retained Go and Rust builders currently use named
-Icons and scalar text Badges.
+builders in `docs/NODE_ICON_BADGE.md`. Go covers resources and retained
+authoring in `docs/GO_ICON_RESOURCES.md` and `docs/GO_ICON_BADGE.md`.
+Rust builders currently use named Icons and scalar text Badges.

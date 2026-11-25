@@ -346,6 +346,7 @@ static cui_bridge_status go_part_query(cui_bridge_app *a,cui_bridge_node n,uint3
 
 #include "skeleton_presentation_ffi.h"
 #include "icon_resources_ffi.h"
+#include "icon_badge_ffi.h"
 
 static int bridge_open(const char *path) {
  if (bridge_initialized) return 0;
@@ -356,6 +357,7 @@ static int bridge_open(const char *path) {
 #undef STATIC_LOAD
  go_skeleton_initialize();
  cui_go_icon_resources_init(bridge_lib);
+ cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
  return 0;
  }
@@ -382,6 +384,7 @@ static int bridge_open(const char *path) {
  bridge_lib = lib;
  go_skeleton_initialize();
  cui_go_icon_resources_init(bridge_lib);
+ cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
  return 0;
 }
@@ -449,6 +452,8 @@ type Options struct {
 type Node struct {
 	timeLocalized                        *TimeFieldConfig
 	skeletonConfig                       *SkeletonConfig
+	iconConfig                           *IconConfig
+	badgeConfig                          *BadgeConfig
 	timeChange                           func(TimeFieldChange)
 	slider                               *sliderNode
 	kind                                 int
@@ -1113,6 +1118,7 @@ func (a *App) Close() error {
 	C.go_destroy(a.ptr)
 	for _, n := range a.nodes {
 		n.timeChange = nil
+		n.iconConfig, n.badgeConfig = nil, nil
 		if n.slider != nil {
 			n.slider.callback = nil
 		}
@@ -1234,18 +1240,24 @@ func (n *Node) SetText(v string) error {
 	if n.removed {
 		return errors.New("removed node")
 	}
+	if n.iconConfig != nil || n.kind == configuredBadgeKind {
+		return errors.New("use configuration to set Icon or Badge text")
+	}
 	if n.app != nil {
 		if err := n.app.check(); err != nil {
 			return err
 		}
-		s := cs(v)
-		defer C.free(unsafe.Pointer(s))
-		if err := result(C.go_set_text(n.app.ptr, n.handle, s)); err != nil {
+		if err := n.setNativeText(v); err != nil {
 			return err
 		}
 	}
 	n.text = v
 	return nil
+}
+func (n *Node) setNativeText(v string) error {
+	s := cs(v)
+	defer C.free(unsafe.Pointer(s))
+	return result(C.go_set_text(n.app.ptr, n.handle, s))
 }
 func (n *Node) GapPx(v float32) *Node {
 	if n.err != nil {
@@ -1469,7 +1481,7 @@ func (n *Node) Disabled(v bool) *Node {
 	if n.err != nil {
 		return n
 	}
-	if !(n.kind == 4 || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || (n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79) {
+	if !(n.kind == 4 || n.kind == configuredBadgeKind || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || (n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79) {
 		n.err = errors.New("disabled requires control")
 		return n
 	}
@@ -1592,6 +1604,19 @@ func (a *App) Mount(root *Node) error {
 		if n.err != nil {
 			return n.err
 		}
+		if n.iconConfig != nil {
+			if _, err := a.iconPresentationHandle(*n.iconConfig); err != nil {
+				return err
+			}
+		}
+		if n.badgeConfig != nil {
+			if err := a.requireConfiguredBadge(); err != nil {
+				return err
+			}
+			if _, _, err := n.badgeConfig.wire(a); err != nil {
+				return err
+			}
+		}
 		usesResponsiveSkeleton = usesResponsiveSkeleton || n.skeletonConfig != nil
 		if n.key == "" {
 			n.key = fmt.Sprintf("go-%p", n)
@@ -1606,7 +1631,7 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("duplicate key")
 		}
 		keys[n.key] = true
-		if n.kind >= 3 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 63 && n.kind != 64 && n.kind != 65 && n.kind != 66 && n.kind != 70 && n.kind != 73 && n.kind != 74 && n.kind != 75 && n.kind != 76 && n.kind != 78 && n.kind != 79 && n.kind != 80 && len(n.children) > 0 {
+		if n.kind >= 3 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 63 && n.kind != 64 && n.kind != 65 && n.kind != 66 && n.kind != 70 && n.kind != 73 && n.kind != 74 && n.kind != 75 && n.kind != 76 && n.kind != 78 && n.kind != 79 && n.kind != 80 && n.kind != configuredBadgeKind && len(n.children) > 0 {
 			return errors.New("leaf has children")
 		}
 		if (n.kind == 54 || n.kind == 60 || n.kind == 64 || n.kind == 65 || n.kind == 66 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 79) && len(n.children) > 64 {
@@ -1648,6 +1673,12 @@ func (a *App) Mount(root *Node) error {
 			if e := result(C.go_slider_create(a.ptr, p, key, &c, &v, &h)); e != nil {
 				return e
 			}
+		} else if n.kind == configuredBadgeKind {
+			badge, err := a.createNativeBadge(n, p, key)
+			if err != nil {
+				return err
+			}
+			h = badge
 		} else {
 			if err := result(C.go_node_create(a.ptr, p, C.cui_bridge_kind(n.kind), key, &h)); err != nil {
 				return err
@@ -1685,7 +1716,7 @@ func (a *App) Mount(root *Node) error {
 			}
 		}
 		if n.text != "" {
-			if err := n.SetText(n.text); err != nil {
+			if err := n.setNativeText(n.text); err != nil {
 				return err
 			}
 		}
@@ -1808,6 +1839,11 @@ func (a *App) Mount(root *Node) error {
 				return e
 			}
 		}
+		if n.iconConfig != nil {
+			if err := n.setNativeIcon(*n.iconConfig); err != nil {
+				return err
+			}
+		}
 		if n.detail != "" {
 			p := cs(n.detail)
 			e := result(C.go_set_detail_text(a.ptr, h, p))
@@ -1831,7 +1867,7 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 		}
-		if (n.kind == 81 || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || ((n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79)) && n.disabled {
+		if (n.kind == 81 || n.kind == configuredBadgeKind || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || ((n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79)) && n.disabled {
 			if err := result(C.go_set_disabled(a.ptr, h, 1)); err != nil {
 				return err
 			}
@@ -2369,6 +2405,7 @@ func (n *Node) Remove() error {
 		delete(x.app.nodes, keyID(x.handle))
 		x.removed = true
 		x.timeChange = nil
+		x.iconConfig, x.badgeConfig = nil, nil
 		if x.slider != nil {
 			x.slider.callback = nil
 		}
@@ -2700,6 +2737,10 @@ func (n *Node) VisualSize(width, height float32) *Node {
 	}
 	if n.skeletonConfig != nil {
 		n.err = errors.New("use Skeleton configuration to size a responsive Skeleton")
+		return n
+	}
+	if n.iconConfig != nil {
+		n.err = errors.New("use Icon configuration to size a configured Icon")
 		return n
 	}
 	if !(n.kind == 30 || n.kind == 32 || n.kind == 33 || n.kind == 35 || n.kind == 36 || n.kind == 46 || n.kind == 50 || n.kind == 51 || n.kind == 52 || n.kind == 53 || n.kind == 54 || n.kind == 56 || n.kind == 58 || n.kind == 60 || n.kind == 61 || n.kind == 64 || n.kind == 65 || n.kind == 66 || n.kind == 67 || n.kind == 68 || n.kind == 69 || n.kind == 70 || n.kind == 71 || n.kind == 72 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 78 || n.kind == 79 || n.kind == 80) || !finite(width) || !finite(height) || width < 0 || height < 0 || width > 4096 || height > 4096 {

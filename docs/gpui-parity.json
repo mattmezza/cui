@@ -5864,6 +5864,17 @@
           ]
         },
         {
+          "name": "auto-measured scrolling in a short native starter page",
+          "status": "tested",
+          "evidence": [
+            "examples/native_starter/test_app.c",
+            "docs/NATIVE_APP_STARTER.md"
+          ],
+          "limitations": [
+            "The example verifies wheel and injected touch scrolling and implements application-level reveal for three Settings controls. This does not establish generalized focus reveal or physical touch coverage."
+          ]
+        },
+        {
           "name": "wheel/drag scrollbar",
           "status": "tested",
           "evidence": [

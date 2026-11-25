@@ -4,7 +4,8 @@ A small C11 app with Home, Projects and Settings, real navigation callbacks,
 and editable local settings. At 768 logical pixels and wider, the account menu
 sits at the sidebar bottom. Below 768, **Menu** opens a drawer with the same
 pages and account actions. Crossing the breakpoint preserves page and edit
-state. Navigation focus moves to the corresponding visible control.
+state. Navigation focus moves to the corresponding visible control. In short
+windows the page scrolls separately while the compact Menu stays pinned.
 
 Follow [Build your first native CUI app](../../docs/NATIVE_APP_STARTER.md) for
 prerequisites, installation, CMake, Make and direct compiler commands. The build

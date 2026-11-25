@@ -206,6 +206,12 @@ Focus in the page stays where it is. The two navigation layouts use different
 control IDs, so a press belongs to the layout where it started.
 See [responsive containers](RESPONSIVE_LAYOUT.md).
 
+The page uses an auto-measured Scrollable below the compact Menu button. Short
+windows can scroll to the bottom of Settings by wheel or touch. The starter uses
+the previous layout bounds to reveal a newly focused form control. It shows the
+scrollbar only when the page overflows and holds content width steady as the bar
+comes and goes. A new page starts at the top.
+
 Navigation uses `cui_sidebar_menu` activation callbacks. Settings uses
 `cui_input_ex`, `cui_checkbox` and `cui_button`. Extend `changed()` with your
 persistence or application services. [Native host and callbacks](../examples/native_starter/main.c).
@@ -230,8 +236,10 @@ navigation callbacks, bottom-account geometry, sign-in/out, menu settings,
 Escape dismissal, touch navigation, text-model editing, notification changes
 and save callbacks. It also checks body-only scrolling, pinned account controls,
 clipped link hit testing and repeated breakpoint crossings with an open account
-menu, held input and unsaved edits. A separate Linux test verifies intermediate
-rendered frames and retained input focus during a burst of native resize requests.
+menu, held input and unsaved edits. At 148 logical pixels tall, it verifies that
+wheel, touch and Tab can scroll the page and that Save still works. A separate
+Linux test verifies intermediate rendered frames and retained input focus during
+a burst of native resize requests.
 [Linux live-resize evidence](LINUX_LIVE_RESIZE.md).
 Run the app for a bounded native capture with:
 

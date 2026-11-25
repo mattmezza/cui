@@ -222,6 +222,75 @@ static void navigation_scroll(cui_context *ui, starter_app *a, bool drawer) {
     assert(a->account.overlay.open);
 }
 
+static void short_settings(bool wide) {
+    starter_app a;
+    assert(starter_app_init(&a, changed, calls));
+    a.page = STARTER_SETTINGS;
+    width = wide ? 960 : 360;
+    height = 148;
+    cui_context *ui = cui_create((cui_config){.width = width, .height = height});
+    assert(ui);
+    frame(ui, &a);
+    frame(ui, &a);
+    cui_rect save = cui_bounds(ui, STARTER_SAVE);
+    cui_rect menu = cui_bounds(ui, STARTER_MENU);
+    assert(save.y + save.h > height);
+    scroll_at(ui, &a, (cui_rect){width - 72, height - 62, 40, 40});
+    scroll_at(ui, &a, (cui_rect){width - 72, height - 62, 40, 40});
+    assert_fits(cui_bounds(ui, STARTER_SAVE));
+    assert(cui_bounds(ui, STARTER_SAVE).y < save.y);
+    if (!wide)
+        assert_fits(cui_bounds(ui, STARTER_MENU));
+    assert(cui_bounds(ui, STARTER_MENU).y == menu.y);
+    unsigned saves = calls[STARTER_SAVED];
+    click(ui, &a, STARTER_SAVE);
+    assert(a.saves == 1 && calls[STARTER_SAVED] == saves + 1);
+
+    height = 640;
+    frame(ui, &a);
+    assert(cui_bounds(ui, STARTER_SAVE).y == save.y);
+    assert(cui_bounds(ui, cui_scrollbar_id(STARTER_PAGE_VIEWPORT, true)).w == 0);
+    cui_focus(ui, STARTER_NAME);
+    height = 148;
+    frame(ui, &a);
+    key(ui, &a, CUI_KEY_TAB);
+    assert(cui_focused(ui) == STARTER_NOTIFICATIONS);
+    key(ui, &a, CUI_KEY_TAB);
+    assert(cui_focused(ui) == STARTER_SAVE);
+    assert_fits(cui_bounds(ui, STARTER_SAVE));
+    cui_rect viewport = cui_bounds(ui, STARTER_PAGE_VIEWPORT);
+    cui_rect revealed = cui_bounds(ui, STARTER_SAVE);
+    assert(revealed.y >= viewport.y && revealed.y + revealed.h <= viewport.y + viewport.h);
+    key(ui, &a, CUI_KEY_ENTER);
+    assert(a.saves == 2 && calls[STARTER_SAVED] == saves + 2);
+
+    height = 640;
+    frame(ui, &a);
+    cui_focus(ui, 0);
+    height = 148;
+    frame(ui, &a);
+    viewport = cui_bounds(ui, STARTER_PAGE_VIEWPORT);
+    cui_event swipe = {.type = CUI_EVENT_POINTER_DOWN,
+                       .x = viewport.x + viewport.w - 24,
+                       .y = viewport.y + viewport.h - 8,
+                       .pointer_type = CUI_POINTER_TOUCH,
+                       .pointer_id = 5};
+    assert(a.page_scroll.y == 0);
+    assert(cui_queue_event(ui, swipe));
+    frame(ui, &a);
+    swipe.type = CUI_EVENT_POINTER_MOVE;
+    swipe.y = viewport.y + 8;
+    assert(cui_queue_event(ui, swipe));
+    frame(ui, &a);
+    swipe.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(ui, swipe));
+    frame(ui, &a);
+    assert(a.page_scroll.y > 0 && a.saves == 2);
+    assert(cui_bounds(ui, STARTER_MENU).y == menu.y);
+    starter_app_destroy(&a);
+    cui_destroy(ui);
+}
+
 int main(void) {
     starter_app a;
     assert(starter_app_init(&a, changed, calls));
@@ -261,5 +330,7 @@ int main(void) {
     navigation_scroll(ui, &a, true);
     starter_app_destroy(&a);
     cui_destroy(ui);
+    short_settings(true);
+    short_settings(false);
     return 0;
 }

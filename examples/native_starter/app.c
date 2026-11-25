@@ -15,6 +15,8 @@ static void emit(starter_app *a, starter_event event) {
         a->callback(a->user, event, a);
 }
 static void navigate(starter_app *a, starter_page page) {
+    if (a->page != page)
+        a->page_scroll = (cui_scroll_state){0};
     a->page = page;
     emit(a, STARTER_NAVIGATED);
 }
@@ -207,26 +209,8 @@ static void navigation_drawer(cui_context *ui, const cui_theme *t, starter_app *
         close_drawer(ui, a);
 }
 
-static void main_content(cui_context *ui, const cui_theme *t, starter_app *a, cui_rect viewport,
-                         cui_responsive window, bool wide, const cui_platform *clipboard) {
-    float width = viewport.w - (wide ? sidebar_width : 0);
-    float padding = fminf(width * .125f, cui_responsive_value(window, CUI_BREAKPOINT_MD, 16, 32));
-    cui_begin_box(ui, STARTER_MAIN,
-                  (cui_box){.width = width,
-                            .fixed_width = true,
-                            .height = -1,
-                            .padding = padding,
-                            .gap = wide ? 20 : 12,
-                            .clip = true});
-    if (!wide) {
-        if (cui_button_ex(
-                ui, STARTER_MENU, t, cui_string("Menu"),
-                (cui_button_options){.variant = CUI_BUTTON_OUTLINE, .icon = cui_string("menu")}))
-            cui_surface_open(ui, &a->drawer, STARTER_MENU);
-        cui_set_semantic_details(
-            ui, STARTER_MENU,
-            (cui_semantic_details){.expanded = a->drawer.overlay.open, .controls = STARTER_DRAWER});
-    }
+static void render_page(cui_context *ui, const cui_theme *t, starter_app *a, float width, bool wide,
+                        const cui_platform *clipboard) {
     const char *titles[] = {"Home", "Projects", "Settings"};
     cui_text(ui, cui_string(titles[a->page]), 28, t->text);
     if (a->page == STARTER_HOME) {
@@ -240,9 +224,8 @@ static void main_content(cui_context *ui, const cui_theme *t, starter_app *a, cu
         label(ui, t, "Personal tools");
     } else {
         label(ui, t, "Display name");
-        cui_input_ex(
-            ui, STARTER_NAME, t, cui_string("Display name"), a->name_edit, &a->name_input,
-            (cui_input_options){.width = fminf(300, width - 2 * padding), .clipboard = clipboard});
+        cui_input_ex(ui, STARTER_NAME, t, cui_string("Display name"), a->name_edit, &a->name_input,
+                     (cui_input_options){.width = fminf(300, width), .clipboard = clipboard});
         cui_checkbox(ui, STARTER_NOTIFICATIONS, t, cui_string("Enable notifications"),
                      &a->notifications, false);
         if (cui_button(ui, STARTER_SAVE, t, cui_string("Save settings"), false)) {
@@ -252,6 +235,66 @@ static void main_content(cui_context *ui, const cui_theme *t, starter_app *a, cu
         }
         if (a->saves)
             label(ui, t, "Settings saved locally for this session.");
+    }
+}
+
+static void reveal_page_focus(cui_context *ui, starter_app *a, float width, float height) {
+    cui_id focused = cui_focused(ui);
+    if (a->page != STARTER_SETTINGS ||
+        (focused != STARTER_NAME && focused != STARTER_NOTIFICATIONS && focused != STARTER_SAVE))
+        focused = 0;
+    cui_rect viewport = cui_bounds(ui, STARTER_PAGE_VIEWPORT);
+    if (focused && (focused != a->page_focus || height < viewport.h || width != viewport.w)) {
+        cui_rect target = cui_bounds(ui, focused);
+        if (target.h > 0) {
+            float top = target.y - cui_bounds(ui, STARTER_PAGE_CONTENT).y;
+            a->page_scroll.y = fminf(top, fmaxf(a->page_scroll.y, top + target.h - height));
+        }
+    }
+    a->page_focus = focused;
+}
+
+static void main_content(cui_context *ui, const cui_theme *t, starter_app *a, cui_rect viewport,
+                         cui_responsive window, bool wide, const cui_platform *clipboard) {
+    float width = viewport.w - (wide ? sidebar_width : 0);
+    float padding = fminf(width * .125f, cui_responsive_value(window, CUI_BREAKPOINT_MD, 16, 32));
+    float gap = wide ? 20 : 12;
+    cui_begin_box(ui, STARTER_MAIN,
+                  (cui_box){.width = width,
+                            .fixed_width = true,
+                            .height = -1,
+                            .padding = padding,
+                            .gap = gap,
+                            .clip = true});
+    if (!wide) {
+        if (cui_button_ex(
+                ui, STARTER_MENU, t, cui_string("Menu"),
+                (cui_button_options){.variant = CUI_BUTTON_OUTLINE, .icon = cui_string("menu")}))
+            cui_surface_open(ui, &a->drawer, STARTER_MENU);
+        cui_set_semantic_details(
+            ui, STARTER_MENU,
+            (cui_semantic_details){.expanded = a->drawer.overlay.open, .controls = STARTER_DRAWER});
+    }
+    float height = fmaxf(1, viewport.h - 2 * padding - (wide ? 0 : t->control_height + gap));
+    cui_scroll_options scroll = {.width = width - 2 * padding,
+                                 .height = height,
+                                 .vertical = true,
+                                 .auto_measure_content = true,
+                                 .bar_thickness = 8};
+    cui_theme page_theme = *t;
+    page_theme.surface = t->background;
+    /* Keep the same content width when the scrollbar appears or disappears. */
+    float content_width = cui_scroll_layout(cui_scroll_resolve(&page_theme, scroll)).viewport.width;
+    if (cui_bounds(ui, STARTER_PAGE_CONTENT).h <= height) {
+        scroll.width = content_width;
+        scroll.hide_scrollbars = true;
+    }
+    reveal_page_focus(ui, a, scroll.width, height);
+    if (cui_scrollable_begin(ui, STARTER_PAGE_VIEWPORT, &page_theme, &a->page_scroll, scroll)) {
+        cui_begin_box(ui, STARTER_PAGE_CONTENT, (cui_box){.width = -1, .gap = gap});
+        render_page(ui, t, a, content_width, wide, clipboard);
+        cui_end_box(ui);
+        cui_scrollable_end_ex(ui, STARTER_PAGE_VIEWPORT, &page_theme, &a->page_scroll, scroll);
     }
     cui_end_box(ui);
 }
@@ -267,6 +310,7 @@ cui_draw_list starter_app_frame(cui_context *ui, starter_app *a, float width, fl
     cui_overlay_update(ui, &a->account.overlay);
     starter_page previous_page = a->page;
     bool previous_signed_in = a->signed_in;
+    float previous_height = cui_bounds(ui, STARTER_PAGE_CONTENT).h;
     cui_theme t = cui_theme_light();
     cui_rect viewport = {0, 0, width, height};
     cui_begin_box(
@@ -280,8 +324,9 @@ cui_draw_list starter_app_frame(cui_context *ui, starter_app *a, float width, fl
     if (!wide)
         navigation_drawer(ui, &t, a, viewport, dt);
     cui_draw_list list = cui_end_frame(ui);
-    /* Some labels were submitted before navigation or account callbacks. */
-    if (previous_page != a->page || previous_signed_in != a->signed_in)
+    /* Repaint earlier labels and settle the scroll range after measuring the page. */
+    if (previous_page != a->page || previous_signed_in != a->signed_in ||
+        previous_height != cui_bounds(ui, STARTER_PAGE_CONTENT).h)
         cui_invalidate(ui);
     return list;
 }

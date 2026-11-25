@@ -179,8 +179,9 @@ layout constraints. See `docs/RESPONSIVE_LAYOUT.md` and the native starter in
 `docs/NATIVE_APP_STARTER.md` for a sidebar that becomes a compact drawer while
 preserving page, account and edit state. Use distinct IDs for controls in
 alternate navigation layouts and transfer focus to a visible counterpart when
-closing an overlay at a breakpoint. Test narrow and wide viewports, long content
-and overflow.
+closing an overlay at a breakpoint. The starter also uses auto-measured
+`cui_scrollable_begin` / `cui_scrollable_end_ex` below its pinned Menu and
+explicitly reveals focused form controls in short windows.
 For loading placeholders, see `docs/SKELETON_RESPONSIVE.md`. Keep motion per
 shape, schedule the earliest wake and attach busy state to the application region.
 

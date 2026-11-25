@@ -46,10 +46,15 @@ static void responsive(cui_context *ui, starter_app *a) {
     assert(cui_edit_replace_range(a->name_edit, 0, 5, cui_string("Uncommitted")) == CUI_EDIT_OK);
     /* Cross the boundary with an open desktop popup. */
     click(ui, a, STARTER_ACCOUNT);
+    assert(a->account.overlay.open);
+    cui_focus(ui, STARTER_SESSION);
+    assert(cui_focus_within(ui, a->account.overlay.id));
     const float widths[] = {320, 767, 768, 1280, 360, 960, 224, 360};
     for (size_t i = 0; i < sizeof widths / sizeof widths[0]; ++i) {
         width = widths[i];
         frame(ui, a);
+        if (i == 0)
+            assert(cui_focused(ui) == STARTER_MENU);
         cui_rect root = cui_bounds(ui, STARTER_ROOT), main = cui_bounds(ui, STARTER_MAIN);
         bool wide = width >= 768;
         assert(root.w == width && root.h == height);
@@ -74,25 +79,25 @@ static void responsive(cui_context *ui, starter_app *a) {
     key(ui, a, CUI_KEY_ENTER);
     assert(a->drawer.overlay.open);
     assert_fits(cui_bounds(ui, STARTER_DRAWER));
-    cui_rect account = cui_bounds(ui, STARTER_ACCOUNT);
+    cui_rect account = cui_bounds(ui, STARTER_DRAWER_ACCOUNT);
     assert_fits(account);
     assert(account.y + account.h > height - 20);
-    click(ui, a, STARTER_ACCOUNT);
+    click(ui, a, STARTER_DRAWER_ACCOUNT);
     assert(a->account.overlay.open && a->drawer.overlay.open);
     key(ui, a, CUI_KEY_ESCAPE);
     assert(!a->account.overlay.open && a->drawer.overlay.open);
-    assert(cui_focused(ui) == STARTER_ACCOUNT);
-    click(ui, a, STARTER_ACCOUNT);
-    click(ui, a, STARTER_SESSION);
+    assert(cui_focused(ui) == STARTER_DRAWER_ACCOUNT);
+    click(ui, a, STARTER_DRAWER_ACCOUNT);
+    click(ui, a, STARTER_DRAWER_SESSION);
     assert(a->signed_in && !a->account.overlay.open && a->drawer.overlay.open);
     key(ui, a, CUI_KEY_ESCAPE);
     assert(!a->drawer.overlay.open && cui_focused(ui) == STARTER_MENU);
-    assert(cui_bounds(ui, STARTER_ACCOUNT).w == 0);
+    assert(cui_bounds(ui, STARTER_DRAWER_ACCOUNT).w == 0);
 
     cui_rect menu = cui_bounds(ui, STARTER_MENU);
     tap(ui, a, menu.x + menu.w / 2, menu.y + menu.h / 2, CUI_POINTER_TOUCH);
     assert(a->drawer.overlay.open);
-    cui_rect projects = cui_bounds(ui, STARTER_NAV_PROJECTS);
+    cui_rect projects = cui_bounds(ui, STARTER_DRAWER_NAV_PROJECTS);
     assert_fits(projects);
     tap(ui, a, projects.x + projects.w / 2, projects.y + projects.h / 2, CUI_POINTER_TOUCH);
     assert(!a->drawer.overlay.open && a->page == STARTER_PROJECTS);
@@ -103,11 +108,14 @@ static void responsive(cui_context *ui, starter_app *a) {
     tap(ui, a, 350, 480, CUI_POINTER_MOUSE);
     assert(!a->drawer.overlay.open && cui_focused(ui) == STARTER_MENU);
     click(ui, a, STARTER_MENU);
-    click(ui, a, STARTER_ACCOUNT);
+    click(ui, a, STARTER_DRAWER_ACCOUNT);
+    cui_focus(ui, STARTER_DRAWER_SESSION);
+    assert(cui_focus_within(ui, a->account.overlay.id));
     width = 960;
     height = 190;
     frame(ui, a);
     assert(!a->drawer.overlay.open && !a->account.overlay.open && a->signed_in);
+    assert(cui_focused(ui) == STARTER_ACCOUNT);
     assert(cui_bounds(ui, STARTER_DRAWER).w == 0 && cui_bounds(ui, STARTER_MENU).w == 0);
     account = cui_bounds(ui, STARTER_ACCOUNT);
     assert_fits(account);
@@ -118,6 +126,102 @@ static void responsive(cui_context *ui, starter_app *a) {
     assert(!strcmp(a->name, "Uncommitted") && !strcmp(a->saved_name, "Grace") &&
            a->page == STARTER_SETTINGS);
 }
+
+static void breakpoint_input(cui_context *ui, starter_app *a) {
+    cui_focus(ui, STARTER_NAME);
+    width = 360;
+    frame(ui, a);
+    assert(cui_focused(ui) == STARTER_NAME);
+    width = 960;
+    frame(ui, a);
+    assert(cui_focused(ui) == STARTER_NAME);
+
+    cui_focus(ui, STARTER_NAV_SETTINGS);
+    width = 360;
+    frame(ui, a);
+    assert(cui_focused(ui) == STARTER_MENU);
+    width = 960;
+    frame(ui, a);
+    assert(cui_focused(ui) == STARTER_NAV_SETTINGS);
+
+    unsigned navigations = calls[STARTER_NAVIGATED];
+    const cui_pointer_type pointers[] = {CUI_POINTER_MOUSE, CUI_POINTER_TOUCH};
+    for (size_t i = 0; i < sizeof pointers / sizeof pointers[0]; ++i) {
+        width = 360;
+        frame(ui, a);
+        key(ui, a, CUI_KEY_ENTER);
+        cui_rect link = cui_bounds(ui, STARTER_DRAWER_NAV_HOME);
+        assert_fits(link);
+        cui_event event = {.type = CUI_EVENT_POINTER_DOWN,
+                           .x = link.x + link.w / 2,
+                           .y = link.y + link.h / 2,
+                           .pointer_type = pointers[i],
+                           .pointer_id = 1};
+        assert(cui_queue_event(ui, event));
+        frame(ui, a);
+        cui_focus(ui, STARTER_DRAWER_NAV_HOME);
+        width = 960;
+        frame(ui, a);
+        assert(!a->drawer.overlay.open && cui_focused(ui) == STARTER_NAV_HOME);
+        link = cui_bounds(ui, STARTER_NAV_HOME);
+        assert_fits(link);
+        event.type = CUI_EVENT_POINTER_UP;
+        event.x = link.x + link.w / 2;
+        event.y = link.y + link.h / 2;
+        assert(cui_queue_event(ui, event));
+        frame(ui, a);
+        assert(a->page == STARTER_SETTINGS && calls[STARTER_NAVIGATED] == navigations);
+    }
+    click(ui, a, STARTER_NAV_HOME);
+    assert(a->page == STARTER_HOME && calls[STARTER_NAVIGATED] == navigations + 1);
+}
+
+static void scroll_at(cui_context *ui, starter_app *a, cui_rect region) {
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = region.x + region.w / 2,
+                                           .y = region.y + region.h / 2,
+                                           .dy = -2}));
+    frame(ui, a);
+}
+
+static void navigation_scroll(cui_context *ui, starter_app *a, bool drawer) {
+    width = drawer ? 360 : 960;
+    height = 132;
+    frame(ui, a);
+    if (drawer)
+        click(ui, a, STARTER_MENU);
+    frame(ui, a);
+    const float *scroll = drawer ? &a->drawer.body_scroll : &a->sidebar.scroll.y;
+    cui_rect viewport = drawer ? a->drawer.body_viewport : a->sidebar.viewport;
+    cui_id account_id = drawer ? STARTER_DRAWER_ACCOUNT : STARTER_ACCOUNT;
+    cui_id home_id = drawer ? STARTER_DRAWER_NAV_HOME : STARTER_NAV_HOME;
+    cui_rect account = cui_bounds(ui, account_id), home = cui_bounds(ui, home_id);
+    assert_fits(viewport);
+    assert(viewport.y > 0 && account.y >= viewport.y + viewport.h);
+    assert_fits(account);
+    assert(home.y >= viewport.y && home.y < viewport.y + viewport.h && *scroll == 0);
+
+    scroll_at(ui, a, account);
+    scroll_at(ui, a, (cui_rect){viewport.x, 0, viewport.w, viewport.y});
+    assert(*scroll == 0);
+    scroll_at(ui, a, viewport);
+    assert(*scroll > 0 && cui_bounds(ui, home_id).y == home.y - *scroll);
+    assert(cui_bounds(ui, account_id).y == account.y);
+    assert(cui_bounds(ui, account_id).h == account.h);
+
+    /* Part of the scrolled menu sits behind the header, outside the hit clip. */
+    cui_rect projects = cui_bounds(ui, drawer ? STARTER_DRAWER_NAV_PROJECTS : STARTER_NAV_PROJECTS);
+    float clipped_top = projects.y > 0 ? projects.y : 0;
+    float clipped_bottom =
+        projects.y + projects.h < viewport.y ? projects.y + projects.h : viewport.y;
+    assert(clipped_bottom > clipped_top);
+    unsigned navigations = calls[STARTER_NAVIGATED];
+    tap(ui, a, projects.x + projects.w / 2, (clipped_top + clipped_bottom) / 2, CUI_POINTER_MOUSE);
+    assert(a->page == STARTER_HOME && calls[STARTER_NAVIGATED] == navigations);
+    click(ui, a, account_id);
+    assert(a->account.overlay.open);
+}
+
 int main(void) {
     starter_app a;
     assert(starter_app_init(&a, changed, calls));
@@ -152,6 +256,9 @@ int main(void) {
     frame(ui, &a);
     assert(!a.account.overlay.open);
     responsive(ui, &a);
+    breakpoint_input(ui, &a);
+    navigation_scroll(ui, &a, false);
+    navigation_scroll(ui, &a, true);
     starter_app_destroy(&a);
     cui_destroy(ui);
     return 0;

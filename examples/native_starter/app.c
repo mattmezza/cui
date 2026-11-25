@@ -5,6 +5,10 @@
 
 static const float sidebar_width = 220;
 static const float drawer_width = 280;
+static const cui_id sidebar_pages[] = {STARTER_NAV_HOME, STARTER_NAV_PROJECTS,
+                                       STARTER_NAV_SETTINGS};
+static const cui_id drawer_pages[] = {STARTER_DRAWER_NAV_HOME, STARTER_DRAWER_NAV_PROJECTS,
+                                      STARTER_DRAWER_NAV_SETTINGS};
 
 static void emit(starter_app *a, starter_event event) {
     if (a->callback)
@@ -55,9 +59,8 @@ static void activate_page(void *user) {
     navigate(link->app, link->page);
 }
 
-static bool navigation(cui_context *ui, const cui_theme *t, starter_app *a) {
+static bool navigation(cui_context *ui, const cui_theme *t, starter_app *a, const cui_id ids[3]) {
     const char *labels[] = {"Home", "Projects", "Settings"};
-    const cui_id ids[] = {STARTER_NAV_HOME, STARTER_NAV_PROJECTS, STARTER_NAV_SETTINGS};
     starter_link links[3];
     cui_sidebar_menu_item items[3];
     bool selected = false;
@@ -74,23 +77,24 @@ static bool navigation(cui_context *ui, const cui_theme *t, starter_app *a) {
 }
 
 static bool account_menu(cui_context *ui, const cui_theme *t, starter_app *a, cui_rect viewport,
-                         float dt) {
+                         float dt, bool in_drawer) {
+    cui_id trigger = in_drawer ? STARTER_DRAWER_ACCOUNT : STARTER_ACCOUNT;
+    cui_id settings = in_drawer ? STARTER_DRAWER_ACCOUNT_SETTINGS : STARTER_ACCOUNT_SETTINGS;
+    cui_id session = in_drawer ? STARTER_DRAWER_SESSION : STARTER_SESSION;
     cui_choice_item items[] = {
-        {.id = STARTER_ACCOUNT_SETTINGS, .label = cui_string("Settings")},
-        {.id = STARTER_SESSION,
-         .label = cui_string(a->signed_in ? "Sign out (demo)" : "Sign in (demo)")}};
+        {.id = settings, .label = cui_string("Settings")},
+        {.id = session, .label = cui_string(a->signed_in ? "Sign out (demo)" : "Sign in (demo)")}};
     cui_id action = 0;
-    if (!cui_menu(ui, STARTER_ACCOUNT, t,
-                  cui_string(a->signed_in ? "Ada / account" : "Guest / account"), items, 2, &action,
-                  &a->account,
+    if (!cui_menu(ui, trigger, t, cui_string(a->signed_in ? "Ada / account" : "Guest / account"),
+                  items, 2, &action, &a->account,
                   (cui_choice_popup_options){
                       .viewport = viewport, .width = 200, .side = CUI_POPUP_ABOVE, .dt = dt}))
         return false;
-    if (action == STARTER_ACCOUNT_SETTINGS) {
+    if (action == settings) {
         navigate(a, STARTER_SETTINGS);
         return true;
     }
-    if (action == STARTER_SESSION) {
+    if (action == session) {
         a->signed_in = !a->signed_in;
         emit(a, STARTER_SESSION_CHANGED);
     }
@@ -111,17 +115,19 @@ static void sidebar_header(cui_context *ui, const cui_theme *t, bool collapsed, 
 
 static void sidebar_links(cui_context *ui, const cui_theme *t, bool collapsed, void *user) {
     (void)collapsed;
-    (void)navigation(ui, t, user);
+    (void)navigation(ui, t, user, sidebar_pages);
 }
 
 static void sidebar_account(cui_context *ui, const cui_theme *t, bool collapsed, void *user) {
     (void)collapsed;
     const starter_sidebar_content *content = user;
-    (void)account_menu(ui, t, content->app, content->viewport, content->dt);
+    (void)account_menu(ui, t, content->app, content->viewport, content->dt, false);
 }
 
 static void sidebar(cui_context *ui, const cui_theme *t, starter_app *a, cui_rect viewport,
                     float dt) {
+    if (!cui_begin_focus_scope(ui, STARTER_SIDEBAR, false))
+        return;
     /* Sidebar owns body scrolling and keeps the footer outside the clip. */
     starter_sidebar_content content = {a, viewport, dt};
     cui_sidebar_entry links = {.id = 12,
@@ -138,11 +144,41 @@ static void sidebar(cui_context *ui, const cui_theme *t, starter_app *a, cui_rec
                                       .footer_user = &content,
                                       .custom_box = true,
                                       .box = {.background = t->surface, .border = t->border}});
+    cui_end_focus_scope(ui);
 }
 
 static void close_drawer(cui_context *ui, starter_app *a) {
     cui_overlay_close(ui, &a->account.overlay);
     cui_surface_close(ui, &a->drawer, CUI_SURFACE_CLOSED);
+}
+
+static cui_id sidebar_focus(cui_context *ui, const starter_app *a) {
+    cui_id focused = cui_focused(ui);
+    if (focused == STARTER_DRAWER_ACCOUNT || cui_focus_within(ui, a->account.overlay.id))
+        return STARTER_ACCOUNT;
+    for (size_t i = 0; i < sizeof drawer_pages / sizeof drawer_pages[0]; ++i)
+        if (focused == drawer_pages[i])
+            return sidebar_pages[i];
+    if (focused == STARTER_MENU || cui_focus_within(ui, STARTER_DRAWER))
+        return sidebar_pages[a->page];
+    return 0;
+}
+
+static void switch_navigation_layout(cui_context *ui, starter_app *a, bool wide) {
+    if (a->has_layout && a->wide_layout != wide) {
+        /* Save the previous scope's focus before closing overlays restores their old anchors. */
+        cui_id focus = wide                                    ? sidebar_focus(ui, a)
+                       : cui_focus_within(ui, STARTER_SIDEBAR) ? STARTER_MENU
+                                                               : 0;
+        if (wide)
+            close_drawer(ui, a);
+        else
+            cui_overlay_close(ui, &a->account.overlay);
+        if (focus)
+            cui_focus(ui, focus);
+    }
+    a->has_layout = true;
+    a->wide_layout = wide;
 }
 
 static void navigation_drawer(cui_context *ui, const cui_theme *t, starter_app *a,
@@ -162,10 +198,10 @@ static void navigation_drawer(cui_context *ui, const cui_theme *t, starter_app *
         }
         return;
     }
-    bool selected = navigation(ui, t, a);
+    bool selected = navigation(ui, t, a, drawer_pages);
     cui_surface_footer_begin(ui, t);
     /* Keep the account control in the fixed footer even when links scroll. */
-    selected |= account_menu(ui, t, a, (cui_rect){0, 0, width, viewport.h}, dt);
+    selected |= account_menu(ui, t, a, (cui_rect){0, 0, width, viewport.h}, dt, true);
     cui_surface_end(ui);
     if (selected)
         close_drawer(ui, a);
@@ -226,10 +262,7 @@ cui_draw_list starter_app_frame(cui_context *ui, starter_app *a, float width, fl
     if (!a || !window.valid || !cui_begin_frame(ui, width, height, dt))
         return (cui_draw_list){0};
     bool wide = cui_responsive_at_least(window, CUI_BREAKPOINT_MD);
-    if (wide && a->drawer.overlay.open)
-        close_drawer(ui, a);
-    if (!wide && !a->drawer.overlay.open)
-        cui_overlay_close(ui, &a->account.overlay);
+    switch_navigation_layout(ui, a, wide);
     /* Process nested dismissal before the drawer or its background controls. */
     cui_overlay_update(ui, &a->account.overlay);
     starter_page previous_page = a->page;

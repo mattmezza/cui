@@ -21,13 +21,20 @@ enum {
     STARTER_SESSION = 112,
     STARTER_NAME = 120,
     STARTER_NOTIFICATIONS = 121,
-    STARTER_SAVE = 122
+    STARTER_SAVE = 122,
+    STARTER_DRAWER_NAV_HOME = 201,
+    STARTER_DRAWER_NAV_PROJECTS = 202,
+    STARTER_DRAWER_NAV_SETTINGS = 203,
+    STARTER_DRAWER_ACCOUNT = 210,
+    STARTER_DRAWER_ACCOUNT_SETTINGS = 211,
+    STARTER_DRAWER_SESSION = 212
 };
 typedef struct starter_app starter_app;
 typedef void (*starter_callback)(void *user, starter_event event, const starter_app *app);
 struct starter_app {
     starter_page page;
     bool signed_in, notifications;
+    bool has_layout, wide_layout;
     unsigned saves;
     char name[80], saved_name[80];
     cui_edit *name_edit;

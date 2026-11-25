@@ -199,7 +199,12 @@ returns focus to Menu.
 The page, account session, and Settings edit model live in the application.
 Changing width preserves these values. The compact view caps the name input at
 its available width. On crossing the breakpoint, the app closes any navigation
-overlay whose trigger is leaving the current layout. See [responsive containers](RESPONSIVE_LAYOUT.md).
+overlay whose trigger is leaving the current layout. Sidebar focus moves to
+Menu in compact mode. On widening, Menu focus moves to the current page link;
+focus in the drawer moves to the matching sidebar link or account control.
+Focus in the page stays where it is. The two navigation layouts use different
+control IDs, so a press belongs to the layout where it started.
+See [responsive containers](RESPONSIVE_LAYOUT.md).
 
 Navigation uses `cui_sidebar_menu` activation callbacks. Settings uses
 `cui_input_ex`, `cui_checkbox` and `cui_button`. Extend `changed()` with your
@@ -223,9 +228,11 @@ requests a redraw, including during resize.
 `test_app.c` exercises real Core/component reducers without opening a window:
 navigation callbacks, bottom-account geometry, sign-in/out, menu settings,
 Escape dismissal, touch navigation, text-model editing, notification changes
-and save callbacks. It also crosses the responsive breakpoint repeatedly with
-unsaved edits. A separate Linux test verifies intermediate rendered frames
-during a burst of native resize requests. [Linux live-resize evidence](LINUX_LIVE_RESIZE.md).
+and save callbacks. It also checks body-only scrolling, pinned account controls,
+clipped link hit testing and repeated breakpoint crossings with an open account
+menu, held input and unsaved edits. A separate Linux test verifies intermediate
+rendered frames and retained input focus during a burst of native resize requests.
+[Linux live-resize evidence](LINUX_LIVE_RESIZE.md).
 Run the app for a bounded native capture with:
 
 ```sh

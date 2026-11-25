@@ -45,11 +45,13 @@ including 767 and 768, while the starter displays Settings. Each frame
 checks the current window, main layout and input widths. Captured pixels
 verify the sidebar background where the sidebar is present, and the main
 background across the full width in compact mode. Settings, sign-in,
-notification state, saved name, and unsaved edit all survive.
+notification state, saved name, and unsaved edits all survive. The name input
+retains keyboard focus on every sampled frame.
 
-The private X11 software run presented **24 frames across all six requested
-widths during a 1.48-second burst**. The headless starter tests cover drawer
-interaction and dismissal separately.
+The focused-input X11 software run presented **40 frames across all six
+requested widths during a 1.48-second burst**. The headless starter tests cover
+focus transfer between navigation layouts, body-only scrolling, and drawer
+dismissal.
 
 ## Run safely
 

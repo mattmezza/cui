@@ -177,8 +177,10 @@ Use the opt-in adapter and keep numeric requests separate from confirmed values.
 For responsive UI, derive available space from the host and use the documented
 layout constraints. See `docs/RESPONSIVE_LAYOUT.md` and the native starter in
 `docs/NATIVE_APP_STARTER.md` for a sidebar that becomes a compact drawer while
-preserving page, account and edit state. Test narrow and wide viewports, long
-content and overflow.
+preserving page, account and edit state. Use distinct IDs for controls in
+alternate navigation layouts and transfer focus to a visible counterpart when
+closing an overlay at a breakpoint. Test narrow and wide viewports, long content
+and overflow.
 For loading placeholders, see `docs/SKELETON_RESPONSIVE.md`. Keep motion per
 shape, schedule the earliest wake and attach busy state to the application region.
 

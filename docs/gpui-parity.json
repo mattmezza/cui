@@ -6186,7 +6186,7 @@
             "docs/LINUX_LIVE_RESIZE.md"
           ],
           "limitations": [
-            "Starter composition verified with programmatic X11 resize and headless input. Physical window-border drag and other hosts remain open."
+            "Headless starter checks cover body-only scrolling, pinned account controls, clipping, focus transfer and held mouse/touch across the breakpoint. Private X11 resize checks preserve focused page input. Physical window-border drag and other hosts remain open."
           ]
         },
         {

@@ -62,6 +62,7 @@ static bool initialize(void *user, int argc, char **argv, cui_sdl3 **host, cui_c
     s->app.notifications = false;
     if (cui_edit_replace_range(s->app.name_edit, 0, 3, cui_string("Unsaved")) != CUI_EDIT_OK)
         return false;
+    cui_focus(s->ui, STARTER_NAME);
 #else
     dashboard_init(&s->app, NULL, NULL);
     s->app.page = 1;
@@ -103,7 +104,8 @@ static int frame(void *user, cui_sdl3 *host, cui_context *ui) {
     bool wide = width >= 768;
     if (s->app.page != STARTER_SETTINGS || !s->app.signed_in || s->app.notifications ||
         s->app.saves || strcmp(s->app.name, "Unsaved") || strcmp(s->app.saved_name, "Ada") ||
-        s->app.drawer.overlay.open || s->app.account.overlay.open)
+        s->app.drawer.overlay.open || s->app.account.overlay.open ||
+        cui_focused(ui) != STARTER_NAME)
         return -1;
     if (wide ? (sidebar.w != 220 || account.y + account.h <= height - 20 || menu.w > 0)
              : (sidebar.w > 0 || account.w > 0 || menu.w <= 0))

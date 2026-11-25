@@ -7327,6 +7327,18 @@
           ]
         },
         {
+          "name": "caller-owned page requests and viewport retention",
+          "status": "tested",
+          "evidence": [
+            "docs/TABLE.md",
+            "tests/unit/test_table.c",
+            "tests/web/test_table_selection_contracts.py"
+          ],
+          "limitations": [
+            "The offline gallery checks threshold requests, one pending timer, anchored completion, disabling, route cancellation and end of data. Network transport and a standardized remote data adapter remain open."
+          ]
+        },
+        {
           "name": "remote data adapter",
           "status": "not_started",
           "evidence": []

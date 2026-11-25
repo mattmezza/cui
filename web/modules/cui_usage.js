@@ -24,6 +24,37 @@ cui_table_result draw_live_data_table(cui_context *ui, cui_id id, const cui_them
     return cui_data_table(ui, id, theme, model, state, options, NULL, NULL, NULL);
 }`;
 
+export const pagedDataTableUsage = `#include <cui/cui_table.h>
+
+/* Keep model, state and pending across frames. A true return requests one page.
+ * Start the request and return promptly. Preserve the loaded rows while waiting. */
+bool draw_paged_data_table(cui_context *ui, cui_id id, const cui_theme *theme,
+    cui_table_model *model, cui_table_state *state, cui_table_options options,
+    bool more_rows, bool *pending) {
+    options.load_more = more_rows && !options.disabled;
+    options.load_more_threshold = 2;
+    cui_table_result result = cui_data_table(ui, id, theme, model, state, options,
+        NULL, NULL, NULL);
+    if (!result.load_more || *pending)
+        return false;
+    *pending = true;
+    return true;
+}
+
+/* Apply a current request on the UI thread before drawing. Pass the complete
+ * retained row snapshot in display order, including the newly arrived page.
+ * Keep prior rows alive until bind succeeds. Use effective scrollbar options. */
+cui_table_error apply_data_table_page(cui_table_model *model, cui_table_state *state,
+    cui_table_options options, const cui_table_row *rows, size_t count,
+    cui_table_column *columns, size_t column_count, bool *pending) {
+    cui_table_row_anchor anchor = cui_table_capture_row_anchor(model, state->scroll_y, options);
+    cui_table_error result = cui_table_bind(model, rows, count, columns, column_count);
+    if (result == CUI_TABLE_OK)
+        state->scroll_y = cui_table_restore_row_anchor(model, anchor, options);
+    *pending = false;
+    return result;
+}`;
+
 export const virtualInboxUsage = `#include <cui/cui_virtual_scroll.h>
 
 /* Retain list and state. Supply the updated key order before drawing.

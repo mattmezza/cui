@@ -361,6 +361,9 @@ of `cui_table_restore_row_anchor` to `state.scroll_y`. Pass the corresponding
 table options, including the effective scrollbar style. Selection stays keyed.
 See the **Live updates** gallery example and `docs/TABLE.md`. Foreign builders
 lack the C row-anchor helpers.
+For paging, use `result.load_more` with an app-owned in-flight flag and keep
+the current rows interactive. See **Paged inbox** and the paging guide in
+`docs/TABLE.md`.
 For variable-height VirtualList updates in C, capture an anchor before
 rebuilding keys or changing heights and restore it before the next draw.
 Retain the within-row offset for surviving keys. Clear it if a removed item's

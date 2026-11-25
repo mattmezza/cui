@@ -168,6 +168,31 @@ while the model rebinds. Changing examples or disabling the preview cancels
 the pending update. The example demonstrates the UI-thread rebind step using a
 local timer.
 
+### Request another page
+
+Choose **Paged inbox** in the gallery. Start with 16 files and scroll near the
+bottom to load the next 16. The preview keeps the loaded rows interactive and
+shows progress below the table. It stops at 48 files. A local timer simulates
+arrival, so the example works offline. Switching stories or disabling the
+preview cancels a pending page.
+
+Set `options.load_more` while the data source has more rows, with
+`load_more_threshold` set to the count of rows remaining after the visible
+window. Use `result.load_more` to start a request. Keep a separate in-flight
+flag because the table can signal again after leaving and re-entering the
+threshold. Reserve `options.loading` for a view that replaces its rows with
+a loading placeholder. For incremental loads, draw the busy status alongside
+the existing table.
+
+On the UI thread, check that the response belongs to the current dataset and
+request before applying it. Capture and restore the row anchor around a
+successful bind of the complete updated view, with the effective scrollbar
+options. Keep the bound snapshot alive until it is replaced. Clear the in-flight
+flag after completion or cancellation. To rearm after cancellation, submit with
+`load_more` off while disabled, as the gallery does. With a failed bind the
+gallery keeps its old rows and lets the user leave and re-enter the threshold
+to retry. The copyable C example shows the request and completion steps.
+
 Custom leaf-header, group-header, row-header, whole-row and trailing-column render hooks use option userdata. Group headers accept up to sixteen levels of bounded spans. Every level must cover all data columns exactly, and no group may cross the fixed-column boundary; `cui_table_group_headers_valid` lets applications validate a configuration before rendering. Group cells expose column-header semantics at their first column; the callback receives the complete span. Whole-row callbacks run only for virtualized rows and can add row-level decoration or content before the cells. The optional trailing column uses a caller-selected width (12 logical pixels by default) and participates in horizontal scroll extent; its callback runs for each header level, the leaf header and visible rows. Loading replaces body rows with a busy status and suppresses input/load requests; empty and loading placeholders have optional render hooks and accessible default labels.
 
 Set `scrollbars` to reserve scrollbar gutters only when an axis overflows. `bar_thickness` controls their logical thickness. The drawing-free reducer delegates keyboard, track and thumb behavior to the reusable Scroll base primitive, while the styled table paints the same scrollbar state. The grid and scrollbar semantics share the table as their scroll owner. Applications that build a custom renderer can use `cui_table_scroll_layout` to obtain the reduced viewport and scroll maxima.

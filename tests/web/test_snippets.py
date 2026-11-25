@@ -43,11 +43,11 @@ def main():
         import {join} from 'node:path';
         const load = name => import('data:text/javascript;base64,' +
             readFileSync(join(process.argv[1], name)).toString('base64'));
-        const {virtualInboxUsage, liveDataTableUsage} = await load('cui_usage.js');
+        const {virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage} = await load('cui_usage.js');
         const {hoverCardUsage} = await load('cui_hover_card_usage.js');
         process.stdout.write(JSON.stringify({
             VirtualList: [virtualInboxUsage],
-            DataTable: [liveDataTableUsage],
+            DataTable: [liveDataTableUsage, pagedDataTableUsage],
             HoverCard: [0, 1, 2].flatMap(mode => [0, 1, 2].map(preview => hoverCardUsage(mode, preview)))
         }));
     ''', str(ROOT / 'web/modules')], text=True))

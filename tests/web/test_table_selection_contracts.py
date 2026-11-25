@@ -104,19 +104,20 @@ def check_data_table_appearance(audit):
     assert cell_pixel(audit, first_column(audit, 30, 4)) == stripe_color
 
 
-def check_live_data_table(audit):
-    def visible_cells():
-        body = audit.target('Rows', 34)
-        top, bottom = body['f'][2], body['f'][2] + body['f'][4]
-        cells = [cell for cell in audit.snapshot() if cell['f'][0] == 30 and cell['f'][23] == 1
-                 and cell['f'][2] < bottom and cell['f'][2] + cell['f'][4] > top]
-        return body, sorted(cells, key=lambda cell: cell['f'][22])
+def visible_data_cells(audit):
+    body = audit.target('Rows', 34)
+    top, bottom = body['f'][2], body['f'][2] + body['f'][4]
+    cells = [cell for cell in audit.snapshot() if cell['f'][0] == 30 and cell['f'][23] == 1
+             and cell['f'][2] < bottom and cell['f'][2] + cell['f'][4] > top]
+    return body, sorted(cells, key=lambda cell: cell['f'][22])
 
+
+def check_live_data_table(audit):
     audit.configure('table-mode', 4)
     assert 'cui_table_restore_row_anchor' in audit.page.locator('#snippet').text_content()
     assert audit.target('Workspace files', 31)['f'][24] == 1000
     audit.drag(audit.target('Rows', 34), 0, -44, rx=.15, ry=.6)
-    body, cells = visible_cells()
+    body, cells = visible_data_cells(audit)
     first, selected, successor = cells[:3]
     assert abs(body['f'][19] - 44) < .2
     assert first['f'][22] == 2
@@ -130,7 +131,7 @@ def check_live_data_table(audit):
         return Array.from({length:e.gallery_semantic_count()}, (_,i)=>i)
             .some(i=>e.gallery_semantic(i,0)===31 && e.gallery_semantic(i,24)===1001);
     }''')
-    updated, cells = visible_cells()
+    updated, cells = visible_data_cells(audit)
     assert cells[0]['id'] == first['id'] and cells[0]['f'][22] == first['f'][22] + 1
     assert abs(cells[0]['f'][2] - first['f'][2]) < .2
     assert abs(updated['f'][19] - body['f'][19] - 32) < .2
@@ -156,6 +157,97 @@ def check_live_data_table(audit):
     audit.configure('table-mode', 4)
     assert audit.target('Workspace files', 31)['f'][24] == 1000
     audit.target('Receive a file', 1)
+
+
+def check_paged_data_table(audit):
+    page = audit.page
+    page.set_viewport_size({'width': 1280, 'height': 900})
+    page.clock.install()
+    audit.configure('table-mode', 5)
+    assert 'apply_data_table_page' in page.locator('#snippet').text_content()
+
+    def rows():
+        return audit.target('Workspace files', 31)['f'][24]
+
+    def scroll(delta):
+        point = audit.point(audit.target('Rows', 34))
+        page.mouse.move(point['x'], point['y'])
+        page.mouse.wheel(0, delta)
+        page.wait_for_timeout(80)
+
+    def wait_status(text):
+        page.locator(f'#accessible [role="status"][aria-label*="{text}"]').wait_for(state='attached')
+
+    def wake():
+        return page.evaluate('cuiGallery.exports.gallery_next_wake()')
+
+    assert rows() == 16 and wake() == 0
+    wait_status('Scroll for more files')
+    scroll(1500)
+    wait_status('16 of 48 files · Loading next page')
+    deadline = wake()
+    assert deadline > 0
+    scroll(-1500)
+    scroll(1500)
+    assert wake() == deadline and rows() == 16
+    body, cells = visible_data_cells(audit)
+    first, selected = cells[:2]
+    audit.tap(selected)
+    assert audit.value(selected, 11) == 1 and audit.value(selected, 7) == 1
+
+    page.clock.fast_forward(2100)
+    wait_status('32 of 48 files · Scroll for more files')
+    assert rows() == 32 and wake() == 0
+    after, cells = visible_data_cells(audit)
+    assert cells[0]['id'] == first['id'] and abs(cells[0]['f'][2] - first['f'][2]) < .2
+    assert abs(after['f'][19] - body['f'][19]) < .2
+    assert audit.value(selected, 11) == 1 and audit.value(selected, 7) == 1
+
+    scroll(1500)
+    wait_status('32 of 48 files · Loading next page')
+    audit.configure('disabled', True)
+    wait_status('Paging paused')
+    assert wake() == 0
+    page.clock.fast_forward(2100)
+    assert rows() == 32
+    audit.configure('disabled', False)
+    wait_status('32 of 48 files · Loading next page')
+    page.clock.fast_forward(2100)
+    wait_status('48 of 48 files · All files loaded')
+    assert rows() == 48 and wake() == 0
+    scroll(1500)
+    assert rows() == 48 and wake() == 0
+
+    audit.configure('table-mode', 4)
+    assert rows() == 1000
+    audit.configure('table-mode', 5)
+    assert rows() == 16
+    audit.tap(audit.target('Name', 29))
+    assert audit.target('Name', 29)['f'][8] == 2
+    scroll(1500)
+    wait_status('Loading next page')
+    body, cells = visible_data_cells(audit)
+    first = cells[0]
+    page.clock.fast_forward(2100)
+    # With descending sort the larger keys land above the viewport.
+    wait_status('32 of 48 files · Loading next page')
+    after, cells = visible_data_cells(audit)
+    assert rows() == 32 and cells[0]['id'] == first['id']
+    assert abs(cells[0]['f'][2] - first['f'][2]) < .2
+    assert abs(after['f'][19] - body['f'][19] - 16 * 32) < .2
+    audit.route('Button')
+    assert wake() == 0
+    page.clock.fast_forward(2100)
+    page.set_viewport_size({'width': 390, 'height': 844})
+    audit.route('DataTable')
+    audit.configure('table-mode', 5)
+    assert rows() == 16 and wake() == 0
+    for _ in range(3):
+        audit.drag(audit.target('Rows', 34), 0, -120, rx=.25, ry=.85)
+    wait_status('16 of 48 files · Loading next page')
+    page.clock.fast_forward(2100)
+    wait_status('32 of 48 files · Scroll for more files')
+    assert rows() == 32 and wake() == 0
 
 
 def main():
@@ -211,6 +303,7 @@ def main():
    check_table_appearance(appearance)
    check_data_table_appearance(appearance)
    check_live_data_table(appearance)
+   check_paged_data_table(appearance)
    assert appearance.page.evaluate('cuiGallery.exports.gallery_error()') == 0
    assert not appearance.errors, appearance.errors
    browser.close()

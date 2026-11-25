@@ -2498,15 +2498,28 @@ static cui_table_selection table_selection[64];
 static bool table_pinned, table_actions, table_selection_locked, table_source_sort = true;
 static bool table_story_disabled;
 static bool table_custom_header = true, table_striped = true;
-typedef enum { TABLE_BASIC, TABLE_COMPOSED, TABLE_LOADING, TABLE_EMPTY, TABLE_LIVE } table_story;
-enum { TABLE_INITIAL_ROWS = 1000, TABLE_MAX_ROWS = TABLE_INITIAL_ROWS + 32 };
+typedef enum {
+    TABLE_BASIC,
+    TABLE_COMPOSED,
+    TABLE_LOADING,
+    TABLE_EMPTY,
+    TABLE_LIVE,
+    TABLE_PAGED
+} table_story;
+enum {
+    TABLE_INITIAL_ROWS = 1000,
+    TABLE_MAX_ROWS = TABLE_INITIAL_ROWS + 32,
+    TABLE_PAGE_SIZE = 16,
+    TABLE_PAGED_ROWS = 3 * TABLE_PAGE_SIZE
+};
 static table_story table_mode;
 static int table_row_hooks, table_inspections;
 static cui_table_selection_mode table_selection_mode = CUI_TABLE_SELECT_CELL;
 static cui_table_row table_rows[TABLE_INITIAL_ROWS];
-static cui_table_row table_live_rows[2][TABLE_MAX_ROWS];
-static unsigned table_live_buffer;
+static cui_table_row table_staged_rows[2][TABLE_MAX_ROWS];
+static unsigned table_active_buffer;
 static double table_arrival_at;
+static bool table_page_failed;
 static cui_table_column table_columns[3];
 static char table_names[TABLE_MAX_ROWS][24], table_sizes[TABLE_MAX_ROWS][24];
 static cui_surface_state dialog_surface, alert_dialog_surface, sheet_surface, popover_surface,
@@ -2645,33 +2658,47 @@ static int table_compare_rows(const void *left, const void *right) {
         order = -order;
     return order;
 }
+static bool table_uses_staged_rows(table_story story) {
+    return story == TABLE_LIVE || story == TABLE_PAGED;
+}
+static cui_table_row table_file_row(size_t index) {
+    return (cui_table_row){.key = index + 1, .label = cui_string(table_names[index])};
+}
 static bool gallery_apply_table_sort(void) {
     for (size_t c = 0; c < 3; c++)
         if (!cui_table_get_column(table, c, &table_columns[c]))
             return false;
-    bool live = table_mode == TABLE_LIVE;
-    cui_table_row *rows = live ? table_live_rows[table_live_buffer] : table_rows;
-    size_t count = live ? cui_table_rows(table) : TABLE_INITIAL_ROWS;
+    bool staged = table_uses_staged_rows(table_mode);
+    cui_table_row *rows = staged ? table_staged_rows[table_active_buffer] : table_rows;
+    size_t count = staged ? cui_table_rows(table) : TABLE_INITIAL_ROWS;
     qsort(rows, count, sizeof(*rows), table_compare_rows);
     return cui_table_bind(table, rows, table_mode == TABLE_EMPTY ? 0 : count, table_columns, 3) ==
            CUI_TABLE_OK;
 }
-static void gallery_table_receive(cui_table_options options) {
+static bool gallery_table_add_rows(cui_table_options options, size_t add, bool prepend) {
     size_t count = cui_table_rows(table);
-    if (count >= TABLE_MAX_ROWS)
-        return;
+    if (!add || add > TABLE_MAX_ROWS - count)
+        return false;
     cui_table_row_anchor anchor =
         cui_table_capture_row_anchor(table, table_state.scroll_y, options);
-    unsigned spare = 1 - table_live_buffer;
-    cui_table_row *next = table_live_rows[spare];
-    next[0] = (cui_table_row){.key = count + 1, .label = cui_string(table_names[count])};
-    memcpy(next + 1, table_live_rows[table_live_buffer], count * sizeof(*next));
+    unsigned spare = 1 - table_active_buffer;
+    cui_table_row *next = table_staged_rows[spare];
+    memcpy(next + (prepend ? add : 0), table_staged_rows[table_active_buffer],
+           count * sizeof(*next));
+    size_t insert = prepend ? 0 : count;
+    for (size_t i = 0; i < add; ++i)
+        next[insert + i] = table_file_row(count + i);
     if (table_state.sort != CUI_TABLE_SORT_DEFAULT)
-        qsort(next, count + 1, sizeof(*next), table_compare_rows);
-    if (cui_table_bind(table, next, count + 1, table_columns, 3) == CUI_TABLE_OK) {
-        table_live_buffer = spare;
-        table_state.scroll_y = cui_table_restore_row_anchor(table, anchor, options);
-    }
+        qsort(next, count + add, sizeof(*next), table_compare_rows);
+    if (cui_table_bind(table, next, count + add, table_columns, 3) != CUI_TABLE_OK)
+        return false;
+    table_active_buffer = spare;
+    table_state.scroll_y = cui_table_restore_row_anchor(table, anchor, options);
+    return true;
+}
+static void gallery_table_schedule_wake(void) {
+    if (table_arrival_at > 0 && (!next_wake || table_arrival_at < next_wake))
+        next_wake = table_arrival_at;
 }
 static void gallery_table_live_controls(cui_context *context, const cui_theme *theme,
                                         cui_table_options options) {
@@ -2679,7 +2706,7 @@ static void gallery_table_live_controls(cui_context *context, const cui_theme *t
         table_arrival_at = 0;
     } else if (table_arrival_at > 0 && host_seconds >= table_arrival_at) {
         table_arrival_at = 0;
-        gallery_table_receive(options);
+        (void)gallery_table_add_rows(options, 1, true);
     }
     bool pending = table_arrival_at > 0, full = cui_table_rows(table) >= TABLE_MAX_ROWS;
     const char *label = full ? "File limit reached" : pending ? "File arriving…" : "Receive a file";
@@ -2691,8 +2718,40 @@ static void gallery_table_live_controls(cui_context *context, const cui_theme *t
         table_arrival_at = (double)host_seconds + 2;
         cui_invalidate(context);
     }
-    if (table_arrival_at > 0 && (!next_wake || table_arrival_at < next_wake))
-        next_wake = table_arrival_at;
+    gallery_table_schedule_wake();
+}
+static void gallery_table_finish_page(cui_table_options options) {
+    if (!table_arrival_at)
+        return;
+    if (options.disabled) {
+        table_arrival_at = 0;
+    } else if (host_seconds >= table_arrival_at) {
+        table_arrival_at = 0;
+        size_t remaining = TABLE_PAGED_ROWS - cui_table_rows(table);
+        size_t add = remaining < TABLE_PAGE_SIZE ? remaining : TABLE_PAGE_SIZE;
+        table_page_failed = !gallery_table_add_rows(options, add, false);
+    }
+}
+static void gallery_table_page_status(cui_context *context, const cui_theme *theme, bool request,
+                                      bool disabled) {
+    if (request && !table_arrival_at) {
+        table_page_failed = false;
+        table_arrival_at = (double)host_seconds + 2;
+    }
+    gallery_table_schedule_wake();
+    size_t count = cui_table_rows(table);
+    const char *message = count == TABLE_PAGED_ROWS ? "All files loaded"
+                          : disabled                ? "Paging paused"
+                          : table_arrival_at        ? "Loading next page…"
+                          : table_page_failed       ? "Scroll back up, then down to retry"
+                                                    : "Scroll for more files";
+    char text[96];
+    snprintf(text, sizeof(text), "%zu of %d files · %s", count, TABLE_PAGED_ROWS, message);
+    cui_id id = cui_id_from(context, "file-page-status");
+    cui_begin_box(context, id, (cui_box){.width = -1});
+    cui_interact(context, id, CUI_ROLE_STATUS, cui_string(text), false, false, 0);
+    cui_label(context, theme, cui_string(text));
+    cui_end_box(context);
 }
 static void table_row_hook(cui_context *context, const cui_theme *theme, void *user, size_t row) {
     (void)context;
@@ -3136,7 +3195,7 @@ int gallery_init(void) {
         snprintf(table_sizes[i], sizeof(table_sizes[i]), "%zu KB", i + 1);
     }
     for (size_t i = 0; i < TABLE_INITIAL_ROWS; i++)
-        table_rows[i] = (cui_table_row){.key = i + 1, .label = cui_string(table_names[i])};
+        table_rows[i] = table_file_row(i);
     const char *column_names[] = {"Name", "Status", "Size"};
     for (size_t i = 0; i < 3; i++)
         table_columns[i] = (cui_table_column){.key = 101 + i,
@@ -6098,6 +6157,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 45: {
         table_story_disabled = disabled != 0;
         bool live = table_mode == TABLE_LIVE, composed = table_mode == TABLE_COMPOSED;
+        bool paged = table_mode == TABLE_PAGED;
         cui_begin_box(ui, cui_id_from(ui, "table-contract-controls"),
                       (cui_box){.row = true, .width = width - 48, .gap = 4});
         const cui_button_options toggle_options = {
@@ -6138,8 +6198,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                      .selection_mode = table_selection_mode,
                                      .row_header = composed,
                                      .row_header_width = 52,
-                                     .scrollbars = composed || live,
-                                     .scrollbar_style = live ? &t.scrollbar : NULL,
+                                     .scrollbars = composed || live || paged,
+                                     .scrollbar_style = live || paged ? &t.scrollbar : NULL,
+                                     .load_more_threshold = 2,
                                      .group_headers = &group_row,
                                      .group_header_count = composed ? 1 : 0,
                                      .render_row = composed ? table_row_hook : NULL,
@@ -6156,6 +6217,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                      .accessible_name = cui_string("Workspace files")};
         if (live)
             gallery_table_live_controls(ui, &t, options);
+        if (paged) {
+            gallery_table_finish_page(options);
+            options.load_more = !options.disabled && cui_table_rows(table) < TABLE_PAGED_ROWS;
+        }
         cui_table_result result =
             cui_data_table(ui, cui_id_from(ui, "data-table"), &t, table, &table_state, options,
                            table_label, table_actions ? table_action_cell : NULL, NULL);
@@ -6166,6 +6231,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         if (result.sort_changed && gallery_apply_table_sort()) {
             cui_invalidate(ui);
             redraw = true;
+        }
+        if (paged) {
+            gallery_table_page_status(ui, &t, result.load_more, options.disabled);
+            break;
         }
         char text[72];
         snprintf(text, sizeof(text), "%zu rows / visible %zu-%zu / sort %d", cui_table_rows(table),
@@ -7481,23 +7550,33 @@ void gallery_table_pin(int pinned) {
     for (size_t c = 0; c < 3; c++)
         table_columns[c].fixed_left = pinned && table_columns[c].key == 101;
     cui_table_row *rows =
-        table_mode == TABLE_LIVE ? table_live_rows[table_live_buffer] : table_rows;
+        table_uses_staged_rows(table_mode) ? table_staged_rows[table_active_buffer] : table_rows;
     if (cui_table_bind(table, rows, cui_table_rows(table), table_columns, 3) == CUI_TABLE_OK)
         table_pinned = pinned != 0;
 }
 void gallery_table_mode(int mode) {
-    if (!table || mode == (int)table_mode || mode < TABLE_BASIC || mode > TABLE_LIVE)
+    if (!table || mode == (int)table_mode || mode < TABLE_BASIC || mode > TABLE_PAGED)
         return;
     cui_table_row *rows = table_rows;
-    if (mode == TABLE_LIVE) {
-        rows = table_live_rows[0];
-        memcpy(rows, table_rows, sizeof(table_rows));
+    unsigned buffer = 0;
+    size_t count = mode == TABLE_EMPTY ? 0 : TABLE_INITIAL_ROWS;
+    if (table_uses_staged_rows((table_story)mode)) {
+        if (table_uses_staged_rows(table_mode))
+            buffer = 1 - table_active_buffer;
+        rows = table_staged_rows[buffer];
+        if (mode == TABLE_PAGED) {
+            count = TABLE_PAGE_SIZE;
+            for (size_t i = 0; i < count; ++i)
+                rows[i] = table_file_row(i);
+        } else {
+            memcpy(rows, table_rows, sizeof(table_rows));
+        }
     }
-    if (cui_table_bind(table, rows, mode == TABLE_EMPTY ? 0 : TABLE_INITIAL_ROWS, table_columns,
-                       3) == CUI_TABLE_OK) {
+    if (cui_table_bind(table, rows, count, table_columns, 3) == CUI_TABLE_OK) {
         table_mode = (table_story)mode;
-        table_live_buffer = 0;
+        table_active_buffer = buffer;
         table_arrival_at = 0;
+        table_page_failed = false;
         table_state = (cui_table_state){.selection = table_selection, .selection_capacity = 64};
     }
 }

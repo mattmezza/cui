@@ -1155,7 +1155,7 @@ Event API includes: `cui/cui_command_events.h`.
 
 **Interaction:** cui_table_result reports interaction; cui_table_label_fn provides accessibility text and cui_table_cell_fn composes visible cells.
 
-**Usage:** Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result. Capture with cui_table_capture_row_anchor before a live update and apply cui_table_restore_row_anchor after a successful bind. Striped body cells alternate in model order and selection takes precedence. Wheel ticks use the Scrollable default of 48 logical pixels; mark pixel deltas scroll_precise. Enabled movable headers own touch reorder; body/nonmovable headers retain pan, and touch drops use indexed clipped-region admission.
+**Usage:** Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result. Capture with cui_table_capture_row_anchor before a live update and apply cui_table_restore_row_anchor after a successful bind. For paging, use result.load_more and a caller-owned in-flight flag while displayed rows stay interactive. Striped body cells alternate in model order and selection takes precedence. Wheel ticks use the Scrollable default of 48 logical pixels; mark pixel deltas scroll_precise. Enabled movable headers own touch reorder; body/nonmovable headers retain pan, and touch drops use indexed clipped-region admission.
 
 API: `cui_table_create`, `cui_table_bind`, `cui_data_table`, `cui_table_destroy`, `cui_table_capture_row_anchor`, `cui_table_restore_row_anchor`. [Public header](../include/cui/cui_table.h); [guide](TABLE.md).
 

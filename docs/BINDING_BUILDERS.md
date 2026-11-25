@@ -278,9 +278,65 @@ uses the same API. With an existing TypeScript compiler, this command checks
 the declarations and runs the compiled example with the addon above.
 
 ```sh
-python bindings/node/test/run-keyed-data-table-types.py \
+python bindings/node/test/run-data-table-types.py --case keyed \
   --tsc "$(command -v tsc)" --node "$(command -v node)" \
   --output build-node/keyed-data-table-types
+```
+
+## Page a JavaScript or TypeScript DataTable
+
+Check `app.supports_data_table_paging()` before opting in. It checks the addon
+and the complete V1 API in the bridge. To mount a previously configured tree
+on an older provider, clear the opt-in with `configure_load_more({enabled: false})`
+before mounting. Existing positional and keyed setters remain available on
+providers that support each setter.
+
+```javascript
+const {data_table} = require('./bindings/node/index.cjs');
+
+const inbox = data_table('inbox')
+  .table_data(['Subject'], initialMessages, initialKeys)
+  .configure_load_more({threshold: 1});
+
+// After mounting and stepping, on the UI thread.
+const request = inbox.poll_load_more();
+if (request) {
+  inbox.configure_load_more({enabled: false});
+  // Schedule the next page using an app-owned request identity and cursor.
+}
+```
+
+The threshold is the number of rows beyond the visible window, from 0 through
+32. The default is 0. You can also mount with headers and empty rows to request
+the first page. `poll_load_more()` consumes one frozen `DataTableLoadMore` record
+or returns `undefined`. `frameSequence` is `bigint`. The other fields are numbers
+and the visible index range is half-open. Polling leaves the normal callback
+queue alone, and a copied record remains readable after unmount or close.
+
+Keep a single request in flight and disable paging while it runs. The rows
+remain interactive. Verify the response against the current request before
+appending through `table_data(headers, rows, rowKeys)` on the UI thread. This
+preserves the viewport and selection. Enable paging again when more data is
+available. The retained bridge holds up to 32 rows.
+
+`app.run(afterFrame)` calls a synchronous hook after painting and regular
+event dispatch. Closing from regular dispatch skips the hook. The native runner
+blocks Node's event loop. For Promise or timer-based transports, drive the UI
+from your own Node loop with `app.step()` and poll after each successful step.
+
+The [JavaScript inbox](../bindings/node/examples/data-table-paging.cjs) checks
+selection during loading, retry, rejection of a stale response, and an anchored
+final append. Pass a font path as the first argument to try the native demo
+with an SDL-enabled bridge. The [TypeScript inbox](../bindings/typescript/examples/data_table_paging.ts)
+uses the same API and verifies an anchored append with strict types. With the
+addon built and an existing TypeScript compiler, run from the repository root:
+
+```sh
+export CUI_NODE_ADDON="$PWD/build-node/cui.node"
+node bindings/node/examples/data-table-paging.cjs
+python bindings/node/test/run-data-table-types.py --case paging \
+  --tsc "$(command -v tsc)" --node "$(command -v node)" \
+  --output build-node/data-table-paging-types
 ```
 
 ## Styling, state and callbacks

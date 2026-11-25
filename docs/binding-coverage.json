@@ -946,7 +946,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "All five bindings support keyed replacement on providers with cui_bridge_data_table_set_keyed. Python also supports opt-in near-end polling on V1 providers. JavaScript, TypeScript, Go and Rust omit paging. Custom cells and network transport are outside the bridge contract."
+        "All five bindings support keyed replacement on providers with cui_bridge_data_table_set_keyed. Python, JavaScript and TypeScript also support opt-in near-end polling on V1 providers. Go and Rust omit paging. Custom cells and network transport are outside the bridge contract."
       ]
     },
     {

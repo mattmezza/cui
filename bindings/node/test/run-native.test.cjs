@@ -25,4 +25,17 @@ for (const mode of ['close','destroy','error','nested']) {
     if(mode!=='destroy')assert.throws(()=>app.step(),/closed/);
   } finally {app.dispose();}
 }
+
+const app = new App({backend: 'sdl', fontPath: process.env.CUI_TEST_FONT, initiallyHidden: true});
+const marker = new Error('after-frame hook marker');
+try {
+  app.mount(row().children(button('hook').label('Go')));
+  assert.throws(() => app.run(active => {
+    assert.equal(active, app);
+    throw marker;
+  }), error => error === marker);
+  assert.throws(() => app.step(), /closed/);
+} finally {
+  app.dispose();
+}
 console.log('Node native callback run lifecycle PASS');

@@ -14,6 +14,13 @@ all stop the C runner before rethrowing/resuming in the language caller. Rust
 builds using `panic=abort` retain the toolchain's abort behavior. No language may
 unwind through a C callback.
 
+Python `App.run(after_frame=callback)` and Node/TypeScript `App.run(callback)`
+also accept a synchronous hook. It receives the app after the regular handlers
+for a successful frame have returned. Closing or disposing during event dispatch
+skips the hook. The hook can update nodes for the next frame and can poll
+DataTable paging demand. [Python paging example](BINDING_BUILDERS.md#page-a-python-datatable) ·
+[Node paging examples](BINDING_BUILDERS.md#page-a-javascript-or-typescript-datatable)
+
 A normal window close returns normally. After the runner exits, its native host
 is released and the app is terminal: release the app owner as usual. Python
 `close()`, Node `dispose()` and Go `Close()` may also destroy the owner inside a

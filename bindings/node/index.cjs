@@ -44,6 +44,14 @@ function validateDate(year,month,day) {
 function requiresKeyedTable(node) {
   return node.matrixValue?.[2] !== undefined || node.childrenValue.some(requiresKeyedTable);
 }
+function preflightDataTablePaging(app, node) {
+  if (node.loadMoreThreshold !== undefined) {
+    if (!app.supports_data_table_paging())
+      throw new Error('DataTable paging is unavailable in this bridge');
+    if (!node.matrixValue) throw new Error('DataTable paging requires column headers');
+  }
+  for (const child of node.childrenValue) preflightDataTablePaging(app, child);
+}
 function applyTableData(node, [headers, rows, rowKeys]) {
   const app = node.owner;
   if (rowKeys === undefined) {
@@ -300,6 +308,29 @@ class Node {
     this.matrixValue = copied;
     return this;
   }
+  configure_load_more(options = {}) {
+    if (this.kind !== 71) throw new TypeError('configure_load_more requires DataTable');
+    if (!options || typeof options !== 'object' || Array.isArray(options))
+      throw new TypeError('DataTable paging requires an options object');
+    const {enabled = true, threshold = 0} = options;
+    if (typeof enabled !== 'boolean') throw new TypeError('enabled must be boolean');
+    if (!Number.isInteger(threshold) || threshold < 0 || threshold > 32)
+      throw new RangeError('threshold must be an integer in 0..32');
+    if (this.owner) {
+      if (!this.owner.supports_data_table_paging())
+        throw new Error('DataTable paging is unavailable in this bridge');
+      native.configureDataTableLoadMore(this.owner.handle, this[NODE], Number(enabled), threshold);
+    }
+    this.loadMoreThreshold = enabled ? threshold : undefined;
+    return this;
+  }
+  poll_load_more() {
+    if (this.kind !== 71 || !this.owner) throw new Error('poll_load_more requires a mounted DataTable');
+    if (!this.owner.supports_data_table_paging())
+      throw new Error('DataTable paging is unavailable in this bridge');
+    const request = native.pollDataTableLoadMore(this.owner.handle, this[NODE]);
+    return request === undefined ? undefined : Object.freeze(request);
+  }
   current_cell(row,column) {if(this.kind!==71||![row,column].every(v=>Number.isInteger(v)&&v>=0&&v<=0xffffffff))throw new TypeError('invalid cell');if(this.owner)return native.getMatrixCell(this.owner.handle,this[NODE],row,column);if(!this.matrixValue||!this.matrixValue[1][row]||column>=this.matrixValue[0].length)throw new RangeError('missing cell');return this.matrixValue[1][row][column];}
   selection_mode(value) {const modes={row:0,column:1,cell:2};if(this.kind!==71||!Object.hasOwn(modes,value))throw new TypeError('invalid table selection mode');if(this.owner)native.setSelectionMode(this.owner.handle,this[NODE],modes[value]);this.selectionModeValue=modes[value];return this;}
   table_state() {if(this.kind!==71||!this.owner)throw new TypeError('mounted DataTable required');return native.getMatrixState(this.owner.handle,this[NODE]);}
@@ -428,6 +459,7 @@ class App {
     if (!(root instanceof Node) || root.parent || root.owner || ![1,2,76].includes(root.kind)) throw new TypeError('root must be an unattached row, column or root_view');
     if (!this.supports_keyed_data_table() && requiresKeyedTable(root))
       throw new Error('keyed DataTable replacement is unavailable in this bridge');
+    preflightDataTablePaging(this, root);
     skeletons.preflight(this, root);
     sliderModels.preflight(this, root);
     localizedTimes.preflight(this, root);
@@ -463,6 +495,8 @@ class App {
       if(node.kind===71)native.setSelectionMode(this.handle,node[NODE],node.selectionModeValue);
       if(node.kind===75 && node.openSet)native.setOpen(this.handle,node[NODE],node.openValue?1:0);
       if (node.kind === 71 && node.matrixValue) applyTableData(node, node.matrixValue);
+      if (node.loadMoreThreshold !== undefined)
+        node.configure_load_more({threshold: node.loadMoreThreshold});
       if(node.kind===67)native.setTextFormat(this.handle,node[NODE],node.textFormatValue);
       if(node.questionFlags)native.questionConfig(this.handle,node[NODE],...node.questionFlags.map(v=>v?1:0));
       if(node.panelValue!==null)native.setValue(this.handle,node[NODE],node.panelValue);
@@ -603,6 +637,12 @@ class App {
     this._alive();
     return typeof native.supportsKeyedDataTable === 'function' && native.supportsKeyedDataTable();
   }
+  supports_data_table_paging() {
+    this._alive();
+    return typeof native.supportsDataTablePaging === 'function' &&
+      typeof native.configureDataTableLoadMore === 'function' &&
+      typeof native.pollDataTableLoadMore === 'function' && native.supportsDataTablePaging();
+  }
   supports_skeleton_presentation() { return skeletons.supports(this); }
   supports_localized_time_field(){return localizedTimes.supports(this);}
   enable_localized_time_fields(capacity=4096){return localizedTimes.enable(this,capacity);}
@@ -613,13 +653,20 @@ class App {
   poll_slider_request(){return sliderModels.poll(this);}
   accept_slider_request(receipt,value){sliderModels.accept(this,receipt,value);}
   dispatch_slider_requests(){if(this.localizedTimeDispatching)throw new Error('nested typed dispatch unavailable');return sliderModels.dispatch(this);}
-  run() {
+  run(afterFrame) {
     if(this.sliderDispatching)throw new Error('run unavailable during controlled Slider callback');
     if(this.localizedTimeDispatching)throw new Error('run unavailable during localized TimeField callback');
     this._alive();
+    if (afterFrame !== undefined && typeof afterFrame !== 'function')
+      throw new TypeError('after-frame hook must be a function');
     if (this.running || this.timer) throw new Error('app is already running');
     this.running = true;
-    try { native.run(this.handle, () => this._dispatch()); }
+    try {
+      native.run(this.handle, () => {
+        this._dispatch();
+        if (afterFrame && !this.disposed && !this.closed) afterFrame(this);
+      });
+    }
     finally { this.running = false; }
     return this;
   }

@@ -377,9 +377,10 @@ the current rows interactive. See **Paged inbox** and the paging guide in
 `docs/TABLE.md`. Retained C owners configure the threshold with
 `cui_bridge_data_table_configure_load_more_v1` and poll a copied record via
 `cui_bridge_data_table_poll_load_more_v1`. See the paging inbox in
-`docs/BRIDGE_COMPONENTS.md`. Python uses `configure_load_more` and
-`poll_load_more` after checking `app.supports_data_table_paging()`. See the
-offline inbox in `docs/BINDING_BUILDERS.md`. JS/TS, Go and Rust omit this poll.
+`docs/BRIDGE_COMPONENTS.md`. Python and JS/TS use `configure_load_more` and
+`poll_load_more` after checking `app.supports_data_table_paging()`. JS/TS
+demand has a `bigint` frame sequence. See offline inboxes and loop options in
+`docs/BINDING_BUILDERS.md`. Go and Rust omit this poll.
 For variable-height VirtualList updates in C, capture an anchor before
 rebuilding keys or changing heights and restore it before the next draw.
 Retain the within-row offset for surviving keys. Clear it if a removed item's

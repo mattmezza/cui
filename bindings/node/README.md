@@ -58,12 +58,18 @@ app.dispose();
 
 `App.step(dt)` renders one frame, then drains click events and calls handlers. A handler may update labels and button styles for the next frame. `App.start(fps)` schedules `step` with Node timers, keeping the event loop responsive. `App.stop()` stops the timer; `App.close()` requests CUI closure and stops it; `App.dispose()` releases native resources. Host tests can queue `pointer` and `key` events, then call `step`. Handles belong to one app, and operations after disposal or removal throw.
 
-`App.run()` is the synchronous native callback runner for live window resize.
-It dispatches handlers after each completed frame and returns on close. Callback
-errors are rethrown after leaving the native runner. Unlike timer-based `start()`,
-it blocks JavaScript timers and I/O until closure. Do not mix the two loops or
-call `step()`/`run()` recursively from a handler. See
+`App.run(afterFrame?)` is the synchronous native callback runner for live window
+resize. It dispatches handlers after each completed frame, then calls the
+optional hook with the app if still open. Callback errors are rethrown after
+leaving the native runner. The runner blocks JavaScript timers and I/O until
+closure. Do not mix `start()` and `run()` or call `step()`/`run()` recursively
+from a handler. See
 [runner lifecycle](../../docs/BINDING_NATIVE_RUN.md) for ownership and errors.
+
+DataTable can request another page near the end of its viewport. Use
+`app.supports_data_table_paging()`, `table.configure_load_more()` and
+`table.poll_load_more()` with your app's request state.
+[JavaScript and TypeScript paged inboxes](../../docs/BINDING_BUILDERS.md#page-a-javascript-or-typescript-datatable)
 
 ## Controlled Single/Range Slider (unreleased)
 

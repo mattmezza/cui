@@ -39,8 +39,8 @@ export class App {
   key(phase: KeyPhase, key: Key, modifiers?: number, repeat?: boolean): this;
   text_input(text: string): this;
   step(dt?: number): number;
-  /** Blocking native runner; dispatches handlers after paint. */
-  run(): this;
+  /** Blocking native runner; calls the optional synchronous hook after dispatch. */
+  run(afterFrame?: (app: App) => void): this;
   start(fps?: number): this;
   stop(): this;
   close(): this;
@@ -186,9 +186,27 @@ export function editor(key?: string,text?: string): Editor;
 export interface Chart extends Label {chart_data(data: Array<[string,number]>): this; chart_kind(kind: 'line'|'area'|'bar'|'pie'): this; current_datum(index: number): [string,number]; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Table extends Label, Composite {visual_size(width: number,height: number): this}
 export interface DataTableState {row: number; column: number; sortColumn: number; sortDirection: number}
+export interface DataTablePagingOptions {
+  /** Defaults to true when configuring. A new DataTable starts with paging off. */
+  enabled?: boolean;
+  /** Remaining rows beyond the visible window, an integer in 0..32. Defaults to 0. */
+  threshold?: number;
+}
+export interface DataTableLoadMore {
+  readonly frameSequence: bigint;
+  readonly rowCount: number;
+  /** The visible index range is half-open. */
+  readonly visibleBegin: number;
+  readonly visibleEnd: number;
+  readonly lastRowKey: number;
+  readonly capacity: number;
+}
 export interface DataTable extends Label {
   /** Supply stable nonzero uint32 row keys to preserve the viewport on replacement. */
   table_data(headers: readonly string[], rows: readonly (readonly string[])[], rowKeys?: readonly number[]): this;
+  configure_load_more(options?: DataTablePagingOptions): this;
+  /** Consume one copied request from a mounted table after a successful frame. */
+  poll_load_more(): DataTableLoadMore | undefined;
   selection_mode(mode: 'row' | 'column' | 'cell'): this;
   current_cell(row: number, column: number): string;
   table_state(): DataTableState;
@@ -198,7 +216,7 @@ export interface DataTable extends Label {
   disabled(value?: boolean): this;
   on_change(callback: (event: ChangeEvent) => void): this;
 }
-export interface App {supports_keyed_data_table(): boolean}
+export interface App {supports_keyed_data_table(): boolean; supports_data_table_paging(): boolean}
 export interface Plot extends Label {plot_points(points: Array<[number,number]>): this; current_point(index: number): [number,number]; visual_size(width: number,height: number): this}
 export function chart(key?: string,text?: string): Chart;
 export function table(key?: string,text?: string): Table;

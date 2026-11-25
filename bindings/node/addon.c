@@ -2082,6 +2082,78 @@ static napi_value numeric_object(napi_env env, const char *const *names, const d
     return obj;
 }
 
+_Static_assert(sizeof(cui_bridge_data_table_load_more_v1) == 32, "DataTable paging V1 wire size");
+typedef struct {
+    uint32_t (*size)(void);
+    cui_bridge_status (*configure)(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t);
+    cui_bridge_status (*poll)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                              cui_bridge_data_table_load_more_v1 *);
+} data_table_paging_api;
+
+static int load_data_table_paging(data_table_paging_api *api) {
+    return optional_bridge_symbol(&api->size, sizeof api->size,
+                                  "cui_bridge_data_table_load_more_size_v1") &&
+           optional_bridge_symbol(&api->configure, sizeof api->configure,
+                                  "cui_bridge_data_table_configure_load_more_v1") &&
+           optional_bridge_symbol(&api->poll, sizeof api->poll,
+                                  "cui_bridge_data_table_poll_load_more_v1") &&
+           api->size() == sizeof(cui_bridge_data_table_load_more_v1);
+}
+
+static napi_value supports_data_table_paging(napi_env env, napi_callback_info info) {
+    (void)info;
+    data_table_paging_api api;
+    napi_value result;
+    return napi_get_boolean(env, load_data_table_paging(&api) != 0, &result) == napi_ok ? result
+                                                                                        : NULL;
+}
+
+static napi_value configure_data_table_load_more(napi_env env, napi_callback_info info) {
+    napi_value v[4];
+    js_app *app;
+    js_node *node;
+    uint32_t enabled, threshold;
+    if (!args(env, info, 4, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &enabled) || !uint_arg(env, v[3], &threshold))
+        return NULL;
+    data_table_paging_api api;
+    if (!load_data_table_paging(&api))
+        return fail(env, "DataTable paging is unavailable in this bridge");
+    cui_bridge_status code = api.configure(app->bridge, node->node, enabled, threshold);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
+static napi_value poll_data_table_load_more(napi_env env, napi_callback_info info) {
+    napi_value v[2];
+    js_app *app;
+    js_node *node;
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
+        return NULL;
+    data_table_paging_api api;
+    if (!load_data_table_paging(&api))
+        return fail(env, "DataTable paging is unavailable in this bridge");
+    cui_bridge_data_table_load_more_v1 request = {0};
+    cui_bridge_status code = api.poll(app->bridge, node->node, sizeof request, &request);
+    if (code == CUI_BRIDGE_EMPTY)
+        return undefined(env);
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
+    if (request.reserved || !request.frame || request.visible_begin > request.visible_end ||
+        request.visible_end > request.row_count || request.row_count >= request.capacity ||
+        ((request.row_count == 0) != (request.last_row_key == 0)))
+        return fail(env, "malformed DataTable load-more record");
+    const char *const names[] = {"rowCount", "visibleBegin", "visibleEnd", "lastRowKey",
+                                 "capacity"};
+    const double values[] = {request.row_count, request.visible_begin, request.visible_end,
+                             request.last_row_key, request.capacity};
+    napi_value result = numeric_object(env, names, values, sizeof names / sizeof names[0]);
+    napi_value frame = notification_frame(env, request.frame);
+    if (!result || !frame ||
+        napi_set_named_property(env, result, "frameSequence", frame) != napi_ok)
+        return NULL;
+    return result;
+}
+
 static uint32_t load_le32(const unsigned char *p) {
     return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
 }
@@ -2216,6 +2288,9 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setMatrix", set_matrix, 0);
     EXPORT("setMatrixKeyed", set_matrix, 1);
     EXPORT("supportsKeyedDataTable", supports_keyed_data_table, 0);
+    EXPORT("supportsDataTablePaging", supports_data_table_paging, 0);
+    EXPORT("configureDataTableLoadMore", configure_data_table_load_more, 0);
+    EXPORT("pollDataTableLoadMore", poll_data_table_load_more, 0);
     EXPORT("getMatrixCell", get_matrix_cell, 0);
     EXPORT("getMatrixState", matrix_state, 0);
     EXPORT("matrixCellBounds", matrix_bounds, 0);

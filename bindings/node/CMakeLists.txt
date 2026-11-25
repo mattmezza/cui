@@ -380,6 +380,51 @@ endif()
 if(CUI_NODE_TSC_EXECUTABLE)
  add_test(NAME node_keyed_data_table_types COMMAND ${CMAKE_COMMAND} -E env
   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> "${Python3_EXECUTABLE}"
-  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-keyed-data-table-types.py --tsc "${CUI_NODE_TSC_EXECUTABLE}"
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-data-table-types.py --case keyed --tsc "${CUI_NODE_TSC_EXECUTABLE}"
   --node "${NODE_EXECUTABLE}" --output ${CMAKE_CURRENT_BINARY_DIR}/keyed-data-table-types)
+endif()
+
+add_test(NAME node_data_table_paging COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} --test
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/data-table-paging.test.cjs)
+add_test(NAME node_data_table_paging_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/data-table-paging.cjs)
+if(CUI_BRIDGE_NATIVE_TESTS)
+ add_test(NAME node_data_table_paging_native COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> SDL_RENDER_DRIVER=software ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/data-table-paging.cjs "${CUI_TEST_FONT}" --smoke)
+ add_test(NAME node_native_run COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_TEST_FONT=${CUI_TEST_FONT}
+  SDL_RENDER_DRIVER=software ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/run-native.test.cjs)
+endif()
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_data_table_paging_types COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> "${Python3_EXECUTABLE}"
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-data-table-types.py --case paging --tsc "${CUI_NODE_TSC_EXECUTABLE}"
+  --node "${NODE_EXECUTABLE}" --output ${CMAKE_CURRENT_BINARY_DIR}/data-table-paging-types)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ add_library(cui_node_data_table_paging_fixture SHARED test/data-table-paging-provider.c)
+ target_include_directories(cui_node_data_table_paging_fixture PRIVATE ../../include)
+ target_compile_options(cui_node_data_table_paging_fixture PRIVATE -Wall -Wextra -Wpedantic -Werror)
+ foreach(mode size exact reserved frame window visible capacity key)
+  add_test(NAME node_data_table_paging_${mode} COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_DATA_TABLE_PAGING_FIXTURE=${mode}
+   LD_PRELOAD=$<TARGET_FILE:cui_node_data_table_paging_fixture>
+   ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/data-table-paging.test.cjs)
+ endforeach()
+ if(TARGET cui_node_icon_alpha4)
+  add_library(cui_node_partial_paging_fixture SHARED test/data-table-paging-provider.c)
+  target_include_directories(cui_node_partial_paging_fixture PRIVATE ../../include)
+  target_compile_definitions(cui_node_partial_paging_fixture PRIVATE CUI_TEST_PARTIAL_PAGING_PROVIDER)
+  target_compile_options(cui_node_partial_paging_fixture PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  add_test(NAME node_data_table_paging_alpha4 COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_icon_alpha4> CUI_DATA_TABLE_PAGING_FIXTURE=legacy
+   ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/data-table-paging.test.cjs)
+  add_test(NAME node_data_table_paging_partial COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_icon_alpha4> CUI_DATA_TABLE_PAGING_FIXTURE=partial
+   LD_PRELOAD=$<TARGET_FILE:cui_node_partial_paging_fixture>
+   ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/data-table-paging.test.cjs)
+ endif()
 endif()

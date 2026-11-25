@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.0-alpha.5 — candidate
+
+- DataTable keeps the visible row and selection across keyed updates. C, Python,
+  JavaScript, TypeScript, Go and Rust support opt-in near-end paging and copied
+  snapshots of up to 10,000 rows within a 32 MiB native app budget. Ordinary
+  setters accept 32 rows. Applications own page transport and request lifetime.
+- Retained Icon and Badge builders share owned SVG artwork across all five
+  language bindings. Configured Badges preserve the actions of their children.
+  Responsive Skeleton builders include runnable loading-to-content examples.
+- The native starter switches between pinned Sidebar and compact Sheet
+  navigation as the window resizes. Projects combines resizable panes and
+  bounded tabs. Short Settings pages stay accessible through scrolling and
+  keyboard focus.
+- VideoPlayer adds mute and volume controls with host confirmation. Its browser
+  example uses decoded audio and player-only fullscreen. The optional native
+  example uses FFV1/PCM with SDL audio gain.
+- Scroll input follows the same wheel step in DataTable and Scrollable.
+  Bounded horizontal tabs accept Shift-wheel on SDL. The gallery includes
+  anchored updates in DataTable and variable-height VirtualList.
+- Popover adds explicit trigger linking and optional right-click toggling.
+  HoverCard follows intrinsic content changes. Composed Dialog discards held
+  input across reopen and Command fills its panel on the first frame.
+- Core indexes box IDs and semantic ancestry and reuses clipped hit results
+  during hover queries. The Linux C adapter adds opt-in AT-SPI numeric Slider
+  actions. Broader assistive-technology and hardware acceptance remains open.
+
+All 78 baseline families remain in the gallery. Remote data adapters, full
+component parity, native platform acceptance and registry delivery remain open.
+
 ## 0.1.0-alpha.4 — 2026-11-01
 
 Published GitHub prerelease with matching website and native starter assets. Alpha.3

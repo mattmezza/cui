@@ -1,9 +1,12 @@
 [package]
 name = "cui-builders"
-version = "0.1.0-alpha.4"
+version = "0.1.0-alpha.5"
 edition = "2021"
 license = "MIT"
 description = "Alpha CUI builders over a source-built C bridge; tested subset"
+repository = "https://github.com/mattmezza/cui"
+homepage = "https://matteo.merola.co/cui/"
+documentation = "https://github.com/mattmezza/cui/blob/main/docs/RUST_BUILDERS.md"
 build = "build.rs"
 links = "cui_bridge"
 publish = false

@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
+#include "../base/cui_table_internal.h"
 #include "cui/cui_media.h"
 #include "cui/cui_message.h"
 #include "cui/cui_stepper_visual.h"
-#include "../base/cui_table_internal.h"
 #include "cui_bridge_internal.h"
 #include <math.h>
 #include <stddef.h>
@@ -2005,7 +2005,7 @@ static bool bridge_data_table_add_bytes(size_t *total, size_t bytes) {
 }
 
 static cui_bridge_status bridge_data_table_measure(const char *const *strings, size_t count,
-                                                    size_t *bytes) {
+                                                   size_t *bytes) {
     for (size_t i = 0; i < count; i++) {
         size_t length;
         if (bridge_utf8_limit(strings[i], BRIDGE_DATA_TABLE_MAX_TEXT, &length) != CUI_BRIDGE_OK)
@@ -2075,10 +2075,11 @@ typedef enum {
     BRIDGE_DATA_TABLE_KEYED_CAPACITY
 } bridge_data_table_mode;
 
-static cui_bridge_status bridge_data_table_set(
-    cui_bridge_app *app, cui_bridge_node handle, const char *const *headers, uint32_t column_count,
-    const char *const *cells, const uint32_t *row_keys, uint32_t row_count, uint32_t row_capacity,
-    bridge_data_table_mode mode) {
+static cui_bridge_status bridge_data_table_set(cui_bridge_app *app, cui_bridge_node handle,
+                                               const char *const *headers, uint32_t column_count,
+                                               const char *const *cells, const uint32_t *row_keys,
+                                               uint32_t row_count, uint32_t row_capacity,
+                                               bridge_data_table_mode mode) {
     cui_bridge_node_record *node;
     cui_bridge_status status = bridge_valid_node(app, handle, &node);
     if (status != CUI_BRIDGE_OK)
@@ -2088,8 +2089,7 @@ static cui_bridge_status bridge_data_table_set(
     const bool preserve = mode != BRIDGE_DATA_TABLE_POSITIONAL;
     const bool extended = mode == BRIDGE_DATA_TABLE_KEYED_CAPACITY;
     if (!column_count || column_count > BRIDGE_DATA_TABLE_MAX_COLUMNS || !row_capacity ||
-        row_count > row_capacity || !headers ||
-        (row_count && (!cells || (preserve && !row_keys))))
+        row_count > row_capacity || !headers || (row_count && (!cells || (preserve && !row_keys))))
         return CUI_BRIDGE_INVALID_ARGUMENT;
     if (row_capacity > BRIDGE_DATA_TABLE_MAX_ROWS)
         return CUI_BRIDGE_CAPACITY;
@@ -5209,10 +5209,9 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
             bridge_skeleton_render(app, node->id, owned);
         else {
             float phase = cui_loading_phase(cui_frame_time(app->ui), 2);
-            cui_skeleton(app->ui, node->id, &app->theme,
-                         node->visual_width > 0 ? node->visual_width : 120,
-                         node->visual_height > 0 ? node->visual_height : 16, 4, phase, false,
-                         false);
+            cui_skeleton(
+                app->ui, node->id, &app->theme, node->visual_width > 0 ? node->visual_width : 120,
+                node->visual_height > 0 ? node->visual_height : 16, 4, phase, false, false);
         }
     } else if (node->kind == CUI_BRIDGE_SPINNER) {
         float phase = cui_loading_phase(cui_frame_time(app->ui), .8f);
@@ -5396,8 +5395,8 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
         bool previous = app->render_disabled;
         app->render_disabled = previous || node->disabled;
         bridge_panel_binding binding = {app, slot};
-        bridge_badge_render(app, node->id, bridge_badge_node(app, slot),
-                            bridge_root_content, &binding);
+        bridge_badge_render(app, node->id, bridge_badge_node(app, slot), bridge_root_content,
+                            &binding);
         app->render_disabled = previous;
         return;
     }

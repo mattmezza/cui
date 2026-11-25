@@ -12,6 +12,7 @@ use the checklists below to track acceptance and delivery.
 | Track | Current status |
 | --- | --- |
 | Public release | **v0.1.0-alpha.4**, including native starter and language assets; [release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.4). |
+| Release candidate | **v0.1.0-alpha.5** batches the responsive starter, retained Icon/Badge and Skeleton builders, larger DataTables, player audio controls, and gallery interaction fixes. Integrated validation and publication are pending. [Candidate notes](CHANGELOG.md#010-alpha5--candidate) |
 | Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
 | Public website | Interactive WASM gallery, docs and API index; alpha.4 source at `17533b89`; [documentation deployment](https://github.com/mattmezza/cui/actions/runs/41308009221) at `4752885b` passed. |
 | Working source | Alpha.4 released from `17533b89`. Exact-source hosted CI/native bindings/Pages pass. Installed C/Python/JS/TS/Go/Rust, real-font text and native starter checks pass. Broader platform/parity acceptance remains open. |

@@ -1,3 +1,11 @@
+# Candidate v0.1.0-alpha.5
+
+The integration branch prepares `v0.1.0-alpha.5` for the library, native
+starter, language assets, and gallery. The [changelog](../CHANGELOG.md) lists
+the changes. Publication depends on the frozen source, exact-revision hosted
+gates, and installed-artifact checks below. The latest published release is
+alpha.4.
+
 # Published prerelease: v0.1.0-alpha.4
 
 [**v0.1.0-alpha.4 is published**](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.4)

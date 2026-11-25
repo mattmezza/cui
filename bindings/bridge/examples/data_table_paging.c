@@ -25,8 +25,8 @@ static const uint32_t keys[] = {101, 102, 103, 104, 105, 106, 107, 108, 301, 302
 
 static cui_bridge_status replace_messages(const inbox *owner, uint32_t count) {
     if (!owner->capacity)
-        return cui_bridge_data_table_set_keyed(owner->app, owner->table, headers, 1, messages,
-                                                keys, count);
+        return cui_bridge_data_table_set_keyed(owner->app, owner->table, headers, 1, messages, keys,
+                                               count);
 
     const char *rows[40];
     uint32_t row_keys[40];
@@ -42,7 +42,7 @@ static cui_bridge_status replace_messages(const inbox *owner, uint32_t count) {
         }
     }
     return cui_bridge_data_table_set_keyed_capacity_v1(owner->app, owner->table, headers, 1, rows,
-                                                        row_keys, count, owner->capacity);
+                                                       row_keys, count, owner->capacity);
 }
 
 static cui_bridge_status start_page(inbox *owner, page_ticket *ticket) {
@@ -71,9 +71,9 @@ static cui_bridge_status receive_page(inbox *owner, page_ticket ticket) {
         return status;
     owner->pending_frame = 0;
     /* The data source says this is the final page. Leave paging off. */
-    return cui_bridge_set_text(owner->app, owner->status, owner->capacity
-                                   ? "40 messages. End of inbox."
-                                   : "12 messages. End of inbox.");
+    return cui_bridge_set_text(owner->app, owner->status,
+                               owner->capacity ? "40 messages. End of inbox."
+                                               : "12 messages. End of inbox.");
 }
 
 static cui_bridge_status retry_page(inbox *owner) {

@@ -30,8 +30,7 @@ static void row(cui_context *ui, float width, float clip, bool disabled) {
 }
 
 static void portal(cui_context *ui, cui_id id, int16_t layer, bool disabled) {
-    cui_begin_portal(ui, id, (cui_box){.width = 20, .height = 20}, (cui_rect){5, 0, 20, 20},
-                     layer);
+    cui_begin_portal(ui, id, (cui_box){.width = 20, .height = 20}, (cui_rect){5, 0, 20, 20}, layer);
     control(ui, id, disabled);
     cui_end_box(ui);
 }
@@ -119,8 +118,8 @@ static void shared_root(cui_context *ui) {
     cui_end_box(ui);
     cui_end_box(ui);
     portal(ui, 4, 1, false);
-    cui_set_semantic_details(ui, 4, (cui_semantic_details){.blocks_pointer_activation = true,
-                                                         .no_focus = true});
+    cui_set_semantic_details(
+        ui, 4, (cui_semantic_details){.blocks_pointer_activation = true, .no_focus = true});
     end(ui);
     assert(cui_hovered(ui, 2) && cui_hovered(ui, 3) && cui_hovered(ui, 4));
 }

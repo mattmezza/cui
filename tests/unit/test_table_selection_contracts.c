@@ -330,10 +330,8 @@ static void striped_cell_fill(void) {
     cui_table_column column = {.key = 10, .label = CUI_STR("Name"), .width = 150};
     assert(ui && model && cui_table_bind(model, rows, 2, &column, 1) == CUI_TABLE_OK);
     cui_table_state state = {0};
-    cui_table_options options = {.width = 220,
-                                 .height = 120,
-                                 .striped = true,
-                                 .selection_mode = CUI_TABLE_SELECT_CELL};
+    cui_table_options options = {
+        .width = 220, .height = 120, .striped = true, .selection_mode = CUI_TABLE_SELECT_CELL};
     cui_theme theme = cui_theme_light();
     theme.background = theme.surface; /* The default gallery presets have this palette. */
     theme.muted_background = (cui_color){130, 140, 150, 255};
@@ -346,8 +344,8 @@ static void striped_cell_fill(void) {
         options.striped = scene != 2;
         if (scene == 3)
             theme.background = (cui_color){100, 110, 120, 255};
-        cui_color second_fill = (cui_color[]){theme.muted_background, theme.primary,
-                                              theme.surface, theme.background}[scene];
+        cui_color second_fill = (cui_color[]){theme.muted_background, theme.primary, theme.surface,
+                                              theme.background}[scene];
         assert(cui_begin_frame(ui, 260, 220, 0));
         cui_table_result result =
             cui_data_table(ui, table, &theme, model, &state, options, NULL, NULL, NULL);

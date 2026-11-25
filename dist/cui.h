@@ -8,7 +8,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define CUI_VERSION "0.1.0-alpha.4"
+#define CUI_VERSION "0.1.0-alpha.5"
 typedef uint64_t cui_id;
 typedef struct {
     const char *data;
@@ -9110,11 +9110,11 @@ cui_context *cui_create(cui_config config) {
     ui->arena = malloc(n);
     if (!ui->prepaints || !ui->geometry || !ui->prepaint_commands || !ui->prepaint_deferred ||
         !ui->text_sources || !ui->resources || !ui->text_styles || !ui->commands ||
-        !ui->semantics || !ui->previous || !ui->box_ids || !ui->activations || !ui->semantic_scopes ||
-        !ui->previous_semantic_scopes || !ui->scroll_gestures || !ui->previous_scroll_gestures ||
-        !ui->strings || !ui->nodes || !ui->semantic_nodes || !ui->previous_parents ||
-        !ui->previous_hits || !ui->bounds_tracks || !ui->previous_layers || !ui->previous_order ||
-        !ui->clip_containers || !ui->arena) {
+        !ui->semantics || !ui->previous || !ui->box_ids || !ui->activations ||
+        !ui->semantic_scopes || !ui->previous_semantic_scopes || !ui->scroll_gestures ||
+        !ui->previous_scroll_gestures || !ui->strings || !ui->nodes || !ui->semantic_nodes ||
+        !ui->previous_parents || !ui->previous_hits || !ui->bounds_tracks || !ui->previous_layers ||
+        !ui->previous_order || !ui->clip_containers || !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;

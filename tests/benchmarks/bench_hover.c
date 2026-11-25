@@ -20,10 +20,8 @@ static void print_samples(const char *label, clock_t samples[SAMPLES]) {
 }
 
 static bool run(size_t rows) {
-    cui_context *ui = cui_create((cui_config){.width = WIDTH,
-                                             .height = HEIGHT,
-                                             .max_elements = rows + 32,
-                                             .max_commands = rows + 32});
+    cui_context *ui = cui_create((cui_config){
+        .width = WIDTH, .height = HEIGHT, .max_elements = rows + 32, .max_commands = rows + 32});
     if (!ui)
         return false;
     clock_t hover[SAMPLES], submit[SAMPLES], finish[SAMPLES], frame_time[SAMPLES];
@@ -49,10 +47,9 @@ static bool run(size_t rows) {
         clock_t queried = clock();
         cui_begin_box(ui, 1, (cui_box){.width = WIDTH, .height = HEIGHT, .clip = true});
         for (size_t row = 0; row < rows; ++row) {
-            cui_begin_box(ui, row + 2,
-                          (cui_box){.width = WIDTH,
-                                    .height = ROW_HEIGHT,
-                                    .background = {30, 40, 50, 255}});
+            cui_begin_box(
+                ui, row + 2,
+                (cui_box){.width = WIDTH, .height = ROW_HEIGHT, .background = {30, 40, 50, 255}});
             (void)cui_interact(ui, row + 2, CUI_ROLE_BUTTON, cui_string("Message"), false, false,
                                0);
             cui_end_box(ui);

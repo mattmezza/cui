@@ -72,3 +72,56 @@ full Input parity, browser acceptance or general text-engine completion claimed.
 Verified on this slice: strict-warning Release and ASan/UBSan builds each pass
 `input_grow_width`, `input`, and `input_group_events` (3/3) through the private
 Xvfb wrapper. Formatting and whitespace checks pass.
+
+## Same-frame projection proposal
+
+The 400→220→500 probe was rerun on `6a8dfa8a` through private Xvfb.
+The first shrinking frame published an IME anchor with X=388 while the viewport
+ended at X=209. The first growing frame put the caret at X=208 while the right
+edge was X=489. This affects what's painted during a drag even when the host
+presents every resize frame.
+
+Use a private, declarative horizontal viewport record. Styled Input supplies
+its measured display extent, caret position, alignment, incoming scroll and
+optional placeholder geometry. The registration copies scalars and uses only
+Core-owned storage and current-layout element references. It borrows no
+`cui_input_state`, edit model, string, callback or userdata. The pinned Clay
+integration resolves registered placements immediately after horizontal sizing,
+before positioning, clipping, offscreen culling or floating-root placement.
+Text, selection, the caret and the host IME anchor then share the same layout.
+An overflowing value starts at the logical left edge and scrolls. Center and
+end alignment apply while the value fits. A placeholder aligns by its own
+measured width. Repeating a layout calculation uses the same copied seed.
+
+The completed-frame projection records the actual scroll and the synchronously
+returned scroll for the viewport ID. Reduction uses validated previous-frame
+geometry when the supplied scroll still matches that return value. An explicit
+change to the supplied scroll takes precedence. An omitted, invalid or failed
+frame cannot publish a new projection or resurrect an older one. The next
+submission reconciles its retained scroll from the completed frame.
+`cui_input_state.scroll_x` continues to be written synchronously. An additive
+read-only C query exposes the actual growing-viewport scroll when a consumer
+needs it immediately after layout. Short-lived paint-only states remain valid.
+
+The implementation keeps the existing component submission and event order,
+the underlying public structure layouts and the active font geometry. Use the
+existing context resource budget for per-viewport storage. Test the capacity
+path and guard publication after layout/render-command failure. The layout hook
+processes only registrations, and it does not add another sizing or measurement
+pass. Native transition behavior that overrides bounds after sizing needs its
+own evidence.
+
+Prepaint runs too late to affect Clay culling or positioned children. Adjusting
+draw commands afterwards would also miss tracked bounds and floating clips. A
+second sizing pass would repeat text/layout work during live resize. Delayed
+writeback into state supplied to existing functions would extend caller
+lifetimes. This proposal keeps the adjustment in the ordinary layout pass and
+keeps event dispatch unchanged.
+
+1. Add the layout integration and direct C regression tests for live width,
+   paint and IME agreement, alignment, optional placeholder and event timing.
+2. Exercise the shared styled path with InputGroup and other temporary-state
+   callers, next-frame hit testing, capacity and stale publication. Promote
+   the reproducer to an ordinary required regression.
+3. Validate the real WASM gallery and regenerate the standalone distributions,
+   SDK sources, usage metadata and consumer skill.

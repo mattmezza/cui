@@ -348,6 +348,37 @@ static cui_bridge_status go_part_query(cui_bridge_app *a,cui_bridge_node n,uint3
 #include "icon_resources_ffi.h"
 #include "icon_badge_ffi.h"
 
+typedef cui_bridge_status (*data_table_keyed_fn)(cui_bridge_app *, cui_bridge_node,
+ const char *const *, uint32_t, const char *const *, const uint32_t *, uint32_t);
+static data_table_keyed_fn table_keyed;
+
+static void go_data_table_initialize(void) {
+ if (!bridge_lib) {
+#if defined(CUI_GO_STATIC)
+  table_keyed = cui_bridge_data_table_set_keyed;
+#endif
+  return;
+ }
+#if defined(_WIN32)
+ FARPROC symbol = GetProcAddress((HMODULE)bridge_lib, "cui_bridge_data_table_set_keyed");
+#else
+ void *symbol = dlsym(bridge_lib, "cui_bridge_data_table_set_keyed");
+#endif
+ if (symbol && sizeof symbol == sizeof table_keyed)
+  memcpy(&table_keyed, &symbol, sizeof table_keyed);
+}
+
+static int go_data_table_keyed_supported(void) {
+ return table_keyed != NULL;
+}
+
+static cui_bridge_status go_data_table_set_keyed(cui_bridge_app *app, cui_bridge_node node,
+ const char *const *headers, uint32_t columns, const char *const *cells,
+ const uint32_t *row_keys, uint32_t rows) {
+ return table_keyed ? table_keyed(app, node, headers, columns, cells, row_keys, rows)
+                    : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+
 static int bridge_open(const char *path) {
  if (bridge_initialized) return 0;
 #if defined(CUI_GO_STATIC)
@@ -355,6 +386,7 @@ static int bridge_open(const char *path) {
 #define STATIC_LOAD(name, ret, params, args) fp_##name = cui_bridge_##name;
  API(STATIC_LOAD, STATIC_LOAD)
 #undef STATIC_LOAD
+ go_data_table_initialize();
  go_skeleton_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
@@ -382,6 +414,7 @@ static int bridge_open(const char *path) {
  API(LOAD, LOAD)
 #undef LOAD
  bridge_lib = lib;
+ go_data_table_initialize();
  go_skeleton_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
@@ -500,6 +533,7 @@ type Node struct {
 	hasChartData                         bool
 	tableHeaders                         []string
 	tableRows                            [][]string
+	tableRowKeys                         []uint32
 	hasTableData                         bool
 	tableSelectionMode                   uint32
 	hasTableSelectionMode                bool
@@ -1549,6 +1583,9 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("invalid or reused node")
 		}
 		seen[n] = true
+		if n.tableRowKeys != nil && C.go_data_table_keyed_supported() == 0 {
+			return ErrKeyedDataTableUnavailable
+		}
 		if d > 128 {
 			return errors.New("tree too deep")
 		}
@@ -1736,7 +1773,7 @@ func (a *App) Mount(root *Node) error {
 			}
 		}
 		if n.hasTableData {
-			if e := n.SetTable(n.tableHeaders, n.tableRows); e != nil {
+			if e := n.setTable(n.tableHeaders, n.tableRows, n.tableRowKeys); e != nil {
 				return e
 			}
 		}
@@ -3040,7 +3077,20 @@ func (a *App) PlotPoint(n *Node, index uint32) (PlotPoint, error) {
 	return PlotPoint{float64(p.x), float64(p.y)}, nil
 }
 
+// DataTableState reports the selected row key and one-based column positions.
+// Zero means no row, column, or sort column is selected.
 type DataTableState struct{ Row, Column, SortColumn, SortDirection uint32 }
+
+// ErrKeyedDataTableUnavailable indicates that the loaded bridge lacks keyed replacement.
+var ErrKeyedDataTableUnavailable = errors.New("keyed DataTable replacement is unavailable in this bridge")
+
+// SupportsKeyedDataTable reports whether the active bridge exports keyed replacement.
+func (a *App) SupportsKeyedDataTable() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_data_table_keyed_supported() != 0, nil
+}
 
 type TableSelectionMode uint32
 
@@ -3079,7 +3129,32 @@ func (n *Node) TableData(headers []string, rows [][]string) *Node {
 	}
 	return n
 }
+
+// TableDataKeyed copies the matrix and stable row keys, retaining position on replacement.
+func (n *Node) TableDataKeyed(headers []string, rows [][]string, rowKeys []uint32) *Node {
+	if n.err == nil {
+		n.err = n.SetTableKeyed(headers, rows, rowKeys)
+	}
+	return n
+}
+
+// SetTable copies the matrix, assigns one-based positional row keys, and resets table state.
 func (n *Node) SetTable(headers []string, rows [][]string) error {
+	return n.setTable(headers, rows, nil)
+}
+
+// SetTableKeyed copies the matrix and keys. Keys are distinct, nonzero, and
+// stable across replacements. The viewport follows the first visible row,
+// and selection and navigation follow surviving keys. A failed update leaves
+// the previous matrix and state intact.
+func (n *Node) SetTableKeyed(headers []string, rows [][]string, rowKeys []uint32) error {
+	if rowKeys == nil {
+		rowKeys = []uint32{}
+	}
+	return n.setTable(headers, rows, rowKeys)
+}
+
+func (n *Node) setTable(headers []string, rows [][]string, rowKeys []uint32) error {
 	if n == nil || n.kind != 71 {
 		return errors.New("table data requires DataTable")
 	}
@@ -3088,6 +3163,18 @@ func (n *Node) SetTable(headers []string, rows [][]string) error {
 	}
 	if len(headers) == 0 || len(headers) > 16 || len(rows) > 32 {
 		return errors.New("invalid data table dimensions")
+	}
+	if rowKeys != nil {
+		if len(rowKeys) != len(rows) {
+			return errors.New("DataTable requires one row key per row")
+		}
+		seen := make(map[uint32]bool, len(rowKeys))
+		for _, key := range rowKeys {
+			if key == 0 || seen[key] {
+				return errors.New("DataTable row keys must be distinct and nonzero")
+			}
+			seen[key] = true
+		}
 	}
 	for _, s := range headers {
 		if e := valid(s); e != nil {
@@ -3113,6 +3200,9 @@ func (n *Node) SetTable(headers []string, rows [][]string) error {
 	if n.app != nil {
 		if e := n.app.check(); e != nil {
 			return e
+		}
+		if rowKeys != nil && C.go_data_table_keyed_supported() == 0 {
+			return ErrKeyedDataTableUnavailable
 		}
 		ch := make([]*C.char, len(headers))
 		cc := make([]*C.char, len(headers)*len(rows))
@@ -3140,8 +3230,20 @@ func (n *Node) SetTable(headers []string, rows [][]string) error {
 		if len(cc) > 0 {
 			cells = &cc[0]
 		}
-		if e := result(C.go_data_table_set(n.app.ptr, n.handle, (**C.char)(unsafe.Pointer(&ch[0])), C.uint32_t(len(ch)), cells, C.uint32_t(len(rows)))); e != nil {
-			return e
+		var code C.cui_bridge_status
+		if rowKeys == nil {
+			code = C.go_data_table_set(n.app.ptr, n.handle, &ch[0], C.uint32_t(len(ch)),
+				cells, C.uint32_t(len(rows)))
+		} else {
+			var keys *C.uint32_t
+			if len(rowKeys) != 0 {
+				keys = (*C.uint32_t)(unsafe.Pointer(&rowKeys[0]))
+			}
+			code = C.go_data_table_set_keyed(n.app.ptr, n.handle, &ch[0], C.uint32_t(len(ch)),
+				cells, keys, C.uint32_t(len(rows)))
+		}
+		if err := result(code); err != nil {
+			return err
 		}
 		runtime.KeepAlive(ch)
 		runtime.KeepAlive(cc)
@@ -3150,6 +3252,10 @@ func (n *Node) SetTable(headers []string, rows [][]string) error {
 	n.tableRows = make([][]string, len(rows))
 	for i, row := range rows {
 		n.tableRows[i] = append([]string(nil), row...)
+	}
+	n.tableRowKeys = nil
+	if rowKeys != nil {
+		n.tableRowKeys = append([]uint32{}, rowKeys...)
 	}
 	n.hasTableData = true
 	return nil

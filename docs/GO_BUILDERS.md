@@ -105,7 +105,10 @@ Chart renders caller-supplied `ChartDatum{Label, Value}` data as line, area, bar
 
 Table is a compositional native table: its `Item` children are rows, and each row's `Item` children are text cells. The first row renders as a header. `VisualSize(width, 0)` sets its width; cell `SetText` updates the next frame. Sorting, selection, and virtualization belong to DataTable rather than this basic Table.
 
-DataTable uses `TableData(headers, rows)` or `SetTable` with 1–16 columns and up to 32 rows; every cell and header is valid UTF-8 up to 128 bytes. Go and the bridge copy the matrix. `SelectionMode(SelectRows/SelectColumns/SelectCells)` chooses native row, column, or cell selection. `App.DataTableCell`, `DataTableCellBounds`, `DataTableHeaderBounds`, and `DataTableState` expose live data and hit targets. Native selection and header presses emit `OnChange`; `DataTableState` reports one-based selected row/column and sort column/direction. Sorting is a signal: the application must reorder and re-supply its rows.
+DataTable uses `TableData(headers, rows)` or `SetTable` with 1–16 columns and up to 32 rows; every cell and header is valid UTF-8 up to 128 bytes. Go and the bridge copy the matrix. `SelectionMode(SelectRows/SelectColumns/SelectCells)` chooses native row, column, or cell selection. `App.DataTableCell`, `DataTableCellBounds`, `DataTableHeaderBounds`, and `DataTableState` expose live data and hit targets. Native selection and header presses emit `OnChange`. `DataTableState` reports
+the selected row key and one-based column and sort column positions. The
+legacy setter assigns one-based positional row keys. To apply a sort
+request, reorder the rows and submit the new matrix. See the [keyed DataTable example](#keep-the-visible-datatable-row-during-a-go-update) for live replacements.
 
 DataTable `OnChange` also includes a copied JSON `Event.Text` snapshot with `reason`, `row`, `column`, `sortColumn`, and `sortDirection`. Parse that payload when a callback needs the exact queued transition rather than a later live state.
 
@@ -132,6 +135,50 @@ Settings contains up to eight `Item` pages, each with up to eight `Item` groups,
 VirtualList accepts up to 64 keyed `Item` rows with fixed 32-pixel height and an overscanned viewport. `VisualSize` sets its viewport, `Value` sets a vertical offset, and `App.Value` reads the live offset. `App.VirtualListItemBounds` returns bounds only for a visible row. Native wheel and keyboard scroll emit `OnChange` with the offset; disabling the list suppresses scrolling.
 
 The composed workspace example lives at `bindings/go/examples/workspace`. From `bindings/go`, run `CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --headless` to validate native hit targets, Account/Preferences tab navigation, name editing, notifications checkbox, an older birthday, save dialog, and status update without opening a window. To use the SDL UI, run `CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --font /absolute/path/to/font.ttf`. Automated SDL runs on Linux must use invisible Xvfb, for example `xvfb-run -a env -u WAYLAND_DISPLAY CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --font /absolute/path/to/font.ttf`; native mode remains open until the user closes its window.
+
+## Keep the visible DataTable row during a Go update
+
+Use `TableDataKeyed` to build and `SetTableKeyed` to replace rows from the
+app's owner thread. Pass one distinct nonzero `uint32` per row. Reuse the
+same keys across updates so the viewport, selection, and keyboard
+navigation follow surviving rows. Go and the bridge copy the input.
+
+```go
+headers := []string{"Subject", "Sender"}
+rows := [][]string{{"Release notes", "Build team"}, {"Design review", "Morgan"}}
+inbox := cui.DataTable("inbox").TableDataKeyed(headers, rows, []uint32{203, 204})
+
+// After mounting, apply the replacement from a UI-thread callback.
+updated := append([][]string{{"New message", "Workspace"}}, rows...)
+if err := inbox.SetTableKeyed(headers, updated, []uint32{301, 203, 204}); err != nil {
+    return err
+}
+```
+
+`DataTableState.Row` and change events report the selected key. Cell and
+bounds reads still use zero-based matrix indices. The limits are 32 rows,
+16 columns, and 128 UTF-8 bytes per string. For an empty keyed table, call
+`SetTableKeyed(headers, nil, nil)`. Replacing rows does not emit a change event.
+
+`app.SupportsKeyedDataTable()` checks the active bridge. If that provider
+lacks keyed replacement, mount and update return
+`cui.ErrKeyedDataTableUnavailable` and leave the prior state intact.
+`TableData` and `SetTable` continue to use positional keys on those
+providers.
+
+Run the [complete inbox](../bindings/go/examples/data_table_live/main.go)
+from `bindings/go`. The default opens no window and exercises the button
+callback, scroll position, and updated rows.
+
+```sh
+go run ./examples/data_table_live
+```
+
+The bundled native route on Linux uses
+`go run -tags cui_native ./examples/data_table_live --font /path/to/font.ttf`.
+For an existing SDL shared bridge, set `CUI_BRIDGE_LIBRARY` to its absolute
+path and use `-tags cui_dynamic` instead. The examples here use a local
+arrival. The retained bridge currently has no load-more notification.
 
 ## Packaged build-time CUI bridge
 

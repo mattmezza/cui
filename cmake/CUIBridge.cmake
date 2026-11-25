@@ -152,6 +152,41 @@ if(CUI_GO_SKELETON_TESTS)
    run -tags cui_dynamic ./examples/skeleton_profile --font ${CUI_TEST_FONT} --smoke)
  endif()
 endif()
+option(CUI_GO_KEYED_DATA_TABLE_TESTS "Check keyed DataTable authoring with Go on Linux" OFF)
+if(CUI_GO_KEYED_DATA_TABLE_TESTS)
+ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "Go keyed DataTable provider tests currently support Linux only")
+ endif()
+ find_program(CUI_GO_KEYED_DATA_TABLE_EXECUTABLE go REQUIRED)
+ set(CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY "" CACHE FILEPATH "Optional existing bridge without keyed tables")
+ function(cui_go_keyed_data_table_test suffix library legacy)
+  add_test(NAME bridge_go_keyed_data_table_${suffix} COMMAND ${CMAKE_COMMAND} -E env
+   GOMAXPROCS=1 GOFLAGS=-p=1 GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local
+   CUI_BRIDGE_LIBRARY=${library} CUI_KEYED_DATA_TABLE_LEGACY=${legacy} SDL_RENDER_DRIVER=software
+   ${CUI_GO_KEYED_DATA_TABLE_EXECUTABLE} ${ARGN})
+  set_tests_properties(bridge_go_keyed_data_table_${suffix} PROPERTIES
+   WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/go" RUN_SERIAL TRUE TIMEOUT 600)
+ endfunction()
+ cui_go_keyed_data_table_test(dynamic $<TARGET_FILE:cui_bridge> 0
+  test -tags cui_dynamic ./cui -count=1 -run "^Test(KeyedDataTable|DataTable)$")
+ cui_go_keyed_data_table_test(static "" 0
+  test ./cui -count=1 -run "^Test(KeyedDataTable|DataTable)$")
+ cui_go_keyed_data_table_test(example "" 0 run ./examples/data_table_live)
+ if(CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY)
+  if(NOT EXISTS "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}")
+   message(FATAL_ERROR "CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY must name an existing bridge")
+  endif()
+  cui_go_keyed_data_table_test(legacy "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}" 1
+   test -tags cui_dynamic ./cui -count=1 -run "^Test(KeyedDataTableLegacyProvider|DataTable)$")
+  cui_go_keyed_data_table_test(legacy_bundled "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}" 1
+   test ./cui -count=1 -run "^Test(KeyedDataTableLegacyProvider|DataTable)$")
+ endif()
+ if(CUI_BRIDGE_NATIVE_TESTS)
+  cui_go_keyed_data_table_test(native $<TARGET_FILE:cui_bridge> 0
+   run -tags cui_dynamic ./examples/data_table_live --font ${CUI_TEST_FONT} --smoke)
+ endif()
+endif()
+
 option(CUI_RUST_SKELETON_TESTS "Check responsive Skeleton authoring with Rust on Linux" OFF)
 set(CUI_RUST_SKELETON_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-skeleton-target" CACHE PATH "Reusable Cargo cache for dynamic Skeleton checks")
 set(CUI_RUST_SKELETON_STATIC_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-skeleton-static-target" CACHE PATH "Reusable Cargo cache for bundled Skeleton checks")

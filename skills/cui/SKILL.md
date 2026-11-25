@@ -365,8 +365,10 @@ See `docs/BRIDGE_COMPONENTS.md`. In Python, use `table_data(headers, rows,
 row_keys=keys)` after checking `app.supports_keyed_data_table()`. The runnable
 inbox in `bindings/bridge/examples/data_table_live.py` defaults to headless.
 JavaScript and TypeScript use `table_data(headers, rows, rowKeys)` with the same
-capability query. See `docs/BINDING_BUILDERS.md` for both inbox examples. Go and
-Rust use positional keys in their builders.
+capability query. See `docs/BINDING_BUILDERS.md` for both inbox examples. Go
+uses `TableDataKeyed` and `SetTableKeyed`, with `SupportsKeyedDataTable` for
+provider checks. See `docs/GO_BUILDERS.md` and
+`bindings/go/examples/data_table_live/main.go`. Rust uses positional keys.
 For paging, use `result.load_more` with an app-owned in-flight flag and keep
 the current rows interactive. See **Paged inbox** and the paging guide in
 `docs/TABLE.md`.

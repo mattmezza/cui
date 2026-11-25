@@ -946,7 +946,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript and TypeScript support keyed replacement on providers with cui_bridge_data_table_set_keyed. Go and Rust use positional keys. The retained bridge and bindings omit load-more notifications."
+        "Python, JavaScript, TypeScript and Go support keyed replacement on providers with cui_bridge_data_table_set_keyed. Rust uses positional keys. The retained bridge and bindings omit load-more notifications."
       ]
     },
     {

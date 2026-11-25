@@ -110,11 +110,14 @@ static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surf
 }
 static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_surface_state *s,
                                        cui_str title, cui_str description, cui_surface_options o,
-                                       const cui_rect *positioned, const cui_popover_paint *arrow) {
+                                       const cui_rect *positioned, const cui_popover_paint *arrow,
+                                       cui_popover_outside_focus outside_focus) {
     cui_rect bounds = positioned ? *positioned
                       : s        ? cui_surface_geometry(s->kind, o)
                                  : (cui_rect){0};
-    if (!t || bounds.w <= 0 || bounds.h <= 0)
+    if (!t || bounds.w <= 0 || bounds.h <= 0 ||
+        (outside_focus != CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER &&
+         outside_focus != CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER))
         return false;
     cui_popover_style style = {.background = t->surface,
                                .foreground = t->text,
@@ -133,7 +136,7 @@ static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_
         stack = cui_resource_get(ui, CUI_SURFACE_SKIN_OWNER, CUI_SURFACE_SKIN_NAMESPACE,
                                  sizeof(*stack), cui_surface_skin_collect, NULL);
     if ((active && !stack) || (stack && stack->depth == 64) ||
-        !cui_base_surface_begin(ui, s, title, description, o))
+        !cui_base_surface_begin_with_outside_focus(ui, s, title, description, o, outside_focus))
         return false;
     if (stack) {
         cui_surface_skin_entry *entry = &stack->entries[stack->depth++];
@@ -213,14 +216,23 @@ static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_
 }
 bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s, cui_str title,
                        cui_str description, cui_surface_options o) {
-    return cui_surface_begin_internal(ui, t, s, title, description, o, NULL, NULL);
+    return cui_surface_begin_internal(ui, t, s, title, description, o, NULL, NULL,
+                                      CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER);
 }
 bool cui_popover_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s, cui_str title,
                        cui_str description, cui_surface_options o, cui_popover_position p) {
+    return cui_popover_begin_with_outside_focus(ui, t, s, title, description, o, p,
+                                                CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER);
+}
+bool cui_popover_begin_with_outside_focus(cui_context *ui, const cui_theme *t, cui_surface_state *s,
+                                          cui_str title, cui_str description, cui_surface_options o,
+                                          cui_popover_position p,
+                                          cui_popover_outside_focus outside_focus) {
     if (!s || s->kind != CUI_SURFACE_POPOVER)
         return false;
     if (p.mode == CUI_POPOVER_POSITION_LEGACY)
-        return cui_surface_begin(ui, t, s, title, description, o);
+        return cui_surface_begin_internal(ui, t, s, title, description, o, NULL, NULL,
+                                          outside_focus);
     cui_rect bounds;
     cui_popover_style style;
     if (!t || !cui_popover_surface_geometry(o, p, &bounds) ||
@@ -230,7 +242,7 @@ bool cui_popover_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     if (p.arrow && !cui_popover_paint_build(bounds, o.anchor, o.viewport, p, t, style, o, &paint))
         return false;
     return cui_surface_begin_internal(ui, t, s, title, description, o, &bounds,
-                                      p.arrow ? &paint : NULL);
+                                      p.arrow ? &paint : NULL, outside_focus);
 }
 void cui_surface_footer_begin(cui_context *ui, const cui_theme *t) {
     if (!ui || !t)

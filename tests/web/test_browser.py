@@ -2064,7 +2064,9 @@ def main():
             assert page.locator('#accessible [role=dialog][aria-modal=false]').count() == 1
             assert page.evaluate('cuiGallery.exports.gallery_modal()') == 0
             click_semantic('Notify me about releases')
-            page.wait_for_function('document.querySelector("#accessible [role=checkbox]")?.getAttribute("aria-checked")==="true"')
+            page.wait_for_function('''document.querySelector(
+                '#accessible [role=checkbox][aria-label="Notify me about releases"]'
+            )?.getAttribute('aria-checked') === 'true' ''')
             rectangle = canvas.bounding_box()
             page.mouse.click(rectangle['x']+rectangle['width']-4, rectangle['y']+rectangle['height']-4)
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)===0')

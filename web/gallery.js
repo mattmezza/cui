@@ -106,6 +106,7 @@ $('surface-variant').after(dialogBodyControl);
 function popoverValues(){return [Number($('popover-mode').value),Number($('popover-anchor').value),Number($('popover-custom-offset').checked),Number($('popover-offset').value),Number($('popover-arrow').checked),Number($('popover-rem').value),Number($('popover-edge').checked),Number($('popover-opacity').value),Number($('popover-inert').checked),Number($('popover-modal').checked)];}
 function popoverUsage(){
  const [mode,anchor,custom,offset,arrow,rem,edge,opacity,inert,modal]=popoverValues();
+ const placement=mode?'position':'(cui_popover_position){0}';
  const position=mode?`    cui_popover_position position = {
         .mode = CUI_POPOVER_POSITION_ANCHOR, .anchor = CUI_POPOVER_${popoverAnchors[anchor]},
         .reference_rem = ${rem}, .custom_offset = ${!!custom}, .offset = ${offset}, .arrow = ${!!arrow}};
@@ -114,7 +115,6 @@ function popoverUsage(){
         (cui_box){.width = width - 48, .height = height - 48,
           .align_x = CUI_ALIGN_${edge?'END':'CENTER'}, .align_y = CUI_ALIGN_${edge?'END':'CENTER'},
           .custom_opacity = true, .opacity = ${Number(opacity).toFixed(1)}f, .inert = ${!!inert}});`:'';
- const begin=mode?'cui_popover_begin(ui, theme, card, cui_string("Alex Morgan"),\n            cui_string("Maintainer"), options, position)':'cui_surface_begin(ui, theme, card, cui_string("Alex Morgan"),\n            cui_string("Maintainer"), options)';
  return `#include <cui/cui_surface.h>
 #include <cui/cui_components.h>
 /* Retain card and layer across frames. Call init once before drawing. */
@@ -127,7 +127,8 @@ void account_modal_open(cui_context *ui, cui_surface_state *layer) {
     cui_surface_open(ui, layer, 0);
 }
 `:''}void account_draw(cui_context *ui, const cui_theme *theme,
-        cui_surface_state *card, cui_surface_state *layer, float width, float height) {
+        cui_surface_state *card, cui_surface_state *layer, bool *previews,
+        float width, float height) {
     (void)layer;
 ${position}
     cui_id trigger = cui_id_from(ui, "account-trigger");
@@ -138,7 +139,9 @@ ${position}
         .anchor = cui_bounds(ui, trigger), .width = width > 500 ? 340 : width - 48,
         .height = 190, .margin = 12, .side = CUI_POPUP_BELOW,
         .popover_appearance = CUI_POPOVER_APPEARANCE_SOURCE};
-    bool admitted = ${begin};
+    bool admitted = cui_popover_begin_with_outside_focus(ui, theme, card,
+        cui_string("Alex Morgan"), cui_string("Maintainer"), options, ${placement},
+        CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER);
     if (admitted) {
         cui_id profile = cui_id_from(ui, "view-profile");
         if (opening)
@@ -148,7 +151,14 @@ ${position}
         cui_surface_end(ui);
     }
     (void)cui_popover_link_trigger(ui, card, trigger, admitted);
-${mode?'    cui_end_box(ui);\n':''}${modal&&mode?`    cui_surface_options modal = {.viewport = {0, 0, width, height},
+${mode?'    cui_end_box(ui);\n':''}    /* An outside control keeps its click and focus when the Popover closes. */
+    float previews_y = ${mode?'24':'height - theme->control_height - 24'};
+    cui_begin_absolute_box(ui, 0, (cui_box){0},
+        (cui_rect){24, previews_y, width - 48, theme->control_height});
+    cui_checkbox(ui, cui_id_from(ui, "show-previews"), theme, cui_string("Show previews"),
+                 previews, false);
+    cui_end_box(ui);
+${modal&&mode?`    cui_surface_options modal = {.viewport = {0, 0, width, height},
         .width = width > 500 ? 260 : width - 72, .height = 120, .layer = 200};
     if (cui_surface_begin(ui, theme, layer, cui_string("Layering modal"),
             cui_string("The account card remains below"), modal))
@@ -974,7 +984,7 @@ function render(){
  const avatarDiameter=selected.name==='Avatar'?wasm.gallery_avatar_metric(designScale,Number($('avatar-rem').value),0):0;
  canvas.parentElement.style.overflowX=selected.name==='Avatar'?'auto':'';
  canvas.style.minWidth=selected.name==='Avatar'?`${avatarDiameter+48}px`:selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):selected.name==='TimeField'?(width<420?560:360):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'&&$('popover-mode').value==='1'?520:selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<268?240:width-48<488?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?($('virtual-axis').value==='2'?390:360):selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value==='1'?8*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):selected.name==='TimeField'?(width<420?560:360):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'?($('popover-mode').value==='1'?520:320):selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<268?240:width-48<488?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?($('virtual-axis').value==='2'?390:360):selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value==='1'?8*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);

@@ -26,11 +26,17 @@ static bool button(cui_context *ui, cui_id id, const cui_theme *theme, cui_str n
     return cui_button(ui, id, theme, name, disabled);
 #endif
 }
-static bool begin(cui_context *ui, const cui_theme *theme, cui_surface_state *s,
-                  cui_surface_options options) {
+static bool begin_with_outside_focus(cui_context *ui, const cui_theme *theme, cui_surface_state *s,
+                                     cui_surface_options options,
+                                     cui_popover_outside_focus outside_focus) {
 #ifdef CUI_SURFACE_BASE_ONLY
-    if (!cui_base_surface_begin(ui, s, cui_string("Surface title"), cui_string("Description"),
-                                options))
+    bool admitted = outside_focus == CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER
+                        ? cui_base_surface_begin(ui, s, cui_string("Surface title"),
+                                                 cui_string("Description"), options)
+                        : cui_base_surface_begin_with_outside_focus(
+                              ui, s, cui_string("Surface title"), cui_string("Description"),
+                              options, outside_focus);
+    if (!admitted)
         return false;
     cui_rect bounds = cui_surface_current_geometry(s, options);
     cui_begin_portal(ui, s->overlay.id, (cui_box){0}, bounds,
@@ -48,9 +54,18 @@ static bool begin(cui_context *ui, const cui_theme *theme, cui_surface_state *s,
         button(ui, cui_surface_part_id(s->overlay.id, 1), theme, cui_string("Close"), false);
     return true;
 #else
+    if (outside_focus != CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER)
+        return cui_popover_begin_with_outside_focus(ui, theme, s, cui_string("Surface title"),
+                                                    cui_string("Description"), options,
+                                                    (cui_popover_position){0}, outside_focus);
     return cui_surface_begin(ui, theme, s, cui_string("Surface title"), cui_string("Description"),
                              options);
 #endif
+}
+static bool begin(cui_context *ui, const cui_theme *theme, cui_surface_state *s,
+                  cui_surface_options options) {
+    return begin_with_outside_focus(ui, theme, s, options,
+                                    CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER);
 }
 static void end(cui_context *ui) {
 #ifdef CUI_SURFACE_BASE_ONLY
@@ -212,6 +227,119 @@ static void confirmation_and_popover(void) {
     assert(s.overlay.open);
     cui_destroy(ui);
 }
+typedef struct {
+    cui_context *ui;
+    const cui_surface_state *surface;
+    unsigned count, decisions;
+    cui_id focus;
+    cui_surface_result result;
+    bool veto;
+} popover_close_observation;
+static void observe_popover_close(void *user, cui_surface_result result) {
+    popover_close_observation *close = user;
+    assert(!close->surface->overlay.open && close->surface->result == result);
+    close->count++;
+    close->focus = cui_focused(close->ui);
+    close->result = result;
+}
+static bool decide_popover_close(void *user, cui_surface_result result) {
+    popover_close_observation *close = user;
+    assert(close->surface->overlay.open && result == CUI_SURFACE_CANCELLED);
+    close->decisions++;
+    return !close->veto;
+}
+static bool popover_focus_frame(cui_context *ui, const cui_theme *theme, cui_surface_state *s,
+                                cui_surface_options options,
+                                cui_popover_outside_focus outside_focus) {
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    if (consume_first)
+        assert(cui_consume_event(ui, 0));
+    cui_begin_box(ui, 900, (cui_box){.width = 600, .height = 400});
+    button(ui, 1, theme, cui_string("Open"), false);
+    bool clicked = button(ui, 2, theme, cui_string("Background"), false);
+    if (begin_with_outside_focus(ui, theme, s, options, outside_focus)) {
+        button(ui, 20, theme, cui_string("First action"), false);
+        end(ui);
+    }
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return clicked;
+}
+static void check_popover_outside_focus(cui_popover_outside_focus outside_focus, bool modal) {
+#ifdef CUI_SURFACE_BASE_ONLY
+    cui_theme theme = {0};
+#else
+    cui_theme theme = cui_theme_light();
+#endif
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    assert(ui);
+    cui_surface_state state;
+    cui_surface_init(&state, 100, CUI_SURFACE_POPOVER);
+    popover_close_observation close = {.ui = ui, .surface = &state};
+    cui_surface_options options = {.viewport = {0, 0, 600, 400},
+                                   .anchor = {100, 100, 30, 30},
+                                   .width = 280,
+                                   .height = 200,
+                                   .modal_popover = modal,
+                                   .decide = decide_popover_close,
+                                   .decision_user = &close,
+                                   .on_close = observe_popover_close,
+                                   .close_user = &close};
+    popover_focus_frame(ui, &theme, &state, options, outside_focus);
+    cui_surface_open(ui, &state, 1);
+    popover_focus_frame(ui, &theme, &state, options, outside_focus);
+    cui_focus(ui, 20);
+    cui_rect outside = cui_bounds(ui, 2);
+    float x = outside.x + outside.w / 2, y = outside.y + outside.h / 2;
+    if (!modal && outside_focus == CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER) {
+        consume_first = true;
+        pointer(ui, x, y);
+        popover_focus_frame(ui, &theme, &state, options, outside_focus);
+        assert(state.overlay.open && close.decisions == 0 && close.count == 0);
+        consume_first = false;
+        close.veto = true;
+        pointer(ui, x, y);
+        popover_focus_frame(ui, &theme, &state, options, outside_focus);
+        assert(state.overlay.open && close.decisions == 1 && close.count == 0);
+        close.veto = false;
+    }
+    pointer(ui, x, y);
+    assert(popover_focus_frame(ui, &theme, &state, options, outside_focus) == !modal);
+    assert(!state.overlay.open && close.count == 1 && close.result == CUI_SURFACE_CANCELLED);
+    cui_id expected = !modal && outside_focus == CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER ? 2 : 1;
+    assert(close.focus == expected && cui_focused(ui) == expected);
+
+    cui_surface_open(ui, &state, 1);
+    popover_focus_frame(ui, &theme, &state, options, outside_focus);
+    cui_focus(ui, 20);
+    key(ui, CUI_KEY_ESCAPE);
+    popover_focus_frame(ui, &theme, &state, options, outside_focus);
+    assert(!state.overlay.open && close.count == 2 && close.focus == 1 && cui_focused(ui) == 1);
+    assert(cui_surface_take_result(&state) == CUI_SURFACE_CANCELLED);
+    assert(cui_surface_take_result(&state) == CUI_SURFACE_NONE && close.count == 2);
+    if (!modal && outside_focus == CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER) {
+        cui_surface_open(ui, &state, 1);
+        popover_focus_frame(ui, &theme, &state, options, outside_focus);
+        cui_focus(ui, 20);
+        pointer(ui, 580, 380);
+        assert(!popover_focus_frame(ui, &theme, &state, options, outside_focus));
+        assert(!state.overlay.open && close.count == 3 && close.focus == 0 && cui_focused(ui) == 0);
+
+        cui_surface_open(ui, &state, 1);
+        popover_focus_frame(ui, &theme, &state, options, outside_focus);
+        cui_focus(ui, 20);
+        cui_surface_request_close(ui, &state, CUI_SURFACE_CANCELLED);
+        popover_focus_frame(ui, &theme, &state, options, outside_focus);
+        assert(!state.overlay.open && close.count == 4 && close.focus == 1 && cui_focused(ui) == 1);
+    }
+    cui_destroy(ui);
+}
+static void popover_outside_focus(void) {
+    check_popover_outside_focus(CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER, false);
+    check_popover_outside_focus(CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER, false);
+    check_popover_outside_focus(CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER, true);
+}
 static const cui_semantic *find_semantic(cui_context *ui, cui_id id) {
     size_t count;
     const cui_semantic *nodes = cui_semantics(ui, &count);
@@ -233,12 +361,11 @@ static void popover_link_scene(cui_context *ui, const cui_theme *theme, cui_surf
     button(ui, 2, theme, cui_string("Another control"), false);
     if (opening)
         cui_surface_open(ui, s, 1);
-    bool admitted = !omit_panel &&
-                    begin(ui, theme, s,
-                          (cui_surface_options){.viewport = {0, 0, 600, 400},
-                                                .anchor = {0, 0, 110, 30},
-                                                .width = 280,
-                                                .height = 200});
+    bool admitted = !omit_panel && begin(ui, theme, s,
+                                         (cui_surface_options){.viewport = {0, 0, 600, 400},
+                                                               .anchor = {0, 0, 110, 30},
+                                                               .width = 280,
+                                                               .height = 200});
     if (admitted) {
         if (opening)
             cui_focus(ui, 20);
@@ -287,7 +414,8 @@ static void popover_link_and_focus(void) {
 
     cui_surface_open(ui, &state, 1);
     popover_link_scene(ui, &theme, &state, true, false);
-    assert(state.overlay.open && !find_semantic(ui, 100) && !find_semantic(ui, 1)->details.controls);
+    assert(state.overlay.open && !find_semantic(ui, 100) &&
+           !find_semantic(ui, 1)->details.controls);
     popover_link_scene(ui, &theme, &state, false, false);
     assert(find_semantic(ui, 1)->details.controls == 100);
     cui_surface_request_close(ui, &state, CUI_SURFACE_CLOSED);
@@ -999,6 +1127,7 @@ int main(void) {
     geometry();
     dialog_events();
     confirmation_and_popover();
+    popover_outside_focus();
     popover_link_and_focus();
     sheet_events();
     resize_sheets();

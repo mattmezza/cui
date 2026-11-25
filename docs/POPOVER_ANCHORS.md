@@ -88,8 +88,9 @@ On trigger activation, explicitly move focus to an enabled, focusable child
 inside a successful begin. Choose a stable ID and submit the child in the same
 frame. Move focus only on the opening action so later frames respect the user's
 navigation. Nonmodal Popovers keep ordinary Tab order. Subject to the decision
-policy, Escape cancels the focused surface, and closing restores its enabled
-trigger. See [Surfaces](SURFACES.md) for close ordering.
+policy, Escape cancels the focused surface and restores its enabled trigger.
+To let another control keep focus and receive its click when it dismisses a
+nonmodal Popover, choose `CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER`.
 
 ```c
 /* card is initialized with CUI_SURFACE_POPOVER and retained between frames. */
@@ -97,8 +98,9 @@ bool opening = cui_button(ui, trigger, theme, cui_string("Open account"), false)
 if (opening)
     cui_surface_open(ui, card, trigger);
 
-bool admitted = cui_popover_begin(ui, theme, card, cui_string("Account"),
-                                   (cui_str){0}, options, position);
+bool admitted = cui_popover_begin_with_outside_focus(
+    ui, theme, card, cui_string("Account"), (cui_str){0}, options, position,
+    CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER);
 if (admitted) {
     if (opening)
         cui_focus(ui, profile);
@@ -108,6 +110,12 @@ if (admitted) {
 }
 cui_popover_link_trigger(ui, card, trigger, admitted);
 ```
+
+The Base equivalent is `cui_base_surface_begin_with_outside_focus`. The policy
+applies to accepted outside primary presses only. The close callback sees the
+focus Core chose before submission. Use `cui_popover_begin` or explicitly pass
+`CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER` for default trigger restoration.
+See [Surfaces](SURFACES.md) for close ordering and the modal behavior.
 
 `cui_popover_link_trigger` is optional. Call it after the trigger and the
 optional panel, passing the current begin result. On frames that omit the
@@ -125,7 +133,9 @@ not identify an explicit collapsed state for all native adapters.
 ## Browser gallery
 
 The Popover story starts with its existing legacy account card. Select **Source
-anchors (opt in)** to use `cui_popover_begin` and a real centered CUI trigger.
+anchors (opt in)** to use anchor placement and a real centered CUI trigger.
+In either mode, open the card and click or tap **Show previews** to dismiss it
+while making a change in the control outside it.
 All eight names identify the popup's own anchor. Controls map directly to
 `mode`, `anchor`, `custom_offset`, signed scalar `offset`, `arrow` and
 `reference_rem`. The latter is explicit application/host root sizing: zero means
@@ -151,5 +161,6 @@ ordering. Fractional clamped Canvas rectangle edges can still antialias the join
 differently from mesh pixel-center coverage: a dark fill value 10 can read 9 at
 an adjacent join pixel. Clamped geometry is checked separately; exact centered
 join assertions retain exact values. This known raster difference is not claimed
-as GPUI pixel parity. Browser keyboard opening and Escape cover the explicit
-focus path above. Native focus and accessibility depend on the host.
+as GPUI pixel parity. Browser keyboard opening, Escape, and mouse/touch outside
+dismissal cover the focus paths above. Native focus and accessibility depend on
+the host.

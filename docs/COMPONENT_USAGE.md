@@ -316,7 +316,7 @@ API: `cui_begin_group_box`, `cui_end_group_box`. [Public header](../include/cui/
 
 **Interaction:** Hover, focus and escape update the open model. Optional synchronous observers report aggregate open-state transitions, independently of composition admission or actual visibility.
 
-**Usage:** Submit the trigger first. With event facades, inspect changed separately from control_result; end HoverCard only when control_result is true. Handlers are borrowed for the call and are not retained across delay or omission. Explicit TAP_TOGGLE accepts the submitted trigger result. LEGACY uses conservative outside taps and a retained contact workspace; RAW_PRIMARY uses unconsumed primary releases outside previous valid content bounds, with no matching down or movement threshold. Raw mode needs no contact. Accepted activation uses entry-open after release; disabled/Escape/placement retain precedence.
+**Usage:** Submit the trigger first. Zero height fits wrapped children within the viewport and requests a follow-up when the fitted height changes. A positive height stays fixed. content_revision is an optional placement refresh. With event facades, inspect changed separately from control_result; end HoverCard only when control_result is true. Handlers are borrowed for the call and are not retained across delay or omission. Explicit TAP_TOGGLE accepts the submitted trigger result. LEGACY uses conservative outside taps and a retained contact workspace; RAW_PRIMARY uses unconsumed primary releases outside previous valid content bounds, with no matching down or movement threshold. Raw mode needs no contact. Accepted activation uses entry-open after release; disabled/Escape/placement retain precedence.
 
 API: `cui_begin_hover_card`, `cui_end_hover_card`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md); [event header](../include/cui/cui_hover_events.h); [event guide](HOVER_EVENTS.md).
 
@@ -938,7 +938,7 @@ API: `cui_menu_tree`, `cui_menu`. [Public header](../include/cui/cui_choice.h); 
 
 **Interaction:** cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.
 
-**Usage:** Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once. Use cui_popover_begin for explicit anchor/offset/arrow positioning, paired with surface_end; legacy surface_begin keeps its original placement. Arrow rendering requires a mesh-capable adapter; SDL3 and browser adapters support bounded analytic meshes with documented limits. The gallery starts in legacy mode; explicitly select source anchors to explore all eight popup anchors, signed custom gap, arrow toggle, app/host reference rem and edge clamping. Open the card before the inert/modal demonstrations. The copyable complete C11 snippet follows the current mode.
+**Usage:** Initialize the surface kind and open from an action. Pair end only when begin succeeds. On the opening action, applications may use cui_focus for an enabled child in that successful frame. Call cui_popover_link_trigger after the trigger and panel with the current begin result, or false when omitted. Choose CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER with an outside-focus begin function to preserve existing pointer focus on accepted nonmodal outside dismissal. Other closes restore the trigger. Consume result once. Use cui_popover_begin for explicit anchor/offset/arrow positioning. Arrow rendering requires a mesh-capable adapter; SDL3 and browser adapters support bounded analytic meshes with documented limits. The gallery shows outside dismissal in both legacy and source anchor modes. Source anchors expose all eight popup anchors, signed custom gap, arrow toggle, app/host reference rem and edge clamping. The complete C11 snippet follows the current mode.
 
 API: `cui_surface_init`, `cui_surface_begin`, `cui_surface_end`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
 
@@ -1141,7 +1141,7 @@ The gallery custom tooltip toggle uses `cui_chart_tooltip_build_fn` with copied 
 
 **Interaction:** on_select/on_query/on_confirm/on_cancel observe synchronous interaction; command item action invokes application work.
 
-**Usage:** Initialize bounded query/row storage, submit entries each frame, and execute actions only from confirmation/action events.
+**Usage:** Initialize bounded query/row storage, submit entries each frame, and execute actions only from confirmation/action events. Set width=-1 to grow inside a Dialog or other bounded parent.
 
 API: `cui_command_init`, `cui_command`. [Public header](../include/cui/cui_command.h); [guide](COMMAND.md).
 

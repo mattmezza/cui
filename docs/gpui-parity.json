@@ -5651,7 +5651,7 @@
       },
       "limitations": [
         "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending.",
-        "Legacy placement retains side-based flip/clamp. The optional C trigger link and explicit focus entry/return are tested in Base, Styled and actual WASM subsets. Right-click triggering, foreign authoring and native screen-reader validation remain pending.",
+        "Legacy placement retains side-based flip/clamp. The optional C trigger link, explicit focus entry/return and opt-in nonmodal outside focus preservation have Base, Styled and actual WASM subset coverage. Right-click triggering, foreign authoring and native screen-reader validation remain pending.",
         "Additive C anchor/offset/arrow positioning retains legacy defaults and uses frame-owned copied paint. Scoped software/WASI and private-Xvfb Sokol evidence does not establish complete family parity: SDL3 and Canvas analytic mesh subsets have runtime pixel evidence, but exact reference stroke/raster antialiasing remains pending; language builders omit the positioning API."
       ],
       "owner": "integrator",
@@ -5687,7 +5687,7 @@
             "tests/web/test_popover_anchor_gallery.py",
             "docs/POPOVER_ANCHORS.md"
           ],
-          "scope": "Headless and WASM cover optional current-frame controls/expanded, clearing the link on child close or omission, explicit focus entry and Escape return. Default nonmodal Tab and legacy reducers stay available. Dismissal handoff, foreign builders and native assistive-technology acceptance remain open."
+          "scope": "Headless and WASM cover optional current-frame controls/expanded, clearing the link on child close or omission, explicit focus entry, Escape return and opt-in outside pointer handoff. Headless Base and Styled verify legacy and modal restoration, consumed and vetoed input, synchronous close observation and result read without replay. Foreign builders and native assistive-technology acceptance remain open."
         },
         {
           "name": "composed themed body, title and copied description",

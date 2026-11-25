@@ -38,7 +38,21 @@ def arguments(source, opening):
 def main():
     data = json.loads(subprocess.check_output(['node', '-e', EXTRACT, str(SOURCE)], text=True))
     stories, snippets = data['stories'], data['snippets']
-    missing = sorted(set(stories) - set(snippets))
+    standalone = json.loads(subprocess.check_output(['node', '--input-type=module', '-e', r'''
+        import {readFileSync} from 'node:fs';
+        import {join} from 'node:path';
+        const load = name => import('data:text/javascript;base64,' +
+            readFileSync(join(process.argv[1], name)).toString('base64'));
+        const {virtualInboxUsage, liveDataTableUsage} = await load('cui_usage.js');
+        const {hoverCardUsage} = await load('cui_hover_card_usage.js');
+        process.stdout.write(JSON.stringify({
+            VirtualList: [virtualInboxUsage],
+            DataTable: [liveDataTableUsage],
+            HoverCard: [0, 1, 2].flatMap(mode => [0, 1, 2].map(preview => hoverCardUsage(mode, preview)))
+        }));
+    ''', str(ROOT / 'web/modules')], text=True))
+    assert all(standalone.values()) and set(standalone) <= set(stories)
+    missing = sorted(set(stories) - set(snippets) - set(standalone))
     assert not missing, f'Usage excerpts missing for {missing}'
     baseline = {entry['name'] for entry in json.loads((ROOT / 'docs/gpui-parity.json').read_text())['components']}
     extensions = {'Video', 'VideoPlayer'}
@@ -46,7 +60,10 @@ def main():
     assert set(stories) == baseline | extensions
     headers = '\n'.join(path.read_text() for path in (ROOT / 'include/cui').glob('*.h'))
     declarations = re.sub(r'/\*.*?\*/|//[^\n]*', '', headers, flags=re.S)
-    for story, snippet in snippets.items():
+    excerpts = list(snippets.items()) + [
+        (story, snippet) for story, examples in standalone.items() for snippet in examples
+    ]
+    for story, snippet in excerpts:
         assert snippet.strip() and 'No complete styled browser example' not in snippet, story
         calls = re.sub(r'/\*.*?\*/|//[^\n]*', '', snippet, flags=re.S)
         for match in re.finditer(r'\b(cui_[A-Za-z_0-9]+)\s*\(', calls):
@@ -59,7 +76,7 @@ def main():
             assert actual == expected, (story, symbol, actual, expected)
         for token in set(re.findall(r'\b(CUI_[A-Z_0-9]+)\b', snippet)):
             assert token in headers, (story, token)
-    compiled = tuple(stories)
+    compiled = tuple(story for story in stories if story in snippets)
     extra = {
         'Video': 'cui_video_view confirmed_view = {0}; const cui_video_player_frame *decoded_frame = 0;',
         'VideoPlayer': 'cui_video_view confirmed_view = {0}; cui_video_audio_view confirmed_audio = {0}; const cui_video_player_frame *decoded_frame = 0; cui_video_request_fn queue_video_request = 0; void *video_host = 0;',
@@ -157,19 +174,19 @@ static void draw_profile(cui_context *ui) { (void)ui; }
         f'{common.replace("cui_theme theme = {0};", "" ) if story == "Theme" else common}'
         f'{extra.get(story, "")}\n{snippets[story]}\n}}'
         for story in compiled) + '\n'
-    live_examples = subprocess.check_output(['node', '--input-type=module', '-e', r'''
-        import {readFileSync} from 'node:fs';
-        const encoded = readFileSync(process.argv[1]).toString('base64');
-        const {virtualInboxUsage, liveDataTableUsage} = await import('data:text/javascript;base64,' + encoded);
-        process.stdout.write([virtualInboxUsage, liveDataTableUsage].join('\n'));
-    ''', str(ROOT / 'web/modules/cui_usage.js')], text=True)
     with tempfile.TemporaryDirectory() as directory:
         source = Path(directory) / 'snippets.c'
-        source.write_text(code + '\n' + live_examples)
+        source.write_text(code)
+        paths = [source]
+        for story, examples in standalone.items():
+            for index, example in enumerate(examples):
+                path = Path(directory) / f'{story}-{index}.c'
+                path.write_text(example)
+                paths.append(path)
         subprocess.run(['cc', '-std=c11', '-fsyntax-only', '-Wall', '-Wextra',
                         '-Werror', '-Wno-unused-variable', '-Wno-unused-parameter',
-                        '-I', str(ROOT / 'include'), str(source)], check=True)
-    print(f'PASS: {len(stories)} gallery stories covered; {len(compiled) + 2} displayed excerpts compile')
+                        '-I', str(ROOT / 'include'), *map(str, paths)], check=True)
+    print(f'PASS: {len(stories)} gallery stories covered; {len(excerpts)} displayed excerpts compile')
 
 
 if __name__ == '__main__':

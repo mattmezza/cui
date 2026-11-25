@@ -67,7 +67,7 @@ typedef struct {
     size_t shadow_count;
     cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
 } cui_popover_style;
-/* Additive positioning options consumed by cui_popover_begin only.
+/* Additive positioning options consumed by the styled Popover entry points.
  * Existing surface options/state struct ABI and surface_begin are unchanged. */
 typedef enum {
     CUI_POPOVER_POSITION_LEGACY = 0,
@@ -93,6 +93,10 @@ typedef struct {
     float offset; /* Signed logical gap, active only with custom_offset. */
     bool custom_offset, arrow;
 } cui_popover_position;
+typedef enum {
+    CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER = 0,
+    CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER
+} cui_popover_outside_focus;
 typedef struct {
     float x, y;
 } cui_popover_point;
@@ -136,7 +140,7 @@ typedef struct {
     float sheet_minimum, sheet_maximum;
     cui_surface_decision_fn decide; /* False keeps the surface open. */
     void *decision_user;
-    cui_surface_closed_fn on_close; /* Runs after close and focus restoration. */
+    cui_surface_closed_fn on_close; /* Runs after close and its focus handling. */
     void *close_user;
     /* Zero preserves immediate opening/closing. Uses cui_frame_time(ui). */
     float sheet_animation_seconds;
@@ -167,6 +171,12 @@ cui_id cui_surface_part_id(cui_id, unsigned part);
 bool cui_base_surface_update(cui_context *, cui_surface_state *, cui_surface_options);
 bool cui_base_surface_begin(cui_context *, cui_surface_state *, cui_str title, cui_str description,
                             cui_surface_options);
+/* KEEP_POINTER preserves Core's focus on an accepted outside primary press
+ * on a nonmodal Popover. All other closes use ordinary focus restoration.
+ * Submit once per frame. Invalid policy returns false before state mutation. */
+bool cui_base_surface_begin_with_outside_focus(cui_context *, cui_surface_state *, cui_str title,
+                                               cui_str description, cui_surface_options,
+                                               cui_popover_outside_focus);
 void cui_base_surface_end(cui_context *);
 /* Submit inside a box/portal with resize part ID, after base begin. */
 void cui_base_surface_submit_resize(cui_context *, const cui_surface_state *, cui_surface_options);
@@ -193,6 +203,10 @@ bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cu
  * may retry. No legacy public struct ABI change. */
 bool cui_popover_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options, cui_popover_position);
+/* Same composition and positioning contract with an explicit outside-focus policy. */
+bool cui_popover_begin_with_outside_focus(cui_context *, const cui_theme *, cui_surface_state *,
+                                          cui_str title, cui_str description, cui_surface_options,
+                                          cui_popover_position, cui_popover_outside_focus);
 /* After submitting the trigger and optional panel, update the trigger's current
  * controls/expanded details. Pass the begin result for this frame, or false
  * when omitting the panel. Call when closed, too. Only an admitted panel opened
@@ -396,15 +410,22 @@ void cui_surface_open(cui_context *ui, cui_surface_state *s, cui_id trigger) {
     cui_overlay_open(ui, &s->overlay, trigger);
 }
 static void cui_surface_finish_close(cui_context *ui, cui_surface_state *s,
-                                     cui_surface_result result) {
+                                     cui_surface_result result, bool restore_trigger) {
     if (!ui || !s || !s->overlay.open)
         return;
     s->result = result;
     s->sheet_closing = false;
     s->sheet_progress = 0;
     s->resizing = false;
-    cui_dismiss_focus_scope(ui, s->overlay.id, s->overlay.trigger);
-    cui_overlay_close(ui, &s->overlay);
+    if (restore_trigger) {
+        cui_dismiss_focus_scope(ui, s->overlay.id, s->overlay.trigger);
+        cui_overlay_close(ui, &s->overlay);
+    } else {
+        /* Outside pointer dismissal runs before the scope is submitted. Core
+         * has already routed the press and resolved focus for this frame. */
+        s->overlay.open = false;
+        cui_invalidate(ui);
+    }
     if (s->on_close)
         s->on_close(s->close_user, result);
 }
@@ -426,7 +447,7 @@ void cui_surface_close(cui_context *ui, cui_surface_state *s, cui_surface_result
         cui_surface_block_input(ui);
         cui_invalidate(ui);
     } else
-        cui_surface_finish_close(ui, s, result);
+        cui_surface_finish_close(ui, s, result, true);
 }
 void cui_surface_request_close(cui_context *ui, cui_surface_state *s, cui_surface_result result) {
     if (!ui || !s || !s->overlay.open || s->sheet_closing)
@@ -586,7 +607,7 @@ static void cui_surface_resize_event(cui_context *ui, cui_surface_state *s, cui_
     }
 }
 static bool cui_surface_update_route(cui_context *ui, cui_surface_state *s, cui_surface_options o,
-                                     bool composed) {
+                                     bool composed, cui_popover_outside_focus outside_focus) {
     if (!ui || !s || !cui_surface_popover_valid(s, o))
         return false;
     s->sheet_animation_seconds =
@@ -608,13 +629,13 @@ static bool cui_surface_update_route(cui_context *ui, cui_surface_state *s, cui_
         if (phase < 1)
             cui_invalidate(ui);
         else if (s->sheet_closing) {
-            cui_surface_finish_close(ui, s, s->sheet_close_result);
+            cui_surface_finish_close(ui, s, s->sheet_close_result, true);
             return true;
         }
     } else {
         s->sheet_progress = 1;
         if (s->sheet_closing) {
-            cui_surface_finish_close(ui, s, s->sheet_close_result);
+            cui_surface_finish_close(ui, s, s->sheet_close_result, true);
             return true;
         }
     }
@@ -660,6 +681,7 @@ static bool cui_surface_update_route(cui_context *ui, cui_surface_state *s, cui_
         }
         cui_id activation = cui_event_activation(ui, i);
         cui_surface_result reason = CUI_SURFACE_NONE;
+        bool keep_pointer_focus = false;
         if (!composed && s->kind == CUI_SURFACE_ALERT &&
             activation == cui_surface_part_id(s->overlay.id, 2))
             reason = CUI_SURFACE_ACCEPTED;
@@ -679,25 +701,40 @@ static bool cui_surface_update_route(cui_context *ui, cui_surface_state *s, cui_
                  s->overlay.has_bounds && cui_pointer_scope_allowed(ui, s->overlay.id) &&
                  (!s->overlay.modal || cui_event_target(ui, i) == s->overlay.id)) {
             cui_rect b = s->overlay.bounds;
-            if (e.x < b.x || e.y < b.y || e.x >= b.x + b.w || e.y >= b.y + b.h)
+            if (e.x < b.x || e.y < b.y || e.x >= b.x + b.w || e.y >= b.y + b.h) {
                 reason = CUI_SURFACE_CANCELLED;
+                keep_pointer_focus = s->kind == CUI_SURFACE_POPOVER && !s->overlay.modal &&
+                                     outside_focus == CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER;
+            }
         }
-        if (reason != CUI_SURFACE_NONE && (!o.decide || o.decide(o.decision_user, reason)))
-            cui_surface_close(ui, s, reason);
+        if (reason != CUI_SURFACE_NONE && (!o.decide || o.decide(o.decision_user, reason))) {
+            if (keep_pointer_focus)
+                cui_surface_finish_close(ui, s, reason, false);
+            else
+                cui_surface_close(ui, s, reason);
+        }
     }
     return !s->overlay.open;
 }
 bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
-    return cui_surface_update_route(ui, s, o, false);
+    return cui_surface_update_route(ui, s, o, false, CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER);
 }
 bool cui_dialog_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
-    return cui_surface_update_route(ui, s, o, true);
+    return cui_surface_update_route(ui, s, o, true, CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER);
 }
 bool cui_base_surface_begin(cui_context *ui, cui_surface_state *s, cui_str title,
                             cui_str description, cui_surface_options o) {
-    if (!ui || !s || !cui_surface_popover_valid(s, o))
+    return cui_base_surface_begin_with_outside_focus(ui, s, title, description, o,
+                                                     CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER);
+}
+bool cui_base_surface_begin_with_outside_focus(cui_context *ui, cui_surface_state *s, cui_str title,
+                                               cui_str description, cui_surface_options o,
+                                               cui_popover_outside_focus outside_focus) {
+    if (!ui || !s || !cui_surface_popover_valid(s, o) ||
+        (outside_focus != CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER &&
+         outside_focus != CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER))
         return false;
-    cui_base_surface_update(ui, s, o);
+    cui_surface_update_route(ui, s, o, false, outside_focus);
     if (!s->overlay.open || !cui_overlay_begin(ui, &s->overlay))
         return false;
     cui_interact(ui, s->overlay.id,
@@ -1042,11 +1079,14 @@ static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surf
 }
 static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_surface_state *s,
                                        cui_str title, cui_str description, cui_surface_options o,
-                                       const cui_rect *positioned, const cui_popover_paint *arrow) {
+                                       const cui_rect *positioned, const cui_popover_paint *arrow,
+                                       cui_popover_outside_focus outside_focus) {
     cui_rect bounds = positioned ? *positioned
                       : s        ? cui_surface_geometry(s->kind, o)
                                  : (cui_rect){0};
-    if (!t || bounds.w <= 0 || bounds.h <= 0)
+    if (!t || bounds.w <= 0 || bounds.h <= 0 ||
+        (outside_focus != CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER &&
+         outside_focus != CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER))
         return false;
     cui_popover_style style = {.background = t->surface,
                                .foreground = t->text,
@@ -1065,7 +1105,7 @@ static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_
         stack = cui_resource_get(ui, CUI_SURFACE_SKIN_OWNER, CUI_SURFACE_SKIN_NAMESPACE,
                                  sizeof(*stack), cui_surface_skin_collect, NULL);
     if ((active && !stack) || (stack && stack->depth == 64) ||
-        !cui_base_surface_begin(ui, s, title, description, o))
+        !cui_base_surface_begin_with_outside_focus(ui, s, title, description, o, outside_focus))
         return false;
     if (stack) {
         cui_surface_skin_entry *entry = &stack->entries[stack->depth++];
@@ -1145,14 +1185,23 @@ static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_
 }
 bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s, cui_str title,
                        cui_str description, cui_surface_options o) {
-    return cui_surface_begin_internal(ui, t, s, title, description, o, NULL, NULL);
+    return cui_surface_begin_internal(ui, t, s, title, description, o, NULL, NULL,
+                                      CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER);
 }
 bool cui_popover_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s, cui_str title,
                        cui_str description, cui_surface_options o, cui_popover_position p) {
+    return cui_popover_begin_with_outside_focus(ui, t, s, title, description, o, p,
+                                                CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER);
+}
+bool cui_popover_begin_with_outside_focus(cui_context *ui, const cui_theme *t, cui_surface_state *s,
+                                          cui_str title, cui_str description, cui_surface_options o,
+                                          cui_popover_position p,
+                                          cui_popover_outside_focus outside_focus) {
     if (!s || s->kind != CUI_SURFACE_POPOVER)
         return false;
     if (p.mode == CUI_POPOVER_POSITION_LEGACY)
-        return cui_surface_begin(ui, t, s, title, description, o);
+        return cui_surface_begin_internal(ui, t, s, title, description, o, NULL, NULL,
+                                          outside_focus);
     cui_rect bounds;
     cui_popover_style style;
     if (!t || !cui_popover_surface_geometry(o, p, &bounds) ||
@@ -1162,7 +1211,7 @@ bool cui_popover_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     if (p.arrow && !cui_popover_paint_build(bounds, o.anchor, o.viewport, p, t, style, o, &paint))
         return false;
     return cui_surface_begin_internal(ui, t, s, title, description, o, &bounds,
-                                      p.arrow ? &paint : NULL);
+                                      p.arrow ? &paint : NULL, outside_focus);
 }
 void cui_surface_footer_begin(cui_context *ui, const cui_theme *t) {
     if (!ui || !t)

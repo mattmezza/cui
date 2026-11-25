@@ -2514,6 +2514,7 @@ static cui_surface_state dialog_surface, alert_dialog_surface, sheet_surface, po
 static cui_dialog_layout_v1 dialog_layout, alert_dialog_layout, nested_dialog_layout;
 static int surface_variant, alert_attempts;
 static bool dialog_updates = true, popover_updates;
+static bool popover_previews;
 static bool dialog_long_body;
 static cui_popover_position gallery_popover_position;
 static bool popover_edge, popover_inert, popover_modal;
@@ -5654,9 +5655,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_id trigger = cui_id_from(ui, "hover-trigger");
         bool edge = story == 24 && card_view == CARD_EDGE;
         if (edge)
-            cui_begin_absolute_box(ui, 0, (cui_box){.align_x = CUI_ALIGN_END},
-                                   (cui_rect){24, height - 103, fmaxf(1, width - 48),
-                                              t.control_height});
+            cui_begin_absolute_box(
+                ui, 0, (cui_box){.align_x = CUI_ALIGN_END},
+                (cui_rect){24, height - 103, fmaxf(1, width - 48), t.control_height});
         bool accepted = cui_button(ui, trigger, &t, cui_string("Hover or focus here"), disabled);
         if (edge)
             cui_end_box(ui);
@@ -6345,9 +6346,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                        .margin = 12,
                                        .side = CUI_POPUP_BELOW,
                                        .popover_appearance = CUI_POPOVER_APPEARANCE_SOURCE};
-        bool admitted = cui_popover_begin(ui, &t, &popover_surface, cui_string("Alex Morgan"),
-                                          cui_string("Maintainer · Portable UI systems"), options,
-                                          gallery_popover_position);
+        bool admitted = cui_popover_begin_with_outside_focus(
+            ui, &t, &popover_surface, cui_string("Alex Morgan"),
+            cui_string("Maintainer · Portable UI systems"), options, gallery_popover_position,
+            CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER);
         if (admitted) {
             cui_id updates = cui_id_from(ui, "popover-updates");
             if (opening)
@@ -6363,6 +6365,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         (void)cui_popover_link_trigger(ui, &popover_surface, trigger, admitted);
         if (positioned)
             cui_end_box(ui);
+        float previews_y = positioned ? 24 : height - t.control_height - 24;
+        cui_begin_absolute_box(ui, 0, (cui_box){0},
+                               (cui_rect){24, previews_y, width - 48, t.control_height});
+        cui_checkbox(ui, cui_id_from(ui, "popover-previews"), &t, cui_string("Show previews"),
+                     &popover_previews, disabled);
+        cui_end_box(ui);
         if (positioned && popover_modal && dialog_surface.overlay.open) {
             cui_surface_options modal = {.viewport = {0, 0, width, height},
                                          .width = width > 500 ? 260 : width - 72,

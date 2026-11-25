@@ -66,7 +66,7 @@ typedef struct {
     size_t shadow_count;
     cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
 } cui_popover_style;
-/* Additive positioning options consumed by cui_popover_begin only.
+/* Additive positioning options consumed by the styled Popover entry points.
  * Existing surface options/state struct ABI and surface_begin are unchanged. */
 typedef enum {
     CUI_POPOVER_POSITION_LEGACY = 0,
@@ -92,6 +92,10 @@ typedef struct {
     float offset; /* Signed logical gap, active only with custom_offset. */
     bool custom_offset, arrow;
 } cui_popover_position;
+typedef enum {
+    CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER = 0,
+    CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER
+} cui_popover_outside_focus;
 typedef struct {
     float x, y;
 } cui_popover_point;
@@ -135,7 +139,7 @@ typedef struct {
     float sheet_minimum, sheet_maximum;
     cui_surface_decision_fn decide; /* False keeps the surface open. */
     void *decision_user;
-    cui_surface_closed_fn on_close; /* Runs after close and focus restoration. */
+    cui_surface_closed_fn on_close; /* Runs after close and its focus handling. */
     void *close_user;
     /* Zero preserves immediate opening/closing. Uses cui_frame_time(ui). */
     float sheet_animation_seconds;
@@ -166,6 +170,12 @@ cui_id cui_surface_part_id(cui_id, unsigned part);
 bool cui_base_surface_update(cui_context *, cui_surface_state *, cui_surface_options);
 bool cui_base_surface_begin(cui_context *, cui_surface_state *, cui_str title, cui_str description,
                             cui_surface_options);
+/* KEEP_POINTER preserves Core's focus on an accepted outside primary press
+ * on a nonmodal Popover. All other closes use ordinary focus restoration.
+ * Submit once per frame. Invalid policy returns false before state mutation. */
+bool cui_base_surface_begin_with_outside_focus(cui_context *, cui_surface_state *, cui_str title,
+                                               cui_str description, cui_surface_options,
+                                               cui_popover_outside_focus);
 void cui_base_surface_end(cui_context *);
 /* Submit inside a box/portal with resize part ID, after base begin. */
 void cui_base_surface_submit_resize(cui_context *, const cui_surface_state *, cui_surface_options);
@@ -192,6 +202,10 @@ bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cu
  * may retry. No legacy public struct ABI change. */
 bool cui_popover_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options, cui_popover_position);
+/* Same composition and positioning contract with an explicit outside-focus policy. */
+bool cui_popover_begin_with_outside_focus(cui_context *, const cui_theme *, cui_surface_state *,
+                                          cui_str title, cui_str description, cui_surface_options,
+                                          cui_popover_position, cui_popover_outside_focus);
 /* After submitting the trigger and optional panel, update the trigger's current
  * controls/expanded details. Pass the begin result for this frame, or false
  * when omitting the panel. Call when closed, too. Only an admitted panel opened

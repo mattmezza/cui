@@ -128,6 +128,35 @@ private-X11 inbox check shows how a custom cell can use `cui_hovered` with a
 stable row ID, while composition stays within the virtual viewport. See the
 [reproducible workload and timings](PERFORMANCE.md#native-datatable-inbox).
 
+### Keep the visible row during a live update
+
+Capture the first visible row before mutating or replacing the current borrowed
+rows. After a successful bind, restore the scroll position before the next
+submission. Use the corresponding table options at each step so both helpers
+account for the body viewport and any scrollbar gutters.
+
+```c
+/* Between frames. next_rows and columns stay live while bound. */
+cui_table_row_anchor anchor =
+    cui_table_capture_row_anchor(model, state.scroll_y, options);
+if (cui_table_bind(model, next_rows, next_count, columns, column_count) == CUI_TABLE_OK) {
+    state.scroll_y = cui_table_restore_row_anchor(model, anchor, options);
+}
+```
+
+The offset follows the same key and preserves the scrolled distance within its
+row. If the key disappeared, restoration uses the former index, or the final
+row when the list is now shorter. If the row is shorter than the saved offset,
+it aligns to the row's top. The viewport can clamp at either edge. An empty
+model or a zero-key anchor restores to the top.
+
+These C helpers only calculate offsets and allocate nothing. Selection and the
+keyboard cursor still follow their existing keyed contracts. Bind and scroll
+policy remain application-controlled, so a deliberate change such as sorting can
+choose a new scroll position. Supply valid replacement arrays to avoid changing
+the current borrowed rows on a failed bind. Foreign builders do not expose
+this workflow yet.
+
 Custom leaf-header, group-header, row-header, whole-row and trailing-column render hooks use option userdata. Group headers accept up to sixteen levels of bounded spans. Every level must cover all data columns exactly, and no group may cross the fixed-column boundary; `cui_table_group_headers_valid` lets applications validate a configuration before rendering. Group cells expose column-header semantics at their first column; the callback receives the complete span. Whole-row callbacks run only for virtualized rows and can add row-level decoration or content before the cells. The optional trailing column uses a caller-selected width (12 logical pixels by default) and participates in horizontal scroll extent; its callback runs for each header level, the leaf header and visible rows. Loading replaces body rows with a busy status and suppresses input/load requests; empty and loading placeholders have optional render hooks and accessible default labels.
 
 Set `scrollbars` to reserve scrollbar gutters only when an axis overflows. `bar_thickness` controls their logical thickness. The drawing-free reducer delegates keyboard, track and thumb behavior to the reusable Scroll base primitive, while the styled table paints the same scrollbar state. The grid and scrollbar semantics share the table as their scroll owner. Applications that build a custom renderer can use `cui_table_scroll_layout` to obtain the reduced viewport and scroll maxima.

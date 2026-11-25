@@ -941,7 +941,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the C live row-rebind scroll-anchor helpers."
+      ]
     },
     {
       "name": "Plot",

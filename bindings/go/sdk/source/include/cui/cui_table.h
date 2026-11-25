@@ -129,6 +129,22 @@ typedef struct {
 } cui_table_options;
 cui_table_options cui_table_options_default(void);
 typedef struct {
+    cui_id key; /* Zero means no anchor. */
+    size_t fallback_index;
+    float within;
+} cui_table_row_anchor;
+/* Capture before mutating or replacing borrowed rows. Pass the same options
+ * used to submit the table so the body viewport accounts for scrollbar gutters. */
+cui_table_row_anchor cui_table_capture_row_anchor(const cui_table_model *, float scroll_y,
+                                                  cui_table_options);
+/* After a successful bind, assign the returned offset to state.scroll_y before
+ * submitting the table. Preserves the key and within-row offset when possible.
+ * A removed key falls back to its former index, clamped to the remaining rows.
+ * An offset that no longer fits the row aligns at its top. The result is
+ * clamped to the new viewport. Empty models and absent anchors return zero. */
+float cui_table_restore_row_anchor(const cui_table_model *, cui_table_row_anchor,
+                                   cui_table_options);
+typedef struct {
     bool selection_changed, sort_changed, columns_changed;
     bool visible_rows_changed, visible_columns_changed, load_more, context_requested;
     cui_id context_row, context_column;

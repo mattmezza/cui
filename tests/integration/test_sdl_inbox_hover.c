@@ -5,10 +5,17 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 enum { WIDTH = 520, HEIGHT = 288, TABLE = 800, ROW_HEIGHT = 32, SAMPLES = 90 };
 enum { SENDER = 10001, SUBJECT = 10002, RECEIVED = 10003 };
 static const cui_color hover_fill = {197, 79, 151, 255};
+static const cui_table_options table_options = {.width = WIDTH,
+                                                .height = 8 * ROW_HEIGHT,
+                                                .row_height = ROW_HEIGHT,
+                                                .header_height = ROW_HEIGHT,
+                                                .overscan = 1,
+                                                .striped = true};
 
 typedef struct {
     cui_context *ui;
@@ -26,20 +33,25 @@ typedef struct {
 } sample;
 
 static cui_str label(void *user, size_t row, cui_id column) {
-    (void)user;
+    const inbox *test = user;
+    cui_table_row message;
+    assert(cui_table_get_row(test->model, row, &message));
     if (column == SENDER)
-        return cui_string(row % 2 ? "Alex Morgan" : "Sam Rivera");
+        return cui_string(message.key % 2 ? "Sam Rivera" : "Alex Morgan");
     if (column == SUBJECT)
-        return cui_string(row % 2 ? "Review the latest build" : "Notes for the upcoming release");
+        return cui_string(message.key % 2 ? "Notes for the upcoming release"
+                                          : "Review the latest build");
     return cui_string("09:30");
 }
 
 static void cell(cui_context *ui, const cui_theme *theme, void *user, size_t row, cui_id column) {
     inbox *test = user;
     ++test->cells;
-    if (column == SENDER && cui_hovered(ui, cui_table_row_id(TABLE, row + 1))) {
+    cui_table_row message;
+    assert(cui_table_get_row(test->model, row, &message));
+    if (column == SENDER && cui_hovered(ui, cui_table_row_id(TABLE, message.key))) {
         assert(!test->highlighted);
-        test->highlighted = row + 1;
+        test->highlighted = message.key;
         cui_begin_box(ui, 0, (cui_box){.width = 5, .height = 15, .background = hover_fill});
         cui_end_box(ui);
     }
@@ -54,13 +66,7 @@ static sample frame(inbox *test, const cui_theme *theme, cui_id expected_hover) 
     Uint64 polled = SDL_GetTicksNS();
     assert(cui_begin_frame(test->ui, WIDTH, HEIGHT, .016f));
     cui_table_result result = cui_data_table(test->ui, TABLE, theme, test->model, &test->state,
-                                             (cui_table_options){.width = WIDTH,
-                                                                 .height = 8 * ROW_HEIGHT,
-                                                                 .row_height = ROW_HEIGHT,
-                                                                 .header_height = ROW_HEIGHT,
-                                                                 .overscan = 1,
-                                                                 .striped = true},
-                                             label, cell, test);
+                                             table_options, label, cell, test);
     cui_draw_list draw = cui_end_frame(test->ui);
     Uint64 composed = SDL_GetTicksNS();
     assert(cui_sdl3_render(test->host, &draw, theme->background));
@@ -101,19 +107,51 @@ static int compare_time(const void *left, const void *right) {
     return (a > b) - (a < b);
 }
 
+static void update_inbox(inbox *test, const cui_theme *theme, cui_table_row *rows, size_t count,
+                         cui_table_column *columns) {
+    cui_table_row_anchor anchor =
+        cui_table_capture_row_anchor(test->model, test->state.scroll_y, table_options);
+    assert(anchor.key && anchor.within == 16);
+    cui_id selected = anchor.key + 2;
+    test->state.row = test->state.cursor_row = selected;
+    test->state.cursor_column = SENDER;
+    (void)frame(test, theme, 0);
+    cui_id selected_cell = cui_table_cell_id(TABLE, selected, SENDER);
+    cui_focus(test->ui, selected_cell);
+    cui_rect before = cui_bounds(test->ui, selected_cell);
+    assert(before.w > 0 && before.h > 0);
+
+    memmove(rows + 1, rows, count * sizeof(*rows));
+    rows[0] = (cui_table_row){.key = count + 1, .label = cui_string("New message")};
+    assert(cui_table_bind(test->model, rows, count + 1, columns, 3) == CUI_TABLE_OK);
+    test->state.scroll_y = cui_table_restore_row_anchor(test->model, anchor, table_options);
+    move(test, selected + 1);
+    move(test, selected);
+    sample updated = frame(test, theme, selected);
+    assert(updated.cells <= 33 && test->state.row == selected);
+    assert(test->state.visible_begin == anchor.fallback_index + 1);
+    assert(cui_focused(test->ui) == selected_cell);
+    assert(cui_bounds(test->ui, selected_cell).y == before.y);
+
+    assert(cui_queue_event(test->ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_DOWN}));
+    (void)frame(test, theme, selected);
+    assert(test->state.row == selected + 1 && test->state.cursor_row == selected + 1);
+    assert(test->state.visible_begin == anchor.fallback_index + 1);
+}
+
 static size_t exercise(cui_sdl3 *host, SDL_WindowID window, cui_font *font, size_t row_count) {
     size_t middle = row_count / 2;
     inbox test = {
         .host = host,
         .window = window,
-        .model = cui_table_create(row_count),
+        .model = cui_table_create(row_count + 1),
         .state = {.scroll_y = (float)middle * ROW_HEIGHT},
         .ui = cui_create((cui_config){.measure = cui_font_measure,
                                       .measure_user = font,
                                       .max_elements = 256,
                                       .max_commands = 512}),
     };
-    cui_table_row *rows = calloc(row_count, sizeof(*rows));
+    cui_table_row *rows = calloc(row_count + 1, sizeof(*rows));
     assert(rows && test.model && test.ui);
     for (size_t r = 0; r < row_count; ++r)
         rows[r] = (cui_table_row){.key = r + 1, .label = cui_string("Inbox message")};
@@ -163,6 +201,7 @@ static size_t exercise(cui_sdl3 *host, SDL_WindowID window, cui_font *font, size
     assert(SDL_PushEvent(&wheel));
     (void)frame(&test, &theme, 0);
     assert(test.state.scroll_y == previous_offset + 48 && test.state.visible_begin == middle + 1);
+    update_inbox(&test, &theme, rows, row_count, columns);
 
     cui_destroy(test.ui);
     cui_table_destroy(test.model);

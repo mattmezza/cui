@@ -7228,6 +7228,18 @@
           ]
         },
         {
+          "name": "row-key viewport anchoring across caller-owned rebinds",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_table.c",
+            "tests/integration/test_sdl_inbox_hover.c",
+            "docs/TABLE.md"
+          ],
+          "limitations": [
+            "Opt-in C helpers preserve a row key and pixel offset. Automatic remote updates and foreign builder exposure remain open."
+          ]
+        },
+        {
           "name": "remote data adapter",
           "status": "not_started",
           "evidence": []

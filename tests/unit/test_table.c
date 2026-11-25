@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_table.h"
 #include <assert.h>
+#include <float.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,6 +57,46 @@ static void models(void) {
     cui_table_destroy(m);
     free(rows);
 }
+static void row_anchors(void) {
+    cui_table_model *m = cui_table_create(6);
+    cui_table_column column = {.key = 7, .width = 140};
+    cui_table_row rows[] = {{.key = 1}, {.key = 2}, {.key = 3}, {.key = 4}, {.key = 5}, {.key = 6}};
+    cui_table_options o = {.width = 100, .height = 80, .row_height = 32, .scrollbars = true};
+    assert(m && cui_table_bind(m, rows + 1, 5, &column, 1) == CUI_TABLE_OK);
+    cui_table_row_anchor anchor = cui_table_capture_row_anchor(m, 64.25f, o);
+    assert(anchor.key == 4 && anchor.fallback_index == 2 && anchor.within == .25f);
+    assert(cui_table_restore_row_anchor(m, anchor, o) == 64.25f);
+
+    assert(cui_table_bind(m, rows, 6, &column, 1) == CUI_TABLE_OK);
+    assert(cui_table_restore_row_anchor(m, anchor, o) == 96.25f);
+    cui_table_row duplicate[] = {{.key = 4}, {.key = 4}};
+    assert(cui_table_bind(m, duplicate, 2, &column, 1) == CUI_TABLE_DUPLICATE_KEY);
+    assert(cui_table_restore_row_anchor(m, anchor, o) == 96.25f);
+
+    cui_table_row replacement[] = {{.key = 1}, {.key = 2}, {.key = 3}, {.key = 5}, {.key = 6}};
+    assert(cui_table_bind(m, replacement, 5, &column, 1) == CUI_TABLE_OK);
+    float restored = cui_table_restore_row_anchor(m, anchor, o);
+    assert(restored == 64.25f && cui_table_capture_row_anchor(m, restored, o).key == 3);
+    cui_table_row_anchor tail = {.key = 6, .fallback_index = 4, .within = 10};
+    assert(cui_table_restore_row_anchor(m, tail, o) == 90); /* 10px horizontal gutter. */
+    o.scrollbars = false;
+    assert(cui_table_restore_row_anchor(m, tail, o) == 80);
+    o.height = 20;
+    o.row_height = 16;
+    cui_table_row_anchor shrunk = {.key = 2, .within = 20};
+    assert(cui_table_restore_row_anchor(m, shrunk, o) == 16);
+    shrunk.within = NAN;
+    assert(cui_table_restore_row_anchor(m, shrunk, o) == 16);
+    assert(cui_table_capture_row_anchor(m, NAN, o).key == 1);
+    assert(cui_table_restore_row_anchor(m, (cui_table_row_anchor){0}, o) == 0);
+
+    cui_table_view giant_view = cui_table_viewport(m, 30, FLT_MAX, FLT_MIN, 0);
+    assert(giant_view.begin == 0 && giant_view.end == 5 && giant_view.scroll == 0);
+    assert(cui_table_bind(m, NULL, 0, &column, 1) == CUI_TABLE_OK);
+    assert(cui_table_restore_row_anchor(m, anchor, o) == 0);
+    assert(!cui_table_capture_row_anchor(m, 10, o).key);
+    cui_table_destroy(m);
+}
 static void columns_and_loading(void) {
     cui_table_model *m = cui_table_create(20);
     cui_table_row rows[20];
@@ -89,7 +130,13 @@ static void columns_and_loading(void) {
     result = cui_table_reduce(ui, 10, m, &state, o);
     assert(!result.load_more && !result.visible_rows_changed);
     cui_end_frame(ui);
+    cui_table_row_anchor before_append = cui_table_capture_row_anchor(m, state.scroll_y, o);
     assert(cui_table_bind(m, rows, 12, cols, 100) == CUI_TABLE_OK);
+    state.scroll_y = cui_table_restore_row_anchor(m, before_append, o);
+    assert(cui_begin_frame(ui, 700, 500, .016f));
+    result = cui_table_reduce(ui, 10, m, &state, o);
+    assert(!result.load_more && !result.visible_rows_changed && result.rows.begin == 8);
+    cui_end_frame(ui);
     state.scroll_y = 320;
     assert(cui_begin_frame(ui, 700, 500, .016f));
     result = cui_table_reduce(ui, 10, m, &state, o);
@@ -1002,6 +1049,7 @@ int main(void) {
 #endif
     defaults();
     models();
+    row_anchors();
     spans();
     columns_and_loading();
     events();

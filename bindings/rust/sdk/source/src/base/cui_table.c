@@ -320,14 +320,35 @@ cui_table_view cui_table_viewport(const cui_table_model *m, float scroll, float 
     h = isfinite(h) && h > 0 ? h : 240;
     v.total = (float)m->count * row;
     v.scroll = isfinite(scroll) ? fmaxf(0, fminf(scroll, fmaxf(0, v.total - h))) : 0;
-    size_t first = (size_t)floorf(v.scroll / row), last = (size_t)ceilf((v.scroll + h) / row);
-    if (last > m->count)
-        last = m->count;
+    size_t first = (size_t)fminf((float)m->count, floorf(v.scroll / row)),
+           last = (size_t)fminf((float)m->count, ceilf((v.scroll + h) / row));
     v.begin = first > over ? first - over : 0;
     v.end = over > m->count - last ? m->count : last + over;
     v.before = (float)v.begin * row;
     v.after = (float)(m->count - v.end) * row;
     return v;
+}
+cui_table_row_anchor cui_table_capture_row_anchor(const cui_table_model *m, float scroll,
+                                                  cui_table_options o) {
+    if (!m || !m->count)
+        return (cui_table_row_anchor){0};
+    o = view_options(m, o);
+    float row = row_height(o);
+    cui_table_view view = cui_table_viewport(m, scroll, height(o), row, 0);
+    size_t index = view.begin < m->count ? view.begin : m->count - 1;
+    return (cui_table_row_anchor){m->rows[index].key, index,
+                                  fmaxf(0, view.scroll - (float)index * row)};
+}
+float cui_table_restore_row_anchor(const cui_table_model *m, cui_table_row_anchor anchor,
+                                   cui_table_options o) {
+    if (!m || !m->count || !anchor.key)
+        return 0;
+    size_t index;
+    if (!cui_table_row_index(m, anchor.key, &index))
+        index = anchor.fallback_index < m->count ? anchor.fallback_index : m->count - 1;
+    float row = row_height(o);
+    float within = anchor.within >= 0 && anchor.within < row ? anchor.within : 0;
+    return fminf((float)index * row + within, cui_table_scroll_max_y(m, view_options(m, o)));
 }
 cui_table_view cui_table_column_viewport(const cui_table_model *m, float scroll, float width,
                                          size_t over) {

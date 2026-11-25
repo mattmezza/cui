@@ -339,6 +339,10 @@ DataTable wheel steps match Scrollable at 48 logical pixels. Custom hosts
 that send pixel deltas must set `scroll_precise`. See `docs/TABLE.md`.
 Reuse the bound model between frames so only virtual cells are composed in
 long inboxes. See the measured SDL workload in `docs/PERFORMANCE.md`.
+For live DataTable updates in C, capture with `cui_table_capture_row_anchor`
+before changing the borrowed rows. After a successful bind, assign the result
+of `cui_table_restore_row_anchor` to `state.scroll_y`. Pass the corresponding
+table options. Selection stays keyed. Foreign builders lack these helpers.
 For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots alive
 through frame completion and ensure the container fits the panels' combined
 min/max range. A pane at its constraint cannot move farther in that direction.

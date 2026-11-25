@@ -13,6 +13,13 @@ determines the highlighted row in the submitted draw list. Both model sizes
 call the renderer for 30 virtual cells and emit 166 draw commands per frame.
 One native wheel tick then moves the inbox by 48 logical pixels.
 
+After those timed frames, the test also prepends a new message while the
+viewport starts halfway through a row. It checks that the selected key and
+its cell's vertical position and keyboard focus stay fixed, that the latest pointer sample
+highlights the correct key on the rebind frame, and that Down moves selection
+to the following message. The cell callback still runs only within the
+viewport and its overscan. The timings below exclude the rebind.
+
 Private X11 with SDL 3.4.18, SDL software rendering, vsync off, Inter, GCC
 16.2.1 Release, and one CPU on the Core Ultra 5 235U. Measured 90 warm frames
 per size. Values are p50 / p95 wall time in milliseconds.

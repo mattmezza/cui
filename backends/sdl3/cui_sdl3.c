@@ -393,6 +393,9 @@ static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided,
                                                    : CUI_EVENT_COMPOSITION_CANCEL;
             s->ime_commit_pending |= s->ime_composing;
             s->ime_composing = e.edit.text && e.edit.text[0];
+            /* Empty editing clears the preedit. SDL can send the committed
+             * text separately, including in a later poll. */
+            v.ime_composing = !s->ime_composing && s->ime_commit_pending && s->ime_focus;
             v.text_data = e.edit.text;
             v.text_length = e.edit.text ? SDL_strlen(e.edit.text) : 0;
             v.composition_anchor = e.edit.start >= 0

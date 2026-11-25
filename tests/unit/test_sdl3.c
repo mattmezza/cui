@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl3.h"
+#include "cui/cui_time_field_v1.h"
 #include <SDL3/SDL.h>
 #include <assert.h>
 #include <stdio.h>
@@ -283,6 +284,86 @@ static void pointer_presence(cui_sdl3 *s) {
     assert(!cui_hovered(ui, 10));
     cui_destroy(ui);
 }
+typedef struct {
+    cui_time_field_options_v1 options;
+    cui_time_field_state_v1 state;
+    cui_time value;
+    size_t commits;
+} time_field_test;
+
+static void time_field_changed(void *user, const cui_time_change *event) {
+    time_field_test *field = user;
+    assert(event->event.target == 20 && event->previous.minute != event->value.minute);
+    assert(event->value.minute == field->value.minute);
+    field->commits++;
+}
+static void time_field_frame(cui_context *ui, time_field_test *field, const char *preedit,
+                             unsigned minute, size_t commits) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    cui_time_field_result_v1 result =
+        cui_time_field_v1(ui, 20, &theme, cui_string("Time"), &field->state, &field->value,
+                          &field->options, (cui_time_handler){time_field_changed, field});
+    assert(result.status == CUI_TIME_TEXT_OK && result.validation == CUI_TIME_TEXT_OK);
+    cui_id segment = 0;
+    cui_str pending = cui_time_field_preedit_v1(ui, 20, &segment);
+    if (preedit) {
+        assert(segment == cui_time_segment_id(20, CUI_TIME_FIELD_MINUTE_V1));
+        assert(pending.length == strlen(preedit) && !memcmp(pending.data, preedit, pending.length));
+    } else
+        assert(!segment && !pending.length);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    assert(field->value.minute == minute && field->commits == commits);
+}
+static void time_field_ime(cui_sdl3 *s) {
+    cui_context *ui = cui_create((cui_config){.width = 320, .height = 160});
+    assert(ui);
+    time_field_test field = {.value = {9, 30, 0}};
+    assert(cui_time_field_options_init_v1(&field.options) == CUI_TIME_TEXT_OK);
+    cui_time_locale_v1 locale;
+    assert(cui_time_locale_init_v1(&locale) == CUI_TIME_TEXT_OK);
+    const char *digits[] = {"٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"};
+    for (unsigned i = 0; i < 10; i++)
+        locale.digits[i] = cui_string(digits[i]);
+    field.options.text.locale = &locale;
+    field.options.flags = CUI_TIME_FIELD_IME_V1;
+    assert(cui_time_field_state_init_v1(&field.state, field.value, &field.options) ==
+           CUI_TIME_TEXT_OK);
+    time_field_frame(ui, &field, NULL, 30, 0);
+    cui_focus(ui, cui_time_segment_id(20, CUI_TIME_FIELD_MINUTE_V1));
+    time_field_frame(ui, &field, NULL, 30, 0);
+    assert(cui_sdl3_poll(s, ui));
+
+    SDL_Event update = {.type = SDL_EVENT_TEXT_EDITING};
+    SDL_Event clear = {.type = SDL_EVENT_TEXT_EDITING};
+    SDL_Event commit = {.type = SDL_EVENT_TEXT_INPUT};
+    clear.edit.text = "";
+    update.edit.text = commit.text.text = "٢١";
+    assert(SDL_PushEvent(&update) && cui_sdl3_poll(s, ui));
+    time_field_frame(ui, &field, "٢١", 30, 0);
+    assert(SDL_PushEvent(&clear) && cui_sdl3_poll(s, ui));
+    time_field_frame(ui, &field, NULL, 30, 0);
+    time_field_frame(ui, &field, NULL, 30, 0);
+    assert(SDL_PushEvent(&commit) && cui_sdl3_poll(s, ui));
+    time_field_frame(ui, &field, NULL, 21, 1);
+
+    update.edit.text = commit.text.text = "٤٢";
+    assert(SDL_PushEvent(&update) && SDL_PushEvent(&clear) && SDL_PushEvent(&commit));
+    assert(cui_sdl3_poll(s, ui));
+    time_field_frame(ui, &field, NULL, 42, 2);
+
+    update.edit.text = commit.text.text = "٥٥";
+    assert(SDL_PushEvent(&update) && SDL_PushEvent(&clear) && cui_sdl3_poll(s, ui));
+    time_field_frame(ui, &field, NULL, 42, 2);
+    SDL_Event lost = {.type = SDL_EVENT_WINDOW_FOCUS_LOST};
+    assert(SDL_PushEvent(&lost) && SDL_PushEvent(&commit) && cui_sdl3_poll(s, ui));
+    time_field_frame(ui, &field, NULL, 42, 2);
+    SDL_Event gained = {.type = SDL_EVENT_WINDOW_FOCUS_GAINED};
+    assert(SDL_PushEvent(&gained) && cui_sdl3_poll(s, ui));
+    time_field_frame(ui, &field, NULL, 42, 2);
+    cui_destroy(ui);
+}
 int main(int argc, char **argv) {
     if (argc > 2) {
         fprintf(stderr, "Usage: test_sdl3 [FONT]\n");
@@ -547,6 +628,7 @@ int main(int argc, char **argv) {
     assert(resumed <= waited_and_resumed - .015);
     density_render(s, font);
     pointer_presence(s);
+    time_field_ime(s);
     assert(window.perform(window.user, CUI_WINDOW_CLOSE, 0, 0));
     assert(!cui_sdl3_poll(s, ui));
     cui_destroy(ui);

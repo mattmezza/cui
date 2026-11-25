@@ -77,9 +77,12 @@ session. The host delivers one commit for each accepted composition. The widget
 ignores plain text while that segment is composing.
 
 Headless Chromium covers localized preedit, commit, rejection and cancellation.
-SDL3 can send cancellation on an empty editing event before delivering the
-committed text. This sequence clears the session and the widget drops the late
-commit. Native IME and physical accessibility acceptance remain open. The
+An SDL empty editing event hides preedit immediately. A later commit applies
+once if it explicitly targets the same segment and the session is still
+eligible. Ordinary edits, Escape, a terminal cancel or focus transfer end
+eligibility. Private Xvfb checks the SDL adapter with injected same-poll and
+cross-poll events. Physical IME input and accessibility still need platform
+qualification. See the [host event contract](IME.md). The
 optional bridge and Python, JavaScript, TypeScript, Go and Rust facades expose
 localized editing through their documented subset and omit C composition
 opt-in and preedit. Host clipboard shortcuts and composition range styling are

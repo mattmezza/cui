@@ -60,6 +60,17 @@ this owner and rejects text input between window focus loss and regain; the
 browser rejects composition commits after a canceled session. Untagged manually
 queued events use the current focus.
 
+An SDL host can report empty editing before the committed text arrives. The
+adapter keeps the existing `CUI_EVENT_COMPOSITION_CANCEL` followed by
+`CUI_EVENT_COMPOSITION_COMMIT` sequence. On the cancel, a nonzero
+`composition_target` paired with `ime_composing` indicates that preedit
+should disappear and a commit may follow for the same owner. It leaves the
+keyboard shortcut path available. TimeField preserves commit eligibility only
+for the existing session on that segment and requires an explicitly targeted
+commit. Other controls still receive the same ordered clear and commit
+events. An unmarked cancel terminates the session.
+[SDL IBus preedit and commit signals](https://github.com/libsdl-org/SDL/blob/7f3ae3d57459e59943a4ecfefc8f6277ec6bf540/src/core/linux/SDL_ibus.c#L207-L251).
+
 Read-only, disabled, unfocused and removed controls cancel their session. External
 document revision or selection changes invalidate the old replacement range.
 Keys and ordinary text events yield while composition is active. Pointer selection
@@ -137,6 +148,9 @@ it also checks read-only and blur/disabled cancellation.
 `tests/web/test_ime_additional.py` covers Numeric/OTP/Combobox through real CDP
 composition, Numeric Undo, masked OTP first-scalar commit, cancel and disable.
 Native headless Numeric/OTP tests cover filtering, trailing payload, callback
-counts, caller capacity, source replacement and stale-focus rejection. SDL injected preedit
-checks scalar-to-byte conversion with an emoji and an accented scalar. Linux and
-Chromium are exercised here; macOS/Windows native IME UI remains unverified.
+counts, caller capacity, source replacement and stale-focus rejection. Injected
+SDL events check scalar-to-byte conversion with an emoji and an accented
+scalar. The SDL TimeField test covers empty editing and committed text in
+one poll and across polls, plus suppression after window focus loss. The
+tests exercise the Linux SDL adapter and Chromium. Physical IME interaction
+and system candidate UI require platform qualification.

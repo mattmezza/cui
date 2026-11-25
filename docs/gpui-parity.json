@@ -4996,7 +4996,8 @@
         "tests/web/test_browser.py",
         "tests/unit/test_time_field_v1.c",
         "tests/unit/test_time_field_v1_headers.c",
-        "tests/web/test_time_field.py"
+        "tests/web/test_time_field.py",
+        "tests/unit/test_sdl3.c"
       ],
       "status": "tested",
       "platforms": {
@@ -5007,7 +5008,7 @@
       "limitations": [
         "Legacy segmented ASCII and additive localized options coexist. Bridge and foreign builders expose localized options and copied observations through the subset described in docs/binding-coverage.json.",
         "The localized widget uses global segment Tab stops. Source one-root focus and re-entry, full size/focus-ring styling, localized DateTimePicker and physical native accessibility remain open.",
-        "Direct C composition and borrowed preedit are opt-in. Chromium verifies localized preedit paint, atomic commit, rejection and cancellation in the gallery. Native IME qualification, SDL3 empty-edit handoff, composition-range styling and bridge exposure remain open."
+        "Direct C composition and borrowed preedit are opt-in. Chromium verifies localized preedit paint, atomic commit, rejection and cancellation. Private Xvfb tests injected SDL3 empty-edit and same-owner commit handoff. Physical IME, composition-range styling and bridge exposure remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5031,6 +5032,15 @@
             "tests/unit/test_time_field_v1.c",
             "tests/web/test_time_field.py",
             "docs/TIME_FIELD_LOCALIZED.md"
+          ]
+        },
+        {
+          "name": "SDL3 empty-preedit and targeted TimeField commit handoff",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_sdl3.c",
+            "tests/unit/test_time_field_v1.c",
+            "docs/IME.md"
           ]
         },
         {

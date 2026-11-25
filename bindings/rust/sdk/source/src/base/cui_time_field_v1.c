@@ -259,6 +259,7 @@ typedef struct {
     cui_id segment;
     uint64_t frame;
     size_t length;
+    bool awaiting_commit;
     char text[CUI_TIME_TEXT_MAX_BYTES_V1];
 } cui_tfw_preedit;
 
@@ -270,7 +271,8 @@ cui_str cui_time_field_preedit_v1(cui_context *ui, cui_id id, cui_id *segment) {
     if (!cui_frame_is_submitting(ui) || !cui_frame_paint_enabled(ui))
         return (cui_str){0};
     const cui_tfw_preedit *p = cui_resource_find(ui, id, cui_tfw_preedit_resource);
-    if (!p || p->frame != cui_frame_sequence(ui) || !p->segment || p->segment != cui_focused(ui))
+    if (!p || p->frame != cui_frame_sequence(ui) || p->awaiting_commit || !p->segment ||
+        p->segment != cui_focused(ui))
         return (cui_str){0};
     if (segment)
         *segment = p->segment;
@@ -438,10 +440,13 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
             if (cui_event_consumed(ui, e) || !cui_pointer_scope_allowed(ui, 0))
                 continue;
             const cui_event *event = &events[e];
-            if (preedit &&
-                (event->type == CUI_EVENT_POINTER_DOWN || event->type == CUI_EVENT_CANCEL))
-                preedit->segment = 0;
             cui_id target = cui_event_target(ui, e);
+            if (preedit &&
+                (event->type == CUI_EVENT_POINTER_DOWN || event->type == CUI_EVENT_CANCEL ||
+                 (event->type == CUI_EVENT_ACCESSIBILITY_ACTION &&
+                  event->accessibility_action == CUI_ACCESSIBILITY_FOCUS &&
+                  target != preedit->segment)))
+                preedit->segment = 0;
             unsigned segment = 4;
             for (unsigned i = 0; i < 4; i++)
                 if (cui_tfw_visible(o, i) && target == cui_time_segment_id(id, i))
@@ -456,8 +461,10 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
                     event->type == CUI_EVENT_COMPOSITION_UPDATE) {
                     if (event->type == CUI_EVENT_COMPOSITION_UPDATE &&
                         !cui_tfw_preedit_valid(text)) {
-                        if (preedit && preedit->segment == target)
+                        if (preedit && preedit->segment == target) {
                             preedit->length = 0;
+                            preedit->awaiting_commit = false;
+                        }
                         continue;
                     }
                     if (!preedit)
@@ -468,10 +475,20 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
                         break;
                     }
                     preedit->segment = target;
+                    preedit->awaiting_commit = false;
                     preedit->length = event->type == CUI_EVENT_COMPOSITION_UPDATE ? text.length : 0;
                     if (preedit->length)
                         memcpy(preedit->text, text.data, text.length);
                 } else if (preedit && preedit->segment == target) {
+                    if (event->type == CUI_EVENT_COMPOSITION_CANCEL && event->ime_composing &&
+                        event->composition_target == target) {
+                        preedit->awaiting_commit = true;
+                        preedit->length = 0;
+                        continue;
+                    }
+                    if (preedit->awaiting_commit && event->type == CUI_EVENT_COMPOSITION_COMMIT &&
+                        !event->composition_target)
+                        continue;
                     preedit->segment = 0;
                     if (event->type == CUI_EVENT_COMPOSITION_COMMIT && text.length) {
                         cui_time_field_state_v1 candidate = *s;
@@ -508,6 +525,8 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
                     /* Core already performed global traversal; preserve its focus
                      * after any earlier local auto-advance, without retargeting. */
                     cui_tfw_reset(s);
+                    if (preedit)
+                        preedit->segment = 0;
                     cui_focus(ui, dispatched_focus);
                     continue;
                 }
@@ -527,9 +546,12 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
             }
             source = target;
             if (event->type == CUI_EVENT_TEXT) {
-                if (ime && preedit && preedit->segment == target) {
-                    cui_consume_event(ui, e);
-                    continue;
+                if (preedit && preedit->segment == target) {
+                    if (!preedit->awaiting_commit) {
+                        cui_consume_event(ui, e);
+                        continue;
+                    }
+                    preedit->segment = 0;
                 }
                 if (!cui_tfw_text_edit(s, t, o, cui_tfw_text(event)))
                     r.rejected_count++;
@@ -570,6 +592,8 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
             } else
                 recognized = false;
             if (recognized) {
+                if (preedit)
+                    preedit->segment = 0;
                 cui_consume_event(ui, e);
                 if (!accepted)
                     r.rejected_count++;

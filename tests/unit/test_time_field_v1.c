@@ -814,6 +814,45 @@ static void composition_edits(bool styled) {
     }
     cui_destroy(f.ui);
 }
+static void composition_handoff(bool styled) {
+    fixture f;
+    init(&f, styled);
+    f.options.flags = CUI_TIME_FIELD_IME_V1;
+    warm(&f);
+    focus(&f, 1);
+    cui_id minute = cui_time_segment_id(20, 1);
+    cui_event clear = {
+        .type = CUI_EVENT_COMPOSITION_CANCEL, .composition_target = minute, .ime_composing = true};
+    cui_str candidate = cui_string("42");
+
+    composition(&f, CUI_EVENT_COMPOSITION_UPDATE, minute, candidate);
+    assert(cui_queue_event(f.ui, clear));
+    assert(!frame(&f).changed && !f.composing && f.time.minute == 30);
+    composition(&f, CUI_EVENT_COMPOSITION_COMMIT, 0, candidate);
+    assert(!frame(&f).changed && !f.composing && f.time.minute == 30);
+    composition(&f, CUI_EVENT_COMPOSITION_COMMIT, minute, candidate);
+    assert(frame(&f).change_count == 1 && !f.composing && f.time.minute == 42);
+    composition(&f, CUI_EVENT_COMPOSITION_COMMIT, minute, cui_string("39"));
+    assert(!frame(&f).changed && f.calls == 1);
+
+    for (unsigned mode = 0; mode < 3; ++mode) {
+        composition(&f, CUI_EVENT_COMPOSITION_UPDATE, minute, candidate);
+        assert(cui_queue_event(f.ui, clear));
+        assert(!frame(&f).changed && !f.composing);
+        if (mode == 0)
+            key(&f, CUI_KEY_ESCAPE, 0);
+        else if (mode == 1)
+            composition(&f, CUI_EVENT_COMPOSITION_CANCEL, minute, (cui_str){0});
+        else {
+            assert(cui_queue_accessibility_action(f.ui, cui_time_segment_id(20, 0),
+                                                  CUI_ACCESSIBILITY_FOCUS));
+            assert(cui_queue_accessibility_action(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+        }
+        composition(&f, CUI_EVENT_COMPOSITION_COMMIT, minute, cui_string("39"));
+        assert(!frame(&f).changed && !f.composing && f.calls == 1 && f.time.minute == 42);
+    }
+    cui_destroy(f.ui);
+}
 int main(void) {
     for (unsigned styled = 0; styled < 2; styled++) {
         editing(styled != 0);
@@ -827,6 +866,7 @@ int main(void) {
         inactive_and_generation(styled != 0);
         readiness_recovery(styled != 0);
         composition_edits(styled != 0);
+        composition_handoff(styled != 0);
     }
     atomic_preflight();
     pixels_and_text();

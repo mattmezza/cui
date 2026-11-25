@@ -829,27 +829,20 @@ Additional event includes: `cui/cui_multiline_events.h`.
 
 **Interaction:** Legacy plain functions return bool after applying edits. V1 returns cui_time_field_result_v1: changed is net value mutation, status is operation outcome and validation is edit validation; optional cui_time_change_fn observes one copied aggregate after Base semantics or Styled submission.
 
-**Usage:** Choose one side-effect path: observe via cui_time_handler or branch on changed after submission, rather than applying the same side effect twice. Value mutates through its pointer; do not reapply the callback payload. Retain state/options and immutable locale resources, check status/validation, and compose during ordinary frames.
+**Usage:** Use the ordinary localized route for per-segment Tab and optional IME. The One stop per field gallery mode uses a direct C roster before dispatch. After frame completion use cui_semantic_text_value_v1 to read the ordered field's localized committed value. An accessibility host can use cui_queue_accessibility_action with CUI_ACCESSIBILITY_FOCUS to select an eligible segment for the following ordered frame while logical focus stays on the field. Use either cui_time_handler or changed for any given side effect. Keep state, options and locale resources alive and check status and validation.
 
 API: `cui_time_field`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
 
 Additional event includes: `cui/cui_picker_events.h`.
 
-Pure locale/domain text helpers use `cui/cui_time_text.h`; the unchanged `cui_time`
-value is declared in `cui/cui_time_types.h`. See [TimeField text values](TIME_FIELD_TEXT.md).
-These unreleased C-only helpers do not localize the existing widget.
+Pure locale and domain text helpers use `cui/cui_time_text.h`. Localized C
+widgets use `cui/cui_time_field_v1.h` with explicit locale and domain options.
+[TimeField text values](TIME_FIELD_TEXT.md) · [Localized widget](TIME_FIELD_LOCALIZED.md)
 
-The additive `cui/cui_time_field_v1.h` route uses caller-owned
-`cui_time_field_state_v1` and explicit locale/domain options; see
-[localized widget](TIME_FIELD_LOCALIZED.md). Legacy options and state stay unchanged.
-
-The additive [localized bridge source checkpoint](BRIDGE_TIME_FIELD_LOCALIZED.md)
-is unvalidated; existing foreign builders still expose only the scalar subset.
-Its owned records are declared in `cui/cui_bridge.h`, independently of direct C
-borrowed widget state. No new bridge/binding support is advertised yet.
-The [Python localized source checkpoint](PYTHON_TIME_FIELD_LOCALIZED.md) prepares
-owned configuration/observations and a complete authored UI, but has not passed
-Python runtime or package checks. Other four localized builders remain pending.
+The retained bridge uses owned records in `cui/cui_bridge.h`. Python, Node,
+Go and Rust have localized examples verified from the alpha.5 packages.
+Ordered dispatch with delegated segment focus uses the direct C route.
+[Retained bridge](BRIDGE_TIME_FIELD_LOCALIZED.md) · [Binding coverage](binding-coverage.json) · [Runnable examples](TIME_FIELD_LOCALIZED_EXAMPLE.md)
 
 ## Carousel
 
@@ -1127,10 +1120,7 @@ Additional event includes: `cui/cui_virtual_events.h`.
 
 **Interaction:** Hit testing identifies data; tooltip/format/paint callbacks customize output and are not application action callbacks.
 
-**Usage:** Submit data and options each frame. Scale the bitmap stroke width to
-match the display density. With `CUI_CHART_LAYOUT_SOURCE_POINT`, set
-`show_dots` to add eight-logical-pixel markers to a Line Chart. Route
-application actions from explicit hit testing or child controls.
+**Usage:** Submit data/options each frame. For a scaled Line or Area bitmap, convert the desired logical stroke width to bitmap pixels with the scale ratio. With CUI_CHART_LAYOUT_SOURCE_POINT, set show_dots on a Line to add eight-logical-pixel series markers. Route application actions from explicit hit testing or child controls.
 
 API: `cui_chart`, `cui_chart_hit_test`. [Public header](../include/cui/cui_chart.h); [guide](CHART.md).
 
@@ -1173,11 +1163,11 @@ preserves the viewport during replacement. See the [keyed C bridge guide](BRIDGE
 
 **State:** Caller retains scales, samples, path commands, RGBA pixels, tick labels and callback state; no retained widget tree.
 
-**Interaction:** cui_plot_activate_fn receives validated pointer positions; pure numeric operations return cui_plot_result and the application routes pan/zoom.
+**Interaction:** cui_plot_activate_fn receives validated pointer positions. The optional viewport handles Shift-drag, Ctrl-wheel, touch pan and pinch. CUI_PLOT_TOUCH_YIELD_VERTICAL offers unconsumed vertical touch pan to the host when the Y domain cannot move.
 
-**Usage:** Build paths and render into caller-owned pixels, then submit a themed bitmap and axes each frame; keep labels and pixels alive through renderer completion.
+**Usage:** Reduce the optional viewport before projecting data and bind after submitting the view. Build paths and render into caller-owned pixels. Keep labels and pixels alive through renderer completion.
 
-API: `cui_plot_view`, `cui_plot_axis`, `cui_plot_raster`, `cui_plot_path`, `cui_plot_map`. [Public header](../include/cui/cui_plot_view.h); [guide](PLOT.md); [numeric model](PLOT_MODEL.md).
+API: `cui_plot_view`, `cui_plot_axis`, `cui_plot_raster`, `cui_plot_path`, `cui_plot_map`, `cui_plot_viewport_reduce_with_touch_policy`. [Public header](../include/cui/cui_plot_view.h) · [Guide](PLOT.md) · [Numeric model](PLOT_MODEL.md) · [Viewport interaction](PLOT_INTERACTIONS.md)
 
 ## Table
 

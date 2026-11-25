@@ -64,6 +64,11 @@ def owner(a):
     return a.target(predicate=lambda s: s['f'][17] and s['f'][21] > 40)
 
 
+def plot_domains(a):
+    return a.page.evaluate('''()=>[0,1].map(axis=>
+        [0,1].map(end=>cuiGallery.exports.gallery_plot_domain(axis,end)))''')
+
+
 def owner_point(a, target):
     rect = a.page.locator('canvas').bounding_box()
     point = {'id': 1, 'x': rect['x']+target['f'][1]+target['f'][3]/2,
@@ -163,6 +168,60 @@ def run_cases(a):
         assert abs(a.page.evaluate('scrollY')-before_page) < 1, 'Opt-in plot pinch moved page'
         assert next(t for t in a.texts() if t.startswith('Domain:')) != before, 'Opt-in plot pinch failed to change domain'
     a.case('Plot', 'opt-in pan and two-contact pinch stay owned by viewport', plot)
+
+    def horizontal_plot():
+        a.page.get_by_role('combobox', name='Plot pan axes').select_option('1')
+        a.tap(a.target('Reset', 1))
+        align_canvas(a)
+        target = a.target('Projected sine wave', 20)
+        before = plot_domains(a)
+        a.drag(target, 40, 0)
+        horizontal = plot_domains(a)
+        assert horizontal[0] != before[0] and horizontal[1] == before[1]
+
+        point = a.point(target, .5, .65)
+        page = a.page.evaluate('scrollY')
+        cancels = a.page.evaluate('cuiGallery.exports.gallery_touch_page_cancels()')
+        a.dispatch('touchStart', [point])
+        for step in range(1, 5):
+            a.dispatch('touchMove', [{**point, 'x':point['x']+step, 'y':point['y']-15*step}])
+        a.dispatch('touchEnd', [])
+        assert a.page.evaluate('scrollY') > page+35
+        assert a.page.evaluate('cuiGallery.exports.gallery_touch_page_cancels()') == cancels+1
+        assert plot_domains(a) == horizontal, 'Declined vertical pan changed the Plot'
+
+        point = a.point(target, .5, .55)
+        page = a.page.evaluate('scrollY')
+        left, right = {**point, 'x':point['x']-20}, {**point, 'id':2, 'x':point['x']+20}
+        a.dispatch('touchStart', [left, right])
+        a.dispatch('touchMove', [{**left, 'x':left['x']-15}, {**right, 'x':right['x']+15}])
+        a.dispatch('touchEnd', [])
+        assert a.page.evaluate('scrollY') == page
+        for previous, current in zip(horizontal, plot_domains(a)):
+            assert current[1]-current[0] < previous[1]-previous[0]
+        a.page.get_by_role('combobox', name='Plot pan axes').select_option('0')
+    a.case('Plot', 'horizontal-only Plot yields vertical drag, retains horizontal pan and pinch',
+           horizontal_plot)
+
+    def plot_boundary():
+        a.tap(a.target('Reset', 1))
+        for _ in range(2):
+            a.tap(a.target('Zoom out', 1))
+        align_canvas(a)
+        point = a.point(a.target('Projected sine wave', 20), .5, .7)
+        page = a.page.evaluate('scrollY')
+        before = plot_domains(a)
+        a.dispatch('touchStart', [point])
+        a.dispatch('touchMove', [{**point, 'y':point['y']-70}])
+        bounded = plot_domains(a)
+        assert bounded[1][0] == -5 and bounded[1][0] < before[1][0], (before, bounded)
+        assert a.page.evaluate('scrollY') == page, 'The partly applied sample was also sent to page'
+        a.dispatch('touchMove', [{**point, 'x':point['x']+2, 'y':point['y']-104}])
+        assert a.page.evaluate('scrollY') > page+25
+        assert a.page.evaluate('scrollY') < page+44, 'Page replayed an already consumed sample'
+        assert plot_domains(a) == bounded
+        a.dispatch('touchEnd', [])
+    a.case('Plot', 'vertical boundary yields only after a later unconsumed move', plot_boundary)
 
     def disabled_plot():
         a.configure('disabled', True)

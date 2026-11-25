@@ -71,6 +71,36 @@ pointer anchor may move because satisfying the configured bounds takes priority.
 There is no inertia, rotation, animation, kinetic scrolling, or automatic data
 clipping. Applications still clip/project and render their own data.
 
+## Let vertical touch pan reach the page
+
+The default reducer captures every targeted Plot gesture. In a scrollable
+host, use the opt-in reducer to offer vertical drags when the Plot cannot
+move vertically. For example, use horizontal-only pan while keeping pinch
+zoom on both axes:
+
+```c
+cui_plot_viewport_options navigation = cui_plot_viewport_defaults();
+navigation.pan_y = false;
+cui_plot_viewport_reduce_with_touch_policy(
+    ui, plot_id, &viewport, navigation, CUI_PLOT_TOUCH_YIELD_VERTICAL);
+/* Project, submit and bind with these options as above. */
+```
+
+A one-contact pan with a greater vertical than horizontal delta can yield.
+Disabling vertical pan or reaching a vertical domain boundary can both cause
+it. A yield preserves both domains and leaves the gesture unconsumed at its
+original target. If the Y domain moves partway to the boundary, Plot consumes
+that full sample. A later unconsumed sample can start page scrolling. Mouse,
+wheel, pinch, and terminal events keep their existing ownership.
+
+The browser host reads the unconsumed event after composition and can route it
+to its document. Core does not retarget the gesture to a native ancestor scroll
+panel. The five retained language builders currently expose the Plot
+presentation subset. See the [browser host contract](TOUCH_PAGE_NAVIGATION.md)
+for cancellation and ownership rules.
+
+## Gallery interaction
+
 The browser gallery enables navigation and uses the resulting X/Y scales for
 the line, area, step, radial, natural, rounded-bar, and dot examples. Its reset
 button restores both domains. The demo constrains X to −100..200 with span
@@ -82,10 +112,11 @@ pointer capture loss, and prevent browser Ctrl-wheel zoom only for a claimed
 plot surface. The gallery's Plot-only wheel branch leaves ordinary page wheel
 scrolling unchanged, denies modal/disabled claims, and queues a precise
 Ctrl-scroll event for authoritative Core dispatch. Touch remains in the shared
-Core contact/gesture path. Enabled Plot touch pan and pinch stay on the
-viewport. A single-finger drag over the disabled Plot scrolls the page and
-preserves the plot domain. Native callers use the same reducer with adapter
-input. Physical touch-device coverage remains open.
+Core contact/gesture path. The gallery uses the vertical touch-yield policy
+and offers both-axis or horizontal-only pan. A single-finger drag over the
+disabled Plot scrolls the page and preserves the Plot domains. Native callers
+use the same reducer with adapter input. Physical touch-device coverage remains
+open.
 
 `tests/unit/test_plot.c` checks exact two-axis anchors, pan/pinch composition,
 reset, span/domain limits, logarithmic reversed ranges, transactional overflow,
@@ -96,7 +127,9 @@ touch contacts. It verifies exact projected mouse/touch deltas and wheel anchors
 two-contact pinch, capture loss, cancellation and next tap, disabled behavior,
 slow movement through the tap threshold, and changes to painted data for all
 seven gallery shapes. `tests/web/test_touch_page_navigation.py` checks that
-mobile page scrolling remains available over the disabled Plot. Configuration inputs
+mobile page scrolling over a disabled Plot, a horizontal-only Plot, and a Plot
+at its Y boundary. It also verifies that a partially applied sample stays in
+the Plot and that horizontal pan and pinch still work. Configuration inputs
 and read-only domain/pixel observations are allowed; component actions do not
 invoke exported model reducers. Chromium automation is not physical iOS,
 Android, pen, or native touch-device coverage.

@@ -2450,6 +2450,7 @@
         "cui_plot_viewport_init",
         "cui_plot_viewport_defaults",
         "cui_plot_viewport_reduce",
+        "cui_plot_viewport_reduce_with_touch_policy",
         "cui_plot_viewport_bind"
       ],
       "state_types": [
@@ -2459,7 +2460,7 @@
         "cui_plot_viewport_options"
       ],
       "state_ownership": "Caller retains scales, samples, path commands, RGBA pixels, tick labels and callback state; no retained widget tree.",
-      "interaction": "cui_plot_activate_fn receives validated pointer positions; pure numeric operations return cui_plot_result. Opt-in viewport reduction handles Shift-drag, Ctrl-wheel, touch pan and pinch.",
+      "interaction": "cui_plot_activate_fn receives validated pointer positions. The optional viewport handles Shift-drag, Ctrl-wheel, touch pan and pinch. CUI_PLOT_TOUCH_YIELD_VERTICAL offers unconsumed vertical touch pan to the host when the Y domain cannot move.",
       "usage": "Reduce the optional viewport before projecting data and bind after submitting the view. Build paths and render into caller-owned pixels. Keep labels and pixels alive through renderer completion.",
       "docs": [
         "docs/PLOT.md",

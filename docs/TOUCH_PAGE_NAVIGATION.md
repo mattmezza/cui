@@ -33,9 +33,16 @@ The host gives Core first refusal. Consumed moves stay entirely with Core. A
 single contact can claim page navigation only after eight pixels of dominant
 vertical movement and an unconsumed move. Modal scopes deny fallback, including
 hits on disabled modal content. Slider, Scrollbar, Separator, explicit drag
-priority and opted-in gesture owners reserve their streams. Protected ownership
-is retained from the initial down event. Completed semantic parents protect
-custom drag ancestors as well as the direct target.
+priority and ordinary gesture owners reserve their streams. Protected
+ownership is retained from the initial down event. Completed semantic
+parents protect custom drag ancestors as well as the direct target.
+
+The gallery registers its Plot as eligible to offer a vertical touch gesture.
+The host checks the original dispatch target, a Core-confirmed single contact,
+and the reducer's final consumption. A vertical drag can reach the document
+when vertical Plot pan is disabled or reaches a domain bound. Pinch and
+horizontal Plot pans stay with the viewport. The same modal and drag-priority
+rules apply.
 
 An unconsumed scroll can retain a nonzero Core target at a boundary: persistent
 ownership and failed ancestor deferral do not necessarily clear it. The helper
@@ -78,7 +85,7 @@ passed with this narrow change. Preview-card styling is unchanged.
 | Scrollable bottom and top boundaries | Internal offset stays at 458 or zero; unconsumed vertical pan navigates the page. |
 | Slider and Resizable | Relevant control values change while page position stays fixed. |
 | ColorPicker saturation/value plane | Two-dimensional drag changes RGBA without moving the page. |
-| Plot | Opted-in pan and actual two-contact pinch remain with the viewport; pinch changes its domain. |
+| Plot | Horizontal pan and pinch stay with the enabled viewport. A vertical drag reaches the page over a disabled or horizontal-only Plot, or after the Plot reaches its vertical bound. |
 | Dialog with disabled opener | Touch on modal content cannot navigate the document; close still works. |
 | Multiple contacts | Do not navigate the page; a later single contact can navigate. |
 | Second finger after page claim | Cannot ghost-activate a button; a later ordinary tap works. |

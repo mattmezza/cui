@@ -5,11 +5,12 @@
 
 typedef struct {
     cui_role role;
-    bool drag, viewport, modal, disabled, scroll, consume, parent;
+    bool drag, viewport, yielding_viewport, modal, disabled, scroll, consume, parent;
     float offset;
 } scene;
 static void frame(cui_context *ui, cui_touch_page_host *host, scene s) {
     assert(cui_begin_frame(ui, 300, 300, .016f));
+    host->yielding_viewport = s.yielding_viewport ? 10 : 0;
     if (s.modal)
         assert(cui_begin_focus_scope(ui, 50, true));
     if (s.parent) {
@@ -37,7 +38,7 @@ static void frame(cui_context *ui, cui_touch_page_host *host, scene s) {
         size_t count;
         const cui_event *events = cui_frame_events(ui, &count);
         for (size_t i = 0; i < count; i++)
-            if (events[i].type == CUI_EVENT_POINTER_MOVE ||
+            if (events[i].type == CUI_EVENT_POINTER_MOVE || events[i].type == CUI_EVENT_GESTURE ||
                 (events[i].type == CUI_EVENT_SCROLL && cui_event_target(ui, i)))
                 cui_consume_event(ui, i);
     }
@@ -83,6 +84,14 @@ int main(void) {
     check((scene){.role = CUI_ROLE_BUTTON, .drag = true}, false);
     check((scene){.role = CUI_ROLE_BUTTON, .parent = true}, false);
     check((scene){.role = CUI_ROLE_IMAGE, .viewport = true}, false);
+    check((scene){.role = CUI_ROLE_IMAGE, .viewport = true, .yielding_viewport = true}, true);
+    check(
+        (scene){
+            .role = CUI_ROLE_IMAGE, .viewport = true, .yielding_viewport = true, .consume = true},
+        false);
+    check(
+        (scene){.role = CUI_ROLE_IMAGE, .viewport = true, .yielding_viewport = true, .drag = true},
+        false);
     check((scene){.role = CUI_ROLE_BUTTON, .modal = true}, false);
     check((scene){.role = CUI_ROLE_BUTTON, .modal = true, .disabled = true}, false);
     check((scene){.role = CUI_ROLE_BUTTON, .consume = true}, false);

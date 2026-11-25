@@ -6,6 +6,11 @@ Queue input before `cui_begin_frame`. Events resolve in order against enabled in
 
 `cui_event_target` reports the target at dispatch time, allowing controls to process multiple down/move/up or focus/text events in a single frame. Key events target the focus before that event; pointer move and up target capture. `cui_interact` reports final held state and consumes pending activation once. Multiple queued activations for one control are coalesced to its boolean activation. `cui_update_semantic` updates a submitted controlled value after a same-frame change.
 
+`cui_event_gesture_contacts` reports the physical contact count for a
+Core-generated gesture at the same frame index. It returns one for pan, two
+for pinch, and zero when Core has no contact evidence. A two-contact sample
+can have a scale of one. Reading the count leaves the event untouched.
+
 Text and semantic names are copied to the fixed frame string arena; draw lists and semantic names survive until the next begin. The default text measure uses approximate width `length * font_size * 0.6` and height `font_size * 1.3`; applications needing font metrics supply the callback. Draw conversion supports rectangles, per-edge borders, text, RGBA bitmaps, and clip push/pop. Unsupported Clay draw types are not exposed by the public composition API.
 
 The configuration defaults to 4096 elements, 8192 commands, and 262144 string bytes. There are at most 256 queued events, ID scopes, and nested boxes. Capacity failures set a sticky error. String exhaustion produces empty strings. Command exhaustion returns an empty list to avoid exposing unbalanced clip commands. Skipped elements remain safely balanced by matching end calls. Errors can be explicitly cleared after inspection; frame lifecycle errors reject invalid transitions.

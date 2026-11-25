@@ -623,7 +623,16 @@ cui_end_box(ui);
  Editor:'/* Retain edit, state, query and workspace; call find bar every frame. */\ncui_editor_find_bar(ui, search_id, id, &theme, &state, &search, 640, false);\ncui_editor(ui, id, &theme, cui_string("C code"), &state, cui_editor_default());',
  VirtualList:'/* Retain list and state; paint_row composes each visible item. */\ncui_virtual_list_draw(ui, id, &theme, list, &state,\n    (cui_virtual_widget_options){.scroll = {\n        .width = 640, .height = 320}, .overscan = 1},\n    paint_row, user);',
  Dock:'/* Retain dock and view; panels hold your content callbacks. */\ncui_dock_view_render(ui, id, &theme, dock, view, panels, count,\n    (cui_dock_view_options){.width = 640, .height = 400,\n        .tab_height = 32, .allow_reorder = true});',
- Plot:'/* Build pixels with cui_plot_raster; retain pixels and axis labels. */\ncui_plot_view(ui, id, &theme,\n    &(cui_plot_view_options){.bitmap = bitmap, .axis = &axis,\n        .name = cui_string("Trend")});',
+ Plot:`/* Retain an initialized viewport across frames. */
+cui_plot_viewport_options navigation = cui_plot_viewport_defaults();
+navigation.pan_y = false; /* Horizontal pan, pinch on both axes. */
+cui_plot_viewport_reduce_with_touch_policy(
+    ui, id, &viewport, navigation, CUI_PLOT_TOUCH_YIELD_VERTICAL);
+/* Project with viewport.x and viewport.y, then render into retained pixels. */
+cui_plot_view(ui, id, &theme,
+    &(cui_plot_view_options){.bitmap = bitmap, .axis = &axis,
+        .name = cui_string("Trend")});
+cui_plot_viewport_bind(ui, id, &viewport, navigation);`,
  Calendar:'/* Supply today as a host-local civil date when desired. */\ncui_calendar_ex(ui, id, &theme, &state, &selection, options,\n    (cui_calendar_presentation_options){\n        .month_toggle = true, .neighboring_days = true});',
  DatePicker:'cui_date_picker_ex(ui, id, &theme, label, &state, &selection, options,\n    (cui_date_picker_calendar_options){.presentation = {\n        .month_toggle = true, .neighboring_days = true}});',
  ColorPicker:'cui_color_picker(ui, id, &theme,\n    &state, &color, options);',
@@ -1076,7 +1085,7 @@ function render(){
  wasm.gallery_title_options(Number($('title-decoration').value),Number($('title-close').checked),Number($('title-fullscreen').checked));
  wasm.gallery_typography_options(Number($('text-family').value),Number($('text-size').value),Number($('text-weight').value),Number($('text-italic').checked),Number(textPaintControl.value));
  wasm.gallery_effects_options(Number($('effect-angle').value),Number($('effect-opacity').value),Number($('effect-blur').value));
- wasm.gallery_plot_mode(Number($('plot-mode').value));
+ wasm.gallery_plot_mode(Number($('plot-mode').value),Number($('plot-pan-axes').value));
  wasm.gallery_virtual_mode(Number($('virtual-axis').value));
  wasm.gallery_design_options(($('design-size').hidden?0:Number($('design-size').value)),Number($('design-radius').value),Number($('design-spacing').value));
  wasm.gallery_slider_options(...sliderValues());
@@ -1505,6 +1514,7 @@ function selectComponent(){
  $('control-size').value='0';
  $('control-size').disabled=false;
  $('plot-mode').hidden=selected.name!=='Plot';$('plot-mode').value='0';
+ $('plot-pan-axes').hidden=selected.name!=='Plot';$('plot-pan-axes').value='0';
  $('virtual-axis').hidden=selected.name!=='VirtualList';$('virtual-axis').value='0';
  $('time-field-tab-mode').hidden=selected.name!=='TimeField';$('time-field-tab-mode').value='segments';
  for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control','text-paint'])$(id).hidden=selected.name!=='Theme';textPaintControl.value='0';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
@@ -1830,6 +1840,7 @@ try{
 for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic'])$(id).addEventListener('change',requestFrame);
 
 $('plot-mode').addEventListener('change',requestFrame);
+$('plot-pan-axes').addEventListener('change',requestFrame);
 $('virtual-axis').addEventListener('change',requestFrame);
 
 for(const id of ['scrollbar-policy','scrollbar-width','scrollbar-radius','scrollbar-track'])$(id).addEventListener('change',requestFrame);

@@ -896,6 +896,10 @@ bool cui_begin_tab_group(cui_context *ui, int index);
 void cui_end_tab_group(cui_context *ui);
 /* Target resolved in input order against previous frame regions. */
 cui_id cui_event_target(cui_context *ui, size_t index);
+/* Count of physical contacts in a Core-generated gesture at this frame index.
+ * One for pan, two for pinch (including their terminal events), zero for
+ * host-queued gestures, other events, or an unavailable frame index. */
+unsigned cui_event_gesture_contacts(const cui_context *, size_t index);
 /* Defer an unconsumed scroll event currently routed to from_id to an eligible
  * layout ancestor. Preserves deltas and phase, clipping, modal/overlay and axis
  * constraints. Call before the ancestor handles input. False leaves it intact. */

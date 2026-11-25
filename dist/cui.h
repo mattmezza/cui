@@ -897,6 +897,10 @@ bool cui_begin_tab_group(cui_context *ui, int index);
 void cui_end_tab_group(cui_context *ui);
 /* Target resolved in input order against previous frame regions. */
 cui_id cui_event_target(cui_context *ui, size_t index);
+/* Count of physical contacts in a Core-generated gesture at this frame index.
+ * One for pan, two for pinch (including their terminal events), zero for
+ * host-queued gestures, other events, or an unavailable frame index. */
+unsigned cui_event_gesture_contacts(const cui_context *, size_t index);
 /* Defer an unconsumed scroll event currently routed to from_id to an eligible
  * layout ancestor. Preserves deltas and phase, clipping, modal/overlay and axis
  * constraints. Call before the ancestor handles input. False leaves it intact. */
@@ -8651,6 +8655,7 @@ struct cui_context {
     char *queued_text[CUI_CORE_EVENT_MAX], *frame_text[CUI_CORE_EVENT_MAX];
     size_t queued_text_bytes;
     bool event_consumed[CUI_CORE_DISPATCH_MAX];
+    unsigned char event_gesture_contacts[CUI_CORE_DISPATCH_MAX];
     cui_id event_targets[CUI_CORE_DISPATCH_MAX], event_activations[CUI_CORE_DISPATCH_MAX];
     cui_id event_touch_owners[CUI_CORE_DISPATCH_MAX];
     cui_id event_accepted_activations[CUI_CORE_DISPATCH_MAX];
@@ -9485,7 +9490,8 @@ static cui_id cui_core_touch_owner(cui_context *ui, cui_event e, bool viewport) 
 static float cui_core_touch_float(double value) {
     return (float)fmin((double)FLT_MAX, fmax(-(double)FLT_MAX, value));
 }
-static bool cui_core_touch(cui_context *ui, cui_event *e, cui_id *target, cui_id *scroll_owner) {
+static bool cui_core_touch(cui_context *ui, cui_event *e, cui_id *target, cui_id *scroll_owner,
+                           unsigned char *gesture_contacts) {
     if (e->type == CUI_EVENT_CANCEL && e->pointer_type != CUI_POINTER_TOUCH) {
         memset(ui->contacts, 0, sizeof ui->contacts);
         return false;
@@ -9609,6 +9615,7 @@ static bool cui_core_touch(cui_context *ui, cui_event *e, cui_id *target, cui_id
             ui->contacts[slot].dragging = true;
             cui_core_clear_capture(ui);
             e->type = CUI_EVENT_GESTURE;
+            *gesture_contacts = pinch ? 2 : 1;
             e->dx = pan && !ending ? cui_core_touch_float(dx) : 0;
             e->dy = pan && !ending ? cui_core_touch_float(dy) : 0;
             e->gesture_scale = scale;
@@ -10536,6 +10543,7 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
         }
     }
     memset(ui->event_consumed, 0, sizeof ui->event_consumed);
+    memset(ui->event_gesture_contacts, 0, sizeof ui->event_gesture_contacts);
     for (size_t i = 0; i < CUI_CORE_EVENT_MAX; i++) {
         free(ui->frame_text[i]);
         ui->frame_text[i] = ui->queued_text[i];
@@ -10592,7 +10600,8 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
         cui_id before_capture = ui->capture;
         cui_id touch_owner = 0;
         bool suppressed =
-            !touch_cancellations[i] && cui_core_touch(ui, &e, &gesture_target, &touch_owner);
+            !touch_cancellations[i] &&
+            cui_core_touch(ui, &e, &gesture_target, &touch_owner, &ui->event_gesture_contacts[i]);
         ui->event_touch_owners[i] = touch_owner;
         if (!touch_cancellations[i] && e.pointer_type == CUI_POINTER_TOUCH && before_capture &&
             !ui->capture && e.type != CUI_EVENT_CANCEL) {
@@ -10910,6 +10919,9 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
         cui_id owner = ui->event_touch_owners[previous];
         ui->event_touch_owners[previous] = ui->event_touch_owners[i];
         ui->event_touch_owners[i] = owner;
+        unsigned char gesture_contacts = ui->event_gesture_contacts[previous];
+        ui->event_gesture_contacts[previous] = ui->event_gesture_contacts[i];
+        ui->event_gesture_contacts[i] = gesture_contacts;
         cui_id previous_focus = ui->event_previous_focus[previous];
         ui->event_previous_focus[previous] = ui->event_previous_focus[i];
         ui->event_previous_focus[i] = previous_focus;
@@ -14984,6 +14996,11 @@ void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value) 
 }
 cui_id cui_event_target(cui_context *ui, size_t index) {
     return ui && !cui_core_inert(ui) && index < ui->event_count ? ui->event_targets[index] : 0;
+}
+
+unsigned cui_event_gesture_contacts(const cui_context *ui, size_t index) {
+    return ui && !cui_core_inert(ui) && index < ui->event_count ? ui->event_gesture_contacts[index]
+                                                                : 0;
 }
 
 bool cui_defer_scroll_event(cui_context *ui, size_t index, cui_id from) {

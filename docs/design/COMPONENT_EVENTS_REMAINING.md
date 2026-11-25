@@ -109,7 +109,7 @@ full-family verification. Each family links its authoritative public header.
 | [Chart](../../include/cui/cui_chart.h) | H | Typed hover/result and tooltip/render policy; callbacks may run during layout/prepaint/paint with current-frame borrowed data. |
 | [Command](../../include/cui/cui_command.h) | A | [COMMAND_EVENTS](../COMMAND_EVENTS.md): Base operations and Styled forwarding implemented. Query-before-old-hook exception preserves borrowed query lifetime; cancel is separate. |
 | [DataTable](../../include/cui/cui_table.h) | A | [TABLE_EVENTS](../TABLE_EVENTS.md): Sort/selection/set snapshots/columns/actions/ROW requests; viewport/load-edge still result-only. |
-| [Plot](../../include/cui/cui_plot_view.h) | H | Existing prepaint appearance callback and hover/result; deferred resolver/paint lifetimes must remain through render completion. |
+| [Plot](../../include/cui/cui_plot_view.h) | H | Prepaint appearance callback and hover/result. Deferred resolver/paint resources live through render completion. Direct C offers an optional vertical touch-yield policy that preserves the event target and uses Core contact evidence. [Gesture contract](../PLOT_INTERACTIONS.md#let-vertical-touch-pan-reach-the-page) |
 | [Table](../../include/cui/cui_table.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
 | [TextView](../../include/cui/cui_text_view.h) | T | Existing on_link borrows decoded URI/event, on_reveal requests viewport movement. No common selection/link metadata facade; copying struct does not own URI. |
 

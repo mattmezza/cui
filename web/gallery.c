@@ -1910,8 +1910,10 @@ static cui_plot_scale plot_cached_scale, plot_cached_y;
 static cui_color plot_cached_primary, plot_cached_surface;
 static unsigned plot_cached_width;
 static int plot_mode, plot_cached_mode = -1;
-void gallery_plot_mode(int mode) {
+static bool plot_horizontal_pan;
+void gallery_plot_mode(int mode, int horizontal_pan) {
     plot_mode = mode >= 0 && mode <= 6 ? mode : 0;
+    plot_horizontal_pan = horizontal_pan != 0;
 }
 static cui_overlay trap;
 static int clipboard_request;
@@ -3774,6 +3776,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                : CUI_ALIGN_START,
                                 .gap = design_spacing >= 0 ? t.gap : 16,
                                 .background = t.background});
+    page_touch_host.yielding_viewport = 0;
     switch (story) {
     case 81:
     case 82: {
@@ -6018,11 +6021,15 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_id plot_id = cui_id_from(ui, "plot-wave");
         cui_plot_viewport_options navigation = cui_plot_viewport_defaults();
         navigation.disabled = disabled != 0;
+        navigation.pan_y = !plot_horizontal_pan;
+        if (!navigation.disabled)
+            page_touch_host.yielding_viewport = plot_id;
         navigation.x_limit = (cui_plot_viewport_limit){
             .bounded = true, .minimum = -100, .maximum = 200, .min_span = 10, .max_span = 300};
         navigation.y_limit = (cui_plot_viewport_limit){
             .bounded = true, .minimum = -5, .maximum = 5, .min_span = .1, .max_span = 10};
-        cui_plot_viewport_reduce(ui, plot_id, &plot_viewport, navigation);
+        cui_plot_viewport_reduce_with_touch_policy(ui, plot_id, &plot_viewport, navigation,
+                                                   CUI_PLOT_TOUCH_YIELD_VERTICAL);
         float plot_anchor = (float)(plot_viewport.x.range_start + plot_viewport.x.range_end) / 2;
         cui_text(ui,
                  cui_string("Shift-drag to pan; Ctrl-wheel or pinch to zoom; touch-drag to pan"),

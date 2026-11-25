@@ -323,6 +323,17 @@ struct cui_context;
  * Hosts preserve modifiers and deliver CANCEL on capture loss. */
 cui_plot_result cui_plot_viewport_reduce(struct cui_context *, uint64_t id, cui_plot_viewport *,
                                          cui_plot_viewport_options);
+typedef enum {
+    CUI_PLOT_TOUCH_CAPTURE,
+    CUI_PLOT_TOUCH_YIELD_VERTICAL,
+} cui_plot_touch_policy;
+/* With YIELD_VERTICAL, leave a dominant vertical single-contact pan unconsumed
+ * if the vertical domain cannot move. Both domains stay unchanged on yield.
+ * The event retains its target. A host can offer it to the enclosing page. */
+cui_plot_result cui_plot_viewport_reduce_with_touch_policy(struct cui_context *, uint64_t id,
+                                                           cui_plot_viewport *,
+                                                           cui_plot_viewport_options,
+                                                           cui_plot_touch_policy);
 bool cui_plot_viewport_bind(struct cui_context *, uint64_t id, const cui_plot_viewport *,
                             cui_plot_viewport_options);
 cui_plot_result cui_plot_clip_line(cui_plot_line, cui_plot_rect viewport, cui_plot_line *out);

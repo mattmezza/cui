@@ -4,9 +4,12 @@
 #include <stdio.h>
 #include <string.h>
 
-cui_plot_result cui_plot_viewport_reduce(cui_context *ui, uint64_t id, cui_plot_viewport *v,
-                                         cui_plot_viewport_options o) {
-    if (!ui || !id || !v || !v->initialized)
+cui_plot_result cui_plot_viewport_reduce_with_touch_policy(cui_context *ui, uint64_t id,
+                                                           cui_plot_viewport *v,
+                                                           cui_plot_viewport_options o,
+                                                           cui_plot_touch_policy policy) {
+    if (!ui || !id || !v || !v->initialized ||
+        (policy != CUI_PLOT_TOUCH_CAPTURE && policy != CUI_PLOT_TOUCH_YIELD_VERTICAL))
         return CUI_PLOT_INVALID;
     if (!o.enabled || o.disabled) {
         v->dragging = false;
@@ -28,7 +31,7 @@ cui_plot_result cui_plot_viewport_reduce(cui_context *ui, uint64_t id, cui_plot_
             continue;
         bool target = cui_event_target(ui, i) == id;
         double dx = 0, dy = 0, factor = 1;
-        bool transform = false, claimed = false;
+        bool transform = false, claimed = false, may_yield = false;
         if (e->type == CUI_EVENT_CANCEL && (target || v->dragging)) {
             v->dragging = false;
             claimed = true;
@@ -58,6 +61,8 @@ cui_plot_result cui_plot_viewport_reduce(cui_context *ui, uint64_t id, cui_plot_
                 dy = e->dy;
                 factor = e->gesture_scale;
                 transform = true;
+                may_yield = policy == CUI_PLOT_TOUCH_YIELD_VERTICAL && fabs(dy) > fabs(dx) &&
+                            cui_event_gesture_contacts(ui, i) == 1;
             }
             claimed = true;
         } else if (e->type == CUI_EVENT_SCROLL && (e->modifiers & CUI_MOD_CTRL) &&
@@ -67,18 +72,34 @@ cui_plot_result cui_plot_viewport_reduce(cui_context *ui, uint64_t id, cui_plot_
             transform = claimed = true;
         }
         if (transform) {
+            cui_plot_viewport staged;
+            cui_plot_viewport *destination = v;
+            if (may_yield) {
+                staged = *v;
+                destination = &staged;
+            }
             cui_plot_result next = cui_plot_viewport_transform(
-                v, o, dx, dy, factor, (cui_plot_point){e->x - bounds.x, e->y - bounds.y});
+                destination, o, dx, dy, factor, (cui_plot_point){e->x - bounds.x, e->y - bounds.y});
             if (next != CUI_PLOT_OK)
                 result = next;
-            else
+            else if (may_yield && (!o.pan_y || (staged.y.domain_min == v->y.domain_min &&
+                                                staged.y.domain_max == v->y.domain_max)))
+                claimed = false;
+            else {
+                if (may_yield)
+                    *v = staged;
                 cui_invalidate(ui);
+            }
         }
         if (claimed)
             (void)cui_consume_event(ui, i);
     }
     cui_end_focus_scope(ui);
     return result;
+}
+cui_plot_result cui_plot_viewport_reduce(cui_context *ui, uint64_t id, cui_plot_viewport *v,
+                                         cui_plot_viewport_options o) {
+    return cui_plot_viewport_reduce_with_touch_policy(ui, id, v, o, CUI_PLOT_TOUCH_CAPTURE);
 }
 bool cui_plot_viewport_bind(cui_context *ui, uint64_t id, const cui_plot_viewport *v,
                             cui_plot_viewport_options o) {

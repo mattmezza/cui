@@ -13,7 +13,16 @@ typedef struct {
 } cui_touch_page_contact;
 typedef struct {
     cui_touch_page_contact contacts[16];
+    cui_id yielding_viewport;
 } cui_touch_page_host;
+
+static inline bool cui_touch_page_protected(const cui_touch_page_host *host,
+                                            const cui_semantic *s) {
+    return s->details.touch_drag_priority || s->role == CUI_ROLE_SLIDER ||
+           s->role == CUI_ROLE_SCROLLBAR || s->role == CUI_ROLE_SEPARATOR ||
+           (s->id != host->yielding_viewport &&
+            (s->details.gesture_pan || s->details.gesture_zoom));
+}
 
 static inline void cui_touch_page_dispatch(cui_touch_page_host *host, cui_context *ui) {
     size_t count, semantic_count;
@@ -46,10 +55,7 @@ static inline void cui_touch_page_dispatch(cui_touch_page_host *host, cui_contex
                 }
             for (size_t n = 0; n < semantic_count; n++) {
                 const cui_semantic *s = &semantics[n];
-                bool protected = s->details.touch_drag_priority || s->details.gesture_pan ||
-                                 s->details.gesture_zoom || s->role == CUI_ROLE_SLIDER ||
-                                 s->role == CUI_ROLE_SCROLLBAR || s->role == CUI_ROLE_SEPARATOR;
-                if (protected &&
+                if (cui_touch_page_protected(host, s) &&
                     (cui_event_target(ui, e) == s->id || cui_event_hit_within_scope(ui, e, s->id) ||
                      ((s->details.gesture_pan || s->details.gesture_zoom) &&
                       cui_hovered(ui, s->id))))
@@ -74,10 +80,17 @@ static inline void cui_touch_page_dispatch(cui_touch_page_host *host, cui_contex
                      events[e].scroll_phase == CUI_SCROLL_PHASE_CANCELLED))
                     contact->active = false;
             } else if (events[e].type == CUI_EVENT_GESTURE) {
-                contact->blocked = true;
                 if (events[e].scroll_phase == CUI_SCROLL_PHASE_ENDED ||
-                    events[e].scroll_phase == CUI_SCROLL_PHASE_CANCELLED)
+                    events[e].scroll_phase == CUI_SCROLL_PHASE_CANCELLED) {
                     contact->active = false;
+                } else if (host->yielding_viewport &&
+                           cui_event_target(ui, e) == host->yielding_viewport &&
+                           cui_event_gesture_contacts(ui, e) == 1) {
+                    contact->move = true;
+                    contact->refused |= cui_event_consumed(ui, e);
+                } else {
+                    contact->blocked = true;
+                }
             } else if (events[e].type == CUI_EVENT_POINTER_UP) {
                 contact->active = false;
             }
@@ -97,11 +110,7 @@ static inline void cui_touch_page_finish(cui_touch_page_host *host, cui_context 
         cui_id target = contact->target;
         for (size_t step = 0; target && step < count; step++) {
             for (size_t i = 0; i < count; i++)
-                if (semantics[i].id == target &&
-                    (semantics[i].details.touch_drag_priority || semantics[i].details.gesture_pan ||
-                     semantics[i].details.gesture_zoom || semantics[i].role == CUI_ROLE_SLIDER ||
-                     semantics[i].role == CUI_ROLE_SCROLLBAR ||
-                     semantics[i].role == CUI_ROLE_SEPARATOR))
+                if (semantics[i].id == target && cui_touch_page_protected(host, &semantics[i]))
                     contact->blocked = true;
             target = cui_semantic_parent(ui, target);
         }

@@ -960,7 +960,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "The five retained builders expose Plot presentation. Viewport gesture policies and physical contact evidence use the direct C APIs."
+      ]
     },
     {
       "name": "Table",

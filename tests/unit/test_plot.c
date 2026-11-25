@@ -2067,10 +2067,8 @@ static void viewport_models(void) {
                                        (cui_plot_point){DBL_MAX, DBL_MAX}) != CUI_PLOT_OK);
     assert(memcmp(&v, &saved, sizeof v) == 0);
 }
-static void viewport_frame(cui_context *ui, cui_plot_viewport *v, cui_plot_viewport_options o,
-                           bool modal) {
-    assert(cui_begin_frame(ui, 240, 160, .016f));
-    assert(cui_plot_viewport_reduce(ui, 91, v, o) == CUI_PLOT_OK);
+static void viewport_submit(cui_context *ui, cui_plot_viewport *v, cui_plot_viewport_options o,
+                            bool modal) {
     cui_begin_box(
         ui, 91, (cui_box){.width = 200, .height = 100, .fixed_width = true, .fixed_height = true});
     cui_interact(ui, 91, CUI_ROLE_IMAGE, cui_string("Plot"), o.disabled, false, 0);
@@ -2084,6 +2082,12 @@ static void viewport_frame(cui_context *ui, cui_plot_viewport *v, cui_plot_viewp
         cui_end_focus_scope(ui);
     }
     cui_end_frame(ui);
+}
+static void viewport_frame(cui_context *ui, cui_plot_viewport *v, cui_plot_viewport_options o,
+                           bool modal) {
+    assert(cui_begin_frame(ui, 240, 160, .016f));
+    assert(cui_plot_viewport_reduce(ui, 91, v, o) == CUI_PLOT_OK);
+    viewport_submit(ui, v, o, modal);
 }
 static void viewport_inputs(void) {
     cui_context *ui = cui_create((cui_config){.width = 240, .height = 160});
@@ -2206,9 +2210,95 @@ static void viewport_inputs(void) {
     assert(memcmp(&v, &saved, sizeof v) == 0);
     cui_destroy(ui);
 }
+static void viewport_touch(cui_context *ui, cui_event_type type, unsigned id, float x, float y) {
+    assert(cui_queue_event(
+        ui,
+        (cui_event){
+            .type = type, .pointer_type = CUI_POINTER_TOUCH, .pointer_id = id, .x = x, .y = y}));
+}
+static void viewport_touch_sample(cui_context *ui, cui_plot_viewport *v,
+                                  cui_plot_viewport_options o, cui_plot_touch_policy policy,
+                                  unsigned contacts, float scale, cui_scroll_phase phase,
+                                  bool consumed) {
+    assert(cui_begin_frame(ui, 240, 160, .016f));
+    assert(cui_plot_viewport_reduce_with_touch_policy(ui, 91, v, o, policy) == CUI_PLOT_OK);
+    size_t count, gestures = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count; i++) {
+        if (events[i].type != CUI_EVENT_GESTURE) {
+            assert(cui_event_gesture_contacts(ui, i) == 0);
+            continue;
+        }
+        gestures++;
+        assert(cui_event_target(ui, i) == 91 && cui_event_gesture_contacts(ui, i) == contacts);
+        assert(events[i].scroll_phase == phase && events[i].gesture_scale == scale);
+        assert(cui_event_consumed(ui, i) == consumed);
+    }
+    assert(gestures == 1 && cui_event_gesture_contacts(ui, count) == 0);
+    viewport_submit(ui, v, o, false);
+}
+static void viewport_touch_yield(void) {
+    cui_context *ui = cui_create((cui_config){.width = 240, .height = 160});
+    assert(ui);
+    cui_plot_viewport_options o = cui_plot_viewport_defaults();
+    cui_plot_viewport v;
+    assert(cui_plot_viewport_init(&v, (cui_plot_scale){CUI_PLOT_LINEAR, 0, 100, 0, 200, false},
+                                  (cui_plot_scale){CUI_PLOT_LINEAR, -10, 10, 100, 0, false}) ==
+           CUI_PLOT_OK);
+    const cui_plot_touch_policy yield = CUI_PLOT_TOUCH_YIELD_VERTICAL;
+    o.pan_y = false;
+    viewport_frame(ui, &v, o, false);
+    viewport_touch(ui, CUI_EVENT_POINTER_DOWN, 1, 50, 50);
+    viewport_touch(ui, CUI_EVENT_POINTER_MOVE, 1, 53, 35);
+    viewport_touch_sample(ui, &v, o, yield, 1, 1, CUI_SCROLL_PHASE_STARTED, false);
+    assert(v.x.domain_min == 0 && v.y.domain_min == -10);
+    viewport_touch(ui, CUI_EVENT_POINTER_MOVE, 1, 73, 34);
+    viewport_touch_sample(ui, &v, o, yield, 1, 1, CUI_SCROLL_PHASE_MOVED, true);
+    assert(close(v.x.domain_min, -10) && v.y.domain_min == -10);
+    viewport_touch(ui, CUI_EVENT_POINTER_UP, 1, 73, 34);
+    viewport_touch_sample(ui, &v, o, yield, 1, 1, CUI_SCROLL_PHASE_ENDED, true);
+
+    viewport_touch(ui, CUI_EVENT_POINTER_DOWN, 2, 50, 50);
+    viewport_touch(ui, CUI_EVENT_POINTER_MOVE, 2, 50, 30);
+    viewport_touch_sample(ui, &v, o, CUI_PLOT_TOUCH_CAPTURE, 1, 1, CUI_SCROLL_PHASE_STARTED, true);
+    viewport_touch(ui, CUI_EVENT_CANCEL, 2, 0, 0);
+    viewport_touch_sample(ui, &v, o, yield, 1, 1, CUI_SCROLL_PHASE_CANCELLED, true);
+
+    o.pan_y = true;
+    o.y_limit = (cui_plot_viewport_limit){.bounded = true, .minimum = -12, .maximum = 12};
+    viewport_frame(ui, &v, o, false);
+    viewport_touch(ui, CUI_EVENT_POINTER_DOWN, 3, 50, 50);
+    viewport_touch(ui, CUI_EVENT_POINTER_MOVE, 3, 50, 20);
+    viewport_touch_sample(ui, &v, o, yield, 1, 1, CUI_SCROLL_PHASE_STARTED, true);
+    assert(v.y.domain_min == -12);
+    double x = v.x.domain_min;
+    viewport_touch(ui, CUI_EVENT_POINTER_MOVE, 3, 52, 10);
+    viewport_touch_sample(ui, &v, o, yield, 1, 1, CUI_SCROLL_PHASE_MOVED, false);
+    assert(v.x.domain_min == x && v.y.domain_min == -12);
+    viewport_touch(ui, CUI_EVENT_POINTER_MOVE, 3, 52, 20);
+    viewport_touch_sample(ui, &v, o, yield, 1, 1, CUI_SCROLL_PHASE_MOVED, true);
+    assert(v.y.domain_min > -12);
+    viewport_touch(ui, CUI_EVENT_POINTER_UP, 3, 52, 20);
+    viewport_touch_sample(ui, &v, o, yield, 1, 1, CUI_SCROLL_PHASE_ENDED, true);
+
+    o.pan_y = false;
+    viewport_frame(ui, &v, o, false);
+    viewport_touch(ui, CUI_EVENT_POINTER_DOWN, 4, 50, 50);
+    viewport_touch(ui, CUI_EVENT_POINTER_DOWN, 5, 62, 34);
+    /* The second contact moves vertically at constant separation from the first. */
+    viewport_touch(ui, CUI_EVENT_POINTER_MOVE, 5, 62, 66);
+    viewport_touch_sample(ui, &v, o, yield, 2, 1, CUI_SCROLL_PHASE_STARTED, true);
+    viewport_touch(ui, CUI_EVENT_POINTER_MOVE, 5, 74, 82);
+    viewport_touch_sample(ui, &v, o, yield, 2, 2, CUI_SCROLL_PHASE_MOVED, true);
+    assert(close(v.x.domain_max - v.x.domain_min, 50));
+    viewport_touch(ui, CUI_EVENT_POINTER_UP, 5, 74, 82);
+    viewport_touch_sample(ui, &v, o, yield, 2, 1, CUI_SCROLL_PHASE_ENDED, true);
+    cui_destroy(ui);
+}
 int main(void) {
     viewport_models();
     viewport_inputs();
+    viewport_touch_yield();
     dashed_stroke_meshes();
     extended_stroke_meshes();
     complex_fill_meshes();

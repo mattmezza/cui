@@ -3126,6 +3126,7 @@ static void test_touch_viewport(void) {
     const cui_event *e = cui_frame_events(ui, NULL);
     assert(e[0].type == CUI_EVENT_GESTURE && cui_event_target(ui, 0) == 1);
     assert(e[0].gesture_scale == 2 && e[0].x == 60 && e[0].dx == 20);
+    assert(cui_event_gesture_contacts(ui, 0) == 2);
     viewport(ui, true, false);
     cui_end_frame(ui);
     touch(ui, CUI_EVENT_CANCEL, 2, 0, 0);
@@ -3133,6 +3134,7 @@ static void test_touch_viewport(void) {
     e = cui_frame_events(ui, NULL);
     assert(e[0].type == CUI_EVENT_GESTURE && e[0].gesture_scale == 1);
     assert(e[0].scroll_phase == CUI_SCROLL_PHASE_CANCELLED);
+    assert(cui_event_gesture_contacts(ui, 0) == 2);
     viewport(ui, true, true);
     cui_end_frame(ui);
     touch(ui, CUI_EVENT_POINTER_MOVE, 1, 40, 20);
@@ -3170,7 +3172,16 @@ static void test_touch_viewport_pan_threshold(void) {
     assert(events[2].type == CUI_EVENT_GESTURE &&
            events[2].scroll_phase == CUI_SCROLL_PHASE_ENDED && events[2].dx == 0 &&
            events[2].dy == 0);
+    for (size_t i = 0; i < 3; i++)
+        assert(cui_event_gesture_contacts(ui, i) == 1);
     viewport(ui, true, false);
+    cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_GESTURE,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .gesture_scale = 1}));
+    begin(ui);
+    assert(cui_frame_events(ui, NULL)[0].type == CUI_EVENT_GESTURE);
+    assert(cui_event_gesture_contacts(ui, 0) == 0);
     cui_end_frame(ui);
     cui_destroy(ui);
 }

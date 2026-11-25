@@ -7758,7 +7758,7 @@
             "tests/web/test_touch_page_navigation.py",
             "docs/PLOT_INTERACTIONS.md"
           ],
-          "scope": "Shift-primary drag, Ctrl-wheel and two-contact zoom anchors, slow single-contact pan through the tap threshold, cancellation, and disabled viewport yielding to browser page scroll. Physical touch and general nested viewport boundary arbitration remain open."
+          "scope": "Shift-primary drag, Ctrl-wheel and two-contact zoom anchors, slow single-contact pan through the tap threshold, cancellation, and browser page scroll when a disabled, horizontal-only or vertically bounded Plot yields a drag. C tests check consumption and the measured contact count. Physical touch and native ancestor scrolling remain open."
         },
         {
           "name": "complete zoom/hover/selection composition",

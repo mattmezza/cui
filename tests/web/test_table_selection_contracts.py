@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["playwright==1.58.0"]
 # ///
-"""Real WASM Table naming/sizing and DataTable selection-only actions/sort cycle."""
+"""Real WASM Table layout, appearance, selection and sorting."""
 import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler,ThreadingHTTPServer
@@ -12,6 +12,98 @@ import threading
 from playwright.sync_api import sync_playwright
 from test_touch_components import Audit
 PAINT='''()=>{const e=cuiGallery.exports,d=new TextDecoder();return Array.from({length:e.gallery_count()},(_,i)=>({type:e.gallery_command(i,0),b:[1,2,3,4].map(f=>e.gallery_command(i,f)),text:d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))}));}'''
+
+
+def cell_pixel(audit, target):
+    return audit.page.evaluate('''([x,y,w,h])=>{
+        const canvas=document.querySelector('#preview');
+        const scale=canvas.width/canvas.clientWidth;
+        return Array.from(canvas.getContext('2d').getImageData(
+            Math.floor((x+w*.85)*scale),Math.floor((y+h*.5)*scale),1,1).data);
+    }''', target['f'][1:5])
+
+
+def first_column(audit, role, row):
+    return audit.target(role=role, predicate=lambda target: target['f'][22:24] == [row, 1])
+
+
+def check_table_appearance(audit):
+    audit.route('Table')
+    assert audit.page.locator('#table-custom-header').is_visible()
+    assert audit.page.locator('#table-striped').is_visible()
+    surfaces = []
+    for scheme in ('light', 'dark'):
+        audit.page.emulate_media(color_scheme=scheme)
+        audit.configure('table-custom-header', True)
+        audit.configure('table-striped', True)
+        header = audit.target('Name', 29)
+        first, second, third = [first_column(audit, 28, row) for row in (2, 3, 4)]
+        header_color = cell_pixel(audit, header)
+        base_color = cell_pixel(audit, first)
+        surfaces.append(base_color)
+        stripe_color = cell_pixel(audit, second)
+        assert stripe_color != base_color and cell_pixel(audit, third) == base_color
+        audit.configure('table-custom-header', False)
+        assert cell_pixel(audit, header) != header_color
+        assert cell_pixel(audit, second) == stripe_color
+        audit.configure('table-striped', False)
+        assert cell_pixel(audit, second) == base_color
+    assert surfaces[0] != surfaces[1]
+
+
+def check_data_table_appearance(audit):
+    audit.route('DataTable')
+    assert not audit.page.locator('#table-custom-header').is_visible()
+    assert audit.page.locator('#table-striped').is_visible()
+    for scheme in ('light', 'dark'):
+        audit.page.emulate_media(color_scheme=scheme)
+        audit.configure('table-striped', True)
+        first, second = [first_column(audit, 30, row) for row in (1, 2)]
+        base_color, stripe_color = cell_pixel(audit, first), cell_pixel(audit, second)
+        assert base_color != stripe_color
+        audit.configure('table-striped', False)
+        assert cell_pixel(audit, second) == base_color
+        audit.configure('table-striped', True)
+        assert cell_pixel(audit, second) == stripe_color
+
+    audit.tap(second)
+    assert audit.value(second, 11) == 1
+    primary = audit.page.evaluate('''() => [0,1,2,3].map(
+        channel => cuiGallery.exports.gallery_theme_channel(2, channel))''')
+    assert cell_pixel(audit, second) == primary and cell_pixel(audit, first) == base_color
+
+    header = audit.target('Name', 29)
+    header_y = header['f'][2]
+    header_color = cell_pixel(audit, header)
+    audit.tap(header)
+    sorted_second = first_column(audit, 30, 2)
+    assert sorted_second['id'] != second['id']
+    assert cell_pixel(audit, sorted_second) == stripe_color
+    audit.tap(audit.target('Name', 29))
+    assert first_column(audit, 30, 2)['id'] == second['id']
+    assert audit.value(second, 11) == 1 and cell_pixel(audit, second) == primary
+
+    point = audit.point(first_column(audit, 30, 3))
+    body = audit.target('Rows', 34)
+    audit.page.mouse.move(point['x'], point['y'])
+    audit.page.mouse.wheel(0, 32)
+    audit.page.wait_for_function(
+        '''id => {
+            const api=cuiGallery.exports;
+            for (let i=0;i<api.gallery_semantic_count();++i)
+                if (String(api.gallery_semantic_id(i))===id)
+                    return Math.abs(api.gallery_semantic(i,19)-32)<.01;
+            return false;
+        }''', arg=body['id'])
+    header = audit.target('Name', 29)
+    assert header['f'][2] == header_y and cell_pixel(audit, header) == header_color
+    selected = first_column(audit, 30, 2)
+    assert selected['f'][2] == second['f'][2] - 32
+    assert selected['f'][11] == 1 and cell_pixel(audit, selected) == primary
+    assert cell_pixel(audit, first_column(audit, 30, 3)) == base_color
+    assert cell_pixel(audit, first_column(audit, 30, 4)) == stripe_color
+
+
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--directory',type=Path,default=Path('build/web'));p.add_argument('--chromium');args=p.parse_args()
  class Handler(SimpleHTTPRequestHandler):
@@ -59,7 +151,14 @@ def main():
    before=a.value(owner,18);a.drag(owner,-80,0,rx=.5,ry=.5)
    assert a.value(owner,18)>before
    assert a.page.evaluate('cuiGallery.exports.gallery_error()')==0
-   assert not a.errors,a.errors;browser.close()
+   assert not a.errors,a.errors
+   a.page.close()
+   appearance = Audit(browser,f'http://127.0.0.1:{server.server_port}')
+   check_table_appearance(appearance)
+   check_data_table_appearance(appearance)
+   assert appearance.page.evaluate('cuiGallery.exports.gallery_error()') == 0
+   assert not appearance.errors, appearance.errors
+   browser.close()
  finally:server.shutdown()
  print('Table selection contracts browser passed')
 if __name__=='__main__':main()

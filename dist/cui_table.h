@@ -110,6 +110,8 @@ typedef void (*cui_table_trailing_fn)(cui_context *, const cui_theme *, void *, 
 typedef struct {
     float width, height, row_height, header_height, row_header_width, bar_thickness, trailing_width;
     size_t overscan, column_overscan, load_more_threshold, group_header_count;
+    /* Striped alternates unselected data cell fills by model row index.
+       The alternate uses theme background, or muted_background when it equals surface. */
     bool disabled, striped, bordered, manual_selection, loop_selection, load_more,
         multiple_selection, row_header, loading, scrollbars;
     cui_table_header_fn render_header;
@@ -2172,9 +2174,16 @@ static cui_str cached_cell_label(void *user, size_t row, cui_id column) {
     (void)column;
     return *(const cui_str *)user;
 }
+static cui_color table_stripe_color(const cui_theme *t) {
+    cui_color base = t->surface, stripe = t->background;
+    if (base.r == stripe.r && base.g == stripe.g && base.b == stripe.b && base.a == stripe.a)
+        return t->muted_background;
+    return stripe;
+}
 static void body_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_model *m,
                       cui_table_state *s, cui_table_options o, size_t r, size_t c, float row,
-                      cui_table_label_fn label, cui_table_cell_fn render, void *data) {
+                      cui_color background, cui_table_label_fn label, cui_table_cell_fn render,
+                      void *data) {
     cui_table_row rr;
     cui_table_column col;
     if (!cui_table_get_row(m, r, &rr))
@@ -2191,9 +2200,7 @@ static void body_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_
                             .clip = true,
                             .align_x = align(col.align),
                             .align_y = CUI_ALIGN_CENTER,
-                            .background = selected               ? t->primary
-                                          : o.striped && (r & 1) ? t->background
-                                                                 : t->surface,
+                            .background = selected ? t->primary : background,
                             .border = cui_focused(ui) == cid ? t->focus : t->border,
                             .border_width = cui_focused(ui) == cid ? 2
                                             : o.bordered           ? 1
@@ -2351,6 +2358,7 @@ static cui_table_result cui_data_table_common(
                                                     o.column_overscan),
                    rows = cui_table_viewport(m, s->scroll_y, h, row, o.overscan);
     float span = cols.total - cols.before - cols.after;
+    cui_color stripe = table_stripe_color(t);
     cui_begin_box(
         ui, id,
         (cui_box){.width =
@@ -2438,6 +2446,7 @@ static cui_table_result cui_data_table_common(
         if (!cui_table_get_row(m, r, &rr))
             break;
         cui_id rid = cui_table_row_id(id, rr.key);
+        cui_color background = o.striped && (r & 1) ? stripe : t->surface;
         cui_begin_box(ui, rid, (cui_box){.width = width, .height = row, .row = true});
         cui_table_submit_row(ui, id, m, s, o, r);
         if (o.render_row) {
@@ -2468,7 +2477,7 @@ static cui_table_result cui_data_table_common(
             cui_begin_box(ui, style_id(rid, 3),
                           (cui_box){.width = pin, .height = row, .row = true, .clip = true});
             for (size_t c = 0; c < fixed; c++)
-                body_cell(ui, id, t, m, s, o, r, c, row, label, render, data);
+                body_cell(ui, id, t, m, s, o, r, c, row, background, label, render, data);
             cui_end_box(ui);
         }
         cui_begin_box(ui, style_id(rid, 4),
@@ -2478,7 +2487,7 @@ static cui_table_result cui_data_table_common(
                                 .offset_x = cols.before - s->scroll_x});
         cui_begin_box(ui, style_id(rid, 2), (cui_box){.width = span, .height = row, .row = true});
         for (size_t c = cols.begin; c < cols.end; c++)
-            body_cell(ui, id, t, m, s, o, r, c, row, label, render, data);
+            body_cell(ui, id, t, m, s, o, r, c, row, background, label, render, data);
         if (cols.end == cui_table_columns(m))
             trailing_cell(ui, id, t, o, false, r, rr.key, row);
         cui_end_box(ui);

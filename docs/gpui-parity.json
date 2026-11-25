@@ -7221,6 +7221,17 @@
             "tests/unit/test_table.c",
             "docs/TABLE.md"
           ]
+        },
+        {
+          "name": "striped data cells and selection precedence",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_table_selection_contracts.c",
+            "tests/web/test_table_selection_contracts.py"
+          ],
+          "limitations": [
+            "Native draw commands and browser pixels check alternate fills, including themes with matching surface/background tokens. The browser also checks keyed selection across sorting and scrolling. The source-specific palette is a separate feature."
+          ]
         }
       ],
       "upstream_doc": {
@@ -7438,6 +7449,14 @@
           "name": "themed cells and keyboard behavior",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "custom header and alternate row fills",
+          "status": "tested",
+          "evidence": [
+            "tests/web/test_table_selection_contracts.py",
+            "docs/TABLE.md"
+          ]
         },
         {
           "name": "independent headless reducers and actual themed rendering",

@@ -304,9 +304,66 @@ static void metadata_and_design(void) {
     assert(cui_table_span_width(widths, 3, 0, 2, &span) && span == 200);
     cui_destroy(ui);
 }
+
+static void assert_cell_fill(cui_context *ui, cui_draw_list draw, cui_id cell, cui_color color) {
+    cui_rect bounds = cui_bounds(ui, cell);
+    assert(bounds.w > 0 && bounds.h > 0);
+    for (size_t i = 0; i < draw.count; ++i) {
+        const cui_draw_command *command = &draw.commands[i];
+        if (command->type == CUI_DRAW_RECT && command->bounds.x == bounds.x &&
+            command->bounds.y == bounds.y && command->bounds.w == bounds.w &&
+            command->bounds.h == bounds.h) {
+            cui_color actual = command->color;
+            assert(actual.r == color.r && actual.g == color.g && actual.b == color.b &&
+                   actual.a == color.a);
+            return;
+        }
+    }
+    assert(!"Table cell background is missing");
+}
+
+static void striped_cell_fill(void) {
+    cui_context *ui = cui_create((cui_config){0});
+    cui_table_model *model = cui_table_create(2);
+    cui_table_row rows[] = {{.key = 1, .label = CUI_STR("One")},
+                            {.key = 2, .label = CUI_STR("Two")}};
+    cui_table_column column = {.key = 10, .label = CUI_STR("Name"), .width = 150};
+    assert(ui && model && cui_table_bind(model, rows, 2, &column, 1) == CUI_TABLE_OK);
+    cui_table_state state = {0};
+    cui_table_options options = {.width = 220,
+                                 .height = 120,
+                                 .striped = true,
+                                 .selection_mode = CUI_TABLE_SELECT_CELL};
+    cui_theme theme = cui_theme_light();
+    theme.background = theme.surface; /* The default gallery presets have this palette. */
+    theme.muted_background = (cui_color){130, 140, 150, 255};
+    const cui_id table = 20;
+    const cui_id first = cui_table_cell_id(table, 1, 10);
+    const cui_id second = cui_table_cell_id(table, 2, 10);
+    for (unsigned scene = 0; scene < 4; ++scene) {
+        state.row = scene == 1 ? 2 : 0;
+        state.column = scene == 1 ? 10 : 0;
+        options.striped = scene != 2;
+        if (scene == 3)
+            theme.background = (cui_color){100, 110, 120, 255};
+        cui_color second_fill = (cui_color[]){theme.muted_background, theme.primary,
+                                              theme.surface, theme.background}[scene];
+        assert(cui_begin_frame(ui, 260, 220, 0));
+        cui_table_result result =
+            cui_data_table(ui, table, &theme, model, &state, options, NULL, NULL, NULL);
+        cui_draw_list draw = cui_end_frame(ui);
+        assert(result.error == CUI_TABLE_OK && cui_last_error(ui) == CUI_OK);
+        assert_cell_fill(ui, draw, first, theme.surface);
+        assert_cell_fill(ui, draw, second, second_fill);
+    }
+    cui_table_destroy(model);
+    cui_destroy(ui);
+}
+
 int main(void) {
     selection_and_sort();
     metadata_and_design();
     selection_mode_policies();
+    striped_cell_fill();
     return 0;
 }

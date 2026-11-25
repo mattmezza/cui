@@ -2402,6 +2402,7 @@ static cui_table_state table_state;
 static cui_table_selection table_selection[64];
 static bool table_pinned, table_actions, table_selection_locked, table_source_sort = true;
 static bool table_story_disabled;
+static bool table_custom_header = true, table_striped = true;
 static int table_mode, table_row_hooks, table_inspections;
 static cui_table_selection_mode table_selection_mode = CUI_TABLE_SELECT_CELL;
 static cui_table_row table_rows[1000];
@@ -5927,7 +5928,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                 .row_height = 32,
                                 .header_height = 32,
                                 .disabled = disabled,
-                                .striped = true,
+                                .striped = table_striped,
                                 .bordered = true,
                                 .multiple_selection = multiple_mode,
                                 .selection_mode = table_selection_mode,
@@ -6009,21 +6010,22 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          (cui_semantic_details){.parent = table_id});
             }
             cui_id row_id = table_id + r + 1;
+            bool header = r == 0;
+            bool custom_background = header ? table_custom_header : table_striped && r % 2 == 0;
+            cui_color foreground = header && table_custom_header ? t.accent_foreground : t.text;
             if (!cui_table_begin_row_checked(
                     ui, row_id, &t,
                     (cui_table_row_options){.height = cell_height,
-                                            .header = r == 0,
+                                            .header = header,
                                             .parent = section_id,
                                             .row_index = (unsigned)r + 1,
-                                            .custom_background = true,
-                                            .background = r == 0  ? t.accent
-                                                          : r % 2 ? t.surface
-                                                                  : t.background}))
+                                            .custom_background = custom_background,
+                                            .background = header ? t.accent : t.muted_background}))
                 continue;
             for (size_t c = 0; c < 3; c++) {
                 cui_id cell_id = table_id + 100 + r * 3 + c;
                 const char *headers[] = {"Name", "Status", "Size"};
-                cui_str label = r == 0 ? cui_string(headers[c]) : table_label(NULL, r - 1, 101 + c);
+                cui_str label = header ? cui_string(headers[c]) : table_label(NULL, r - 1, 101 + c);
                 if (cui_table_begin_cell_ex(
                         ui, cell_id, &t,
                         (cui_table_cell_options){.width = cell_width,
@@ -6033,13 +6035,13 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                  .parent = row_id,
                                                  .row_index = (unsigned)r + 1,
                                                  .column_index = (unsigned)c + 1,
-                                                 .header = r == 0,
+                                                 .header = header,
                                                  .design_size = design_size})) {
                     if (scaled)
-                        cui_text_with_line_height(ui, label, metrics.font_size, t.text,
+                        cui_text_with_line_height(ui, label, metrics.font_size, foreground,
                                                   metrics.line_height);
                     else
-                        cui_label(ui, &t, label);
+                        cui_text(ui, label, t.font_size, foreground);
                     cui_table_end(ui);
                 }
             }
@@ -7252,6 +7254,10 @@ int gallery_table_selection_mode(int mode) {
     if (mode >= CUI_TABLE_SELECT_ROW && mode <= CUI_TABLE_SELECT_CELL)
         table_selection_mode = (cui_table_selection_mode)mode;
     return table_selection_mode;
+}
+void gallery_table_appearance(int custom_header, int striped) {
+    table_custom_header = custom_header != 0;
+    table_striped = striped != 0;
 }
 void gallery_disclosure_options(int mode, int multiple) {
     if (mode >= 0 && mode <= 2 && mode != disclosure_mode) {

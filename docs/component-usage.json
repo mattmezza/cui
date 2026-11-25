@@ -2400,7 +2400,7 @@
       ],
       "state_ownership": "Caller retains allocated model/state, data rows/columns and any borrowed label storage.",
       "interaction": "cui_table_result reports interaction; cui_table_label_fn provides accessibility text and cui_table_cell_fn composes visible cells.",
-      "usage": "Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result. Wheel ticks use the Scrollable default of 48 logical pixels; mark pixel deltas scroll_precise. Enabled movable headers own touch reorder; body/nonmovable headers retain pan, and touch drops use indexed clipped-region admission.",
+      "usage": "Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result. Striped body cells alternate in model order and selection takes precedence. Wheel ticks use the Scrollable default of 48 logical pixels; mark pixel deltas scroll_precise. Enabled movable headers own touch reorder; body/nonmovable headers retain pan, and touch drops use indexed clipped-region admission.",
       "docs": [
         "docs/TABLE.md",
         "docs/TABLE_EVENTS.md",
@@ -2447,13 +2447,15 @@
       "api_symbols": [
         "cui_table_begin",
         "cui_table_begin_row",
+        "cui_table_begin_row_ex",
+        "cui_table_begin_row_checked",
         "cui_table_begin_cell",
         "cui_table_end"
       ],
       "state_types": [],
       "state_ownership": "Caller owns row/cell hierarchy and data; no retained table model is required.",
       "interaction": "Composition only; child controls handle actions.",
-      "usage": "Submit sections, rows and cells using balanced begin/end nesting each frame.",
+      "usage": "Submit sections, rows and cells using balanced begin/end nesting each frame. Set custom_background and background on a row for custom header fills or alternate body rows.",
       "docs": [
         "docs/TABLE.md"
       ],

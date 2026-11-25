@@ -502,6 +502,8 @@ latest pointer position and ordinary hover styling. Virtualize long lists
 when layout permits; see `docs/PERFORMANCE.md`. Enabled movable Table headers
 own touch reorder while body/nonmovable header pan remains available. Follow
 `docs/TABLE.md`; do not infer Dialog reopen or all-consumer lifecycle completion.
+Use `cui_table_begin_row_ex` for a static Table's custom header and row fills.
+Set `striped` for DataTable body stripes. Selected cells take precedence.
 
 For Skeleton, read `docs/SKELETON_PALETTE.md`: legacy phase APIs remain distinct
 from scheduled fixed-size `cui_skeleton_ex` and owned-color `cui_skeleton_with_palette`.

@@ -109,6 +109,8 @@ typedef void (*cui_table_trailing_fn)(cui_context *, const cui_theme *, void *, 
 typedef struct {
     float width, height, row_height, header_height, row_header_width, bar_thickness, trailing_width;
     size_t overscan, column_overscan, load_more_threshold, group_header_count;
+    /* Striped alternates unselected data cell fills by model row index.
+       The alternate uses theme background, or muted_background when it equals surface. */
     bool disabled, striped, bordered, manual_selection, loop_selection, load_more,
         multiple_selection, row_header, loading, scrollbars;
     cui_table_header_fn render_header;

@@ -950,9 +950,9 @@ Additional event includes: `cui/cui_surface_events.h`.
 
 **State:** Caller retains state, slots and panel descriptors.
 
-**Interaction:** cui_resizable_resize_fn observes size changes; panel content composes controls.
+**Interaction:** Mouse and touch drag the handle. The focused separator responds to arrow keys. cui_resizable_resize_fn observes completed resizes.
 
-**Usage:** Initialize slot storage, submit panel descriptors each frame and save sizes after resize events.
+**Usage:** Initialize slot storage, submit panel descriptors within a feasible combined min/max range every frame and save sizes after completed resizes.
 
 API: `cui_resizable_state_init`, `cui_resizable`. [Public header](../include/cui/cui_resizable.h); [guide](RESIZABLE.md).
 
@@ -1040,7 +1040,7 @@ API: `cui_status_bar`. [Public header](../include/cui/cui_chrome.h); [guide](CHR
 
 **Interaction:** Returns selection changes; cui_tab_panel_fn composes selected panel content.
 
-**Usage:** Submit tab descriptors and current selected key; keep optional animation state across frames.
+**Usage:** Submit tab descriptors and current selected key. For a bounded strip retain scroll state and specify bar_extent. The gallery and SDL3 adapter translate Shift plus vertical-only wheel into horizontal scrolling. Keep optional animation state across frames.
 
 API: `cui_tabs`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.md).
 
@@ -1073,7 +1073,7 @@ is an allocation-free building block, not a renderer.
 
 **Interaction:** on_close callback handles application close; window host functions implement native window behavior.
 
-**Usage:** Submit current window information each frame; keep host/user pointers valid during calls.
+**Usage:** Provide cui_sdl3_window_interface or an equivalent host. Decorated Cocoa windows use native traffic lights; SDL borderless windows use client controls. Keep host/user pointers valid during calls. Submit current window information each frame.
 
 API: `cui_title_bar`. [Public header](../include/cui/cui_chrome.h); [guide](CHROME.md).
 
@@ -1155,7 +1155,7 @@ Event API includes: `cui/cui_command_events.h`.
 
 **Interaction:** cui_table_result reports interaction; cui_table_label_fn provides accessibility text and cui_table_cell_fn composes visible cells.
 
-**Usage:** Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result. Enabled movable headers own touch reorder; body/nonmovable headers retain pan, and touch drops use indexed clipped-region admission.
+**Usage:** Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result. Striped body cells alternate in model order and selection takes precedence. Wheel ticks use the Scrollable default of 48 logical pixels; mark pixel deltas scroll_precise. Enabled movable headers own touch reorder; body/nonmovable headers retain pan, and touch drops use indexed clipped-region admission.
 
 API: `cui_table_create`, `cui_data_table`, `cui_table_destroy`. [Public header](../include/cui/cui_table.h); [guide](TABLE.md).
 
@@ -1181,9 +1181,9 @@ API: `cui_plot_view`, `cui_plot_axis`, `cui_plot_raster`, `cui_plot_path`, `cui_
 
 **Interaction:** Composition only; child controls handle actions.
 
-**Usage:** Submit sections, rows and cells using balanced begin/end nesting each frame.
+**Usage:** Submit sections, rows and cells using balanced begin/end nesting each frame. Set custom_background and background on a row for custom header fills or alternate body rows.
 
-API: `cui_table_begin`, `cui_table_begin_row`, `cui_table_begin_cell`, `cui_table_end`. [Public header](../include/cui/cui_table.h); [guide](TABLE.md).
+API: `cui_table_begin`, `cui_table_begin_row_ex`, `cui_table_begin_row_checked`, `cui_table_begin_cell`, `cui_table_end`. [Public header](../include/cui/cui_table.h); [guide](TABLE.md).
 
 ## TextView
 

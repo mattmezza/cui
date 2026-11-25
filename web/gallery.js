@@ -494,7 +494,30 @@ const snippets = {
  Form:'/* Application owns editors, validation and callbacks. */\ncui_form(ui, id, &theme, fields, count,\n    (cui_form_options){.columns = 2,\n        .name = cui_string("Profile"),\n        .render_footer = draw_save_button});',
  Scrollable:'if (cui_scrollable_begin(ui, id, &theme,\n    &state, options)) {\n    draw_content(ui);\n    cui_scrollable_end(ui, id, &theme, &state, options);\n}',
  DataTable:'cui_data_table(ui, id, &theme, model,\n    &state, options, cell_label, draw_cell, user);',
- Table:'cui_table_begin(ui, id, &theme, width);\n/* Compose rows and cells; end each begin. */\ncui_table_end(ui);',
+ Table:`cui_table_begin(ui, id, &theme, width);
+cui_table_begin_row_ex(ui, cui_id_from(ui, "files-header"), &theme,
+    (cui_table_row_options){.height = 32, .header = true,
+        .custom_background = true, .background = theme.accent});
+cui_table_begin_head_cell(ui, cui_id_from(ui, "files-name"), width, 32,
+    CUI_TABLE_ALIGN_LEFT, cui_string("Name"));
+cui_text(ui, cui_string("Name"), theme.font_size, theme.accent_foreground);
+cui_table_end(ui); /* Header cell */
+cui_table_end(ui); /* Header row */
+
+const char *files[] = {"Notes", "Roadmap"};
+for (size_t row = 0; row < sizeof(files) / sizeof(files[0]); ++row) {
+    if (!cui_push_id(ui, files[row]))
+        continue;
+    cui_table_begin_row_ex(ui, cui_id_from(ui, "row"), &theme,
+        (cui_table_row_options){.height = 32,
+            .custom_background = row % 2 != 0, .background = theme.muted_background});
+    cui_table_begin_cell(ui, cui_id_from(ui, "name"), width, 32, CUI_TABLE_ALIGN_LEFT);
+    cui_label(ui, &theme, cui_string(files[row]));
+    cui_table_end(ui); /* Body cell */
+    cui_table_end(ui); /* Body row */
+    cui_pop_id(ui);
+}
+cui_table_end(ui); /* Table */`,
  Dialog:'if (cui_surface_begin(ui, &theme, &dialog, title,\n    description, options)) {\n    /* Compose arbitrary children. */\n    cui_surface_end(ui);\n}',
  AlertDialog:'cui_alert_dialog(ui, &theme, &alert, title,\n    description, confirm, cancel, options);',
  Sheet:'options.edge = CUI_SHEET_RIGHT;\nif (cui_surface_begin(ui, &theme, &sheet, title,\n    description, options)) {\n    draw_settings(ui);\n    cui_surface_end(ui);\n}',
@@ -933,6 +956,7 @@ function render(){
  wasm.gallery_table_pin(Number($('table-pin').value));
  wasm.gallery_table_mode(Number($('table-mode').value));
  wasm.gallery_table_selection_mode(Number($('table-selection').value));
+ wasm.gallery_table_appearance($('table-custom-header').checked,$('table-striped').checked);
  wasm.gallery_surface_variant(Number($('surface-variant').value));
  wasm.gallery_dialog_options(Number(dialogLongBody.checked));
  wasm.gallery_popover_options(...popoverValues());
@@ -1316,6 +1340,8 @@ function selectComponent(){
  $('table-pin').hidden=selected.name!=='DataTable';$('table-pin').value='0';
  $('table-mode').hidden=selected.name!=='DataTable';$('table-mode').value='0';
  $('table-selection').hidden=selected.name!=='DataTable';$('table-selection').value='2';
+ $('table-custom-header-control').hidden=selected.name!=='Table';$('table-custom-header').checked=true;
+ $('table-striped-control').hidden=!['Table','DataTable'].includes(selected.name);$('table-striped').checked=true;
  $('surface-variant').hidden=selected.name!=='Sheet';$('surface-variant').value='0';
  dialogBodyControl.hidden=selected.name!=='Dialog';dialogLongBody.checked=false;
  popoverControls.hidden=selected.name!=='Popover';
@@ -1596,6 +1622,8 @@ $('form-mode').addEventListener('change',requestFrame);
 $('table-pin').addEventListener('change',requestFrame);
  $('table-mode').addEventListener('change',requestFrame);
  $('table-selection').addEventListener('change',requestFrame);
+ $('table-custom-header').addEventListener('change',requestFrame);
+ $('table-striped').addEventListener('change',requestFrame);
 $('surface-variant').addEventListener('change',requestFrame);
 $('date-locale').addEventListener('change',requestFrame);$('density').addEventListener('change',requestFrame);
 $('disabled').addEventListener('change',()=>{cancelScreenColor();requestFrame();});$('menu').onclick=()=>document.body.classList.toggle('menu-open');new ResizeObserver(requestFrame).observe(canvas);

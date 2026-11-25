@@ -10,6 +10,54 @@ portable C11 public types and independent base behavior.
 begin requires a matching end. These register passive table, row and cell roles;
 callers can set semantic parent and descriptive details using core setters. Head-cell, header/body/footer section and caption helpers preserve that composition. Validated cell-span helpers sum explicit column widths; failed validation does not begin a box. Callers place captions after their sections and provide accessible head-cell names. There are no implicit data cell labels.
 
+## Row and header colors
+
+Set `custom_background` with a `cui_color` on each composable Table row.
+For stripes, set it on every second body row using the row's position in
+the displayed order. Supply readable foreground colors for the content
+you draw. This example goes inside an active frame.
+
+```c
+void draw_files(cui_context *ui, const cui_theme *theme) {
+    const float width = 240, height = 32;
+    cui_table_begin(ui, cui_id_from(ui, "files-table"), theme, width);
+    cui_table_begin_row_ex(ui, cui_id_from(ui, "files-header"), theme,
+        (cui_table_row_options){.height = height, .header = true,
+            .custom_background = true, .background = theme->accent});
+    cui_table_begin_head_cell(ui, cui_id_from(ui, "files-name"), width, height,
+                              CUI_TABLE_ALIGN_LEFT, cui_string("Name"));
+    cui_text(ui, cui_string("Name"), theme->font_size, theme->accent_foreground);
+    cui_table_end(ui);
+    cui_table_end(ui);
+
+    const char *files[] = {"Notes", "Roadmap"};
+    for (size_t row = 0; row < sizeof(files) / sizeof(files[0]); ++row) {
+        if (!cui_push_id(ui, files[row]))
+            continue;
+        cui_table_begin_row_ex(ui, cui_id_from(ui, "row"), theme,
+            (cui_table_row_options){.height = height,
+                .custom_background = row % 2 != 0, .background = theme->muted_background});
+        cui_table_begin_cell(ui, cui_id_from(ui, "name"), width, height,
+                             CUI_TABLE_ALIGN_LEFT);
+        cui_label(ui, theme, cui_string(files[row]));
+        cui_table_end(ui);
+        cui_table_end(ui);
+        cui_pop_id(ui);
+    }
+    cui_table_end(ui);
+}
+```
+
+DataTable's `cui_table_options.striped` alternates unselected data cells by
+model row position. It uses the theme's `surface` and `background`, with
+`muted_background` as the alternate when those tokens are equal. Selected
+cells use `primary` and `on_primary`. Scrolling preserves the stripe phase,
+and selection follows the row key when the caller rebinds sorted records.
+Try **Custom header** and **Alternating rows** in the Table gallery, or
+**Alternating rows** in DataTable.
+
+## Virtual DataTable
+
 `cui_table_column_default(key, label)` supplies a 100-pixel, resizable, movable column with a 20-pixel minimum and optional sorting disabled. `cui_table_options_default()` enables border and scrollbars with row selection and no stripes, matching the supported reference defaults. Zero initialization remains available for applications choosing their own configuration. Widths remain bounded by CUI's 65,536-pixel safety limit.
 
 Create `cui_table_model` with a bounded row capacity, then bind borrowed rows and

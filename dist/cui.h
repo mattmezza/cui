@@ -8404,7 +8404,7 @@ freely, subject to the following restrictions:
 #define CUI_CORE_DISPATCH_MAX (2 * CUI_CORE_EVENT_MAX)
 #define CUI_CORE_HOVER_HITS_MAX 32
 typedef struct {
-    uint32_t clay_id;
+    uint32_t clay_id, semantic_index_plus_one;
     cui_id id;
     size_t parent, focus_scope;
     float requested_width, requested_height, requested_max_width, requested_max_height;
@@ -8558,8 +8558,9 @@ struct cui_context {
     cui_semantic *semantics, *previous;
     size_t semantic_count, previous_count;
     cui_core_hover_cache hover;
-    cui_id *ids, *activations;
-    size_t id_count, activation_count;
+    uint32_t *box_ids;
+    cui_id *activations;
+    size_t activation_count;
     cui_event queued[CUI_CORE_EVENT_MAX], events[CUI_CORE_DISPATCH_MAX];
     size_t queued_count, event_count;
     char *queued_text[CUI_CORE_EVENT_MAX], *frame_text[CUI_CORE_EVENT_MAX];
@@ -9076,7 +9077,7 @@ cui_context *cui_create(cui_config config) {
     ui->prepaint_deferred = calloc(config.max_commands, sizeof(*ui->prepaint_deferred));
     ui->semantics = calloc(config.max_elements, sizeof(*ui->semantics));
     ui->previous = calloc(config.max_elements, sizeof(*ui->previous));
-    ui->ids = calloc(config.max_elements, sizeof(*ui->ids));
+    ui->box_ids = calloc(2 * config.max_elements, sizeof(*ui->box_ids));
     ui->activations = calloc(CUI_CORE_EVENT_MAX, sizeof(*ui->activations));
     ui->semantic_scopes = calloc(config.max_elements, sizeof(*ui->semantic_scopes));
     ui->previous_semantic_scopes =
@@ -9102,7 +9103,7 @@ cui_context *cui_create(cui_config config) {
     ui->arena = malloc(n);
     if (!ui->prepaints || !ui->geometry || !ui->prepaint_commands || !ui->prepaint_deferred ||
         !ui->text_sources || !ui->resources || !ui->text_styles || !ui->commands ||
-        !ui->semantics || !ui->previous || !ui->ids || !ui->activations || !ui->semantic_scopes ||
+        !ui->semantics || !ui->previous || !ui->box_ids || !ui->activations || !ui->semantic_scopes ||
         !ui->previous_semantic_scopes || !ui->scroll_gestures || !ui->previous_scroll_gestures ||
         !ui->strings || !ui->nodes || !ui->semantic_nodes || !ui->previous_parents ||
         !ui->previous_hits || !ui->bounds_tracks || !ui->previous_layers || !ui->previous_order ||
@@ -9174,7 +9175,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->commands);
     free(ui->semantics);
     free(ui->previous);
-    free(ui->ids);
+    free(ui->box_ids);
     free(ui->activations);
     free(ui->strings);
     free(ui->clip_containers);
@@ -10575,8 +10576,9 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
     ui->focus_depth = ui->focus_scope_count = 0;
     ui->tab_depth = 0;
     ui->top_modal = SIZE_MAX;
-    ui->semantic_count = ui->id_count = ui->element_count = ui->scope_count = ui->depth =
-        ui->string_used = 0;
+    if (ui->element_count)
+        memset(ui->box_ids, 0, 2 * ui->config.max_elements * sizeof(*ui->box_ids));
+    ui->semantic_count = ui->element_count = ui->scope_count = ui->depth = ui->string_used = 0;
     ui->count = 0;
     cui_core_select_context(ui);
     Clay_SetLayoutDimensions((Clay_Dimensions){w, h});
@@ -10612,6 +10614,17 @@ static uint32_t cui_core_folded(cui_id id) {
     x ^= x >> 31;
     uint32_t out = (uint32_t)x ^ (uint32_t)(x >> 32);
     return out ? out : 1;
+}
+static uint32_t *cui_core_box_id_slot(cui_context *ui, uint32_t key) {
+    /* Only accepted named boxes insert nonzero keys. At most half the slots
+       can be occupied even when the frame reaches its element limit. */
+    size_t capacity = 2 * ui->config.max_elements;
+    size_t index = key % capacity;
+    while (ui->box_ids[index] && ui->box_ids[index] != key) {
+        if (++index == capacity)
+            index = 0;
+    }
+    return &ui->box_ids[index];
 }
 static Clay_SizingAxis cui_core_axis(float n) {
     if (n > 0)
@@ -10655,15 +10668,14 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     }
     bool ok = ui->element_count < ui->config.max_elements &&
               (ui->depth == 0 || ui->opened[ui->depth - 1]);
-    if (id)
-        for (size_t i = 0; i < ui->id_count; i++)
-            if (ui->ids[i] == id || cui_core_folded(ui->ids[i]) == cui_core_folded(id)) {
-                ui->ambiguous_box_ids = true;
-                cui_core_detail(ui, CUI_ERROR_DUPLICATE_ID, CUI_DIAGNOSTIC_DUPLICATE_ID, __func__,
-                                id, 0, 0, 0);
-                ok = false;
-                break;
-            }
+    uint32_t internal_id = id ? cui_core_folded(id) : 0;
+    uint32_t *slot = id ? cui_core_box_id_slot(ui, internal_id) : NULL;
+    if (slot && *slot) {
+        ui->ambiguous_box_ids = true;
+        cui_core_detail(ui, CUI_ERROR_DUPLICATE_ID, CUI_DIAGNOSTIC_DUPLICATE_ID, __func__, id, 0, 0,
+                        0);
+        ok = false;
+    }
     ui->opened[ui->depth++] = ok;
     if (!ok) {
         if (ui->element_count >= ui->config.max_elements)
@@ -10672,9 +10684,10 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
         return;
     }
     ui->element_count++;
-    if (id)
-        ui->ids[ui->id_count++] = id;
-    uint32_t internal_id = cui_core_folded(id ? id : (cui_id)(ui->element_count + 0x80000000u));
+    if (slot)
+        *slot = internal_id;
+    else
+        internal_id = cui_core_folded((cui_id)(ui->element_count + 0x80000000u));
     size_t parent = ui->depth > 1 ? ui->node_stack[ui->depth - 2] : SIZE_MAX;
     bool layout_only = b.layout_only || (parent != SIZE_MAX && ui->nodes[parent].layout_only);
     bool inert = layout_only || b.inert || (parent != SIZE_MAX && ui->nodes[parent].inert);
@@ -14211,6 +14224,11 @@ cui_core_commands_done:
             ui->numeric->masks[visible] = ui->numeric->masks[i];
         ui->semantics[visible] = ui->semantics[i];
         ui->semantic_scopes[visible] = ui->semantic_scopes[i];
+        /* Distinct semantic IDs can resolve to this same painted node.
+           The first matching semantic owns the node for ancestry. */
+        if (node != SIZE_MAX && ui->nodes[node].clay_id == folded &&
+            !ui->nodes[node].semantic_index_plus_one)
+            ui->nodes[node].semantic_index_plus_one = (uint32_t)(visible + 1);
         ui->semantic_nodes[visible++] = node;
     }
     ui->semantic_count = visible;
@@ -14256,14 +14274,11 @@ cui_core_commands_done:
         if (ancestor != SIZE_MAX)
             ancestor = ui->nodes[ancestor].parent;
         for (; ancestor != SIZE_MAX; ancestor = ui->nodes[ancestor].parent) {
-            for (size_t j = 0; j < ui->semantic_count; ++j)
-                if (ui->semantic_nodes[j] == ancestor &&
-                    cui_core_folded(ui->semantics[j].id) == ui->nodes[ancestor].clay_id) {
-                    ui->previous_parents[i] = j;
-                    break;
-                }
-            if (ui->previous_parents[i] != SIZE_MAX)
+            uint32_t index = ui->nodes[ancestor].semantic_index_plus_one;
+            if (index) {
+                ui->previous_parents[i] = index - 1;
                 break;
+            }
         }
         cui_rect clipped = s->bounds;
         for (size_t n = ui->semantic_nodes[i]; n != SIZE_MAX; n = ui->nodes[n].parent) {

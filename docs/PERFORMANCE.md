@@ -55,10 +55,30 @@ Subsequent queries reuse up to 32 overlapping semantic indices. More than
 focusable paint root is found across all overlaps. The cache uses 296 bytes
 per context on the measured 64-bit build and makes no heap allocations.
 
-Row submission still accounts for 36.585 ms of the median 4,000-row frame.
-Core still composes all submitted rows. Use a virtualized component for long
-lists when the layout permits it. See the separate native DataTable workload
-above for SDL rendering and presentation timings.
+### Box submission and semantic ancestry
+
+Using the same workload, the next change replaces repeated scans of submitted
+box IDs with a per-frame set keyed by the exact layout identity. Named boxes
+still reject duplicate and aliased IDs. While resolving the semantic snapshot,
+Core records the first matching semantic for each painted box. Parent lookup
+can then walk actual layout ancestors directly.
+
+| Rows | Submission before → after | End frame before → after | Whole frame before → after |
+| ---: | ---: | ---: | ---: |
+| 100 | .079 / .091 → .044 / .051 | .050 / .057 → .031 / .040 | .133 / .155 → .079 / .101 |
+| 1,000 | 2.585 / 2.738 → 1.119 / 1.143 | .815 / .865 → .310 / .329 | 3.425 / 3.605 → 1.440 / 1.486 |
+| 4,000 | 36.711 / 38.376 → 12.516 / 12.916 | 9.811 / 10.258 → 1.398 / 1.585 | 46.652 / 48.380 → 13.992 / 14.520 |
+
+These are separate before/after runs on the same host and settings. The box ID
+set uses the same eight bytes per configured element as the previous ID array.
+Core clears the set after a frame with boxes, so reset work scales with the
+configured element limit. The semantic owner field fits in existing box
+metadata padding on the measured 64-bit layout.
+
+Core still composes all submitted rows. The remaining CPU time and actual
+rendering time depend on widget count and content. Use a virtualized component
+for long lists when the layout permits it. The native DataTable workload above
+also includes SDL rendering and presentation.
 
 ```sh
 cmake --build build --target cui_bench_hover

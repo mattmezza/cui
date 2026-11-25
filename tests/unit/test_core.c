@@ -2622,6 +2622,25 @@ static void test_unpainted_semantic_does_not_own_ancestor(void) {
     }
     cui_destroy(ui);
 }
+static void test_painted_semantic_parent_alias_order(void) {
+    cui_context *ui = make();
+    /* Both semantics resolve to the same painted box. The nearest painted
+       ancestor uses the first matching semantic in submission order. */
+    const cui_id aliases[] = {76894, 86448};
+    for (size_t frame = 0; frame < 2; ++frame) {
+        begin(ui);
+        cui_interact(ui, aliases[frame], CUI_ROLE_GROUP, cui_string("First"), false, false, 0);
+        cui_interact(ui, aliases[1 - frame], CUI_ROLE_GROUP, cui_string("Second"), false, false, 0);
+        cui_begin_box(ui, aliases[0], (cui_box){.width = 80, .height = 40});
+        cui_begin_box(ui, 409, (cui_box){.width = 80, .height = 30});
+        cui_interact(ui, 409, CUI_ROLE_BUTTON, cui_string("Child"), false, false, 0);
+        cui_end_box(ui);
+        cui_end_box(ui);
+        (void)cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK && cui_semantic_parent(ui, 409) == aliases[frame]);
+    }
+    cui_destroy(ui);
+}
 static void test_pointer_click_metadata(void) {
     cui_context *ui = cui_create((cui_config){0});
     assert(ui);
@@ -3496,6 +3515,7 @@ int main(void) {
     test_metrics_revision();
     test_pointer_click_metadata();
     test_unpainted_semantic_does_not_own_ancestor();
+    test_painted_semantic_parent_alias_order();
     test_semantic_parent_query();
     test_touch_extreme_coordinates();
     test_touch_device_identity();

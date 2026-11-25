@@ -133,8 +133,56 @@ static void test_callback_boundaries(void) {
     assert(first.id == 88 && first.used == 1 && first.path_count == 0);
     cui_destroy(ui);
 }
+
+static void test_box_id_diagnostics(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 4});
+    assert(ui && cui_begin_frame(ui, 100, 100, 0));
+    const cui_box box = {.width = 20, .height = 20, .background = {20, 40, 60, 255}};
+
+    /* These IDs have distinct layout identities that start in the same slot
+       of an eight-entry table, at the end of the table. */
+    const cui_id separate[] = {20, 29, 0, 0};
+    for (size_t i = 0; i < sizeof(separate) / sizeof(separate[0]); ++i) {
+        cui_begin_box(ui, separate[i], box);
+        cui_end_box(ui);
+    }
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_begin_box(ui, 29, box);
+    cui_end_box(ui);
+    cui_diagnostic first, latest;
+    assert(cui_first_diagnostic(ui, &first) && first.detail == CUI_DIAGNOSTIC_DUPLICATE_ID);
+    assert(cui_latest_diagnostic(ui, &latest) && latest.detail == CUI_DIAGNOSTIC_ELEMENTS);
+    assert(first.id == 29 && latest.id == 29 && latest.used == 4 && latest.limit == 4);
+    assert(cui_end_frame(ui).count == 4);
+
+    cui_clear_error(ui);
+    assert(cui_begin_frame(ui, 100, 100, 0));
+    /* These distinct CUI IDs fold to exactly the same layout identity. */
+    cui_begin_box(ui, 76894, box);
+    cui_end_box(ui);
+    cui_begin_box(ui, 86448, box);
+    assert(cui_first_diagnostic(ui, &first) && first.detail == CUI_DIAGNOSTIC_DUPLICATE_ID);
+    assert(first.id == 86448 && first.frame_sequence == 2);
+    cui_clear_error(ui);
+    cui_begin_box(ui, 29, box); /* Suppressed beneath the rejected box. */
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_begin_box(ui, 29, box);
+    cui_end_box(ui);
+    assert(cui_last_error(ui) == CUI_OK && cui_end_frame(ui).count == 2);
+
+    assert(cui_begin_frame(ui, 100, 100, 0));
+    cui_begin_box(ui, 86448, box); /* Same layout identity in a new frame. */
+    cui_end_box(ui);
+    cui_begin_box(ui, 29, box); /* Reused ID also remains valid. */
+    cui_end_box(ui);
+    assert(cui_end_frame(ui).count == 2 && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_callback_boundaries();
+    test_box_id_diagnostics();
     cui_context *ui = make();
     cui_diagnostic first = {0}, latest = {0};
     assert(!cui_first_diagnostic(ui, &first));

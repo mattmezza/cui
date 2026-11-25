@@ -1,5 +1,8 @@
 """Validate owned native models and exact copied event payloads through Python."""
+import json
+import os
 import unittest
+from unittest.mock import patch
 import cui_bridge as c
 
 class Models(unittest.TestCase):
@@ -170,7 +173,6 @@ class Models(unittest.TestCase):
             chart.chart_data([['valid',2]]).chart_kind('pie');app.step()
 
     def test_data_table_exact_selection_and_sort_snapshots(self):
-        import json
         with c.App() as app:
             events=[];rows=[['Alex','95','A'],['Bob','87','B']]
             table=c.data_table('results').table_data(['Name','Score','Team'],rows).selection_mode('cell').visual_size(400,180).on_change(events.append);rows[0][0]='Changed'
@@ -183,6 +185,97 @@ class Models(unittest.TestCase):
             self.assertEqual(table.table_state()['sortColumn'],3)
             table.table_data(['Name','Score','Team'],[['Bob','87','B'],['Alex','95','A']]);app.step();self.assertEqual(table.current_cell(0,0),'Bob')
             table.disabled();app.step();events.clear();self.press(app,table.table_header_bounds(0));app.dispatch();self.assertEqual(events,[])
+
+    def test_keyed_data_table_retains_scroll_selection_and_focus(self):
+        headers = ["Subject", "Sender"]
+        rows = [[f"Message {index}", "Team"] for index in range(8)]
+        keys = [11, 22, 0xffffffff, 44, 55, 66, 77, 88]
+        original_keys = keys[:]
+        changes = []
+        table = (c.data_table("inbox").table_data(headers, rows, row_keys=keys)
+                 .visual_size(320, 160).selection_mode("cell").on_change(changes.append))
+        keys[2] = 999  # Mount must use the copied keys.
+        with c.App() as app:
+            self.assertTrue(app.supports_keyed_data_table())
+            app.mount(c.column("root").children(table))
+            app.step()
+            x, y, _, _ = table.table_cell_bounds(1, 0)
+            app.queue_scroll(x + 10, y + 10, 0, -1)
+            app.step()
+            anchored_y = table.table_cell_bounds(1, 0)[1]
+            self.assertEqual(anchored_y, y - 48)
+            selected_cell = table.table_cell_bounds(2, 1)
+            self.press(app, selected_cell)
+            app.dispatch()
+            self.assertEqual(table.table_state()["row"], 0xffffffff)
+            self.assertEqual(json.loads(changes.pop().text)["row"], 0xffffffff)
+
+            for invalid in ([0], [True], [-1], [2**32], [1.0], [], [1, 2]):
+                with self.subTest(keys=invalid), self.assertRaisesRegex(ValueError, "row_keys"):
+                    table.table_data(headers, rows[:1], row_keys=invalid)
+            with self.assertRaisesRegex(ValueError, "row_keys"):
+                table.table_data(headers, rows[:2], row_keys=[44, 44])
+            with self.assertRaisesRegex(ValueError, "128 UTF-8 bytes"):
+                table.table_data(headers, [["x" * 129, "Team"]], row_keys=[44])
+            self.assertEqual(table.table_state()["row"], 0xffffffff)
+            self.assertEqual(table.current_cell(2, 0), "Message 2")
+
+            table.table_data(headers, [["New message", "Owner"], *rows],
+                             row_keys=[9, *original_keys])
+            app.step()
+            self.assertEqual(table.table_cell_bounds(2, 0)[1], anchored_y)
+            self.assertEqual(table.table_cell_bounds(3, 1), selected_cell)
+            self.assertEqual(table.table_state()["row"], 0xffffffff)
+            app.dispatch()
+            self.assertEqual(changes, [])
+
+            app.queue_key("down", "down")
+            app.step()
+            app.dispatch()
+            self.assertEqual(table.table_state()["row"], 44)
+            self.assertEqual(json.loads(changes.pop().text)["row"], 44)
+
+            table.table_data(headers, [], row_keys=[])
+            app.step()
+            self.assertEqual(table.table_state()["row"], 0)
+            table.table_data(headers, rows)
+            app.step()
+            self.assertEqual(table.table_cell_bounds(1, 0)[1], y)
+            self.press(app, table.table_cell_bounds(1, 1))
+            self.assertEqual(table.table_state()["row"], 2)
+
+    def test_data_table_setter_is_optional_on_legacy_bridge(self):
+        def check(library):
+            with c.App(library=library, max_nodes=2) as app:
+                self.assertFalse(app.supports_keyed_data_table())
+                table = c.data_table("table").table_data(["File"], [["Keyed"]], row_keys=[7])
+                root = c.column("root").children(table)
+                with self.assertRaisesRegex(RuntimeError, "keyed DataTable.*unavailable"):
+                    app.mount(root)
+                self.assertEqual(table.current_cell(0, 0), "Keyed")
+                table.table_data(["File"], [["Legacy"]])
+                app.mount(root)
+                app.step()
+                with self.assertRaisesRegex(RuntimeError, "keyed DataTable.*unavailable"):
+                    table.table_data(["File"], [["Rejected"]], row_keys=[7])
+                self.assertEqual(table.current_cell(0, 0), "Legacy")
+                self.press(app, table.table_cell_bounds(0, 0))
+                self.assertEqual(table.table_state()["row"], 1)
+
+        library = os.environ.get("CUI_DATA_TABLE_LEGACY_LIBRARY")
+        if library:
+            check(library)
+            return
+        provider = c.C.CDLL(os.environ["CUI_BRIDGE_LIBRARY"])
+
+        class LegacyBridge:
+            def __getattr__(self, name):
+                if name == "cui_bridge_data_table_set_keyed":
+                    raise AttributeError(name)
+                return getattr(provider, name)
+
+        with patch.object(c.C, "CDLL", return_value=LegacyBridge()):
+            check(os.environ["CUI_BRIDGE_LIBRARY"])
 
     def test_command_native_filter_and_confirmation(self):
         with c.App() as app:

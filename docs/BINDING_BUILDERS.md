@@ -49,6 +49,9 @@ profile UI that replaces loading placeholders with content. See the
 [JavaScript and TypeScript](NODE_SKELETON.md), [Go](GO_SKELETON.md) and
 [Rust](RUST_SKELETON.md) examples use the same composition.
 
+The [live inbox example](#keep-a-python-datatables-scroll-position-during-updates)
+shows a keyed DataTable update from a callback.
+
 ```sh
 cmake -S bindings/bridge -B build-bridge -G Ninja
 cmake --build build-bridge --target cui_bridge test_bridge_core test_bridge_components
@@ -82,6 +85,52 @@ inside that rectangle, call `app.step()` and then `app.dispatch()`. The checked-
 [Python tests](../bindings/python/test_bridge.py) demonstrate this using actual
 CUI hit testing. Headless mode computes layout and draw commands; it does not
 paint a window or provide native font metrics.
+
+## Keep a Python DataTable's scroll position during updates
+
+Use the keyword argument `row_keys` when mounting and updating a DataTable.
+
+```python
+from cui_bridge import data_table
+
+headers = ["Subject", "Sender"]
+rows = [["Release notes", "Build team"], ["Design review", "Morgan"]]
+inbox = data_table("inbox").table_data(headers, rows, row_keys=[203, 204])
+
+# Call on the UI thread after mounting, for example from a dispatched callback.
+inbox.table_data(headers, [["New message", "Workspace"], *rows],
+                 row_keys=[301, 203, 204])
+```
+
+Assign each row a distinct integer key from 1 through 4,294,967,295. Reuse
+keys across replacements. The builder copies the matrix and keys. It keeps
+the first visible row and its intra-row offset where scroll bounds allow.
+Selection and keyboard focus follow surviving keys. `table_state()["row"]`
+and change notifications report the selected key. `current_cell(row, column)`
+and `table_cell_bounds(row, column)` take zero-based matrix indices.
+The limits are 32 rows, 16 columns, and 128 UTF-8 bytes per string.
+
+Use `app.supports_keyed_data_table()` to check the loaded provider. Older
+libraries accept `table_data(headers, rows)` with positional keys and reset
+behavior. An explicit keyed request on those libraries raises `RuntimeError`
+and leaves the previous table intact. Use `row_keys=[]` to submit an empty
+keyed table.
+
+Run the [complete inbox](../bindings/bridge/examples/data_table_live.py) from
+the repository root after [building the Python bridge](#python-build-and-launch).
+The default run opens no window and checks that the visible row stays in
+place after the Load latest button inserts two rows above it.
+
+```sh
+export CUI_BRIDGE_LIBRARY="$PWD/build-bridge/libcui_bridge.so"
+export PYTHONPATH="$PWD/bindings/python"
+python bindings/bridge/examples/data_table_live.py
+```
+
+For interactive SDL, provide an installed font using `--font /path/to/font.ttf`.
+This example applies local data from a callback. The retained bridge currently
+has no automatic load-more notification.
+
 
 ## JavaScript and TypeScript: build and launch
 
@@ -340,9 +389,10 @@ Chart copies `chart_data([["Label", value], ...])` and accepts
 cells; the first row is the header. DataTable copies `table_data(headers, rows)`
 and supports `selection_mode("row"|"column"|"cell")`. Its change event text is
 JSON containing `reason`, `row`, `column`, `sortColumn` and `sortDirection`.
-Indices are one-based, with zero meaning none. Sort events request an order;
-replace the matrix yourself to apply it. Plot copies `plot_points([[x,y], ...])`;
-its bridge subset draws dots and does not yet expose axes, pan/zoom or hit tests.
+The legacy setter assigns one-based row keys. Columns and sort columns are
+one-based, and zero means none. Sort events request an order. Replace the
+matrix to apply it. Plot copies `plot_points([[x,y], ...])` and draws dots.
+Axes, pan/zoom and hit tests are outside its current bridge subset.
 
 Command contains Item actions. `label` changes the native filter query;
 `current_text` and `selected` read it back. An Item's `detail` adds a filter

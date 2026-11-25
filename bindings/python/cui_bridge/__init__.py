@@ -12,7 +12,7 @@ import math
 import os
 from pathlib import Path
 from threading import current_thread
-from typing import Callable, ClassVar, Iterator, Literal
+from typing import Callable, ClassVar, Iterable, Iterator, Literal
 
 
 def _utf8(value: str, limit: int = 4096) -> bytes:
@@ -150,6 +150,13 @@ class _API:
         self.set_plot = bind("plot_set_points", C.c_int, C.c_void_p, _Handle, C.POINTER(_PlotPoint), C.c_uint32)
         self.get_plot = bind("plot_get_point", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.POINTER(_PlotPoint))
         self.set_matrix = bind("data_table_set", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_char_p), C.c_uint32, C.POINTER(C.c_char_p), C.c_uint32)
+        self.set_matrix_keyed = None
+        if hasattr(lib, "cui_bridge_data_table_set_keyed"):
+            self.set_matrix_keyed = bind(
+                "data_table_set_keyed", C.c_int, C.c_void_p, _Handle,
+                C.POINTER(C.c_char_p), C.c_uint32, C.POINTER(C.c_char_p),
+                C.POINTER(C.c_uint32), C.c_uint32,
+            )
         self.get_matrix_cell = bind("data_table_get_cell", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32))
         self.get_matrix_state = bind("data_table_get_state", C.c_int, C.c_void_p, _Handle, *([C.POINTER(C.c_uint32)]*4))
         self.matrix_cell_bounds = bind("data_table_cell_bounds", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.POINTER(_Rect))
@@ -1006,13 +1013,45 @@ class Widget:
             return self._plot_points[index]
         point=_PlotPoint();self._change("get_plot",index,C.byref(point));return point.x,point.y
 
-    def table_data(self, headers, rows) -> "Widget":
-        if self.kind != "data_table": raise ValueError("table_data requires DataTable")
-        headers=tuple(headers);rows=tuple(tuple(row) for row in rows)
-        if not 1<=len(headers)<=16 or len(rows)>32 or any(len(row)!=len(headers) for row in rows): raise ValueError("invalid matrix dimensions")
-        if any(len(_utf8(v))>128 for v in headers) or any(len(_utf8(v))>128 for row in rows for v in row): raise ValueError("table strings are limited to 128 UTF-8 bytes")
-        native_headers=(C.c_char_p*len(headers))(*[_utf8(v) for v in headers]);flat=[_utf8(v) for row in rows for v in row];native_cells=(C.c_char_p*len(flat))(*flat)
-        self._change("set_matrix",native_headers,len(headers),native_cells,len(rows));self._matrix=headers,rows;return self
+    def table_data(self, headers: Iterable[str], rows: Iterable[Iterable[str]], *,
+                   row_keys: Iterable[int] | None = None) -> "Widget":
+        """Copy a DataTable matrix and optionally preserve the viewport by row key.
+
+        Supply unique nonzero uint32 keys to retain position, selection and
+        keyboard navigation through updates. State and change events report
+        the selected key. Cell access still takes zero-based matrix indices.
+        Omitting keys resets retained table state as before.
+        """
+        if self.kind != "data_table":
+            raise ValueError("table_data requires DataTable")
+        headers = tuple(headers)
+        rows = tuple(tuple(row) for row in rows)
+        if not 1 <= len(headers) <= 16 or len(rows) > 32 or any(
+            len(row) != len(headers) for row in rows
+        ):
+            raise ValueError("invalid matrix dimensions")
+        keys = None if row_keys is None else tuple(row_keys)
+        if keys is not None:
+            if len(keys) != len(rows) or any(
+                isinstance(key, bool) or not isinstance(key, int) or not 0 < key <= 0xffffffff
+                for key in keys
+            ) or len(set(keys)) != len(keys):
+                raise ValueError("row_keys must contain one distinct nonzero uint32 per row")
+            if self._app is not None and not self._app.supports_keyed_data_table():
+                raise RuntimeError("keyed DataTable replacement is unavailable in this bridge")
+
+        encoded_headers = [_utf8(header, 128) for header in headers]
+        encoded_cells = [_utf8(cell, 128) for row in rows for cell in row]
+        native_headers = (C.c_char_p * len(headers))(*encoded_headers)
+        native_cells = (C.c_char_p * len(encoded_cells))(*encoded_cells)
+        if keys is None:
+            self._change("set_matrix", native_headers, len(headers), native_cells, len(rows))
+        else:
+            native_keys = (C.c_uint32 * len(keys))(*keys)
+            self._change("set_matrix_keyed", native_headers, len(headers), native_cells,
+                         native_keys, len(rows))
+        self._matrix = headers, rows, keys
+        return self
 
     def current_cell(self, row: int, column: int) -> str:
         if self.kind != "data_table" or any(isinstance(v,bool) or not isinstance(v,int) or not 0<=v<=0xffffffff for v in (row,column)): raise ValueError("invalid cell indices")
@@ -1468,6 +1507,11 @@ class App:
         if current_thread() is not self._creation_thread:
             raise RuntimeError("Icon and Badge App calls require the app's owner thread")
 
+    def supports_keyed_data_table(self) -> bool:
+        """Report whether the loaded bridge exports keyed DataTable replacement."""
+        self._ensure_open()
+        return self._api.set_matrix_keyed is not None
+
     def font_fallbacks(self, paths: list[str] | tuple[str, ...]) -> "App":
         """Replace the SDL font's owned ordered fallback chain (at most 32)."""
         self._ensure_open()
@@ -1574,7 +1618,9 @@ class App:
                 if node.kind == "plot": node.plot_points(node._plot_points)
                 if node.kind == "data_table": node._change("set_selection_mode",node._selection_mode)
                 if node.kind == "sidebar" and node._open_set: node._change("set_open",int(node._open))
-                if node.kind == "data_table" and node._matrix is not None: node.table_data(*node._matrix)
+                if node.kind == "data_table" and node._matrix is not None:
+                    headers, rows, keys = node._matrix
+                    node.table_data(headers, rows, row_keys=keys)
                 if node.kind == "text_view": node._change("set_text_format",node._text_format)
                 if node._question_flags is not None: node._change("question_config",*[int(v) for v in node._question_flags])
                 if node._panel_size is not None: node._change("set_value",node._panel_size)

@@ -361,7 +361,10 @@ of `cui_table_restore_row_anchor` to `state.scroll_y`. Pass the corresponding
 table options, including the effective scrollbar style. Selection stays keyed.
 See the **Live updates** gallery example and `docs/TABLE.md`. The retained C
 bridge offers `cui_bridge_data_table_set_keyed` for copied matrices up to 32 rows.
-See `docs/BRIDGE_COMPONENTS.md`. Foreign builders still use the legacy setter.
+See `docs/BRIDGE_COMPONENTS.md`. In Python, use `table_data(headers, rows,
+row_keys=keys)` after checking `app.supports_keyed_data_table()`. The runnable
+inbox in `bindings/bridge/examples/data_table_live.py` defaults to headless.
+JavaScript, TypeScript, Go and Rust use positional keys in their builders.
 For paging, use `result.load_more` with an app-owned in-flight flag and keep
 the current rows interactive. See **Paged inbox** and the paging guide in
 `docs/TABLE.md`.

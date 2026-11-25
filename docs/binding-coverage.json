@@ -946,7 +946,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The retained C bridge can replace a copied matrix by stable row keys without resetting the viewport. Python, JavaScript, TypeScript, Go and Rust still use the legacy setter and lack keyed replacement and paging notifications."
+        "Python supports keyed replacement on providers with cui_bridge_data_table_set_keyed. JavaScript, TypeScript, Go and Rust use positional keys. The retained bridge and bindings omit load-more notifications."
       ]
     },
     {

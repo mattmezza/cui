@@ -151,9 +151,9 @@ matrix. Step the bridge before reading the new layout bounds.
 
 The legacy `cui_bridge_data_table_set` uses keys 1 through row count and resets
 the retained table state. Switching to keyed updates can retain matching old
-keys. Python, JavaScript, TypeScript, Go and Rust still use the legacy setter in
-their DataTable builders. The keyed C bridge has no load-more event or
-network adapter.
+keys. [Python exposes keyed updates](BINDING_BUILDERS.md#keep-a-python-datatables-scroll-position-during-updates).
+JavaScript, TypeScript, Go and Rust use positional keys in their builders.
+The keyed C bridge has no load-more event or network adapter.
 
 The visual families above expose their documented default variants. Avatar is
 an initials avatar with no image source. Marker is a single text child; Shimmer

@@ -6541,18 +6541,21 @@
       "category": "layout",
       "base_behavior": [],
       "public_header": "include/cui/cui_chrome.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_chrome.c",
-        "tests/unit/test_sdl3.c"
+        "tests/unit/test_sdl3.c",
+        "tests/integration/test_sdl_titlebar.c",
+        "tests/web/test_example_polish.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
-        "linux_x11": "tested_partial"
+        "linux_x11": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Source geometry/gradient/window SVGs and mock-host pointer/keyboard routing tested. SDL decoration/query/close contracts tested on X11; minimize/maximize remain OS-asynchronous. Native drag/menu, macOS traffic-light placement/preferences and Windows control hit areas remain host integration gaps. Portable double-click thresholds substitute OS preferences; browser story pending."
+        "Source geometry, gradients, SVGs and mock-host routing tested. Private X11 checks live SDL decoration flags and injected Cocoa/dummy driver names. The WASM gallery simulates traffic lights. Native drag/menu, physical Cocoa placement/preferences and Windows control hit areas remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -6579,6 +6582,15 @@
           "evidence": [
             "tests/unit/test_chrome.c",
             "tests/unit/test_sdl3.c"
+          ]
+        },
+        {
+          "name": "SDL TitleBar decoration policy and browser traffic-light simulation",
+          "status": "tested",
+          "evidence": [
+            "tests/integration/test_sdl_titlebar.c",
+            "tests/web/test_example_polish.py",
+            "docs/CHROME.md"
           ]
         }
       ],

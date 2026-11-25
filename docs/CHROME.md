@@ -43,12 +43,17 @@ host window menu. The return value reports a performed action.
 
 The SDL adapter exposes `cui_sdl3_window_interface` and
 `cui_sdl3_set_decorated`. Window close requests stop the next poll without
-invalidating the current frame. Native drivers expose minimize/maximize/restore;
-window managers may complete these asynchronously. Dummy/offscreen hosts expose
-close only. Decoration changes return false when unsupported. Non-macOS native
-hosts map title-bar double-click to maximize/restore. These service contracts,
-unsupported actions and decoration flags run in the SDL tests, including X11;
-portable mock-host tests cover the complete pointer/keyboard routing and paint.
+invalidating the current frame. A decorated Cocoa window reports native
+traffic lights. Borderless windows report client decorations, so the CUI
+TitleBar shows the available window controls and uses the ordinary title
+inset. Dummy/offscreen hosts expose only close. Native minimize, maximize and
+restore may complete asynchronously. Non-Cocoa native hosts map title-bar
+double-click to maximize/restore. The X11 test uses live SDL window flags and
+injects the driver name for Cocoa and dummy cases. It checks title position
+and control presence as decoration changes.
+
+In the gallery, select **Native traffic lights** and clear **Fullscreen** to
+try the simulated controls. They change the preview's window state.
 
 Remaining TitleBar gaps: SDL does not expose drag initiation or a system-window
 menu through this bridge; a host can provide those callbacks. macOS traffic-light
@@ -56,5 +61,4 @@ placement and system double-click preferences, Windows native hit-test control
 areas, and window-manager-specific capabilities are not fully integrated. The
 close override is portable rather than Linux-only. Custom box style replaces the
 outer source style rather than implementing arbitrary incremental refinements.
-Actual native window-manager behavior and browser story still need broader audit;
-this is tested partial support, not full platform parity.
+Physical Cocoa traffic lights and platform window-manager behavior remain open.

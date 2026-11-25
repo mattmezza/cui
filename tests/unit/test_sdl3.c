@@ -514,6 +514,10 @@ int main(int argc, char **argv) {
     const char *driver = cui_sdl3_video_driver();
     if (driver && (!strcmp(driver, "dummy") || !strcmp(driver, "offscreen")))
         assert(info.actions == (1u << CUI_WINDOW_CLOSE));
+    cui_window_decoration decorated_mode = driver && !strcmp(driver, "cocoa")
+                                               ? CUI_WINDOW_NATIVE_TRAFFIC_LIGHTS
+                                               : CUI_WINDOW_SERVER_DECORATED;
+    assert(info.decoration == decorated_mode);
     bool decorated = cui_sdl3_set_decorated(s, false);
     if (driver && (!strcmp(driver, "dummy") || !strcmp(driver, "offscreen")))
         assert(!decorated);
@@ -521,10 +525,9 @@ int main(int argc, char **argv) {
         assert(decorated);
     if (decorated) {
         info = window.query(window.user);
-#ifndef SDL_PLATFORM_MACOS
         assert(info.decoration == CUI_WINDOW_CLIENT_DECORATED);
-#endif
         assert(cui_sdl3_set_decorated(s, true));
+        assert(window.query(window.user).decoration == decorated_mode);
     }
     assert(cui_sdl3_frame_delta(NULL) == 0);
     assert(cui_sdl3_frame_delta(s) == 0);

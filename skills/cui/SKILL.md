@@ -328,6 +328,9 @@ SDL3 support Shift-wheel for horizontal scrolling. See
 `docs/TABS_SCROLL_CHAINING.md` for input ownership and host limitations.
 Set `reveal_selected` to scroll newly selected tabs into view, including
 keyboard and touch selection from the optional overflow menu.
+Use the SDL window interface for TitleBar. Decorated Cocoa windows report
+native traffic lights, and borderless windows use client controls. Read
+`docs/CHROME.md` for available actions.
 For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots alive
 through frame completion and ensure the container fits the panels' combined
 min/max range. A pane at its constraint cannot move farther in that direction.

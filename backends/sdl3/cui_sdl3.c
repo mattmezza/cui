@@ -1417,23 +1417,22 @@ static cui_window_info cui_sdl3_window_query(void *user) {
     if (!s || !s->window)
         return (cui_window_info){0};
     SDL_WindowFlags flags = SDL_GetWindowFlags(s->window);
-    cui_window_info info = {.decoration = (flags & SDL_WINDOW_BORDERLESS)
-                                              ? CUI_WINDOW_CLIENT_DECORATED
-                                              : CUI_WINDOW_SERVER_DECORATED,
+    const char *driver = SDL_GetCurrentVideoDriver();
+    bool cocoa = driver && !strcmp(driver, "cocoa");
+    cui_window_decoration decoration =
+        cocoa ? CUI_WINDOW_NATIVE_TRAFFIC_LIGHTS : CUI_WINDOW_SERVER_DECORATED;
+    if (flags & SDL_WINDOW_BORDERLESS)
+        decoration = CUI_WINDOW_CLIENT_DECORATED;
+    cui_window_info info = {.decoration = decoration,
                             .actions = 1u << CUI_WINDOW_CLOSE,
                             .maximized = (flags & SDL_WINDOW_MAXIMIZED) != 0,
                             .fullscreen = (flags & SDL_WINDOW_FULLSCREEN) != 0};
-#ifdef SDL_PLATFORM_MACOS
-    info.decoration = CUI_WINDOW_NATIVE_TRAFFIC_LIGHTS;
-#endif
-    const char *driver = SDL_GetCurrentVideoDriver();
     if (driver && strcmp(driver, "dummy") && strcmp(driver, "offscreen")) {
         info.actions |= 1u << CUI_WINDOW_MINIMIZE;
         if (flags & SDL_WINDOW_RESIZABLE) {
             info.actions |= (1u << CUI_WINDOW_MAXIMIZE) | (1u << CUI_WINDOW_RESTORE);
-#ifndef SDL_PLATFORM_MACOS
-            info.actions |= 1u << CUI_WINDOW_TITLEBAR_DOUBLE_CLICK;
-#endif
+            if (!cocoa)
+                info.actions |= 1u << CUI_WINDOW_TITLEBAR_DOUBLE_CLICK;
         }
     }
     return info;

@@ -2210,7 +2210,7 @@
       ],
       "state_ownership": "Caller retains cui_title_bar_state and window interface binding.",
       "interaction": "on_close callback handles application close; window host functions implement native window behavior.",
-      "usage": "Submit current window information each frame; keep host/user pointers valid during calls.",
+      "usage": "Provide cui_sdl3_window_interface or an equivalent host. Decorated Cocoa windows use native traffic lights; SDL borderless windows use client controls. Keep host/user pointers valid during calls.",
       "docs": [
         "docs/CHROME.md"
       ],

@@ -235,7 +235,8 @@ capability and may reject a request; host errors are displayed explicitly.
 Mute follows the browser media element's confirmed `muted` flag. The slider is
 available when the host can write `volume`. Native hosts supply their own audio
 output. The [optional FFV1/PCM example](../examples/video_player_audio/README.md)
-uses FFmpeg and SDL audio. Safari and physical audio output remain unverified.
+uses FFmpeg and applies these requests to SDL stream gain. Safari and physical
+audio output remain unverified.
 
 The host chooses VP8 WebM or H.264 MP4 using `canPlayType`, with the alternate
 encoding available if decoding fails. It fetches at most 512 KiB into a Blob so

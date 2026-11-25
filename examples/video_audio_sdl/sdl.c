@@ -48,6 +48,11 @@ static bool resume_device(void *u) {
 static bool clear(void *u) {
     return SDL_ClearAudioStream(((backend *)u)->stream);
 }
+static bool set_gain(void *u, float gain) {
+    backend *b = u;
+    return !atomic_load(&b->invalid) && SDL_SetAudioStreamGain(b->stream, gain) &&
+           SDL_GetAudioStreamGain(b->stream) == gain && !atomic_load(&b->invalid);
+}
 static void close_backend(void *u) {
     backend *b = u;
     /* Pinned SDL3.4.18 dispatch and remove share watcher-list mutex. Owner-only
@@ -80,8 +85,8 @@ video_sdl_output *video_sdl_open(size_t max, size_t chunk) {
         return NULL;
     }
     b->watching = true;
-    video_sdl_backend ops = {lock,         unlock,        format, queued,        put,
-                             pause_device, resume_device, clear,  close_backend, b};
+    video_sdl_backend ops = {lock,          unlock, format,        queued, put,     pause_device,
+                             resume_device, clear,  close_backend, b,      set_gain};
     video_sdl_output *s = video_sdl_create(ops, max, chunk);
     if (!s)
         close_backend(b);

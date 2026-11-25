@@ -6,8 +6,8 @@
 typedef struct video_sound_session video_sound_session;
 typedef struct {
     uint64_t generation, position_frames;
-    double duration;
-    bool ready, seeking, playing, ended, failed;
+    double duration, volume;
+    bool ready, seeking, playing, ended, failed, muted;
     const char *error; /* static text */
 } video_sound_status;
 /* Example-private service seam. NULL functions use actual production services.
@@ -29,6 +29,8 @@ video_sound_status video_sound_snapshot(video_sound_session *);
  * false until both workers/preview are ready and output actually starts. */
 bool video_sound_play(video_sound_session *, bool);
 bool video_sound_seek(video_sound_session *, double seconds);
+/* Apply normalized gain and independent mute to the current SDL audio stream. */
+bool video_sound_set_audio(video_sound_session *, bool muted, double volume);
 /* Borrowed until next poll/successful close. Seek does NOT free a frame borrowed
  * earlier in the same UI composition; renderer must finish before next poll.
  * Paused future preview is visible; playing hides it until mixer clock is due. */

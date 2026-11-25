@@ -1,9 +1,9 @@
 # Optional SDL software-drain output proof
 
-This standalone transport supplies `video_audio_output` to the unchanged audio
-controller. It is not hooked to the video UI or FFmpeg service. Its clock is
-**SDL software-mixer input consumption**, not a DAC, backend-accepted, hardware
-presentation or acoustic clock. Native video sound support remains unimplemented.
+This transport supplies `video_audio_output` to the audio controller. The
+[FFV1/PCM player](../video_player_audio/README.md) connects it to FFmpeg and
+the CUI controls. Its clock measures **SDL software-mixer input consumption**.
+Hardware presentation and acoustic timing require separate measurements.
 
 ```sh
 cmake -S examples/video_audio_sdl -B build-audio-sdl -G Ninja
@@ -26,6 +26,12 @@ regularly while playing. Pump/snapshot/lifecycle are owner-thread only. Controll
 decode remains on its own bounded worker. SDL receives **NULL callbacks and NULL
 userdata**: no OS callback captures a controller, sink or application pointer.
 No callback detach race or retired callback leases exist in this design.
+
+`video_sdl_set_gain` applies a normalized value on the owner thread. SDL
+synchronizes its stream gain internally and the backend checks the reported
+gain. The request leaves the PCM queue and drain ledger intact. A device
+invalidation, a faulted output, or an unsupported gain operation rejects the
+request.
 
 Each pump locks the private stream, validates both stream formats (48 kHz,
 native-endian F32, stereo) and unity frequency ratio, queries remaining input

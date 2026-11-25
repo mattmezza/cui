@@ -20,6 +20,7 @@ typedef struct {
     bool (*clear)(void *);
     void (*close)(void *);
     void *user;
+    bool (*set_gain)(void *, float); /* Optional. Owns its own backend synchronization. */
 } video_sdl_backend;
 typedef struct {
     uint64_t submitted_frames, drained_frames;
@@ -35,6 +36,8 @@ video_sdl_output *video_sdl_create(video_sdl_backend, size_t max_frames, size_t 
  * without SDL_AUDIODRIVER=dummy. No SDL types escape this header. */
 video_sdl_output *video_sdl_open(size_t max_frames, size_t chunk_frames);
 video_audio_output video_sdl_interface(video_sdl_output *);
+/* Owner-thread only. Gain changes leave the PCM queue and clock intact. */
+bool video_sdl_set_gain(video_sdl_output *, float gain);
 /* Owner thread only, including snapshot/destroy. Poll each host iteration;
  * reconcile software mixer drain then submit at most one bounded chunk.
  * false faults transport: owner must seek/discard before restarting.

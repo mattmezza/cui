@@ -57,9 +57,16 @@ build-video-sound/video_player_audio third_party/inter/Inter-Regular.otf build-v
 That command is for manual use; automated agents/tests do not launch it. No
 physical listening test was performed during implementation. Use the existing
 font file or supply another valid font path. This example has play/pause,
-committed seek/skip and replay, responsive layout and visible failures. Unsupported
+committed seek/skip, mute, volume and replay. Unsupported
 media/output does not silently switch to successful silent playback. Device
 invalidation or a partially accepted seek requires closing/reopening the example.
+
+The CUI bar queues up to 32 typed requests during composition. The owner applies
+the batch after rendering and checks each request's source and generation.
+It publishes mute and volume after SDL accepts and confirms stream gain.
+Muting sets SDL gain to zero while preserving the chosen volume. Unmuting
+restores that volume. Changing volume while muted keeps the stream silent.
+Gain changes leave queued PCM, seek generation and media position intact.
 
 For an explicitly chosen local clip, a manual FFmpeg conversion can produce the
 supported codec profile (larger, lossless files; first8s only):

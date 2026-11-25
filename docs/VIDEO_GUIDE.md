@@ -33,7 +33,7 @@ The separate [native video with PCM sound example](../examples/video_player_audi
 connects both workers and the SDL output to a real CUI VideoPlayer UI. Its initial
 supported profile is immutable local Matroska with FFV1 video and PCM audio,
 known zero container origin and duration at most 10 seconds. It offers play,
-pause, seek, skip and replay, and selects decoded video frames against observed
+pause, seek, skip, mute, gain and replay. It selects decoded video frames against observed
 SDL software-mixer consumption. It does not claim a physical DAC clock or
 speaker-level synchronization. Native fullscreen, rate controls, general
 MP4/AAC/Opus playback and actual device hotplug recovery remain unsupported in

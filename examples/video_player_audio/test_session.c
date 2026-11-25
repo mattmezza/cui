@@ -2,6 +2,7 @@
 #include "session.h"
 #include <SDL3/SDL.h>
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <threads.h>
@@ -121,6 +122,12 @@ int main(int argc, char **argv) {
         }
         CHECK(video_sound_play(s, false));
         uint64_t at = video_sound_snapshot(s).position_frames;
+        CHECK(video_sound_snapshot(s).volume == 1 && !video_sound_snapshot(s).muted);
+        CHECK(video_sound_set_audio(s, true, .5));
+        CHECK(video_sound_set_audio(s, true, .25));
+        CHECK(!video_sound_set_audio(s, false, NAN));
+        CHECK(!video_sound_set_audio(s, false, 1.1));
+        CHECK(video_sound_snapshot(s).volume == .25 && video_sound_snapshot(s).muted);
         const cui_video_player_frame *f = video_sound_frame(s);
         CHECK(f);
         const unsigned char *pixels = f->frame.bitmap.pixels;
@@ -139,6 +146,8 @@ int main(int argc, char **argv) {
         CHECK(f);
         CHECK(f->frame.timestamp >= 1.25);
         CHECK(tick(s).position_frames == 60000);
+        CHECK(video_sound_snapshot(s).volume == .25 && video_sound_snapshot(s).muted);
+        CHECK(video_sound_set_audio(s, false, .25));
         CHECK(video_sound_play(s, true));
         tick(s);
         f = video_sound_frame(s);
@@ -187,6 +196,8 @@ int main(int argc, char **argv) {
         event.type = SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED;
         event.adevice.recording = false;
         CHECK(SDL_PushEvent(&event));
+        CHECK(!video_sound_set_audio(s, true, .5));
+        CHECK(video_sound_snapshot(s).volume == 1 && !video_sound_snapshot(s).muted);
         CHECK(!video_sound_poll(s));
         CHECK(video_sound_snapshot(s).failed);
         CHECK(video_sound_snapshot(s).position_frames == position);

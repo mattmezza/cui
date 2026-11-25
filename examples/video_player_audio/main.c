@@ -13,14 +13,23 @@ typedef struct {
     video_sound_session *session;
     cui_video_view view;
     cui_video_controls_state controls;
+    cui_video_audio_state audio_controls;
+    cui_video_request requests[32];
+    size_t request_count;
     const char *captures, *media_path;
     unsigned stage, paused_frames;
     uint64_t paused_position, paused_revision;
     Uint64 started;
-    bool printed_error, audio_initialized;
+    bool printed_error, audio_initialized, request_overflow;
 } application;
 static void requested(void *u, const cui_video_request *r) {
     application *a = u;
+    if (a->request_count < sizeof a->requests / sizeof a->requests[0])
+        a->requests[a->request_count++] = *r;
+    else
+        a->request_overflow = true;
+}
+static void apply_request(application *a, const cui_video_request *r) {
     video_sound_status s = video_sound_snapshot(a->session);
     if (s.failed || r->source_id != 1 || r->generation != s.generation)
         return;
@@ -32,12 +41,32 @@ static void requested(void *u, const cui_video_request *r) {
         double target = r->kind == CUI_VIDEO_SKIP ? s.position_frames / 48000.0 + r->value.seconds
                                                   : r->value.seconds;
         ok = video_sound_seek(a->session, target);
-    }
+    } else if (r->kind == CUI_VIDEO_MUTE)
+        ok = video_sound_set_audio(a->session, r->value.enabled, s.volume);
+    else if (r->kind == CUI_VIDEO_VOLUME)
+        ok = video_sound_set_audio(a->session, s.muted, r->value.volume);
     if (!ok)
         fprintf(stderr, "Playback request failed: %s\n",
                 video_sound_snapshot(a->session).error ? video_sound_snapshot(a->session).error
                                                        : "unavailable");
     cui_invalidate(a->ui);
+}
+static void drain_requests(application *a) {
+    if (a->request_overflow)
+        fputs("Playback request limit: entire batch rejected\n", stderr);
+    else
+        for (size_t i = 0; i < a->request_count; ++i)
+            apply_request(a, &a->requests[i]);
+    a->request_count = 0;
+    a->request_overflow = false;
+}
+static cui_id control_id(cui_context *ui, const char *label) {
+    size_t count, length = strlen(label);
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (semantics[i].name.length == length && !memcmp(semantics[i].name.data, label, length))
+            return semantics[i].id;
+    return 0;
 }
 static bool initialize(void *u, int argc, char **argv, cui_sdl3 **host, cui_context **ui) {
     application *a = u;
@@ -154,20 +183,21 @@ static int iterate(void *u, cui_sdl3 *host, cui_context *ui) {
     if (!cui_begin_frame(ui, width, height, .016f))
         return failed(a, __LINE__);
     cui_theme theme = cui_theme_dark();
-    cui_video_controls_options options = cui_video_controls_defaults();
-    options.width = fmaxf(160, width);
-    options.on_request = requested;
-    options.user = a;
-    bool ok =
-        cui_video_player(ui, 40, &theme, &a->controls, a->view, frame,
-                         (cui_video_player_options){
-                             .surface = {.geometry = {.width = width,
-                                                      .height = fmaxf(1, height - 130),
-                                                      .fit = CUI_IMAGE_CONTAIN},
-                                         .opacity = 1,
-                                         .description = cui_string("Decoded video with PCM sound")},
-                             .controls = true,
-                             .controls_options = options});
+    cui_video_player_options options = cui_video_player_defaults();
+    float chrome = width >= 370 ? 130 : width >= 218 ? 180 : 225;
+    options.surface.geometry.width = width;
+    options.surface.geometry.height = fmaxf(1, height - chrome);
+    options.surface.description = cui_string("Decoded video with PCM sound");
+    options.controls_options.width = fmaxf(160, width);
+    options.controls_options.visible &= ~(unsigned)CUI_VIDEO_CONTROL_FULLSCREEN;
+    options.controls_options.on_request = requested;
+    options.controls_options.user = a;
+    cui_video_audio_view confirmed_audio = {.capabilities = CUI_VIDEO_AUDIO_CAP_MUTE |
+                                                            CUI_VIDEO_AUDIO_CAP_VOLUME,
+                                            .muted = s.muted,
+                                            .volume = s.volume};
+    bool ok = cui_video_player_with_audio(ui, 40, &theme, &a->controls, a->view, frame, options,
+                                          &confirmed_audio, &a->audio_controls);
     cui_draw_list list = cui_end_frame(ui);
     char capture[4096];
     const char *path = NULL;
@@ -186,6 +216,7 @@ static int iterate(void *u, cui_sdl3 *host, cui_context *ui) {
     if (!ok || cui_last_error(ui) != CUI_OK ||
         !cui_sdl3_render_capture(host, &list, theme.background, path))
         return failed(a, __LINE__);
+    drain_requests(a);
     if (a->captures && frame) {
         if (a->stage == 0) {
             a->stage = 1;
@@ -201,13 +232,40 @@ static int iterate(void *u, cui_sdl3 *host, cui_context *ui) {
             if (s.position_frames != a->paused_position ||
                 frame->frame.bitmap.revision != a->paused_revision)
                 return failed(a, __LINE__);
-            if (++a->paused_frames == 4) {
+            video_sound_status audio = video_sound_snapshot(a->session);
+            switch (++a->paused_frames) {
+            case 1:
+                if (!cui_queue_accessibility_action(ui, control_id(ui, "Mute"),
+                                                    CUI_ACCESSIBILITY_ACTIVATE))
+                    return failed(a, __LINE__);
+                break;
+            case 2: {
+                cui_id volume = control_id(ui, "Volume");
+                if (!volume || !audio.muted || audio.volume != 1)
+                    return failed(a, __LINE__);
+                cui_focus(ui, volume);
+                if (!cui_queue_event(ui,
+                                     (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_LEFT}))
+                    return failed(a, __LINE__);
+                break;
+            }
+            case 3:
+                if (!audio.muted || fabs(audio.volume - .95) > 1e-9 ||
+                    !cui_queue_accessibility_action(ui, control_id(ui, "Unmute"),
+                                                    CUI_ACCESSIBILITY_ACTIVATE))
+                    return failed(a, __LINE__);
+                break;
+            case 4:
+                if (audio.muted || fabs(audio.volume - .95) > 1e-9)
+                    return failed(a, __LINE__);
                 if (!video_sound_seek(a->session, 1.25))
                     return failed(a, __LINE__);
                 a->stage = 3;
+                break;
             }
         } else if (a->stage == 3 && !s.seeking) {
-            if (s.generation != 2 || s.position_frames != 60000 || frame->frame.timestamp < 1.25)
+            if (s.generation != 2 || s.position_frames != 60000 || frame->frame.timestamp < 1.25 ||
+                s.muted || fabs(s.volume - .95) > 1e-9)
                 return failed(a, __LINE__);
             a->stage = 4;
             if (!video_sound_play(a->session, true))
@@ -216,7 +274,7 @@ static int iterate(void *u, cui_sdl3 *host, cui_context *ui) {
             if (s.position_frames != 96000)
                 return failed(a, __LINE__);
             printf("PASS: presented real decoded red/pause/blue, PCM dummy mixer EOF96000, seek "
-                   "target60000 retained\n");
+                   "target60000 retained, mute/volume/unmute confirmed\n");
             return 1;
         }
     }

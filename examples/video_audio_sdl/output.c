@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "output.h"
 #include <float.h>
+#include <math.h>
 #include <stdlib.h>
 _Static_assert(sizeof(float) == 4 && FLT_RADIX == 2 && FLT_MANT_DIG == 24,
                "F32 PCM requires binary32 float");
@@ -137,6 +138,10 @@ bad:
 }
 video_audio_output video_sdl_interface(video_sdl_output *s) {
     return (video_audio_output){start, stop, s};
+}
+bool video_sdl_set_gain(video_sdl_output *s, float gain) {
+    return s && owner(s) && !s->faulted && isfinite(gain) && gain >= 0 && gain <= 1 &&
+           s->b.set_gain && s->b.set_gain(s->b.user, gain);
 }
 bool video_sdl_pump(video_sdl_output *s) {
     if (!owner(s) || s->faulted)

@@ -42,6 +42,7 @@ video_sound_session *video_sound_open(const char *path, video_sound_hooks hooks)
     s->owner = thrd_current();
     s->hooks = hooks;
     s->status.generation = 1;
+    s->status.volume = 1;
     s->audio_generation = 1;
     s->decoder = video_ffmpeg_create(path, (video_ffmpeg_limits){0});
     if (!s->decoder) {
@@ -108,6 +109,14 @@ bool video_sound_seek(video_sound_session *s, double seconds) {
     s->status.playing = false;
     s->status.ended = false;
     s->discard_frame = true;
+    return true;
+}
+bool video_sound_set_audio(video_sound_session *s, bool muted, double volume) {
+    if (!s || !owner(s) || s->closing || s->status.failed || !isfinite(volume) || volume < 0 ||
+        volume > 1 || !video_sdl_set_gain(s->output, muted ? 0 : (float)volume))
+        return false;
+    s->status.muted = muted;
+    s->status.volume = volume;
     return true;
 }
 bool video_sound_poll(video_sound_session *s) {

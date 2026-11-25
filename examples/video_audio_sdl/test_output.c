@@ -81,8 +81,8 @@ static void close_fake(void *u) {
     f->closed = true;
 }
 static video_sdl_backend backend(fake *f) {
-    return (video_sdl_backend){lock,       unlock,      format, queued,     put,
-                               pause_fake, resume_fake, clear,  close_fake, f};
+    return (video_sdl_backend){lock,        unlock, format,     queued, put, pause_fake,
+                               resume_fake, clear,  close_fake, f,      NULL};
 }
 typedef struct {
     uint64_t at;

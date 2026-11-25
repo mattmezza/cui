@@ -244,3 +244,45 @@ the editable node's AX value text from its native input buffer, even when
 the host supplies an explicit `aria-valuetext`. The authored attribute still
 carries the localized segment token, and the numeric value and full-time
 description continue to describe committed state during preedit.
+
+## Delegated segment focus checkpoint
+
+The desktop accessibility tree can identify a TimeField segment, but the
+segment's public focus capability is currently false. A segment cannot
+become Core focus without changing Tab order and leaving the ordered
+reducer. Programmatic focus on the whole field resumes the prior segment.
+A pointer event would change selection but would misrepresent the input
+producer and could activate an overlapping control.
+
+Extend the existing ordered participant with an optional internal segment
+selection operation. Keep the application and host APIs for focus. In a
+successfully completed snapshot, a passive spinbutton can offer Focus if it
+delegates to its own visible, enabled, published ordered time-input root
+in the current modal scope. This capability does not add a Tab stop or
+change direct `cui_focus`, generic focus proxies or ordinary TimeField.
+
+On dispatch, the current admitted participant must recognize the requested
+segment under its current options. Move logical focus to the root and
+select the segment before routing subsequent input. Preserve the original
+segment as the accessibility event target. A request for the already
+selected segment keeps the current edit and composition. A change of
+segment clears the draft and invalidates any qualified event for the old
+IME session. Read-only fields accept Focus and preserve their values.
+Focus neither supplies a value nor emits activation or a change callback.
+
+Revalidate against submitted semantics, scope and published roots at frame
+end. Withdraw the receipt for a target omitted by late layout. An omitted
+root discards its staged edit and cannot retain focus. When the root is
+still published, a late layout omission of one child leaves the already
+routed logical focus on the root. Admission or publication cannot rewind
+later events. Native publication projects the active root's focus onto its
+selected eligible child. The gallery forwards DOM focus on its mirror as
+a real accessibility request and transfers DOM focus to the active text
+proxy using the ordinary IME handoff.
+
+Platform value actions remain independent. Advertising Focus does not
+advertise Activate, SetValue, Increment or Decrement. This extends an
+existing ordered dispatch case without a new public dispatch mechanism.
+Verify same-batch physical keys, selection transitions and stale IME, both
+Tab directions, disabled/read-only/omitted cases, the Linux AT-SPI action,
+and the browser's accessibility projection and ordinary input behavior.

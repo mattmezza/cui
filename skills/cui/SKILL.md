@@ -326,6 +326,8 @@ containment fix as complete responsive text-input behavior.
 For bounded Tabs, retain scroll state and set `bar_extent`. The gallery and
 SDL3 support Shift-wheel for horizontal scrolling. See
 `docs/TABS_SCROLL_CHAINING.md` for input ownership and host limitations.
+Set `reveal_selected` to scroll newly selected tabs into view, including
+keyboard and touch selection from the optional overflow menu.
 For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots alive
 through frame completion and ensure the container fits the panels' combined
 min/max range. A pane at its constraint cannot move farther in that direction.

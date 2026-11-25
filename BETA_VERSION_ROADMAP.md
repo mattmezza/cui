@@ -101,7 +101,7 @@ Verify reported regressions against the current gallery as each slice lands.
 | Order | Components | Concrete outcome |
 | --- | --- | --- |
 | 1 | Icon, Badge, Skeleton | Publish the verified configured Icon/Badge builders and responsive Skeleton demos with the next release. |
-| 2 | Sidebar, Resizable, Tabs, TitleBar | Private X11 verifies the responsive starter, bounded Tabs Shift-wheel and pane movement during mouse, keyboard and touch resize through SDL. The gallery already simulates traffic lights. Verify keyboard/touch tab overflow, physical input and native title-bar controls. |
+| 2 | Sidebar, Resizable, Tabs, TitleBar | Private X11 verifies the responsive starter, bounded Tabs Shift-wheel and overflow selection by keyboard and injected touch, plus SDL divider movement. The gallery simulates traffic lights. Verify physical input and native title-bar controls. |
 | 3 | DataTable, Table, VirtualList | Exercise a long inbox or work queue with responsive row hover, consistent wheel/touch scrolling and real sorting. Verify that visible rows stay bounded and that header/alternate row styles compose with selection. |
 | 4 | Video, VideoPlayer | Verify seek artwork, video-only fullscreen and audio in the gallery. Add mute/volume to the reusable controls and document one reproducible native audio provider example. |
 | 5 | Dialog, Popover, HoverCard, Select, Combobox, Command | Prevent held-input Dialog reopening. Verify appropriate dismissal and focus restoration, viewport-aware overlays, and menu/result widths at desktop and touch sizes. |

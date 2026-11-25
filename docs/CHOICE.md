@@ -71,12 +71,9 @@ Labels are frame-copied by the core, and callbacks must not retain draw-list str
 
 `tests/unit/test_choice.c` covers actual pointer activation, keyboard modes,
 orientation, wrapping, disabled controls, ID-stable reorder, invalid selection,
-toggle selection rules, and all five tab variants in all four themes. This is a
-portable C11 vertical slice. GPUI Kit's overflow menu, drag reordering, built-in
-close-button policy, maximum label width/ellipsis,
-and gallery stories remain pending. Composing those controls beside this tab list
-is possible, but is not claimed as equivalent built-in support. Full family parity
-is not yet verified.
+toggle selection rules, and all five tab variants in all four themes. The
+sections below cover the optional overflow menu, label width caps and drag
+requests. Applications compose their own close control and removal policy.
 
 ## List, Select and Menu
 
@@ -418,7 +415,9 @@ IDs and application-owned scratch `cui_menu_entry` storage with capacity at leas
 the tab count. Set its popup options and pass its address as `overflow` alongside
 a bounded scroll viewport. The fixed menu trigger appears when content exceeds
 `bar_extent`. It lists every full label, skips disabled tabs and changes the
-stable selected ID before tab painting and panel rendering. Standard menu
+stable selected ID before tab painting and panel rendering. Set
+`reveal_selected = true` to bring a newly selected tab into view in that frame.
+Standard menu
 keyboard navigation, dismissal and focus restoration apply. Fitting all tabs or
 insufficient scratch capacity hides the trigger and closes an existing menu;
 capacity is checked before any scratch writes. The implementation allocates no
@@ -429,6 +428,11 @@ Tests open the overflow menu through real pointer input, inspect full labels,
 select an offscreen enabled tab through batched Down/Enter, assert same-frame
 selected semantics and panel, restore trigger focus and close the popup when
 the bar expands. Insufficient-capacity storage is also checked.
+
+The private X11 SDL test sends Tab, Enter, Down and Escape and injects touch
+taps and cancellation. Both orientations verify the revealed tab, one
+`cui_tabs_events` notification per selection, trigger focus restoration and
+trigger/menu removal when all tabs fit.
 
 ## Tab drag reorder requests
 

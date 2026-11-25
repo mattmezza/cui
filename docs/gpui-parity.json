@@ -6288,7 +6288,8 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_choice.c",
-        "tests/integration/test_sdl_tabs_wheel.c"
+        "tests/integration/test_sdl_tabs_wheel.c",
+        "tests/integration/test_sdl_tabs_overflow.c"
       ],
       "status": "tested",
       "platforms": {
@@ -6354,6 +6355,14 @@
           "evidence": [
             "tests/integration/test_sdl_tabs_wheel.c",
             "docs/TABS_SCROLL_CHAINING.md"
+          ]
+        },
+        {
+          "name": "SDL keyboard and touch overflow selection, focus restoration and reveal in both orientations",
+          "status": "tested",
+          "evidence": [
+            "tests/integration/test_sdl_tabs_overflow.c",
+            "docs/CHOICE.md"
           ]
         }
       ],

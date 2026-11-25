@@ -216,7 +216,7 @@ The regular callback queue is independent.
 Keep one request in flight while the current rows remain interactive. Use
 your own generation and service cursor to reject stale results, then apply
 accepted pages on the UI thread with `SetTableKeyed`. Enable paging again
-if more data is available. The Go builder holds up to 32 rows.
+if more data is available. The ordinary setter holds up to 32 rows.
 
 The synchronous `app.RunWith(.016, afterFrame)` hook receives the app after
 regular callbacks for each successful native frame. A request to close or
@@ -231,6 +231,53 @@ scroll retention when appending the final page.
 ```sh
 go run ./examples/data_table_paging
 go run -tags cui_native ./examples/data_table_paging --font /path/to/font.ttf
+```
+
+### Retain more than 32 rows in Go
+
+Query the active provider on the app's owner thread. A zero limit means the
+opt-in API is unavailable. In that case use the ordinary setters for snapshots
+of up to 32 rows. With a compatible provider, select a limit that fits the
+largest snapshot you intend to retain.
+
+```go
+maximum, err := app.DataTableMaxRowCapacity()
+if err != nil {
+    return err
+}
+capacity := min(512, maximum)
+if capacity < 40 {
+    return fmt.Errorf("this inbox needs capacity for 40 rows")
+}
+headers := []string{"Subject"}
+inbox := cui.DataTable("inbox").
+    TableDataKeyedCapacity(headers, [][]string{{"Project update"}}, []uint32{101}, capacity).
+    VisualSize(360, 160).LoadMore(0)
+if err := app.Mount(cui.Column("root").Children(inbox)); err != nil {
+    return err
+}
+
+// After accepting a page on the UI thread, submit the combined snapshot.
+return inbox.SetTableKeyedCapacity(headers,
+    [][]string{{"Project update"}, {"Release notes"}},
+    []uint32{101, 102}, capacity)
+```
+
+The current provider accepts up to 10,000 rows, within its 32 MiB app-wide
+native retained budget. The limit is a ceiling and does not preallocate unused
+rows. Each header or cell can contain up to 128 UTF-8 bytes. Provide distinct,
+nonzero keys that stay stable across replacements, or nil for an empty snapshot.
+Successful keyed replacements preserve selection and viewport position when their
+row keys survive. If a replacement fails, the current matrix and capacity stay
+active. Each paging record reports the capacity of its snapshot.
+
+Run the offline inbox below from `bindings/go`. It grows from 8 to 40 rows,
+checks scroll position and selection, and discards a stale response. The second
+command adds the SDL window and needs SDL3, FreeType, HarfBuzz and a font.
+
+```sh
+go run ./examples/data_table_paging --larger
+go run -tags cui_native ./examples/data_table_paging --larger --font /path/to/font.ttf
 ```
 
 ## Packaged build-time CUI bridge

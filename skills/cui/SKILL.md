@@ -373,9 +373,11 @@ inbox in `bindings/bridge/examples/data_table_live.py` defaults to headless.
 JavaScript and TypeScript use `table_data(headers, rows, rowKeys)` with the same
 keyed capability query. For larger snapshots, query
 `app.data_table_max_row_capacity()` and pass `{rowCapacity}` as the fourth
-argument. See `docs/BINDING_BUILDERS.md`. Go
-uses `TableDataKeyed` and `SetTableKeyed`, with `SupportsKeyedDataTable` for
-provider checks. See `docs/GO_BUILDERS.md` and
+argument. See `docs/BINDING_BUILDERS.md`. Go uses `TableDataKeyed` and
+`SetTableKeyed`, with `SupportsKeyedDataTable` for provider checks.
+For larger snapshots query `app.DataTableMaxRowCapacity()` and use
+`TableDataKeyedCapacity` and `SetTableKeyedCapacity`. A zero limit means the
+provider lacks the opt-in API. See `docs/GO_BUILDERS.md` and
 `bindings/go/examples/data_table_live/main.go`. In Rust, use
 `Builder::data_table_keyed` or `App::data_table_keyed` after checking
 `app.supports_keyed_data_table()`. See `docs/RUST_BUILDERS.md` and

@@ -178,7 +178,12 @@ func TestDataTablePagingProtocol(t *testing.T) {
 		t.Skip("requires a synthetic paging record")
 	}
 	a := app(t)
-	table := DataTable("inbox").TableData([]string{"Subject"}, [][]string{{"Fixture"}}).LoadMore(0)
+	table := DataTable("inbox").LoadMore(0)
+	if mode == "explicit_capacity" {
+		table.TableDataKeyedCapacity([]string{"Subject"}, [][]string{{"Fixture"}}, []uint32{7}, 48)
+	} else {
+		table.TableData([]string{"Subject"}, [][]string{{"Fixture"}})
+	}
 	check(t, a.Mount(Column("root").Children(table)))
 	check(t, a.Step(.016))
 	got, ok, err := table.PollLoadMore()

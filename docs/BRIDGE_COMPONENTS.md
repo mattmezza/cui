@@ -167,8 +167,9 @@ along with each row-major snapshot to
 `cui_bridge_data_table_set_keyed_capacity_v1`. Both V1 symbols must be available
 when loading the bridge dynamically. The C provider supports capacities up to
 10,000 rows. See the corresponding language APIs for
-[Python](BINDING_BUILDERS.md#retain-more-than-32-rows-in-python) and
-[JavaScript and TypeScript](BINDING_BUILDERS.md#retain-more-than-32-rows-in-javascript-or-typescript).
+[Python](BINDING_BUILDERS.md#retain-more-than-32-rows-in-python),
+[JavaScript and TypeScript](BINDING_BUILDERS.md#retain-more-than-32-rows-in-javascript-or-typescript),
+and [Go](GO_BUILDERS.md#retain-more-than-32-rows-in-go).
 
 The setter copies headers and cells of up to 128 UTF-8 bytes each, with up to
 16 columns. Pass zero rows and NULL cells and keys for an empty table. The

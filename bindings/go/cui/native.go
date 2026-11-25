@@ -351,6 +351,11 @@ static cui_bridge_status go_part_query(cui_bridge_app *a,cui_bridge_node n,uint3
 typedef cui_bridge_status (*data_table_keyed_fn)(cui_bridge_app *, cui_bridge_node,
  const char *const *, uint32_t, const char *const *, const uint32_t *, uint32_t);
 static data_table_keyed_fn table_keyed;
+static struct {
+ uint32_t (*maximum)(void);
+ cui_bridge_status (*set)(cui_bridge_app *, cui_bridge_node, const char *const *,
+                          uint32_t, const char *const *, const uint32_t *, uint32_t, uint32_t);
+} table_capacity;
 
 _Static_assert(sizeof(cui_bridge_data_table_load_more_v1) == 32, "DataTable paging V1 wire size");
 static struct {
@@ -375,12 +380,18 @@ static void go_data_table_initialize(void) {
  if (!bridge_lib) {
 #if defined(CUI_GO_STATIC)
   table_keyed = cui_bridge_data_table_set_keyed;
+  table_capacity.maximum = cui_bridge_data_table_max_row_capacity_v1;
+  table_capacity.set = cui_bridge_data_table_set_keyed_capacity_v1;
   table_paging.size = cui_bridge_data_table_load_more_size_v1;
   table_paging.configure = cui_bridge_data_table_configure_load_more_v1;
   table_paging.poll = cui_bridge_data_table_poll_load_more_v1;
 #endif
  } else {
   go_data_table_load_symbol(&table_keyed, sizeof table_keyed, "cui_bridge_data_table_set_keyed");
+  go_data_table_load_symbol(&table_capacity.maximum, sizeof table_capacity.maximum,
+                            "cui_bridge_data_table_max_row_capacity_v1");
+  go_data_table_load_symbol(&table_capacity.set, sizeof table_capacity.set,
+                            "cui_bridge_data_table_set_keyed_capacity_v1");
   go_data_table_load_symbol(&table_paging.size, sizeof table_paging.size,
                             "cui_bridge_data_table_load_more_size_v1");
   go_data_table_load_symbol(&table_paging.configure, sizeof table_paging.configure,
@@ -401,6 +412,18 @@ static cui_bridge_status go_data_table_set_keyed(cui_bridge_app *app, cui_bridge
  const uint32_t *row_keys, uint32_t rows) {
  return table_keyed ? table_keyed(app, node, headers, columns, cells, row_keys, rows)
                     : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+
+static uint32_t go_data_table_max_row_capacity(void) {
+ return table_capacity.maximum && table_capacity.set ? table_capacity.maximum() : 0;
+}
+
+static cui_bridge_status go_data_table_set_keyed_capacity(cui_bridge_app *app,
+ cui_bridge_node node, const char *const *headers, uint32_t columns, const char *const *cells,
+ const uint32_t *row_keys, uint32_t rows, uint32_t capacity) {
+ return table_capacity.maximum && table_capacity.set
+        ? table_capacity.set(app, node, headers, columns, cells, row_keys, rows, capacity)
+        : CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
 
 static int go_data_table_paging_supported(void) {
@@ -575,6 +598,7 @@ type Node struct {
 	tableHeaders                         []string
 	tableRows                            [][]string
 	tableRowKeys                         []uint32
+	tableRowCapacity                     uint32
 	hasTableData                         bool
 	tableLoadMore                        bool
 	tableLoadMoreThreshold               uint32
@@ -1626,7 +1650,11 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("invalid or reused node")
 		}
 		seen[n] = true
-		if n.tableRowKeys != nil && C.go_data_table_keyed_supported() == 0 {
+		if n.tableRowCapacity != 0 {
+			if err := a.requireDataTableCapacity(n.tableRowCapacity); err != nil {
+				return err
+			}
+		} else if n.tableRowKeys != nil && C.go_data_table_keyed_supported() == 0 {
 			return ErrKeyedDataTableUnavailable
 		}
 		if n.tableLoadMore {
@@ -1824,7 +1852,7 @@ func (a *App) Mount(root *Node) error {
 			}
 		}
 		if n.hasTableData {
-			if e := n.setTable(n.tableHeaders, n.tableRows, n.tableRowKeys); e != nil {
+			if e := n.applyTable(n.tableHeaders, n.tableRows, n.tableRowKeys, n.tableRowCapacity); e != nil {
 				return e
 			}
 		}
@@ -3144,6 +3172,12 @@ func (a *App) PlotPoint(n *Node, index uint32) (PlotPoint, error) {
 // Zero means no row, column, or sort column is selected.
 type DataTableState struct{ Row, Column, SortColumn, SortDirection uint32 }
 
+const (
+	dataTableLegacyRows = 32
+	dataTableMaxRows    = 10_000
+	dataTableTextBytes  = 128
+)
+
 // ErrKeyedDataTableUnavailable indicates that the loaded bridge lacks keyed replacement.
 var ErrKeyedDataTableUnavailable = errors.New("keyed DataTable replacement is unavailable in this bridge")
 
@@ -3153,6 +3187,37 @@ func (a *App) SupportsKeyedDataTable() (bool, error) {
 		return false, err
 	}
 	return C.go_data_table_keyed_supported() != 0, nil
+}
+
+// ErrDataTableCapacityUnavailable indicates that the loaded bridge does not
+// support the optional DataTable capacity API.
+var ErrDataTableCapacityUnavailable = errors.New("DataTable capacity is unavailable in this bridge")
+
+// DataTableMaxRowCapacity reports the active bridge's usable opt-in row limit.
+// It returns zero when the bridge does not support the capacity API.
+func (a *App) DataTableMaxRowCapacity() (uint32, error) {
+	if err := a.check(); err != nil {
+		return 0, err
+	}
+	maximum := uint32(C.go_data_table_max_row_capacity())
+	if maximum > dataTableMaxRows {
+		maximum = dataTableMaxRows
+	}
+	return maximum, nil
+}
+
+func (a *App) requireDataTableCapacity(capacity uint32) error {
+	maximum, err := a.DataTableMaxRowCapacity()
+	if err != nil {
+		return err
+	}
+	if maximum == 0 {
+		return ErrDataTableCapacityUnavailable
+	}
+	if capacity > maximum {
+		return fmt.Errorf("DataTable capacity exceeds the provider's %d-row limit", maximum)
+	}
+	return nil
 }
 
 // DataTableLoadMore is a copied near-end request. The visible index range is
@@ -3232,8 +3297,13 @@ func (n *Node) PollLoadMore() (DataTableLoadMore, bool, error) {
 	if err := result(status); err != nil {
 		return DataTableLoadMore{}, false, err
 	}
+	capacity := n.tableRowCapacity
+	if capacity == 0 {
+		capacity = dataTableLegacyRows
+	}
 	if wire.reserved != 0 || wire.frame == 0 || wire.visible_begin > wire.visible_end ||
 		wire.visible_end > wire.row_count || wire.row_count >= wire.capacity ||
+		uint32(wire.capacity) != capacity ||
 		(wire.row_count == 0) != (wire.last_row_key == 0) {
 		return DataTableLoadMore{}, false, errors.New("malformed DataTable load-more record")
 	}
@@ -3290,9 +3360,18 @@ func (n *Node) TableDataKeyed(headers []string, rows [][]string, rowKeys []uint3
 	return n
 }
 
+// TableDataKeyedCapacity copies a keyed snapshot with an explicit row capacity.
+// The loaded bridge must support the capacity API to mount the table.
+func (n *Node) TableDataKeyedCapacity(headers []string, rows [][]string, rowKeys []uint32, capacity uint32) *Node {
+	if n.err == nil {
+		n.err = n.SetTableKeyedCapacity(headers, rows, rowKeys, capacity)
+	}
+	return n
+}
+
 // SetTable copies the matrix, assigns one-based positional row keys, and resets table state.
 func (n *Node) SetTable(headers []string, rows [][]string) error {
-	return n.setTable(headers, rows, nil)
+	return n.setTable(headers, rows, nil, 0)
 }
 
 // SetTableKeyed copies the matrix and keys. Keys are distinct, nonzero, and
@@ -3303,17 +3382,41 @@ func (n *Node) SetTableKeyed(headers []string, rows [][]string, rowKeys []uint32
 	if rowKeys == nil {
 		rowKeys = []uint32{}
 	}
-	return n.setTable(headers, rows, rowKeys)
+	return n.setTable(headers, rows, rowKeys, 0)
 }
 
-func (n *Node) setTable(headers []string, rows [][]string, rowKeys []uint32) error {
+// SetTableKeyedCapacity replaces the copied keyed matrix and its row capacity
+// together, preserving the viewport and selection for surviving row keys.
+// Supply one key per row and a capacity from 1 through DataTableMaxRowCapacity.
+// A nil key slice is valid for an empty snapshot. A failed update leaves the
+// previous matrix, capacity and state intact.
+func (n *Node) SetTableKeyedCapacity(headers []string, rows [][]string, rowKeys []uint32, capacity uint32) error {
+	if capacity == 0 || capacity > dataTableMaxRows {
+		return fmt.Errorf("DataTable capacity must be in 1..%d", dataTableMaxRows)
+	}
+	if rowKeys == nil {
+		rowKeys = []uint32{}
+	}
+	return n.setTable(headers, rows, rowKeys, capacity)
+}
+
+func (n *Node) setTable(headers []string, rows [][]string, rowKeys []uint32, capacity uint32) error {
 	if n == nil || n.kind != 71 {
 		return errors.New("table data requires DataTable")
 	}
 	if n.removed {
 		return errors.New("removed data table")
 	}
-	if len(headers) == 0 || len(headers) > 16 || len(rows) > 32 {
+	limit := uint32(dataTableLegacyRows)
+	if capacity != 0 {
+		limit = capacity
+		if n.app != nil {
+			if err := n.app.requireDataTableCapacity(capacity); err != nil {
+				return err
+			}
+		}
+	}
+	if len(headers) == 0 || len(headers) > 16 || len(rows) > int(limit) {
 		return errors.New("invalid data table dimensions")
 	}
 	if rowKeys != nil {
@@ -3332,7 +3435,7 @@ func (n *Node) setTable(headers []string, rows [][]string, rowKeys []uint32) err
 		if e := valid(s); e != nil {
 			return e
 		}
-		if len(s) > 128 {
+		if len(s) > dataTableTextBytes {
 			return errors.New("data table text exceeds 128 bytes")
 		}
 	}
@@ -3344,73 +3447,91 @@ func (n *Node) setTable(headers []string, rows [][]string, rowKeys []uint32) err
 			if e := valid(s); e != nil {
 				return e
 			}
-			if len(s) > 128 {
+			if len(s) > dataTableTextBytes {
 				return errors.New("data table text exceeds 128 bytes")
 			}
 		}
 	}
 	if n.app != nil {
-		if e := n.app.check(); e != nil {
-			return e
-		}
-		if rowKeys != nil && C.go_data_table_keyed_supported() == 0 {
-			return ErrKeyedDataTableUnavailable
-		}
-		ch := make([]*C.char, len(headers))
-		cc := make([]*C.char, len(headers)*len(rows))
-		defer func() {
-			for _, p := range ch {
-				if p != nil {
-					C.free(unsafe.Pointer(p))
-				}
+		if capacity == 0 {
+			if err := n.app.check(); err != nil {
+				return err
 			}
-			for _, p := range cc {
-				if p != nil {
-					C.free(unsafe.Pointer(p))
-				}
-			}
-		}()
-		for i, s := range headers {
-			ch[i] = cs(s)
-		}
-		for r, row := range rows {
-			for c, s := range row {
-				cc[r*len(headers)+c] = cs(s)
+			if rowKeys != nil && C.go_data_table_keyed_supported() == 0 {
+				return ErrKeyedDataTableUnavailable
 			}
 		}
-		var cells **C.char
-		if len(cc) > 0 {
-			cells = &cc[0]
-		}
-		var code C.cui_bridge_status
-		if rowKeys == nil {
-			code = C.go_data_table_set(n.app.ptr, n.handle, &ch[0], C.uint32_t(len(ch)),
-				cells, C.uint32_t(len(rows)))
-		} else {
-			var keys *C.uint32_t
-			if len(rowKeys) != 0 {
-				keys = (*C.uint32_t)(unsafe.Pointer(&rowKeys[0]))
-			}
-			code = C.go_data_table_set_keyed(n.app.ptr, n.handle, &ch[0], C.uint32_t(len(ch)),
-				cells, keys, C.uint32_t(len(rows)))
-		}
-		if err := result(code); err != nil {
+		if err := n.applyTable(headers, rows, rowKeys, capacity); err != nil {
 			return err
 		}
-		runtime.KeepAlive(ch)
-		runtime.KeepAlive(cc)
 	}
-	n.tableHeaders = append([]string(nil), headers...)
+	n.tableHeaders = copyTableRow(headers, capacity != 0)
 	n.tableRows = make([][]string, len(rows))
 	for i, row := range rows {
-		n.tableRows[i] = append([]string(nil), row...)
+		n.tableRows[i] = copyTableRow(row, capacity != 0)
 	}
 	n.tableRowKeys = nil
 	if rowKeys != nil {
 		n.tableRowKeys = append([]uint32{}, rowKeys...)
 	}
+	n.tableRowCapacity = capacity
 	n.hasTableData = true
 	return nil
+}
+
+func copyTableRow(row []string, cloneText bool) []string {
+	copied := append([]string(nil), row...)
+	if cloneText {
+		// Short substrings can otherwise retain arbitrarily large backing strings.
+		for i, s := range copied {
+			copied[i] = strings.Clone(s)
+		}
+	}
+	return copied
+}
+
+// applyTable receives an already validated snapshot. C copies the contents
+// synchronously. Every pointer in the Go vector addresses temporary C memory.
+func (n *Node) applyTable(headers []string, rows [][]string, rowKeys []uint32, capacity uint32) error {
+	columns := len(headers)
+	count := (len(rows) + 1) * columns
+	const stride = dataTableTextBytes + 1
+	memory := C.malloc(C.size_t(count * stride))
+	defer C.free(memory)
+	text := unsafe.Slice((*byte)(memory), count*stride)
+	pointers := make([]*C.char, count)
+	put := func(i int, value string) {
+		offset := i * stride
+		copy(text[offset:offset+len(value)], value)
+		text[offset+len(value)] = 0
+		pointers[i] = (*C.char)(unsafe.Pointer(&text[offset]))
+	}
+	for i, value := range headers {
+		put(i, value)
+	}
+	for r, row := range rows {
+		for c, value := range row {
+			put((r+1)*columns+c, value)
+		}
+	}
+	var cells **C.char
+	if len(rows) != 0 {
+		cells = &pointers[columns]
+	}
+	if rowKeys == nil {
+		return result(C.go_data_table_set(n.app.ptr, n.handle, &pointers[0], C.uint32_t(columns),
+			cells, C.uint32_t(len(rows))))
+	}
+	var keys *C.uint32_t
+	if len(rowKeys) != 0 {
+		keys = (*C.uint32_t)(unsafe.Pointer(&rowKeys[0]))
+	}
+	if capacity != 0 {
+		return result(C.go_data_table_set_keyed_capacity(n.app.ptr, n.handle, &pointers[0], C.uint32_t(columns),
+			cells, keys, C.uint32_t(len(rows)), C.uint32_t(capacity)))
+	}
+	return result(C.go_data_table_set_keyed(n.app.ptr, n.handle, &pointers[0], C.uint32_t(columns),
+		cells, keys, C.uint32_t(len(rows))))
 }
 func (a *App) DataTableCell(n *Node, row, col uint32) (string, error) {
 	if e := a.check(); e != nil {

@@ -7323,7 +7323,7 @@
             "docs/TABLE.md"
           ],
           "limitations": [
-            "Opt-in C helpers preserve a row key and pixel offset. Retained builders support ordinary keyed replacement with a 32-row cap. C, Python, JavaScript and TypeScript also expose larger snapshots. Automatic remote updates remain open."
+            "Opt-in C helpers preserve a row key and pixel offset. Retained builders support ordinary keyed replacement with a 32-row cap. C, Python, JavaScript, TypeScript and Go expose larger snapshots. Automatic remote updates remain open."
           ]
         },
         {
@@ -7470,7 +7470,19 @@
             "docs/GO_BUILDERS.md"
           ],
           "limitations": [
-            "Bundled and shared providers return copied owner-thread demand. The native after-frame hook runs after ordinary dispatch. The runnable inbox uses a local source with app-owned request identity and keeps the 32-row retention bound."
+            "Bundled and shared providers return copied owner-thread demand. The native after-frame hook runs after ordinary dispatch. The runnable inbox uses a local source with app-owned request identity. Ordinary snapshots keep the 32-row retention bound."
+          ]
+        },
+        {
+          "name": "Go bounded retained DataTable snapshots beyond 32 rows",
+          "status": "tested",
+          "evidence": [
+            "bindings/go/cui/data_table_capacity_test.go",
+            "bindings/go/examples/data_table_paging/main.go",
+            "docs/GO_BUILDERS.md"
+          ],
+          "limitations": [
+            "Capacity authoring requires both optional V1 exports, stable row keys, and owner-thread updates. Larger snapshots work with bundled and compatible shared providers. The application owns remote transport."
           ]
         },
         {

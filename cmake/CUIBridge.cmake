@@ -199,11 +199,41 @@ if(CUI_GO_KEYED_DATA_TABLE_TESTS)
  cui_go_data_table_test(data_table_paging_static "" 0
   test ./cui -count=1 -run "^TestDataTablePaging(EmptyAndOwnerThread)?$")
  cui_go_data_table_test(data_table_paging_example "" 0 run ./examples/data_table_paging)
+ cui_go_data_table_test(data_table_capacity_dynamic $<TARGET_FILE:cui_bridge> 0
+  test -tags cui_dynamic ./cui -count=1 -run "^TestDataTableCapacity(Limits)?$")
+ cui_go_data_table_test(data_table_capacity_static "" 0
+  test ./cui -count=1 -run "^TestDataTableCapacity(Limits)?$")
+ cui_go_data_table_test(data_table_capacity_example "" 0
+  run ./examples/data_table_paging --larger)
+
+ function(cui_go_capacity_fixture target provider)
+  add_library(${target} SHARED ${CUI_BRIDGE_ROOT}/bindings/tests/data_table_capacity_provider.c)
+  target_include_directories(${target} PRIVATE ${CUI_BRIDGE_ROOT}/include)
+  target_link_libraries(${target} PRIVATE "-Wl,--no-as-needed" ${provider} "-Wl,--as-needed")
+  if(ARGN)
+   target_compile_definitions(${target} PRIVATE ${ARGN})
+  endif()
+  cui_warnings(${target})
+ endfunction()
+ cui_go_capacity_fixture(cui_go_capacity_query_fixture cui_bridge)
+ cui_go_capacity_fixture(cui_go_capacity_rejected_fixture cui_bridge CUI_TEST_CAPACITY_SETTER_ONLY)
+ foreach(mode limited zero large rejected)
+  if(mode STREQUAL "rejected")
+   set(_go_capacity_fixture cui_go_capacity_rejected_fixture)
+  else()
+   set(_go_capacity_fixture cui_go_capacity_query_fixture)
+  endif()
+  cui_go_data_table_test(data_table_capacity_${mode} $<TARGET_FILE:${_go_capacity_fixture}> 0
+   test -tags cui_dynamic ./cui -count=1 -run "^TestDataTableCapacityProvider$")
+  set_property(TEST bridge_go_data_table_capacity_${mode} PROPERTY
+   ENVIRONMENT "CUI_DATA_TABLE_CAPACITY_FIXTURE=${mode}")
+ endforeach()
+
  add_library(cui_go_paging_fixture SHARED ${CUI_BRIDGE_ROOT}/bindings/tests/data_table_paging_provider.c)
  target_include_directories(cui_go_paging_fixture PRIVATE ${CUI_BRIDGE_ROOT}/include)
  target_link_libraries(cui_go_paging_fixture PRIVATE "-Wl,--no-as-needed" cui_bridge "-Wl,--as-needed")
  cui_warnings(cui_go_paging_fixture)
- foreach(mode exact frame reserved window visible capacity key size)
+ foreach(mode exact frame reserved window visible capacity different_capacity explicit_capacity key size)
   cui_go_data_table_test(data_table_paging_${mode} $<TARGET_FILE:cui_go_paging_fixture> 0
    test -tags cui_dynamic ./cui -count=1 -run "^TestDataTablePaging(Fallback|Protocol)$")
   set_property(TEST bridge_go_data_table_paging_${mode} PROPERTY
@@ -238,6 +268,20 @@ if(CUI_GO_KEYED_DATA_TABLE_TESTS)
    test -tags cui_dynamic ./cui -count=1 -run "^TestDataTablePagingFallback$")
   set_property(TEST bridge_go_data_table_paging_partial PROPERTY
    ENVIRONMENT "CUI_DATA_TABLE_PAGING_FIXTURE=partial")
+  cui_go_data_table_test(data_table_capacity_legacy "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}" 1
+   test -tags cui_dynamic ./cui -count=1 -run "^TestDataTableCapacityProvider$")
+  set_property(TEST bridge_go_data_table_capacity_legacy PROPERTY
+   ENVIRONMENT "CUI_DATA_TABLE_CAPACITY_FIXTURE=legacy")
+  cui_go_capacity_fixture(cui_go_capacity_query_legacy_fixture "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}")
+  cui_go_capacity_fixture(cui_go_capacity_setter_legacy_fixture "${CUI_GO_KEYED_DATA_TABLE_LEGACY_LIBRARY}"
+   CUI_TEST_CAPACITY_SETTER_ONLY)
+  foreach(mode query setter)
+   set_target_properties(cui_go_capacity_${mode}_legacy_fixture PROPERTIES BUILD_RPATH "${_go_paging_provider_dir}")
+   cui_go_data_table_test(data_table_capacity_${mode}_only $<TARGET_FILE:cui_go_capacity_${mode}_legacy_fixture> 1
+    test -tags cui_dynamic ./cui -count=1 -run "^TestDataTableCapacityProvider$")
+   set_property(TEST bridge_go_data_table_capacity_${mode}_only PROPERTY
+    ENVIRONMENT "CUI_DATA_TABLE_CAPACITY_FIXTURE=${mode}-only")
+  endforeach()
  endif()
  if(CUI_BRIDGE_NATIVE_TESTS)
   cui_go_data_table_test(keyed_data_table_native $<TARGET_FILE:cui_bridge> 0
@@ -246,6 +290,10 @@ if(CUI_GO_KEYED_DATA_TABLE_TESTS)
    run -tags cui_dynamic ./examples/data_table_paging --font ${CUI_TEST_FONT} --smoke)
   cui_go_data_table_test(data_table_paging_native_bundled "" 0
    run -tags cui_native ./examples/data_table_paging --font ${CUI_TEST_FONT} --smoke)
+  cui_go_data_table_test(data_table_capacity_native $<TARGET_FILE:cui_bridge> 0
+   run -tags cui_dynamic ./examples/data_table_paging --font ${CUI_TEST_FONT} --smoke --larger)
+  cui_go_data_table_test(data_table_capacity_native_bundled "" 0
+   run -tags cui_native ./examples/data_table_paging --font ${CUI_TEST_FONT} --smoke --larger)
   cui_go_data_table_test(data_table_paging_run $<TARGET_FILE:cui_bridge> 0
    test -tags cui_dynamic ./cui -count=1 -run "^TestNativeRun(Lifecycle|AfterFrame)$")
   set_property(TEST bridge_go_data_table_paging_run PROPERTY ENVIRONMENT "CUI_TEST_FONT=${CUI_TEST_FONT}")

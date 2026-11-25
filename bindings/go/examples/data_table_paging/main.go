@@ -23,22 +23,27 @@ type inbox struct {
 	headers    []string
 	rows       [][]string
 	keys       []uint32
+	capacity   uint32
 	generation uint64
 	pending    pageTicket
 }
 
-func newInbox() *inbox {
+func newInbox(rowCount int, capacity uint32) *inbox {
+	status := cui.Label("8 messages")
 	owner := &inbox{
-		headers: []string{"Subject", "Sender"}, rows: make([][]string, 12),
-		keys: make([]uint32, 12), status: cui.Label("8 messages"), generation: 1,
+		headers: []string{"Subject", "Sender"}, rows: make([][]string, rowCount),
+		keys: make([]uint32, rowCount), status: status, capacity: capacity, generation: 1,
 	}
 	for i := range owner.keys {
 		owner.keys[i] = uint32(101 + i)
 		owner.rows[i] = []string{fmt.Sprintf("Project update %d", i+1), "Workspace"}
 	}
-	owner.table = cui.DataTable("inbox").
-		TableDataKeyed(owner.headers, owner.rows[:initialRows], owner.keys[:initialRows]).
-		VisualSize(360, 160).LoadMore(0)
+	owner.table = cui.DataTable("inbox").VisualSize(360, 160).LoadMore(0)
+	if capacity != 0 {
+		owner.table.TableDataKeyedCapacity(owner.headers, owner.rows[:initialRows], owner.keys[:initialRows], capacity)
+	} else {
+		owner.table.TableDataKeyed(owner.headers, owner.rows[:initialRows], owner.keys[:initialRows])
+	}
 	return owner
 }
 
@@ -70,11 +75,17 @@ func (i *inbox) completePage(ticket pageTicket) (bool, error) {
 		return false, nil
 	}
 	// Apply the final local page in one replacement, keeping the old row keys.
-	if err := i.table.SetTableKeyed(i.headers, i.rows, i.keys); err != nil {
+	var err error
+	if i.capacity != 0 {
+		err = i.table.SetTableKeyedCapacity(i.headers, i.rows, i.keys, i.capacity)
+	} else {
+		err = i.table.SetTableKeyed(i.headers, i.rows, i.keys)
+	}
+	if err != nil {
 		return false, err
 	}
 	i.pending = pageTicket{}
-	return true, i.status.SetText("12 messages · End of inbox")
+	return true, i.status.SetText(fmt.Sprintf("%d messages · End of inbox", len(i.rows)))
 }
 
 func (i *inbox) verify(app *cui.App, smoke bool) {
@@ -125,10 +136,11 @@ func (i *inbox) verify(app *cui.App, smoke bool) {
 	s, err := app.DataTableState(i.table)
 	must(err)
 	require(s.Row == i.keys[6] && bounds(6) == selected, "append moved the selection or viewport")
-	cell, err := app.DataTableCell(i.table, 11, 0)
+	last := len(i.rows) - 1
+	cell, err := app.DataTableCell(i.table, uint32(last), 0)
 	must(err)
-	require(cell == i.rows[11][0], "missing last row")
-	must(app.QueueScroll(first.X+10, first.Y+10, 0, -20))
+	require(cell == i.rows[last][0], "missing last row")
+	must(app.QueueScroll(first.X+10, first.Y+10, 0, -float32(len(i.rows))))
 	must(app.Step(.016))
 	_, ok, err = i.beginPage()
 	must(err)
@@ -136,10 +148,10 @@ func (i *inbox) verify(app *cui.App, smoke bool) {
 
 	if smoke {
 		var ran bool
-		click(bounds(10))
+		click(bounds(uint32(last - 1)))
 		must(app.RunWith(.016, func(active *cui.App) error {
 			ran = true
-			if active != app || len(selectedKeys) != 2 || selectedKeys[1] != i.keys[10] {
+			if active != app || len(selectedKeys) != 2 || selectedKeys[1] != i.keys[last-1] {
 				return fmt.Errorf("hook ran before selection dispatch")
 			}
 			return active.RequestClose()
@@ -180,6 +192,7 @@ func (i *inbox) run(app *cui.App) error {
 func main() {
 	font := flag.String("font", "", "font path for a native SDL window")
 	smoke := flag.Bool("smoke", false, "check a hidden window on the private test display")
+	larger := flag.Bool("larger", false, "page past 32 rows using the optional capacity API")
 	flag.Parse()
 	require(!*smoke || (*font != "" && os.Getenv("CUI_TEST_VIRTUAL_DISPLAY") == "1"),
 		"--smoke requires a font and the private display from scripts/test_local.py")
@@ -189,11 +202,22 @@ func main() {
 	defer app.Close()
 	paging, err := app.SupportsDataTablePaging()
 	must(err)
-	keyed, err := app.SupportsKeyedDataTable()
-	must(err)
-	require(paging && keyed, "the inbox requires a bridge with paging and keyed replacement")
+	require(paging, "the inbox requires a bridge with paging")
+	rows := 12
+	var capacity uint32
+	if *larger {
+		rows = 40
+		maximum, err := app.DataTableMaxRowCapacity()
+		must(err)
+		require(maximum >= uint32(rows), "--larger requires an opt-in capacity of at least 40 rows")
+		capacity = min(128, maximum)
+	} else {
+		keyed, err := app.SupportsKeyedDataTable()
+		must(err)
+		require(keyed, "the inbox requires a bridge with keyed replacement")
+	}
 
-	owner := newInbox()
+	owner := newInbox(rows, capacity)
 	content := cui.Column("content").GapUnits(2).Children(cui.Label("Inbox"), owner.table, owner.status)
 	must(app.Mount(cui.RootView("root").RootPadding(16).Children(content)))
 	if *font == "" || *smoke {

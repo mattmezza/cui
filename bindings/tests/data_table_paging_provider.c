@@ -51,6 +51,8 @@ cui_bridge_status cui_bridge_data_table_poll_load_more_v1(cui_bridge_app *app, c
         out->visible_end = 9;
     if (fixture_is("capacity"))
         out->capacity = 8;
+    if (fixture_is("different_capacity"))
+        out->capacity = 48;
     if (fixture_is("key"))
         out->last_row_key = 0;
     return CUI_BRIDGE_OK;

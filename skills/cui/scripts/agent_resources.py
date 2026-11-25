@@ -47,7 +47,8 @@ def source_files(root):
                     and ('examples' in p.parts or p.name in {'index.d.ts', '__init__.py', 'lib.rs'})):
                 paths.add(p)
     # Narrow typed module exports; do not include arbitrary binding internals.
-    paths.update(root / path for path in ('bindings/python/cui_bridge/shadows.py',
+    paths.update(root / path for path in ('bindings/python/cui_bridge/icons.py',
+                 'bindings/python/cui_bridge/shadows.py',
                  'bindings/python/cui_bridge/slider_model.py',
                  'bindings/python/cui_bridge/time_field_localized.py',
                  'bindings/python/cui_bridge/skeleton_presentation.py',

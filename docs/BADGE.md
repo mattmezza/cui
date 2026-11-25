@@ -97,5 +97,7 @@ measured as 136 bytes native/104 WASM32; WASM was a header probe only. The root
 configured build and expanded headless fixture also pass: nested interactive
 children, narrow/wide resize, omission/reappearance and resource-error recovery.
 The retained C bridge also composes Badge nodes around ordinary retained
-children with copied descriptors, shared SVG handles and frame results. Language
-builders still use the standalone text pill. [Retained C guide](BRIDGE_BADGE.md).
+children with copied descriptors, shared SVG handles and frame results. Python
+also exposes this route. JavaScript, TypeScript, Go and Rust currently offer the
+standalone text pill. [Retained C guide](BRIDGE_BADGE.md),
+[Python guide](PYTHON_ICON_BADGE.md).

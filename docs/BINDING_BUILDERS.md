@@ -41,6 +41,9 @@ Node import library discovery and macOS Node linker settings are provided. See t
 
 ## Python: build and launch
 
+The [Icon and Badge guide](PYTHON_ICON_BADGE.md) shows how to share custom SVG
+artwork, wrap controls in typed Badge indicators, and update them from callbacks.
+
 The [responsive Skeleton guide](PYTHON_SKELETON.md) includes a Python-authored
 profile UI that replaces loading placeholders with content. See the
 [JavaScript and TypeScript](NODE_SKELETON.md), [Go](GO_SKELETON.md) and

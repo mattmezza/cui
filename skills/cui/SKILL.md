@@ -505,4 +505,6 @@ For app-owned SVG data, read `docs/BRIDGE_ICON_RESOURCES.md` and
 per-frame results in retained C nodes. Probe presentation separately from the
 alpha.4 resource API. `docs/BRIDGE_BADGE.md` covers the optional C container and
 its child events, artwork and indicator result. Keep resources on the app's owner
-thread. Language builders still use named Icons and scalar text Badges.
+thread. Python supports those resources and retained builders. Run the Python
+inbox example from `docs/PYTHON_ICON_BADGE.md`. JavaScript, TypeScript, Go and
+Rust currently use named Icons and scalar text Badges.

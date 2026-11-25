@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import math
 import os
 from pathlib import Path
+from threading import current_thread
 from typing import Callable, ClassVar, Iterator, Literal
 
 
@@ -250,6 +251,8 @@ class _API:
         self.request_close = bind("request_close", C.c_int, C.c_void_p)
         if self.abi_version() != 1 or self.options_size() != C.sizeof(_Options):
             raise RuntimeError("Incompatible CUI bridge ABI")
+        from .icons import bind_api as bind_icon_api
+        bind_icon_api(self, bind)
 
     def check(self, status: int) -> None:
         if status != 0:
@@ -266,6 +269,7 @@ _KIND = {"row": 1, "column": 2, "label": 3, "button": 4, "checkbox": 5,
 _BOOLEAN = {"checkbox", "radio", "switch", "toggle"}
 _NUMERIC = {"slider", "progress", "number_input", "pagination", "rating"}
 _KIND["slider_model"] = 81
+_KIND["configured_badge"] = 82
 _EDITABLE = {"input", "textarea", "number_input", "combobox"}
 _GROUP = {"radio_group", "tabs", "accordion", "select", "combobox", "dropdown_button", "list_view", "menu", "stepper", "description_list", "status_bar", "toolbar", "title_bar"}
 _SURFACE = {"dialog", "alert_dialog", "sheet", "popover"}
@@ -283,8 +287,9 @@ _SELECTED = {"sidebar","radio_group", "tabs", "select", "combobox", "dropdown_bu
 _SURFACE |= {"notification"}
 _CHANGE = (_DISABLED - {"button", "accordion", "form"}) | {"message_scroller", "settings"}
 _DISABLED.add("slider_model")  # No legacy CHANGE callback for the controlled route.
+_DISABLED.add("configured_badge")
 _CONSTRUCTOR_CONTAINER = {"root_view","row", "column", "collapsible", "item", "dialog", "sheet", "popover", "hover_card", "group_box", "scrollable", "focus_trap"}
-_CONTAINER = _CONSTRUCTOR_CONTAINER | _GROUP
+_CONTAINER = _CONSTRUCTOR_CONTAINER | _GROUP | {"configured_badge"}
 _VARIANT = {"primary": 0, "secondary": 1, "outline": 2, "ghost": 3}
 _ROUND = {"theme": 0, "none": 1, "small": 2, "large": 3, "custom": 4}
 
@@ -1430,6 +1435,8 @@ class App:
         if type(initially_hidden) is not bool:
             raise TypeError("initially_hidden must be bool")
         self._api = _API(library)
+        self._creation_thread = current_thread()
+        self._icons_active = False
         options = _Options(C.sizeof(_Options), 1, 0 if backend == "none" else 1,
                            max_nodes, max_events, width, height,
                            _utf8(title), _utf8(font_path) if font_path else None)
@@ -1454,6 +1461,12 @@ class App:
     def _ensure_open(self) -> None:
         if not self._ptr:
             raise RuntimeError("App is disposed")
+        if self._icons_active:
+            self._ensure_icon_thread()
+
+    def _ensure_icon_thread(self) -> None:
+        if current_thread() is not self._creation_thread:
+            raise RuntimeError("Icon and Badge App calls require the app's owner thread")
 
     def font_fallbacks(self, paths: list[str] | tuple[str, ...]) -> "App":
         """Replace the SDL font's owned ordered fallback chain (at most 32)."""
@@ -1490,6 +1503,12 @@ class App:
                     raise TypeError("use slider_model() for the controlled route")
                 if any(ancestor.kind not in ("row", "column") for ancestor in lineage):
                     raise ValueError("controlled Slider requires Row/Column ancestry")
+            if isinstance(node, ConfiguredIcon):
+                node._preflight_icon(self)
+            if node.kind == "configured_badge":
+                if not isinstance(node, ConfiguredBadge):
+                    raise TypeError("use configured_badge() for the Badge container")
+                node._preflight_badge(self)
             key = node.key if node.key is not None else f"{node.kind}@{path}"
             _utf8(key)
             if _KIND[node.kind] >= 3:
@@ -1516,6 +1535,8 @@ class App:
                 if node.kind == "slider_model":
                     from .slider_model import mount_node
                     mount_node(self, node, parent_handle, key, handle)
+                elif isinstance(node, ConfiguredBadge):
+                    node._create_badge(self, parent_handle, key, handle)
                 else:
                     self._api.check(self._api.node_create(self._ptr, parent_handle, _KIND[node.kind],
                                                            _utf8(key), C.byref(handle)))
@@ -1524,8 +1545,10 @@ class App:
                 self._by_handle[(handle.slot, handle.generation)] = node
                 if node.kind == "root_view": node._change("set_root_padding",node._root_padding)
                 if node.kind == "otp_input": node._change("set_total",node._total)
-                if _KIND[node.kind] >= 3:
+                if _KIND[node.kind] >= 3 and node.kind != "configured_badge":
                     node._change("set_text", _utf8(node._text))
+                if isinstance(node, ConfiguredIcon):
+                    node._set_icon(self, handle, node._icon_config)
                 if node.kind in ("row", "column"):
                     node._change("set_gap", node._gap)
                 if node.kind in _BOOLEAN or (node.kind == "item" and node._checked_set):
@@ -1957,6 +1980,44 @@ class App:
         from .skeleton_presentation import supported
         return supported(self)
 
+    def supports_icon_resources(self) -> bool:
+        from .icons import supported
+        return supported(self, "icon_resources")
+
+    def supports_icon_presentation(self) -> bool:
+        from .icons import supported
+        return supported(self, "icon_presentation")
+
+    def supports_configured_badge(self) -> bool:
+        from .icons import supported
+        return supported(self, "configured_badge")
+
+    def icon_resource(self, source: IconSource | None = None, *,
+                      limits: IconLimits | None = None) -> IconResource:
+        """Create an explicitly owned resource. A default source is empty."""
+        return IconResource(self, IconSource() if source is None else source,
+                            limits=IconLimits() if limits is None else limits)
+
+    def default_icon_limits(self) -> IconLimits:
+        from .icons import default_limits
+        return default_limits(self)
+
+    def icon_catalog_count(self) -> int:
+        from .icons import catalog_entry_count
+        return catalog_entry_count(self)
+
+    def icon_catalog_entry(self, index: int) -> IconCatalogEntry:
+        from .icons import catalog_entry
+        return catalog_entry(self, index)
+
+    def query_icon(self, name: str) -> IconAvailability:
+        from .icons import query_icon
+        return query_icon(self, name)
+
+    def copy_icon_asset(self, name: str) -> str | None:
+        from .icons import copy_asset
+        return copy_asset(self, name)
+
     def supports_time_field(self) -> bool:
         from .time_field_localized import supported
         return supported(self)
@@ -2021,6 +2082,8 @@ class App:
 
     def close(self) -> None:
         if self._ptr:
+            if self._icons_active:
+                self._ensure_icon_thread()
             if self._time_field_enabled:
                 import threading
                 if threading.get_ident() != self._time_field_owner_thread:
@@ -2038,6 +2101,8 @@ class App:
                     node._request_callback = None
                 if isinstance(node, LocalizedTimeField):
                     node._time_callback = None
+                if isinstance(node, (ConfiguredIcon, ConfiguredBadge)):
+                    node._release_icon_config()
             self._by_handle.clear()
 
     def __enter__(self) -> "App":
@@ -2111,3 +2176,11 @@ from .skeleton_presentation import (SkeletonWidth, SkeletonConfig, SkeletonPrese
                                     ResponsiveSkeleton, responsive_skeleton)
 from .skeleton_presentation import __all__ as _skeleton_exports
 __all__ += _skeleton_exports
+
+from .icons import (BadgeConfig, BadgeResult, BadgeSize, BadgeVariant, ConfiguredBadge,
+    ConfiguredIcon, IconAlign, IconAvailability, IconBitmap, IconCatalogEntry, IconConfig,
+    IconConstraints, IconError, IconInfo, IconLimits, IconOptions, IconResource, IconResult,
+    IconSize, IconSource, IconSourceKind, IconStyle, configured_badge, configured_icon,
+    icon_rotation)
+from .icons import __all__ as _icon_exports
+__all__ += _icon_exports

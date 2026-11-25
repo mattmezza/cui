@@ -69,6 +69,16 @@ add_test(NAME bridge_python_skeleton COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_skeleton_example COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/skeleton_profile.py)
+set(CUI_PYTHON_ICON_BADGE_LEGACY_LIBRARY "" CACHE FILEPATH "Optional published alpha.4 bridge")
+set(CUI_PYTHON_ICON_BADGE_PARTIAL_LIBRARY "" CACHE FILEPATH "Optional bridge with incomplete Badge symbols")
+add_test(NAME bridge_python_icons COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ CUI_ICON_BADGE_LEGACY_LIBRARY=${CUI_PYTHON_ICON_BADGE_LEGACY_LIBRARY}
+ CUI_ICON_BADGE_PARTIAL_LIBRARY=${CUI_PYTHON_ICON_BADGE_PARTIAL_LIBRARY}
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_icons.py)
+add_test(NAME bridge_python_icon_badge_example COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/icon_badge_inbox.py)
 option(CUI_BRIDGE_NATIVE_TESTS "Register opt-in Linux invisible native binding checks" OFF)
 option(CUI_GO_SKELETON_TESTS "Check responsive Skeleton authoring with Go on Linux" OFF)
 if(CUI_GO_SKELETON_TESTS)
@@ -159,6 +169,11 @@ if(CUI_BRIDGE_NATIVE_TESTS)
  add_test(NAME bridge_python_skeleton_native COMMAND ${CMAKE_COMMAND} -E env
   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
   ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/skeleton_profile.py
+  --font ${CUI_TEST_FONT} --smoke)
+ add_test(NAME bridge_python_icon_badge_native COMMAND ${CMAKE_COMMAND} -E env
+  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+  SDL_RENDER_DRIVER=software
+  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/icon_badge_inbox.py
   --font ${CUI_TEST_FONT} --smoke)
 endif()
 

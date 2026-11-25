@@ -106,6 +106,6 @@ reset, and when the latest accepted step omitted the Icon or stopped before
 composition. Reading a result leaves rendering and resources untouched.
 
 The [retained Badge](BRIDGE_BADGE.md) uses the same owned resources and Icon
-options. Configurable Spinner and resource and presentation builders for
-Python, JavaScript, TypeScript, Go and Rust remain open. Existing language
-builders continue to serve named Icons.
+options. The [Python builders](PYTHON_ICON_BADGE.md) expose those shared
+resources and both components. Configurable Spinner and extended JavaScript,
+TypeScript, Go and Rust authoring remain open.

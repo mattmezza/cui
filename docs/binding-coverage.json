@@ -78,7 +78,7 @@
       "omissions": [
         {
           "header": "include/cui/cui_bridge.h",
-          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "languages": ["javascript", "typescript", "go", "rust"],
           "types": [
             "cui_bridge_badge_config_v1",
             "cui_bridge_badge_result_v1"
@@ -88,7 +88,7 @@
             "cui_bridge_badge_configure_v1",
             "cui_bridge_badge_get_result_v1"
           ],
-          "note": "Configured Badge children and owned SVG are available in the C bridge. Language builders still expose the scalar text pill."
+          "note": "C and Python support configured Badge children and owned SVG. JavaScript, TypeScript, Go and Rust expose the scalar text pill."
         }
       ]
     },
@@ -246,7 +246,7 @@
       "omissions": [
         {
           "header": "include/cui/cui_bridge.h",
-          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "languages": ["javascript", "typescript", "go", "rust"],
           "types": [
             "cui_bridge_icon_options_v1",
             "cui_bridge_icon_result_v1"
@@ -255,7 +255,14 @@
             "cui_bridge_icon_configure_node_v1",
             "cui_bridge_icon_get_node_result_v1"
           ],
-          "note": "Owned resource creation and retained Icon configuration are available in the C bridge. Language builders use named Icons."
+          "note": "C and Python support owned resources and retained Icon configuration. JavaScript, TypeScript, Go and Rust use named Icons."
+        },
+        {
+          "header": "include/cui/cui_icon.h",
+          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "types": ["cui_icon_loader_fn"],
+          "symbols": ["cui_icon_set_path", "cui_icon_set_name"],
+          "note": "Direct C accepts arbitrary loader callbacks. Python path sources use a resource-local map of copied SVG data."
         }
       ]
     },
@@ -1271,19 +1278,20 @@
     ]
   },
   "owned_icon_resources_v1": {
-    "scope": "Optional C bridge resource/utilities group. Working source adds independently negotiated retained Icon presentation.",
+    "scope": "Optional C bridge resource/utilities group and independently negotiated retained Icon and Badge presentation.",
     "public_header": "include/cui/cui_bridge.h",
     "languages": {
-      "python": "documented_omission",
+      "python": "tested_subset",
       "javascript": "documented_omission",
       "typescript": "documented_omission",
       "go": "documented_omission",
       "rust": "documented_omission"
     },
-    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Configured Icon and Badge are available in the C bridge. Foreign authoring remains open.",
+    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python also exposes owned SVG resources and catalog/cache utilities, configured retained Icon and Badge builders, copied results and Indicator geometry. See the guide for optional provider support.",
     "guide": "docs/BRIDGE_ICON_RESOURCES.md",
     "presentation_guide": "docs/BRIDGE_ICON_PRESENTATION.md",
     "badge_guide": "docs/BRIDGE_BADGE.md",
+    "python_guide": "docs/PYTHON_ICON_BADGE.md",
     "receipt": "docs/validation/bridge-icon-resources-root.json"
   }
 }

@@ -42,8 +42,8 @@ struct cui_sdl3 {
     cui_text_paint text_paint;
     float density_x, density_y, text_density;
     bool quit, glyph_ok, ime_composing, ime_commit_pending, input_suspended;
+    bool ime_uses_input_state;
     cui_id ime_focus;
-    uint64_t ime_generation;
     cui_text_input_state input_state;
     bool input_active;
     glyph_entry glyphs[GLYPH_CACHE_SLOTS];
@@ -236,13 +236,13 @@ static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided,
         SDL_StopTextInput(s->window);
         reset_input = true;
         s->input_active = false;
-        if ((s->ime_composing || s->ime_commit_pending) && !s->ime_generation)
+        if ((s->ime_composing || s->ime_commit_pending) && !s->ime_uses_input_state)
             (void)cui_queue_event(ui, (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL,
                                                   .composition_target = s->ime_focus});
         /* Delegated sessions already lost their published owner/generation. */
         s->ime_composing = s->ime_commit_pending = false;
         s->ime_focus = 0;
-        s->ime_generation = 0;
+        s->ime_uses_input_state = false;
     }
     if (eligible && !s->input_active) {
         SDL_PropertiesID properties = SDL_CreateProperties();
@@ -392,13 +392,14 @@ static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided,
             }
             if (!s->ime_composing && !s->ime_commit_pending) {
                 s->ime_focus = cui_focused(ui);
-                s->ime_generation = 0;
-                if (eligible && input.owner != s->ime_focus) {
-                    s->ime_focus = input.owner;
-                    s->ime_generation = input.generation;
-                }
+                s->ime_uses_input_state = eligible && s->input_state.owner != s->ime_focus;
+                if (s->ime_uses_input_state)
+                    s->ime_focus = s->input_state.owner;
             }
-            ime_generation = s->ime_generation;
+            /* A change to the SDL text session retires composition before
+               replacing input_state, so this is the captured generation. */
+            if (s->ime_uses_input_state)
+                ime_generation = s->input_state.generation;
             v.composition_target = s->ime_focus;
             v.type = e.edit.text && e.edit.text[0] ? CUI_EVENT_COMPOSITION_UPDATE
                                                    : CUI_EVENT_COMPOSITION_CANCEL;
@@ -426,12 +427,13 @@ static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided,
             }
             if (s->ime_composing || s->ime_commit_pending) {
                 v.composition_target = s->ime_focus;
-                ime_generation = s->ime_generation;
+                if (s->ime_uses_input_state)
+                    ime_generation = s->input_state.generation;
             }
             v.type = s->ime_composing || s->ime_commit_pending ? CUI_EVENT_COMPOSITION_COMMIT
                                                                : CUI_EVENT_TEXT;
             s->ime_composing = s->ime_commit_pending = false;
-            s->ime_generation = 0;
+            s->ime_uses_input_state = false;
             v.text_data = e.text.text;
             v.text_length = e.text.text ? SDL_strlen(e.text.text) : 0;
             if (v.text_length < sizeof(v.text) && v.text_length)
@@ -445,7 +447,7 @@ static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided,
             s->input_suspended = true;
             s->wheel_shift = false;
             s->ime_composing = s->ime_commit_pending = false;
-            s->ime_generation = 0;
+            s->ime_uses_input_state = false;
             v.type = CUI_EVENT_CANCEL;
             leave_after = true;
             break;

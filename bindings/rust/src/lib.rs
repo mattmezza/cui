@@ -420,6 +420,18 @@ pub struct DataTableState {
     pub sort_column: u32,
     pub sort_direction: u32,
 }
+/// Copied DataTable demand from a successful frame. The visible range is
+/// half-open. The last row key is zero for an empty table.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DataTableLoadMore {
+    pub frame_sequence: u64,
+    pub row_count: u32,
+    pub visible_begin: u32,
+    pub visible_end: u32,
+    pub last_row_key: u32,
+    pub capacity: u32,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct QuestionnaireState {
     pub current: Option<Node>,
@@ -843,6 +855,86 @@ fn data_table_keyed_setter() -> Option<DataTableKeyedSetter> {
 
 #[cfg(not(any(cui_bridge_static, unix, windows)))]
 fn data_table_keyed_setter() -> Option<DataTableKeyedSetter> {
+    None
+}
+
+#[repr(C)]
+#[derive(Default)]
+struct DataTableLoadMoreRaw {
+    frame: u64,
+    row_count: u32,
+    visible_begin: u32,
+    visible_end: u32,
+    last_row_key: u32,
+    capacity: u32,
+    reserved: u32,
+}
+const DATA_TABLE_PAGING_V1_SIZE: u32 = 32;
+const _: [(); DATA_TABLE_PAGING_V1_SIZE as usize] =
+    [(); std::mem::size_of::<DataTableLoadMoreRaw>()];
+
+type ConfigureDataTablePaging = unsafe extern "C" fn(*mut c_void, RawNode, u32, u32) -> u32;
+type PollDataTablePaging =
+    unsafe extern "C" fn(*mut c_void, RawNode, u32, *mut DataTableLoadMoreRaw) -> u32;
+
+#[derive(Clone, Copy)]
+struct DataTablePagingApi {
+    configure: ConfigureDataTablePaging,
+    poll: PollDataTablePaging,
+}
+
+#[cfg(cui_bridge_static)]
+fn data_table_paging_api() -> Option<DataTablePagingApi> {
+    extern "C" {
+        fn cui_bridge_data_table_load_more_size_v1() -> u32;
+        fn cui_bridge_data_table_configure_load_more_v1(
+            app: *mut c_void,
+            node: RawNode,
+            enabled: u32,
+            threshold: u32,
+        ) -> u32;
+        fn cui_bridge_data_table_poll_load_more_v1(
+            app: *mut c_void,
+            node: RawNode,
+            size: u32,
+            out: *mut DataTableLoadMoreRaw,
+        ) -> u32;
+    }
+    (unsafe { cui_bridge_data_table_load_more_size_v1() } == DATA_TABLE_PAGING_V1_SIZE).then_some(
+        DataTablePagingApi {
+            configure: cui_bridge_data_table_configure_load_more_v1,
+            poll: cui_bridge_data_table_poll_load_more_v1,
+        },
+    )
+}
+
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn data_table_paging_api() -> Option<DataTablePagingApi> {
+    // The linked provider stays loaded for the life of the process.
+    static API: std::sync::OnceLock<Option<DataTablePagingApi>> = std::sync::OnceLock::new();
+    *API.get_or_init(|| unsafe {
+        let size =
+            notification_symbol_v1(b"cui_bridge_data_table_load_more_size_v1\0".as_ptr().cast());
+        let configure = notification_symbol_v1(
+            b"cui_bridge_data_table_configure_load_more_v1\0"
+                .as_ptr()
+                .cast(),
+        );
+        let poll =
+            notification_symbol_v1(b"cui_bridge_data_table_poll_load_more_v1\0".as_ptr().cast());
+        if size.is_null() || configure.is_null() || poll.is_null() {
+            return None;
+        }
+        let size = std::mem::transmute::<*mut c_void, unsafe extern "C" fn() -> u32>(size);
+        (size() == DATA_TABLE_PAGING_V1_SIZE).then_some(DataTablePagingApi {
+            configure: std::mem::transmute::<*mut c_void, ConfigureDataTablePaging>(configure),
+            poll: std::mem::transmute::<*mut c_void, PollDataTablePaging>(poll),
+        })
+    })
+}
+
+#[cfg(not(any(cui_bridge_static, unix, windows)))]
+fn data_table_paging_api() -> Option<DataTablePagingApi> {
     None
 }
 
@@ -1485,6 +1577,58 @@ impl App {
     /// Whether the linked bridge can replace DataTable rows by key.
     pub fn supports_keyed_data_table(&self) -> bool {
         data_table_keyed_setter().is_some()
+    }
+
+    /// Whether the linked bridge provides the complete, compatible paging API.
+    pub fn supports_data_table_paging(&self) -> bool {
+        data_table_paging_api().is_some()
+    }
+
+    /// Set an opt-in threshold of 0 through 32 rows. Bind column headers first,
+    /// even for an empty table. A provider without paging returns `Error(9)`.
+    pub fn configure_data_table_load_more(
+        &mut self,
+        n: Node,
+        enabled: bool,
+        threshold: u32,
+    ) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        if threshold > 32 {
+            return Err(Error(3));
+        }
+        let api = data_table_paging_api().ok_or(Error(9))?;
+        check(unsafe { (api.configure)(self.raw, n, u32::from(enabled), threshold) })?;
+        Ok(self)
+    }
+
+    /// Consume a copied demand without dispatching callbacks. The application
+    /// owns any in-flight request. The returned copy can outlive the app.
+    pub fn poll_data_table_load_more(&mut self, n: Node) -> Result<Option<DataTableLoadMore>> {
+        let n = self.valid(n)?;
+        let api = data_table_paging_api().ok_or(Error(9))?;
+        let mut raw = DataTableLoadMoreRaw::default();
+        let status = unsafe { (api.poll)(self.raw, n, DATA_TABLE_PAGING_V1_SIZE, &mut raw) };
+        if status == 1 {
+            return Ok(None);
+        }
+        check(status)?;
+        if raw.reserved != 0
+            || raw.frame == 0
+            || raw.visible_begin > raw.visible_end
+            || raw.visible_end > raw.row_count
+            || raw.row_count >= raw.capacity
+            || (raw.row_count == 0) != (raw.last_row_key == 0)
+        {
+            return Err(Error(8));
+        }
+        Ok(Some(DataTableLoadMore {
+            frame_sequence: raw.frame,
+            row_count: raw.row_count,
+            visible_begin: raw.visible_begin,
+            visible_end: raw.visible_end,
+            last_row_key: raw.last_row_key,
+            capacity: raw.capacity,
+        }))
     }
 
     /// Copy a matrix with a distinct nonzero key for each row. Replacement
@@ -2538,6 +2682,12 @@ impl<'a> Builder<'a> {
     }
     pub fn data_table_selection_mode(self, mode: DataTableSelectionMode) -> Result<Self> {
         self.app.data_table_selection_mode(self.node, mode)?;
+        Ok(self)
+    }
+    /// Opt into paging after setting the column headers with a data setter.
+    pub fn data_table_load_more(self, threshold: u32) -> Result<Self> {
+        self.app
+            .configure_data_table_load_more(self.node, true, threshold)?;
         Ok(self)
     }
     pub fn root_padding(self, padding: f32) -> Result<Self> {

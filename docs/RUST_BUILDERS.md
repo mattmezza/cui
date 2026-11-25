@@ -140,9 +140,51 @@ cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --example 
 
 For the native window, add `-- --font /absolute/path/to/font.ttf` and use an
 SDL-enabled shared bridge via `CUI_BRIDGE_LIB_DIR`, or add `--features native`
-for the bundled Linux build. The inbox uses a local page arrival. Your
-application controls loading. The Rust builders currently expose keyed
-replacement. [Paging support](BRIDGE_COMPONENTS.md#load-another-datatable-page)
+for the bundled Linux build. The inbox uses a local page arrival.
+[Paged inbox](#page-a-rust-datatable)
+
+## Page a Rust DataTable
+
+Check `app.supports_data_table_paging()` before opting in. Providers without
+the complete V1 group still support ordinary tables. An explicit paging call
+returns `Error(9)` on those providers and keeps the existing table intact.
+
+```rust
+let table = app.build_child(root, Kind::DataTable, "inbox")?
+    .data_table_keyed(headers, initial_rows, initial_keys)?
+    .data_table_load_more(0)?
+    .finish();
+
+// After a successful frame, on the UI thread.
+if let Some(request) = app.poll_data_table_load_more(table)? {
+    app.configure_data_table_load_more(table, false, 0)?;
+    // Enqueue work using this observation and your own request identity.
+    submit_page(request);
+}
+```
+
+The remaining-row threshold is 0 through 32. With 0, demand is raised when the
+visible window reaches the last row. For an initial page, bind column headers
+and empty rows before opting in. `poll_data_table_load_more` consumes one
+copied `DataTableLoadMore` with the `u64` frame sequence, row count, half-open
+visible range, last local row key and capacity. The callback queue is
+independent. The copy remains valid after removing the table or dropping the app.
+
+Keep the service cursor and one in-flight request in application state.
+Rows stay interactive while paging is off. Check that a response still belongs
+to the current request before using `data_table_keyed` to append it. Enable
+paging again if the source has more rows. The retained bridge holds up to 32.
+
+Use `App::run_with` to poll demand and ready completions in a synchronous
+after-frame hook, or poll after `step` in a manual loop. Apply responses on
+the app's creating thread. The example uses a local source and demonstrates
+selection during loading, retry, stale-response rejection and anchored append.
+[Runnable paged inbox](../bindings/rust/examples/data_table_paging.rs)
+
+```sh
+cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --example data_table_paging
+cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --features native --example data_table_paging -- --font /path/to/font.ttf
+```
 
 ## Composed workspace example
 

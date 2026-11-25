@@ -75,7 +75,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Editor | `cui_editor` | Owned multiline UTF-8 model, native line-numbered editing, copied text CHANGE, language label and disabled state | 4096 UTF-8 bytes and 512 layout lines; no host syntax-highlighting, completion, search, or clipboard callbacks |
 | Chart | `cui_chart` | Copied up to 64 labeled numeric data points, native line/area/bar/pie raster and hover, data readback, disabled | Up to 512×512 pixels; one series, default native tooltip; no custom callbacks, candle, radar, or Sankey |
 | Table | `cui_table_begin_ex`, checked row/cell APIs | Item rows and nested Item cells with copied text, native table semantics and layout; first row is header | Up to 64 rows/64 cells per row; fixed equal column widths, text-only cells; no sort, selection, or virtualization |
-| DataTable | `cui_data_table` | Copied matrix, virtualized viewport, optional keyed replacement, row/column/cell selection, sortable headers, cell/state/bounds queries, copied CHANGE snapshots, optional near-end polling in C, Python, JavaScript, TypeScript and Go | 32 rows × 16 columns, 128 UTF-8 bytes per cell, row selection by default, caller-owned sorting and page delivery, no custom cell content |
+| DataTable | `cui_data_table` | Copied matrix, virtualized viewport, optional keyed replacement, row/column/cell selection, sortable headers, cell/state/bounds queries, copied CHANGE snapshots, optional near-end polling in C, Python, JavaScript, TypeScript, Go and Rust | 32 rows × 16 columns, 128 UTF-8 bytes per cell, row selection by default, caller-owned sorting and page delivery, no custom cell content |
 | Plot | `cui_plot_dots` | Copied up to 256 Cartesian (x,y) samples, native themed point rendering, point readback | Dot plot only; coordinates within ±16384, no path, axis, zoom, or point hit model |
 | Command | `cui_command` | Up to 64 Item actions, owned UTF-8 query editor, native keyword filtering, keyboard/pointer selection, copied query/selection CHANGE and Item confirm CLICK | Flat palette; Item detail is one keyword string, no grouped headings, custom row content, or host action callback |
 | VirtualList | `cui_virtual_list_draw` | Up to 64 keyed Item rows, native overscanned vertical viewport, wheel/keyboard scroll, copied offset CHANGE, visible Item bounds, disabled | Fixed 32px rows, vertical only; no intrinsic row sizing or host data provider |
@@ -186,10 +186,11 @@ A successful replacement clears any unclaimed edge and keeps the policy.
 Changing the policy or disabling the table also clears the edge. Removing
 the table retires its handle. A failed step discards edges first raised in
 that step. A full 32-row table cannot request another page. The application
-owns page delivery. The Rust builder currently exposes keyed replacement.
+owns page delivery.
 [Python paging example](BINDING_BUILDERS.md#page-a-python-datatable) ·
 [JavaScript and TypeScript paging examples](BINDING_BUILDERS.md#page-a-javascript-or-typescript-datatable) ·
-[Go paging example](GO_BUILDERS.md#page-a-go-datatable)
+[Go paging example](GO_BUILDERS.md#page-a-go-datatable) ·
+[Rust paging example](RUST_BUILDERS.md#page-a-rust-datatable)
 
 The [offline inbox](../bindings/bridge/examples/data_table_paging.c) scrolls
 to the end, drives row selection while loading, retries, ignores the old

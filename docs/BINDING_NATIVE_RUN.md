@@ -30,7 +30,9 @@ is released and the app is terminal: release the app owner as usual. Python
 handler; the bridge defers actual destruction until the runner exits. These
 wrappers invalidate their handles immediately and avoid using them afterward.
 Rust ownership prevents dropping a mutably borrowed app while `run` is active;
-use `run_with(|app| app.close())` for a safe close request/update hook.
+use `run_with(|app| app.close())` for a close request from its after-frame hook.
+The same hook can poll paging demand after regular dispatch.
+[Rust paging example](RUST_BUILDERS.md#page-a-rust-datatable)
 
 Manual APIs remain: Python `step`/`dispatch`, Go `Step`/`Dispatch`, Rust
 `step`/`dispatch`/`frame`, and Node `step`. Node `start`/`stop` still use timers and

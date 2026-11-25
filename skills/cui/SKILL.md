@@ -382,7 +382,9 @@ the current rows interactive. See **Paged inbox** and the paging guide in
 demand has a `bigint` frame sequence. See offline inboxes and loop options in
 `docs/BINDING_BUILDERS.md`. Go uses `LoadMore`, `ConfigureLoadMore` and
 `PollLoadMore` after checking `SupportsDataTablePaging`. See the inbox and
-owner-thread `RunWith` hook in `docs/GO_BUILDERS.md`. Rust omits this poll.
+owner-thread `RunWith` hook in `docs/GO_BUILDERS.md`. Rust uses
+`data_table_load_more` and `poll_data_table_load_more` with the same capability
+query. See the headless and native inbox in `docs/RUST_BUILDERS.md`.
 For variable-height VirtualList updates in C, capture an anchor before
 rebuilding keys or changing heights and restore it before the next draw.
 Retain the within-row offset for surviving keys. Clear it if a removed item's

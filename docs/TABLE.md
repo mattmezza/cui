@@ -194,14 +194,15 @@ flag after completion or cancellation. To rearm after cancellation, submit with
 gallery keeps its old rows and lets the user leave and re-enter the threshold
 to retry. The copyable C example shows the request and completion steps.
 
-Retained C, Python, JavaScript, TypeScript and Go applications can configure the
+Retained C, Python, JavaScript, TypeScript, Go and Rust applications can configure the
 threshold and poll one copied near-end snapshot after a successful step. The
-examples exercise final-page delivery. The C, Python, JavaScript and Go
+examples exercise final-page delivery. The C, Python, JavaScript, Go and Rust
 examples also demonstrate logical cancellation and rejection of a late response.
 [C paging](BRIDGE_COMPONENTS.md#load-another-datatable-page) ·
 [Python paging](BINDING_BUILDERS.md#page-a-python-datatable) ·
 [JavaScript and TypeScript paging](BINDING_BUILDERS.md#page-a-javascript-or-typescript-datatable) ·
-[Go paging](GO_BUILDERS.md#page-a-go-datatable)
+[Go paging](GO_BUILDERS.md#page-a-go-datatable) ·
+[Rust paging](RUST_BUILDERS.md#page-a-rust-datatable)
 
 Custom leaf-header, group-header, row-header, whole-row and trailing-column render hooks use option userdata. Group headers accept up to sixteen levels of bounded spans. Every level must cover all data columns exactly, and no group may cross the fixed-column boundary; `cui_table_group_headers_valid` lets applications validate a configuration before rendering. Group cells expose column-header semantics at their first column; the callback receives the complete span. Whole-row callbacks run only for virtualized rows and can add row-level decoration or content before the cells. The optional trailing column uses a caller-selected width (12 logical pixels by default) and participates in horizontal scroll extent; its callback runs for each header level, the leaf header and visible rows. Loading replaces body rows with a busy status and suppresses input/load requests; empty and loading placeholders have optional render hooks and accessible default labels.
 

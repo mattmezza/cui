@@ -341,29 +341,47 @@ if(CUI_RUST_ICON_TESTS)
   endif()
  endforeach()
 endif()
-option(CUI_RUST_KEYED_DATA_TABLE_TESTS "Check keyed DataTable authoring with Rust on Linux" OFF)
+option(CUI_RUST_KEYED_DATA_TABLE_TESTS "Check keyed DataTable authoring and paging with Rust on Linux" OFF)
 if(CUI_RUST_KEYED_DATA_TABLE_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR "Rust keyed DataTable provider tests currently support Linux only")
  endif()
  find_program(CUI_RUST_KEYED_DATA_TABLE_CARGO cargo REQUIRED)
  set(CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY "" CACHE FILEPATH "Optional existing bridge without keyed tables")
- function(cui_rust_keyed_data_table_test suffix target library legacy)
-  add_test(NAME bridge_rust_keyed_data_table_${suffix} COMMAND ${CMAKE_COMMAND} -E env
-   --unset=CUI_BRIDGE_LIB_DIR --unset=LD_LIBRARY_PATH
+ function(cui_rust_data_table_test name target library legacy)
+  add_test(NAME bridge_rust_${name} COMMAND ${CMAKE_COMMAND} -E env
+   --unset=CUI_BRIDGE_LIB_DIR --unset=LD_LIBRARY_PATH --unset=LD_PRELOAD
    CARGO_TARGET_DIR=${target} RUSTFLAGS=-Dwarnings SDL_RENDER_DRIVER=software
    CUI_RUST_KEYED_DATA_TABLE_LEGACY=${legacy} ${library}
    ${CUI_RUST_KEYED_DATA_TABLE_CARGO} ${ARGN})
-  set_tests_properties(bridge_rust_keyed_data_table_${suffix} PROPERTIES
+  set_tests_properties(bridge_rust_${name} PROPERTIES
    WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/rust" RUN_SERIAL TRUE TIMEOUT 600)
  endfunction()
  set(_cui_rust_table_shared CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>)
- cui_rust_keyed_data_table_test(dynamic "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
+ cui_rust_data_table_test(keyed_data_table_dynamic "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
   test --offline --locked -j1 --test data_table_keyed)
- cui_rust_keyed_data_table_test(static "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+ cui_rust_data_table_test(keyed_data_table_static "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
   test --offline --locked -j1 --test data_table_keyed)
- cui_rust_keyed_data_table_test(example "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+ cui_rust_data_table_test(keyed_data_table_example "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
   run --offline --locked -j1 --example data_table_live)
+ cui_rust_data_table_test(data_table_paging_dynamic "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
+  test --offline --locked -j1 --test data_table_paging)
+ cui_rust_data_table_test(data_table_paging_static "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+  test --offline --locked -j1 --test data_table_paging)
+ cui_rust_data_table_test(data_table_paging_example "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+  run --offline --locked -j1 --example data_table_paging)
+ add_library(cui_rust_paging_fixture SHARED ${CUI_BRIDGE_ROOT}/bindings/tests/data_table_paging_provider.c)
+ target_include_directories(cui_rust_paging_fixture PRIVATE ${CUI_BRIDGE_ROOT}/include)
+ cui_warnings(cui_rust_paging_fixture)
+ foreach(mode exact frame reserved window visible capacity key size)
+  set(selection copied_record_is_validated)
+  if(mode STREQUAL "size")
+   set(selection incompatible_provider_leaves_positional_tables_usable)
+  endif()
+  cui_rust_data_table_test(data_table_paging_${mode} "${CUI_RUST_SKELETON_TARGET_DIR}"
+   "${_cui_rust_table_shared};LD_PRELOAD=$<TARGET_FILE:cui_rust_paging_fixture>;CUI_DATA_TABLE_PAGING_FIXTURE=${mode}" 0
+   test --offline --locked -j1 --test data_table_paging -- --exact ${selection})
+ endforeach()
  if(CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY)
   if(NOT EXISTS "${CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY}" OR IS_DIRECTORY "${CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY}")
    message(FATAL_ERROR "CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY must name an existing bridge")
@@ -371,12 +389,27 @@ if(CUI_RUST_KEYED_DATA_TABLE_TESTS)
   set(provider_dir "${CMAKE_CURRENT_BINARY_DIR}/rust-keyed-data-table-legacy")
   file(MAKE_DIRECTORY "${provider_dir}")
   file(CREATE_LINK "${CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY}" "${provider_dir}/libcui_bridge.so" SYMBOLIC)
-  cui_rust_keyed_data_table_test(legacy "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared};LD_LIBRARY_PATH=${provider_dir}" 1
+  cui_rust_data_table_test(keyed_data_table_legacy "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared};LD_LIBRARY_PATH=${provider_dir}" 1
    test --offline --locked -j1 --test data_table_keyed -- --exact legacy_provider_keeps_positional_tables_usable)
+  set(_cui_rust_table_older "CUI_BRIDGE_LIB_DIR=${provider_dir};LD_LIBRARY_PATH=${provider_dir}")
+  cui_rust_data_table_test(data_table_paging_legacy "${CUI_RUST_SKELETON_TARGET_DIR}"
+   "${_cui_rust_table_older};CUI_DATA_TABLE_PAGING_FIXTURE=legacy" 1
+   test --offline --locked -j1 --test data_table_paging -- --exact incompatible_provider_leaves_positional_tables_usable)
+  add_library(cui_rust_partial_paging_fixture SHARED ${CUI_BRIDGE_ROOT}/bindings/tests/data_table_paging_provider.c)
+  target_include_directories(cui_rust_partial_paging_fixture PRIVATE ${CUI_BRIDGE_ROOT}/include)
+  target_compile_definitions(cui_rust_partial_paging_fixture PRIVATE CUI_TEST_PARTIAL_PAGING_PROVIDER)
+  cui_warnings(cui_rust_partial_paging_fixture)
+  cui_rust_data_table_test(data_table_paging_partial "${CUI_RUST_SKELETON_TARGET_DIR}"
+   "${_cui_rust_table_older};LD_PRELOAD=$<TARGET_FILE:cui_rust_partial_paging_fixture>;CUI_DATA_TABLE_PAGING_FIXTURE=partial" 1
+   test --offline --locked -j1 --test data_table_paging -- --exact incompatible_provider_leaves_positional_tables_usable)
  endif()
  if(CUI_BRIDGE_NATIVE_TESTS)
-  cui_rust_keyed_data_table_test(native "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
+  cui_rust_data_table_test(keyed_data_table_native "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
    run --offline --locked -j1 --example data_table_live -- --font ${CUI_TEST_FONT} --smoke)
+  cui_rust_data_table_test(data_table_paging_native "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
+   run --offline --locked -j1 --example data_table_paging -- --font ${CUI_TEST_FONT} --smoke)
+  cui_rust_data_table_test(data_table_paging_native_bundled "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+   run --offline --locked -j1 --features native --example data_table_paging -- --font ${CUI_TEST_FONT} --smoke)
  endif()
 endif()
 if(CUI_BRIDGE_NATIVE_TESTS)

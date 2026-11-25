@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* Synthetic V1 wire records shared by the Node and Go suites. */
+/* Synthetic V1 wire records shared by the Node, Go and Rust suites. */
 #include <cui/cui_bridge.h>
 #include <stdlib.h>
 #include <string.h>

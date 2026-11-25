@@ -134,11 +134,15 @@ The failure fixture discards the working copy after an invalidated frame and
 checks recovery and absence of replay. A change to minute precision checks
 that a formerly visible Second hit cannot select the now-hidden segment.
 
-The next C layer needs admission tied to real widget submission, explicit
-lifetimes and state application, current eligibility and geometry identity,
-and consistent handling of disabled or omitted participants. It also needs to
-define the last rejection point for a staged edit. Later layout or rendering
-failure can occur after synchronous observers have already acted. The private
-test exercises discarding the edit before application. Browser default
-behavior, actual IME editing, root accessibility mapping and foreign
-authoring still need their own paths and verification.
+## Direct C implementation
+
+The [localized guide](../TIME_FIELD_LOCALIZED.md#one-tab-stop-per-field) defines
+admission, borrowing, dispatch and state application. The public tests exercise
+two fields in one batch, submit them in reverse order, and check a real sibling
+activation. They also cover a Styled segment hit, disabled and omitted roots,
+failed admission, and discarding an edit before application. Layout or rendering
+can fail after a synchronous observer has acted. The C route has a headless
+[two-field example](../../examples/time_field_ordered.c).
+
+Browser default Tab, IME in the ordered route, platform accessibility mapping
+and foreign authoring still need integration and verification.

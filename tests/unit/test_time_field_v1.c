@@ -845,6 +845,193 @@ static void explicit_appearance(void) {
     assert(cui_end_frame(f.ui).count == 0);
     cui_destroy(f.ui);
 }
+
+typedef struct {
+    cui_context *ui;
+    cui_id id;
+    cui_time *value;
+    size_t calls;
+} ordered_observer;
+
+static void ordered_changed(void *user, const cui_time_change *event) {
+    ordered_observer *observer = user;
+    assert(event->event.target == observer->id && event->event.frame_sequence &&
+           same(event->value, *observer->value));
+    cui_id hour = cui_time_segment_id(observer->id, CUI_TIME_FIELD_HOUR_V1);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(observer->ui, &count);
+    bool published = false;
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].id == hour)
+            published = semantics[i].value == event->value.hour;
+    assert(published);
+    /* Teardown and recursive ordered submission are blocked during the call. */
+    cui_destroy(observer->ui);
+    assert(cui_base_time_field_from_frame_v1(observer->ui, observer->id, cui_string("Duplicate"),
+                                             (cui_time_handler){0})
+               .status == CUI_TIME_TEXT_INVALID_ARGUMENT);
+    assert(cui_frame_is_submitting(observer->ui));
+    observer->calls++;
+}
+
+static cui_time_field_result_v1 ordered_story(fixture *f, cui_id id, ordered_observer *observer) {
+    if (id == 20)
+        return cui_time_field_from_frame_v1(f->ui, id, &f->theme, cui_string("Start"),
+                                            CUI_DESIGN_BASE,
+                                            (cui_time_handler){ordered_changed, observer});
+    cui_time_field_result_v1 result = cui_base_time_field_from_frame_v1(
+        f->ui, id, cui_string("End"), (cui_time_handler){ordered_changed, observer});
+    if (result.status == CUI_TIME_TEXT_OK) {
+        cui_begin_box(f->ui, id, (cui_box){.row = true});
+        for (unsigned i = 0; i < 2; i++) {
+            cui_begin_box(f->ui, cui_time_segment_id(id, i), (cui_box){.width = 45, .height = 26});
+            cui_end_box(f->ui);
+        }
+        cui_end_box(f->ui);
+    }
+    return result;
+}
+
+static void ordered_public(void) {
+    fixture f;
+    init(&f, true);
+    cui_time other = {10, 45, 0};
+    cui_time_field_state_v1 other_state;
+    cui_time_field_options_v1 other_options = f.options;
+    assert(cui_time_field_state_init_v1(&other_state, other, &other_options) == CUI_TIME_TEXT_OK);
+    cui_time_field_frame_entry_v1 entries[] = {{20, &f.state, &f.time, &f.options},
+                                               {25, &other_state, &other, &other_options}};
+    ordered_observer first = {f.ui, 20, &f.time, 0}, second = {f.ui, 25, &other, 0};
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, entries, 2) == CUI_TIME_TEXT_OK);
+    neighbor(f.ui, 10);
+    assert(ordered_story(&f, 20, &first).status == CUI_TIME_TEXT_OK);
+    assert(ordered_story(&f, 25, &second).status == CUI_TIME_TEXT_OK);
+    neighbor(f.ui, 30);
+    cui_end_frame(f.ui);
+    assert(!first.calls && !second.calls);
+
+    cui_focus(f.ui, 10);
+    key(&f, CUI_KEY_TAB, 0);
+    text(&f, cui_string("3"));
+    key(&f, CUI_KEY_TAB, 0);
+    text(&f, cui_string("4"));
+    key(&f, CUI_KEY_TAB, 0);
+    key(&f, CUI_KEY_ENTER, 0);
+    cui_time_field_frame_entry_v1 duplicate[] = {entries[0], entries[0]};
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, duplicate, 2) ==
+           CUI_TIME_TEXT_INVALID_CONFIG);
+    f.options.flags = CUI_TIME_FIELD_IME_V1;
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, entries, 2) ==
+           CUI_TIME_TEXT_INVALID_CONFIG);
+    f.options.flags = 0;
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, entries, 2) == CUI_TIME_TEXT_OK);
+    assert(f.time.hour == 9 && other.hour == 10 && !first.calls && !second.calls);
+    assert(cui_event_target(f.ui, 1) == 20 && cui_event_target(f.ui, 3) == 25 &&
+           cui_event_target(f.ui, 5) == 30);
+    assert(cui_event_consumed(f.ui, 1) && cui_event_consumed(f.ui, 3));
+    neighbor(f.ui, 10);
+    cui_time_field_result_v1 a = ordered_story(&f, 25, &second);
+    assert(a.changed && a.change_count == 1 && other.hour == 4 && second.calls == 1);
+    assert(f.time.hour == 9 && !first.calls);
+    a = ordered_story(&f, 20, &first);
+    assert(a.changed && a.change_count == 1 && f.time.hour == 3 && first.calls == 1);
+    assert(ordered_story(&f, 20, &first).status == CUI_TIME_TEXT_INVALID_ARGUMENT);
+    assert(neighbor(f.ui, 30) && cui_event_accepted_activation(f.ui, 5) == 30);
+    cui_end_frame(f.ui);
+
+    /* Disabled and omitted fields are excluded at the next batch boundary. */
+    cui_focus(f.ui, 10);
+    key(&f, CUI_KEY_TAB, 0);
+    key(&f, CUI_KEY_UP, 0);
+    f.options.flags = CUI_TIME_FIELD_DISABLED_V1;
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, entries, 2) == CUI_TIME_TEXT_OK);
+    assert(cui_event_target(f.ui, 1) == 25);
+    assert(ordered_story(&f, 20, &first).status == CUI_TIME_TEXT_OK && first.calls == 1);
+    assert(ordered_story(&f, 25, &second).changed && other.minute == 46 && second.calls == 2);
+    neighbor(f.ui, 30);
+    cui_end_frame(f.ui);
+    assert(cui_focused(f.ui) == 25 && other_state.segment == CUI_TIME_FIELD_MINUTE_V1);
+    key(&f, CUI_KEY_ENTER, 0);
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, entries, 1) == CUI_TIME_TEXT_OK);
+    assert(!cui_event_target(f.ui, 0) && !cui_event_activation(f.ui, 0));
+    assert(ordered_story(&f, 20, &first).status == CUI_TIME_TEXT_OK);
+    cui_end_frame(f.ui);
+    assert(cui_last_error(f.ui) == CUI_OK && first.calls == 1 && second.calls == 2);
+    cui_destroy(f.ui);
+}
+
+static void ordered_pointer_and_discard(void) {
+    fixture f;
+    init(&f, true);
+    cui_time_field_frame_entry_v1 entry = {20, &f.state, &f.time, &f.options};
+    ordered_observer observer = {f.ui, 20, &f.time, 0};
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
+    assert(ordered_story(&f, 20, &observer).status == CUI_TIME_TEXT_OK);
+    cui_end_frame(f.ui);
+
+    cui_id minute = cui_time_segment_id(20, CUI_TIME_FIELD_MINUTE_V1);
+    cui_rect bounds = cui_bounds(f.ui, minute);
+    assert(bounds.w > 0 && bounds.h > 0);
+    cui_event pointer = {.type = CUI_EVENT_POINTER_DOWN,
+                         .pointer_button = CUI_POINTER_PRIMARY,
+                         .x = bounds.x + bounds.w * .5f,
+                         .y = bounds.y + bounds.h * .5f};
+    assert(cui_queue_event(f.ui, pointer));
+    pointer.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(f.ui, pointer));
+    key(&f, CUI_KEY_UP, 0);
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
+    assert(cui_event_target(f.ui, 0) == minute && cui_event_target(f.ui, 2) == 20 &&
+           cui_focused(f.ui) == 20);
+    assert(ordered_story(&f, 20, &observer).changed && f.time.minute == 31);
+    assert(f.state.segment == CUI_TIME_FIELD_MINUTE_V1 && observer.calls == 1);
+    cui_end_frame(f.ui);
+
+    key(&f, CUI_KEY_UP, 0);
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
+    assert(cui_event_consumed(f.ui, 0) && f.time.minute == 31);
+    cui_begin_portal(f.ui, 999, (cui_box){0}, (cui_rect){.w = -1}, 1);
+    cui_end_box(f.ui);
+    assert(cui_last_error(f.ui) == CUI_ERROR_LAYOUT);
+    cui_clear_error(f.ui);
+    assert(ordered_story(&f, 20, &observer).status == CUI_TIME_TEXT_INVALID_ARGUMENT);
+    cui_end_frame(f.ui);
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
+    assert(!ordered_story(&f, 20, &observer).changed && f.time.minute == 31 && observer.calls == 1);
+    neighbor(f.ui, 30);
+    cui_end_frame(f.ui);
+
+    cui_focus(f.ui, 20);
+    text(&f, cui_string("1"));
+    assert(cui_queue_accessibility_action(f.ui, 30, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_queue_accessibility_action(f.ui, 20, CUI_ACCESSIBILITY_FOCUS));
+    text(&f, cui_string("2"));
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
+    assert(cui_event_target(f.ui, 1) == 30 && cui_event_target(f.ui, 2) == 20);
+    assert(ordered_story(&f, 20, &observer).changed && f.time.minute == 2 && observer.calls == 2);
+    assert(f.state.segment == CUI_TIME_FIELD_MINUTE_V1);
+    cui_end_frame(f.ui);
+    cui_destroy(f.ui);
+}
+
+static void ordered_budget(void) {
+    fixture f;
+    init(&f, true);
+    cui_destroy(f.ui);
+    f.ui = cui_create((cui_config){.width = 1200, .height = 400, .resource_bytes = 1});
+    assert(f.ui);
+    cui_time_field_frame_entry_v1 entry = {20, &f.state, &f.time, &f.options};
+    text(&f, cui_string("3"));
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, &entry, 1) ==
+           CUI_TIME_TEXT_INVALID_ARGUMENT);
+    assert(cui_begin_frame(f.ui, 1200, 400, 0));
+    size_t count;
+    cui_frame_events(f.ui, &count);
+    assert(count == 1 && f.time.hour == 9);
+    (void)cui_end_frame(f.ui);
+    cui_destroy(f.ui);
+}
+
 static void composition_edits(bool styled, cui_design_size size) {
     fixture f;
     init(&f, styled);
@@ -1024,6 +1211,9 @@ int main(void) {
     atomic_preflight();
     pixels_and_text();
     explicit_appearance();
+    ordered_public();
+    ordered_pointer_and_discard();
+    ordered_budget();
     composition_edits(true, CUI_DESIGN_XL);
     printf("localized TimeField: PASS state=%zu options=%zu result=%zu\n",
            sizeof(cui_time_field_state_v1), sizeof(cui_time_field_options_v1),

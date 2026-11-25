@@ -64,6 +64,11 @@ static cui_core_ordered_input admission(working_time *work) {
     return (cui_core_ordered_input){.root = FIELD, .step = step, .user = work};
 }
 
+static bool begin_probe(cui_context *ui, const cui_core_ordered_input *input) {
+    return cui_core_ordered_ready(ui, input->root) &&
+           cui_core_begin_ordered_frame(ui, 640, 180, 0, input, 1);
+}
+
 static cui_interaction button(cui_context *ui, cui_id id) {
     cui_begin_box(ui, id, (cui_box){.width = 52, .height = 28});
     cui_interaction result =
@@ -140,7 +145,7 @@ static void ordered_batch(bool filter_text, bool reject_value) {
     token[0] = '9'; /* Core owns an exact copy of the queued digit. */
     key(ui, CUI_KEY_TAB, 0);
     key(ui, CUI_KEY_ENTER, 0);
-    assert(cui_core_begin_frame(ui, 640, 180, 0, false, &input));
+    assert(begin_probe(ui, &input));
     assert(cui_frame_input_snapshot_ready(ui));
     assert(cui_event_target(ui, 0) == FIELD && cui_event_target(ui, 1) == FIELD);
     assert(cui_event_consumed(ui, 0) && cui_event_consumed(ui, 1) == filter_text);
@@ -166,7 +171,7 @@ static void ordered_batch(bool filter_text, bool reject_value) {
                !receipt.has_release);
     }
     end(ui);
-    assert(cui_core_begin_frame(ui, 640, 180, 0, false, &input));
+    assert(begin_probe(ui, &input));
     assert(work.edits == (filter_text ? 0u : 1u) && !button(ui, AFTER).activated);
     end(ui);
     cui_destroy(ui);
@@ -186,7 +191,7 @@ static void retain_selection(void) {
     key(ui, CUI_KEY_ENTER, 0);
     key(ui, CUI_KEY_TAB, 0); /* Re-enter on Hour. */
     key(ui, CUI_KEY_TAB, 0); /* Hour to Minute. */
-    assert(cui_core_begin_frame(ui, 640, 180, 0, false, &input));
+    assert(begin_probe(ui, &input));
     assert(cui_event_target(ui, 0) == minute && cui_event_consumed(ui, 0));
     assert(cui_event_target(ui, 1) == FIELD && !cui_event_consumed(ui, 1));
     assert(cui_event_target(ui, 2) == FIELD && !cui_event_consumed(ui, 2));
@@ -202,7 +207,7 @@ static void retain_selection(void) {
     key(ui, CUI_KEY_TAB, 0); /* Exit from Second. */
     key(ui, CUI_KEY_ENTER, 0);
     assert(cui_queue_accessibility_action(ui, FIELD, CUI_ACCESSIBILITY_FOCUS));
-    assert(cui_core_begin_frame(ui, 640, 180, 0, false, &input));
+    assert(begin_probe(ui, &input));
     assert(cui_event_target(ui, 0) == second && cui_event_target(ui, 2) == AFTER &&
            cui_event_target(ui, 3) == FIELD);
     assert(cui_focused(ui) == FIELD && work.state.segment == CUI_TIME_FIELD_SECOND_V1);
@@ -217,11 +222,11 @@ static void invalid_admissions(void) {
     cui_context *ui = create();
     cui_core_ordered_input input = admission(&work);
     digit(ui, "3");
-    assert(!cui_core_begin_frame(ui, 640, 180, 0, false, &input)); /* No layout yet. */
+    assert(!begin_probe(ui, &input)); /* No layout yet. */
     assert(ui->queued_count == 1 && !work.edits && cui_focused(ui) == 0);
     prime(ui, &work, true);
     digit(ui, "3");
-    assert(!cui_core_begin_frame(ui, 640, 180, 0, false, &input)); /* Disabled prior root. */
+    assert(!begin_probe(ui, &input)); /* Disabled prior root. */
     assert(ui->queued_count == 1 && !work.edits);
     prime(ui, &work, false);
     assert(cui_begin_frame(ui, 640, 180, 0));
@@ -231,13 +236,13 @@ static void invalid_admissions(void) {
     cui_end_focus_scope(ui);
     end(ui);
     digit(ui, "3");
-    assert(!cui_core_begin_frame(ui, 640, 180, 0, false, &input)); /* Root outside modal. */
+    assert(!begin_probe(ui, &input)); /* Root outside modal. */
     assert(ui->queued_count == 1 && !work.edits);
     assert(cui_begin_frame(ui, 640, 180, 0));
     assert(cui_event_target(ui, 0) == AFTER);
     end(ui); /* Omit the field. */
     digit(ui, "3");
-    assert(!cui_core_begin_frame(ui, 640, 180, 0, false, &input));
+    assert(!begin_probe(ui, &input));
     assert(ui->queued_count == 1 && !work.edits);
     cui_destroy(ui);
 }
@@ -262,7 +267,7 @@ static void changed_mode_and_composition_guard(void) {
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_TAB, .repeat = true}));
     key(ui, CUI_KEY_TAB, 0);
-    assert(cui_core_begin_frame(ui, 640, 180, 0, false, &input));
+    assert(begin_probe(ui, &input));
     assert(cui_event_target(ui, 0) == old_second && !cui_event_consumed(ui, 0));
     assert(cui_event_target(ui, 2) == FIELD && !cui_event_consumed(ui, 2));
     assert(cui_event_target(ui, 3) == FIELD && !cui_event_consumed(ui, 3));
@@ -276,7 +281,7 @@ static void changed_mode_and_composition_guard(void) {
     assert(cui_bounds(ui, old_second).w == 0);
     work.state.segment = CUI_TIME_FIELD_HOUR_V1;
     key(ui, CUI_KEY_TAB, CUI_MOD_CTRL);
-    assert(cui_core_begin_frame(ui, 640, 180, 0, false, &input));
+    assert(begin_probe(ui, &input));
     assert(cui_focused(ui) == AFTER && work.state.segment == CUI_TIME_FIELD_HOUR_V1 &&
            !cui_event_consumed(ui, 0));
     end(ui);
@@ -291,17 +296,17 @@ static void failed_frame_keeps_owner(void) {
     working_time work = owner;
     cui_core_ordered_input input = admission(&work);
     digit(ui, "3");
-    assert(cui_core_begin_frame(ui, 640, 180, 0, false, &input));
+    assert(begin_probe(ui, &input));
     assert(work.value.hour == 3 && owner.value.hour == 9);
     cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_LAYOUT});
     assert(!cui_frame_input_snapshot_ready(ui));
     (void)cui_end_frame(ui);
     cui_clear_error(ui);
-    assert(!cui_core_begin_frame(ui, 640, 180, 0, false, &input));
+    assert(!begin_probe(ui, &input));
 
     work = owner;
     prime(ui, &owner, false);
-    assert(cui_core_begin_frame(ui, 640, 180, 0, false, &input));
+    assert(begin_probe(ui, &input));
     assert(work.value.hour == 9 && work.edits == 0);
     end(ui);
     cui_destroy(ui);

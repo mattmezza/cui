@@ -2895,6 +2895,11 @@ cui_warnings(test_time_field_example)
 add_test(NAME time_field_example_styled COMMAND test_time_field_example)
 add_test(NAME time_field_example_base COMMAND test_time_field_example base)
 
+add_executable(time_field_ordered_example examples/time_field_ordered.c)
+target_link_libraries(time_field_ordered_example PRIVATE cui)
+cui_warnings(time_field_ordered_example)
+add_test(NAME time_field_ordered_example COMMAND time_field_ordered_example)
+
 foreach(entry selective umbrella)
  add_executable(test_time_field_v1_${entry} tests/unit/test_time_field_v1.c)
  target_include_directories(test_time_field_v1_${entry} PRIVATE dist)

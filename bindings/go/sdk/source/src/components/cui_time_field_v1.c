@@ -21,7 +21,8 @@ static cui_str cui_tfw_label(cui_time value, const cui_time_field_options_v1 *o,
 }
 static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
                           const cui_time_field_state_v1 *s, const cui_time *t,
-                          const cui_time_field_options_v1 *o, const cui_design_metrics *design) {
+                          const cui_time_field_options_v1 *o, const cui_design_metrics *design,
+                          bool ordered) {
     cui_time_locale_v1 ascii;
     cui_time_locale_init_v1(&ascii);
     const cui_time_locale_v1 *l = o->text.locale ? o->text.locale : &ascii;
@@ -55,7 +56,7 @@ static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
                      .background = theme->surface,
                      .border = invalid ? theme->danger : theme->border,
                      .border_width = 1};
-    bool active = !design || (!disabled && cui_pointer_scope_allowed(ui, 0));
+    bool active = (!design && !ordered) || (!disabled && cui_pointer_scope_allowed(ui, 0));
     float cell_padding = 2;
     if (design) {
         field.height = design->control_height;
@@ -78,7 +79,7 @@ static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
         if (i == 3)
             cui_text(ui, l->period_separator, font, theme->muted);
         cui_id child = cui_time_segment_id(id, i);
-        bool focused = focus == child && active;
+        bool focused = (ordered ? focus == id && s->segment == i : focus == child) && active;
         if (design && focused && !theme->hide_focus_ring) {
             float r = theme->radius;
             (void)cui_set_outline(ui, 2, theme->focus, (cui_corner_radii){r, r, r, r});
@@ -150,7 +151,7 @@ cui_time_field_result_v1 cui_time_field_with_size_v1(cui_context *ui, cui_id id,
     cui_time before = t ? *t : (cui_time){0};
     r = cui_time_field_v1_compose(ui, id, name, s, t, o);
     if (r.status == CUI_TIME_TEXT_OK) {
-        cui_tfw_paint(ui, id, theme, s, t, o, scaled ? &design : NULL);
+        cui_tfw_paint(ui, id, theme, s, t, o, scaled ? &design : NULL, false);
         if (cui_last_error(ui) != CUI_OK)
             r.status = CUI_TIME_TEXT_INVALID_ARGUMENT;
         cui_time_field_v1_observe(ui, id, before, t, o, handler, &r);
@@ -162,4 +163,21 @@ cui_time_field_result_v1 cui_time_field_v1(cui_context *ui, cui_id id, const cui
                                            const cui_time_field_options_v1 *o,
                                            cui_time_handler handler) {
     return cui_time_field_with_size_v1(ui, id, theme, name, s, t, o, CUI_DESIGN_INHERIT, handler);
+}
+cui_time_field_result_v1 cui_time_field_from_frame_v1(cui_context *ui, cui_id id,
+                                                      const cui_theme *theme, cui_str name,
+                                                      cui_design_size size,
+                                                      cui_time_handler handler) {
+    cui_time_field_result_v1 r = {.status = CUI_TIME_TEXT_INVALID_ARGUMENT};
+    cui_design_metrics design;
+    bool scaled = size != CUI_DESIGN_INHERIT;
+    if (!cui_tfw_theme(theme) ||
+        (scaled && !cui_design_measure(size, theme->font_size / 16, &design)))
+        return r;
+    cui_tfw_frame_field *field = cui_tfw_frame_start(ui, id, name);
+    if (!field || cui_last_error(ui) != CUI_OK)
+        return r;
+    cui_tfw_paint(ui, id, theme, &field->state, &field->value, field->entry.options,
+                  scaled ? &design : NULL, true);
+    return cui_tfw_frame_apply(ui, field, handler);
 }

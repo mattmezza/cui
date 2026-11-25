@@ -9,7 +9,7 @@ extern "C" {
 /* Additive localized widget. Exact version/size and zero reserved fields.
  * State is caller-owned per widget/context; initialize explicitly. Borrowed
  * options/locale/names/theme/handler remain immutable throughout submission.
- * All visible segments use ordinary global Tab, not source one-root focus.
+ * In the ordinary route each visible segment participates in global Tab.
  * Host clipboard commands are outside this widget's editing contract. */
 #define CUI_TIME_FIELD_VERSION_V1 UINT32_C(1)
 #define CUI_TIME_FIELD_NAME_MAX_BYTES_V1 64u
@@ -70,6 +70,32 @@ cui_time_field_result_v1 cui_time_field_with_size_v1(cui_context *, cui_id, cons
                                                      cui_str name, cui_time_field_state_v1 *,
                                                      cui_time *, const cui_time_field_options_v1 *,
                                                      cui_design_size, cui_time_handler);
+/* Optional ordered frame and one global Tab stop per field. Declare the
+ * fields that this ordinary frame will submit, before input is dispatched.
+ * Copies the entry array. State, value, options and token storage are borrowed
+ * until cui_end_frame. Keep each state and value distinct and unchanged until its
+ * matching submission applies edits.
+ * Changing a field's options, visibility or enabled state takes effect at
+ * the next begin. A configuration with CUI_TIME_FIELD_IME_V1 is rejected. */
+#define CUI_TIME_FIELD_FRAME_MAX_V1 8u
+typedef struct {
+    cui_id id;
+    cui_time_field_state_v1 *state;
+    cui_time *value;
+    const cui_time_field_options_v1 *options;
+} cui_time_field_frame_entry_v1;
+cui_time_text_status_v1 cui_begin_time_field_frame_v1(cui_context *, float width, float height,
+                                                      float dt,
+                                                      const cui_time_field_frame_entry_v1 *,
+                                                      size_t count);
+/* Submit each declared ID once. Base uses the same root and segment IDs as
+ * the localized field. Styled paints the current selected segment.
+ * Results and observers use the existing aggregate change contract. */
+cui_time_field_result_v1 cui_base_time_field_from_frame_v1(cui_context *, cui_id, cui_str name,
+                                                           cui_time_handler);
+cui_time_field_result_v1 cui_time_field_from_frame_v1(cui_context *, cui_id, const cui_theme *,
+                                                      cui_str name, cui_design_size,
+                                                      cui_time_handler);
 /* With CUI_TIME_FIELD_IME_V1, query after submitting this frame's widget.
  * Empty unless the focused segment has an active composition; if segment is
  * supplied, it receives that segment ID or zero. Text is borrowed from the

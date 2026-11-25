@@ -3,6 +3,7 @@
 #include "cui/cui_draw_v2.h"
 #include "cui_background_valid_internal.h"
 #include "cui_drop_shadow_bounds_internal.h"
+#include "cui_ordered_input_internal.h"
 #include "cui_text_paint_internal.h"
 #include "cui_unicode_grapheme.h"
 #include <float.h>
@@ -156,6 +157,12 @@ struct cui_context {
     bool frame_v2, v2_failed;
     cui_core_numeric_state *numeric;
     bool numeric_snapshot_ready, numeric_frame_invalid;
+    void *ordered_data;
+    size_t ordered_bytes;
+    cui_id ordered_roots[CUI_ORDERED_INPUT_MAX], previous_ordered_roots[CUI_ORDERED_INPUT_MAX],
+        retired_ordered_roots[CUI_ORDERED_INPUT_MAX];
+    size_t ordered_count, previous_ordered_count, retired_ordered_count;
+    bool ordered_frame, ordered_observing;
     const cui_core_scroll_layout_header *scroll_layout;
     int tab_path[32];
     size_t tab_depth;
@@ -365,7 +372,7 @@ static void cui_core_clear_capture(cui_context *ui) {
     ui->capture_start_valid = false;
 }
 static bool cui_core_mutation(cui_context *ui) {
-    if (ui && ui->reporting_diagnostic)
+    if (ui && (ui->reporting_diagnostic || ui->ordered_observing))
         return false;
     if (cui_core_paint_context) {
         cui_core_fail(cui_core_paint_context, CUI_ERROR_LIFECYCLE);
@@ -817,6 +824,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->activations);
     free(ui->strings);
     free(ui->clip_containers);
+    free(ui->ordered_data);
     free(ui->arena);
     free(ui);
 }
@@ -862,7 +870,17 @@ static bool cui_core_scope_contains(const cui_core_focus_scope *scopes, size_t c
     }
     return false;
 }
+static bool cui_core_ordered_retired(const cui_context *ui, cui_id id) {
+    for (size_t i = 0; i < ui->retired_ordered_count; i++)
+        if (ui->retired_ordered_roots[i] == id)
+            return true;
+    return false;
+}
 static bool cui_core_previous_allowed(const cui_context *ui, size_t i) {
+    const cui_semantic *s = &ui->previous[i];
+    if (ui->retired_ordered_count && (cui_core_ordered_retired(ui, s->id) ||
+                                      cui_core_ordered_retired(ui, s->details.focus_target)))
+        return false;
     return cui_core_scope_contains(ui->previous_focus_scopes, ui->previous_semantic_scopes[i],
                                    ui->previous_top_modal);
 }
@@ -1567,33 +1585,76 @@ static void cui_core_finalize_text_input(cui_context *ui) {
         next.owner = 0;
     ui->text_input_state = next;
 }
-/* Private prototype for one explicitly admitted compound control. The reducer
- * receives actual routed events and may only edit borrowed working storage.
- * Its decision about a Tab default is independent of input consumption. */
-typedef struct {
-    bool consume, tab_moved;
-} cui_core_ordered_result;
-typedef struct {
-    cui_id root;
-    cui_core_ordered_result (*step)(void *user, const cui_event *, cui_id target);
-    void *user;
-} cui_core_ordered_input;
-
 #include "cui_draw_v2_internal.h"
 
-static bool cui_core_ordered_ready(const cui_context *ui, const cui_core_ordered_input *input) {
-    if (!input->root || !input->step || !cui_accessibility_numeric_snapshot_ready(ui))
+static const cui_core_ordered_input *cui_core_ordered_find(const cui_core_ordered_input *inputs,
+                                                           size_t count, cui_id root) {
+    for (size_t i = 0; i < count; i++)
+        if (inputs[i].root == root && !inputs[i].disabled)
+            return &inputs[i];
+    return NULL;
+}
+static void cui_core_ordered_blur(const cui_core_ordered_input *inputs, size_t count,
+                                  cui_id before, cui_id after) {
+    if (count && before && before != after) {
+        const cui_core_ordered_input *input = cui_core_ordered_find(inputs, count, before);
+        if (input && input->blur)
+            input->blur(input->user);
+    }
+}
+static bool cui_core_ordered_ready(const cui_context *ui, cui_id root) {
+    if (!root || !cui_accessibility_numeric_snapshot_ready(ui))
         return false;
     for (size_t i = 0; i < ui->previous_count; ++i) {
         const cui_semantic *s = &ui->previous[i];
-        if (s->id == input->root && cui_core_focusable(s) && cui_core_tab_stop(s) &&
+        if (s->id == root && cui_core_focusable(s) && cui_core_tab_stop(s) &&
             !s->details.handles_tab && cui_core_previous_allowed(ui, i))
             return true;
     }
     return false;
 }
+static void cui_core_ordered_prepare(cui_context *ui, const cui_core_ordered_input *inputs,
+                                     size_t count) {
+    ui->ordered_count = ui->retired_ordered_count = 0;
+    ui->ordered_frame = inputs != NULL;
+    for (size_t i = 0; i < ui->previous_ordered_count; i++) {
+        cui_id root = ui->previous_ordered_roots[i];
+        if (!cui_core_ordered_find(inputs, count, root))
+            ui->retired_ordered_roots[ui->retired_ordered_count++] = root;
+    }
+    if (cui_core_ordered_retired(ui, ui->focus))
+        cui_core_set_focus(ui, 0);
+}
+void *cui_core_ordered_reserve(cui_context *ui, size_t bytes) {
+    if (!cui_core_mutation(ui) || !ui || ui->in_frame || ui->error != CUI_OK || !bytes)
+        return NULL;
+    if (ui->ordered_data)
+        return bytes == ui->ordered_bytes ? ui->ordered_data : NULL;
+    if (bytes > ui->config.resource_bytes - ui->resource_bytes)
+        return NULL;
+    ui->ordered_data = calloc(1, bytes);
+    if (ui->ordered_data) {
+        ui->ordered_bytes = bytes;
+        ui->resource_bytes += bytes;
+    }
+    return ui->ordered_data;
+}
+void *cui_core_ordered_data(cui_context *ui) {
+    return ui && ui->in_frame && ui->ordered_frame && !ui->ordered_observing ? ui->ordered_data
+                                                                             : NULL;
+}
+uint64_t cui_core_completed_sequence(const cui_context *ui) {
+    return cui_accessibility_numeric_snapshot_ready(ui) ? ui->frame_sequence : 0;
+}
+void cui_core_ordered_publish(cui_context *ui, cui_id id) {
+    if (ui->ordered_count < CUI_ORDERED_INPUT_MAX)
+        ui->ordered_roots[ui->ordered_count++] = id;
+}
+void cui_core_ordered_observing(cui_context *ui, bool observing) {
+    ui->ordered_observing = observing;
+}
 static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bool v2,
-                                 const cui_core_ordered_input *ordered) {
+                                 const cui_core_ordered_input *inputs, size_t input_count) {
     if (!cui_core_mutation(ui))
         return false;
     if (!ui)
@@ -1607,8 +1668,12 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
         cui_core_fail_at(ui, CUI_ERROR_LAYOUT, v2 ? "cui_begin_frame_v2" : "cui_begin_frame");
         return false;
     }
-    if (ordered && !cui_core_ordered_ready(ui, ordered))
-        return false;
+    cui_core_ordered_prepare(ui, inputs, input_count);
+    cui_core_ordered_input active[CUI_ORDERED_INPUT_MAX];
+    size_t active_count = 0;
+    for (size_t i = 0; i < input_count; ++i)
+        if (!inputs[i].disabled && inputs[i].step && cui_core_ordered_ready(ui, inputs[i].root))
+            active[active_count++] = inputs[i];
     ui->frame_v2 = v2;
     ui->v2_failed = false;
     if (ui->v2) {
@@ -1748,7 +1813,9 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
             }
             ui->event_targets[i] = e.accessibility_target;
             if (e.accessibility_action == CUI_ACCESSIBILITY_FOCUS) {
+                cui_id before = ui->focus;
                 cui_core_set_focus(ui, e.accessibility_target);
+                cui_core_ordered_blur(active, active_count, before, ui->focus);
                 ui->focus_visible = true;
             } else if (e.accessibility_action == CUI_ACCESSIBILITY_ACTIVATE) {
                 cui_core_activate(ui, e.accessibility_target);
@@ -1840,7 +1907,11 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
             ui->pointer_present = true;
         }
         bool ordered_tab_moved = false;
-        if (ordered && ui->event_targets[i] == ordered->root && ui->focus == ordered->root) {
+        const cui_core_ordered_input *ordered =
+            active_count && ui->event_targets[i] == ui->focus
+                ? cui_core_ordered_find(active, active_count, ui->focus)
+                : NULL;
+        if (ordered && ordered->step) {
             bool tab = e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_TAB;
             bool ordinary_tab = tab && !e.repeat && !(e.modifiers & ~CUI_MOD_SHIFT);
             if ((e.type == CUI_EVENT_KEY_DOWN && (!tab || ordinary_tab)) ||
@@ -1850,6 +1921,7 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
                 ordered_tab_moved = ordinary_tab && step.tab_moved;
             }
         }
+        cui_id focus_before_default = ui->focus;
         if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
             cui_id hit = cui_core_hit(ui, e.x, e.y), target = hit;
             bool blocked = cui_core_pointer_blocked(ui, hit);
@@ -1872,7 +1944,8 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
                 if (hit || ui->previous_top_modal == SIZE_MAX)
                     cui_core_set_focus(ui, target);
                 ui->focus_visible = false;
-                if (ordered && target == ordered->root) {
+                ordered = cui_core_ordered_find(active, active_count, target);
+                if (ordered && ordered->step) {
                     cui_core_ordered_result step = ordered->step(ordered->user, &e, hit);
                     ui->event_consumed[i] = step.consume;
                 }
@@ -1954,6 +2027,7 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
                 cui_core_activate(ui, ui->focus);
             ui->space_capture = 0;
         }
+        cui_core_ordered_blur(active, active_count, focus_before_default, ui->focus);
         if (ui->activation_count > before_activation) {
             if (e.type != CUI_EVENT_POINTER_UP)
                 cui_core_activation_evidence(ui, ui->activation_count - 1, e, false);
@@ -2034,6 +2108,11 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
         ++ui->frame_sequence;
     ui->dirty = false;
     return true;
+}
+bool cui_core_begin_ordered_frame(cui_context *ui, float w, float h, float dt,
+                                  const cui_core_ordered_input *inputs, size_t count) {
+    return inputs && count <= CUI_ORDERED_INPUT_MAX &&
+           cui_core_begin_frame(ui, w, h, dt, false, inputs, count);
 }
 static uint32_t cui_core_folded(cui_id id) {
     /* Avalanche in a CUI domain: Clay auto IDs combine parent ID + child
@@ -4677,10 +4756,17 @@ cui_core_commands_done:
     }
     ui->numeric_snapshot_ready = ui->error == CUI_OK && !ui->numeric_frame_invalid;
     ui->previous_count = ui->semantic_count;
+    ui->previous_ordered_count = ui->ordered_count;
+    memcpy(ui->previous_ordered_roots, ui->ordered_roots,
+           ui->ordered_count * sizeof(*ui->ordered_roots));
+    ui->retired_ordered_count = 0;
     ui->hover.ready = false;
     if (ui->composition_owner != ui->focus)
         ui->composition_owner = 0;
     cui_core_finalize_text_input(ui);
+    if (ui->ordered_frame && ui->ordered_data)
+        memset(ui->ordered_data, 0, ui->ordered_bytes);
+    ui->ordered_frame = false;
     ui->in_frame = false;
     ui->resolving_layout = false;
     if (ui->scroll_layout && ui->error != CUI_OK)

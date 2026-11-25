@@ -105,6 +105,68 @@ localized editing through their documented subset and omit C composition
 opt-in and preedit. Host clipboard shortcuts and composition range styling are
 outside this route.
 
+## One Tab stop per field
+
+Use the ordered frame route when keyboard focus should enter and leave a
+TimeField as a whole. Each field remembers its selected segment. Tab and
+Shift-Tab move within the field and continue to surrounding controls at its
+boundaries. Moving away clears a partial edit and preserves the selection.
+A digit can finish a segment before the next key in the same
+batch. Input is routed in order even when the application submits its fields
+in a different order from the input.
+
+```c
+cui_time_field_frame_entry_v1 fields[] = {
+    {start_id, &start_state, &start, &start_options},
+    {end_id, &end_state, &end, &end_options},
+};
+if (cui_begin_time_field_frame_v1(ui, width, height, dt, fields, 2) ==
+        CUI_TIME_TEXT_OK) {
+    cui_time_field_from_frame_v1(ui, start_id, &theme, cui_string("Start time"),
+                                CUI_DESIGN_BASE, (cui_time_handler){0});
+    cui_time_field_from_frame_v1(ui, end_id, &theme, cui_string("End time"),
+                                CUI_DESIGN_BASE, (cui_time_handler){0});
+    cui_draw_list draw = cui_end_frame(ui);
+    /* Pass draw to the ordinary renderer. */
+}
+```
+
+Initialize both fields as above. Declare up to eight distinct IDs and mutable
+model pairs before input dispatch. The entry array is copied. Keep the models,
+options and their tokens alive through frame end. Each model stays unchanged
+between admission and its submission. Submit each declared ID once.
+`cui_base_time_field_from_frame_v1` also supports optional custom layout with
+the root and segment IDs. Geometry from the last completed frame routes
+pointer input. A new or re-enabled field needs a frame to publish its geometry
+and keyboard eligibility.
+
+Omit a hidden field from the list or set its disabled flag before beginning
+the frame. Use ordinary `cui_begin_frame` for a frame with zero ordered fields.
+Read-only fields accept navigation and keep their values. Admission is fixed
+for the frame, so an admitted field that an application later fails to submit
+loses its staged edit. Input already routed to the field or to its neighbors
+keeps those targets. Filter unwanted events before queuing them. Consumption
+during composition does not undo ordered input.
+
+Invalid entries, duplicate IDs or models, unsupported options and a failed
+storage reservation leave queued input available for a corrected begin. The
+ordered route reserves one fixed-capacity workspace from the context's
+resource budget. The result and synchronous callback see the applied model
+after semantics, and after paint submission in Styled. A later layout or
+renderer failure leaves an already applied change in the caller's model.
+Schedule teardown after the observer returns. IME options are rejected by
+this route. Use the ordinary localized widget when you need IME. The gallery
+and language bindings currently use their ordinary routes.
+
+Run the [complete two-field form](../examples/time_field_ordered.c) from a
+configured repository. It queues one batch that edits both fields and
+activates Save, using the same frame calls a native host can use.
+
+```sh
+cmake --build build --target time_field_ordered_example
+./build/time_field_ordered_example
+```
+
 ## Results and focus
 
 `changed` reports entry-to-final value difference independently of a handler.
@@ -121,10 +183,9 @@ A valid edit clears transient validation. Explicit
 OWNER_INVALID and an out-of-domain current owner still paint a danger border.
 Unset OWNER_INVALID only when the application's separate validation clears.
 
-All visible segments are ordinary global Tab stops. Forward/backward navigation
-exits at boundaries; the widget does not consume Tab or trap focus. This differs
-from the upstream one-root focus/selection-retaining behavior, which remains
-unfinished. The copied gallery example follows the selected size. See the
+On the ordinary route, all visible segments are global Tab stops.
+The opt-in ordered frame above gives each field one logical stop instead.
+The copied gallery example follows the selected size. See the
 [original design](design/TIME_FIELD_LOCALIZED_WIDGET_V1.md)
 and [binding contract](design/TIME_FIELD_BINDING_CHECKPOINT.md).
 

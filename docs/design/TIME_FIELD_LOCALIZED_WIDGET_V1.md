@@ -278,10 +278,10 @@ and the ordinary-global-Tab exception require review before production.
 
 ## Integrator decision (2026-11-01)
 
-Approved the additive implementation and test scope above. Retain the explicit
-ordinary-global-Tab exception; source one-root focus behavior remains unfinished.
-The [ordered focus checkpoint](TIME_FIELD_FOCUS_ROUTING.md) explains the verified
-batch-order constraint and the proposed opt-in architecture.
+Approved the additive implementation and test scope above. Ordinary fields
+retain global segment Tab stops. The [ordered focus checkpoint](TIME_FIELD_FOCUS_ROUTING.md)
+explains the batch-order constraint and the subsequent opt-in direct C frame.
+Ordered browser Tab and IME integration remain open.
 `changed` reports net value change independently of handler presence;
 `change_count` preserves the existing observer convention of counting actual
 callback invocations, not accepted edits. Existing entry points remain unchanged.

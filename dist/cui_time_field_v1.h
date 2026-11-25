@@ -10,7 +10,7 @@ extern "C" {
 /* Additive localized widget. Exact version/size and zero reserved fields.
  * State is caller-owned per widget/context; initialize explicitly. Borrowed
  * options/locale/names/theme/handler remain immutable throughout submission.
- * All visible segments use ordinary global Tab, not source one-root focus.
+ * In the ordinary route each visible segment participates in global Tab.
  * Host clipboard commands are outside this widget's editing contract. */
 #define CUI_TIME_FIELD_VERSION_V1 UINT32_C(1)
 #define CUI_TIME_FIELD_NAME_MAX_BYTES_V1 64u
@@ -71,6 +71,32 @@ cui_time_field_result_v1 cui_time_field_with_size_v1(cui_context *, cui_id, cons
                                                      cui_str name, cui_time_field_state_v1 *,
                                                      cui_time *, const cui_time_field_options_v1 *,
                                                      cui_design_size, cui_time_handler);
+/* Optional ordered frame and one global Tab stop per field. Declare the
+ * fields that this ordinary frame will submit, before input is dispatched.
+ * Copies the entry array. State, value, options and token storage are borrowed
+ * until cui_end_frame. Keep each state and value distinct and unchanged until its
+ * matching submission applies edits.
+ * Changing a field's options, visibility or enabled state takes effect at
+ * the next begin. A configuration with CUI_TIME_FIELD_IME_V1 is rejected. */
+#define CUI_TIME_FIELD_FRAME_MAX_V1 8u
+typedef struct {
+    cui_id id;
+    cui_time_field_state_v1 *state;
+    cui_time *value;
+    const cui_time_field_options_v1 *options;
+} cui_time_field_frame_entry_v1;
+cui_time_text_status_v1 cui_begin_time_field_frame_v1(cui_context *, float width, float height,
+                                                      float dt,
+                                                      const cui_time_field_frame_entry_v1 *,
+                                                      size_t count);
+/* Submit each declared ID once. Base uses the same root and segment IDs as
+ * the localized field. Styled paints the current selected segment.
+ * Results and observers use the existing aggregate change contract. */
+cui_time_field_result_v1 cui_base_time_field_from_frame_v1(cui_context *, cui_id, cui_str name,
+                                                           cui_time_handler);
+cui_time_field_result_v1 cui_time_field_from_frame_v1(cui_context *, cui_id, const cui_theme *,
+                                                      cui_str name, cui_design_size,
+                                                      cui_time_handler);
 /* With CUI_TIME_FIELD_IME_V1, query after submitting this frame's widget.
  * Empty unless the focused segment has an active composition; if segment is
  * supplied, it receives that segment ID or zero. Text is borrowed from the
@@ -99,9 +125,46 @@ cui_str cui_time_field_preedit_v1(cui_context *, cui_id, cui_id *segment);
 /* src/base/cui_time_field_v1.c */
 /* SPDX-License-Identifier: MIT */
 /* SPDX-License-Identifier: MIT */
+#ifndef CUI_ORDERED_INPUT_INTERNAL_H
+#define CUI_ORDERED_INPUT_INTERNAL_H
+
+enum { CUI_ORDERED_INPUT_MAX = 8 };
+typedef struct {
+    bool consume, tab_moved;
+} cui_core_ordered_result;
+typedef struct {
+    cui_id root;
+    cui_core_ordered_result (*step)(void *user, const cui_event *, cui_id target);
+    void *user;
+    bool disabled;
+    void (*blur)(void *user);
+} cui_core_ordered_input;
+/* Reserve context-owned typed storage before dispatch. The step callbacks and
+ * their event records are borrowed only inside begin. Steps may edit the
+ * supplied working storage and do not call application or CUI code. */
+void *cui_core_ordered_reserve(cui_context *, size_t bytes);
+bool cui_core_begin_ordered_frame(cui_context *, float width, float height, float dt,
+                                  const cui_core_ordered_input *, size_t count);
+void *cui_core_ordered_data(cui_context *);
+uint64_t cui_core_completed_sequence(const cui_context *);
+void cui_core_ordered_publish(cui_context *, cui_id);
+void cui_core_ordered_observing(cui_context *, bool);
+#endif
+
+/* SPDX-License-Identifier: MIT */
 #ifndef CUI_TIME_FIELD_V1_INTERNAL_H
 #define CUI_TIME_FIELD_V1_INTERNAL_H
 
+typedef struct {
+    cui_time_field_frame_entry_v1 entry;
+    cui_time_field_state_v1 state;
+    cui_time before, value;
+    size_t rejected;
+    bool submitted;
+} cui_tfw_frame_field;
+cui_tfw_frame_field *cui_tfw_frame_start(cui_context *, cui_id, cui_str);
+cui_time_field_result_v1 cui_tfw_frame_apply(cui_context *, cui_tfw_frame_field *,
+                                             cui_time_handler);
 bool cui_time_field_v1_equal(cui_time, cui_time);
 cui_str cui_time_field_v1_name(const cui_time_field_options_v1 *, unsigned);
 cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *, cui_id, cui_str,
@@ -112,6 +175,7 @@ void cui_time_field_v1_observe(cui_context *, cui_id, cui_time, cui_time *,
                                cui_time_field_result_v1 *);
 #endif
 
+#include <math.h>
 #include <string.h>
 
 bool cui_time_field_v1_equal(cui_time a, cui_time b) {
@@ -232,6 +296,39 @@ static bool cui_tfw_replace(cui_time_field_state_v1 *s, cui_time *t,
     if (status != CUI_TIME_TEXT_OK)
         return false;
     *t = next;
+    return true;
+}
+static bool cui_tfw_edit_key(cui_time_field_state_v1 *s, cui_time *t,
+                             const cui_time_field_options_v1 *o, cui_key key, bool *accepted) {
+    *accepted = true;
+    if (key == CUI_KEY_LEFT || key == CUI_KEY_RIGHT) {
+        s->segment = cui_tfw_next(o, s->segment, key == CUI_KEY_RIGHT);
+        cui_tfw_reset(s);
+        s->validation = CUI_TIME_TEXT_OK;
+        return true;
+    }
+    if (key == CUI_KEY_ESCAPE) {
+        cui_tfw_reset(s);
+        return true;
+    }
+    if (key != CUI_KEY_UP && key != CUI_KEY_DOWN && key != CUI_KEY_HOME && key != CUI_KEY_END &&
+        key != CUI_KEY_BACKSPACE && key != CUI_KEY_DELETE)
+        return false;
+    unsigned minimum = s->segment == 0 && o->text.cycle ? 1 : 0;
+    unsigned maximum = s->segment == 0 ? (o->text.cycle ? 12 : 23) : s->segment == 3 ? 1 : 59;
+    unsigned value = cui_tfw_value(*t, o, s->segment);
+    if (key == CUI_KEY_BACKSPACE || key == CUI_KEY_DELETE)
+        value = 0;
+    else if (key == CUI_KEY_HOME)
+        value = minimum;
+    else if (key == CUI_KEY_END)
+        value = maximum;
+    else if (key == CUI_KEY_UP)
+        value = value >= maximum ? minimum : value + 1;
+    else
+        value = value <= minimum ? maximum : value - 1;
+    cui_tfw_reset(s);
+    *accepted = cui_tfw_replace(s, t, o, value);
     return true;
 }
 static cui_str cui_tfw_token(const cui_time_locale_v1 *l, unsigned i) {
@@ -462,11 +559,13 @@ static bool cui_tfw_compose_value(cui_time_field_state_v1 *s, cui_time *t,
 }
 static void cui_tfw_submit(cui_context *ui, cui_id id, cui_str name,
                            const cui_time_field_state_v1 *s, const cui_time *t,
-                           const cui_time_field_options_v1 *o) {
+                           const cui_time_field_options_v1 *o, bool ordered) {
     (void)s;
     bool disabled = (o->flags & CUI_TIME_FIELD_DISABLED_V1) != 0;
     cui_interact(ui, id, CUI_ROLE_GROUP, name, disabled, false, 0);
-    cui_set_tab_stop(ui, id, false);
+    if (ordered)
+        cui_set_semantic_details(ui, id, (cui_semantic_details){.focusable = true});
+    cui_set_tab_stop(ui, id, ordered);
     for (unsigned i = 0; i < 4; i++)
         if (cui_tfw_visible(o, i)) {
             cui_id child = cui_time_segment_id(id, i);
@@ -475,12 +574,14 @@ static void cui_tfw_submit(cui_context *ui, cui_id id, cui_str name,
             cui_set_semantic_details(
                 ui, child,
                 (cui_semantic_details){.readonly = (o->flags & CUI_TIME_FIELD_READONLY_V1) != 0,
+                                       .no_focus = ordered,
+                                       .focus_target = ordered ? id : 0,
                                        .parent = id,
                                        .minimum = i == 0 && o->text.cycle ? 1 : 0,
                                        .maximum = i == 0   ? (o->text.cycle ? 12 : 23)
                                                   : i == 3 ? 1
                                                            : 59});
-            cui_set_tab_stop(ui, child, true);
+            cui_set_tab_stop(ui, child, !ordered);
         }
 }
 cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, cui_str name,
@@ -674,36 +775,10 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
             cui_key key = event->key;
             if (key == CUI_KEY_TAB || event->modifiers)
                 continue;
-            bool recognized = true, accepted = true;
-            if (key == CUI_KEY_LEFT || key == CUI_KEY_RIGHT) {
-                s->segment = cui_tfw_next(o, s->segment, key == CUI_KEY_RIGHT);
-                cui_tfw_reset(s);
-                s->validation = 0;
-                cui_focus(ui, cui_time_segment_id(id, s->segment));
-            } else if (key == CUI_KEY_ESCAPE)
-                cui_tfw_reset(s);
-            else if (key == CUI_KEY_UP || key == CUI_KEY_DOWN || key == CUI_KEY_HOME ||
-                     key == CUI_KEY_END || key == CUI_KEY_BACKSPACE || key == CUI_KEY_DELETE) {
-                unsigned minimum = s->segment == 0 && o->text.cycle ? 1 : 0;
-                unsigned maximum = s->segment == 0   ? (o->text.cycle ? 12 : 23)
-                                   : s->segment == 3 ? 1
-                                                     : 59;
-                unsigned value = cui_tfw_value(*t, o, s->segment);
-                if (key == CUI_KEY_BACKSPACE || key == CUI_KEY_DELETE)
-                    value = 0;
-                else if (key == CUI_KEY_HOME)
-                    value = minimum;
-                else if (key == CUI_KEY_END)
-                    value = maximum;
-                else if (key == CUI_KEY_UP)
-                    value = value >= maximum ? minimum : value + 1;
-                else
-                    value = value <= minimum ? maximum : value - 1;
-                cui_tfw_reset(s);
-                accepted = cui_tfw_replace(s, t, o, value);
-            } else
-                recognized = false;
-            if (recognized) {
+            bool accepted;
+            if (cui_tfw_edit_key(s, t, o, key, &accepted)) {
+                if (key == CUI_KEY_LEFT || key == CUI_KEY_RIGHT)
+                    cui_focus(ui, cui_time_segment_id(id, s->segment));
                 if (preedit)
                     preedit->segment = 0;
                 cui_consume_event(ui, e);
@@ -734,7 +809,7 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
     }
     if (r.status != CUI_TIME_TEXT_INVALID_ARGUMENT)
         r.status = CUI_TIME_TEXT_OK;
-    cui_tfw_submit(ui, id, name, s, t, o);
+    cui_tfw_submit(ui, id, name, s, t, o, false);
     if (cui_last_error(ui) != CUI_OK)
         r.status = CUI_TIME_TEXT_INVALID_ARGUMENT;
     r.changed = !cui_time_field_v1_equal(before, *t);
@@ -774,12 +849,177 @@ cui_time_field_result_v1 cui_base_time_field_v1(cui_context *ui, cui_id id, cui_
     return r;
 }
 
+typedef struct {
+    cui_tfw_frame_field fields[CUI_TIME_FIELD_FRAME_MAX_V1];
+    size_t count;
+    bool ready;
+} cui_tfw_frame_batch;
+
+static void cui_tfw_frame_blur(void *user) {
+    cui_tfw_frame_field *field = user;
+    cui_tfw_reset(&field->state);
+}
+
+static cui_core_ordered_result cui_tfw_frame_step(void *user, const cui_event *event, cui_id hit) {
+    cui_tfw_frame_field *field = user;
+    cui_time_field_state_v1 *state = &field->state;
+    const cui_time_field_options_v1 *options = field->entry.options;
+    if (event->type == CUI_EVENT_POINTER_DOWN) {
+        for (unsigned i = 0; i < 4; i++)
+            if (cui_tfw_visible(options, i) && hit == cui_time_segment_id(field->entry.id, i)) {
+                state->segment = i;
+                cui_tfw_reset(state);
+                return (cui_core_ordered_result){.consume = true};
+            }
+    } else if (event->type == CUI_EVENT_KEY_DOWN && event->key == CUI_KEY_TAB) {
+        unsigned selection =
+            cui_tfw_next(options, state->segment, !(event->modifiers & CUI_MOD_SHIFT));
+        if (selection != state->segment) {
+            state->segment = selection;
+            cui_tfw_reset(state);
+            return (cui_core_ordered_result){.consume = true, .tab_moved = true};
+        }
+    } else if (event->type == CUI_EVENT_KEY_DOWN && !event->modifiers &&
+               (event->key == CUI_KEY_LEFT || event->key == CUI_KEY_RIGHT ||
+                !(options->flags & CUI_TIME_FIELD_READONLY_V1))) {
+        bool accepted;
+        if (cui_tfw_edit_key(state, &field->value, options, event->key, &accepted)) {
+            field->rejected += !accepted;
+            return (cui_core_ordered_result){.consume = true};
+        }
+    } else if (event->type == CUI_EVENT_TEXT && !(options->flags & CUI_TIME_FIELD_READONLY_V1)) {
+        field->rejected += !cui_tfw_text_edit(state, &field->value, options, cui_tfw_text(event));
+        return (cui_core_ordered_result){.consume = true};
+    }
+    return (cui_core_ordered_result){0};
+}
+
+cui_time_text_status_v1 cui_begin_time_field_frame_v1(cui_context *ui, float w, float h, float dt,
+                                                      const cui_time_field_frame_entry_v1 *entries,
+                                                      size_t count) {
+    if (!ui || !entries || !count || count > CUI_TIME_FIELD_FRAME_MAX_V1 || !isfinite(w) ||
+        !isfinite(h) || !isfinite(dt) || w < 0 || h < 0 || dt < 0)
+        return CUI_TIME_TEXT_INVALID_ARGUMENT;
+    _Static_assert(CUI_TIME_FIELD_FRAME_MAX_V1 == CUI_ORDERED_INPUT_MAX, "ordered field capacity");
+    cui_tfw_frame_batch pending = {.count = count};
+    cui_core_ordered_input inputs[CUI_ORDERED_INPUT_MAX];
+    uint64_t previous = cui_core_completed_sequence(ui);
+    for (size_t i = 0; i < count; i++) {
+        cui_time_field_frame_entry_v1 entry = entries[i];
+        if (!entry.id || !entry.value || !cui_tfw_state(entry.state))
+            return CUI_TIME_TEXT_INVALID_ARGUMENT;
+        for (size_t j = 0; j < i; j++)
+            if (entries[j].id == entry.id || entries[j].value == entry.value ||
+                entries[j].state == entry.state)
+                return CUI_TIME_TEXT_INVALID_CONFIG;
+        cui_time_text_status_v1 status = cui_tfw_config(entry.options);
+        if (status != CUI_TIME_TEXT_OK)
+            return status;
+        const cui_time_field_options_v1 *options = entry.options;
+        if (options->flags & CUI_TIME_FIELD_IME_V1)
+            return CUI_TIME_TEXT_INVALID_CONFIG;
+        status = cui_time_validate_v1(*entry.value, &options->text);
+        if (status != CUI_TIME_TEXT_OK && status != CUI_TIME_TEXT_OUT_OF_RANGE)
+            return status;
+        bool disabled = (options->flags & CUI_TIME_FIELD_DISABLED_V1) != 0;
+        cui_tfw_frame_field *field = &pending.fields[i];
+        *field = (cui_tfw_frame_field){
+            .entry = entry, .state = *entry.state, .value = *entry.value, .before = *entry.value};
+        cui_time_field_state_v1 *state = &field->state;
+        if (disabled || !previous || state->last_frame_sequence != previous ||
+            !cui_time_field_v1_equal(state->last_value, field->value) ||
+            state->edit_generation != options->edit_generation ||
+            state->last_cycle != options->text.cycle ||
+            state->last_precision != options->text.precision) {
+            cui_tfw_reset(state);
+            state->validation = status;
+        }
+        if (cui_focused(ui) != entry.id)
+            cui_tfw_reset(state);
+        if (!cui_tfw_visible(options, state->segment))
+            state->segment = CUI_TIME_FIELD_HOUR_V1;
+        state->edit_generation = options->edit_generation;
+        state->last_cycle = options->text.cycle;
+        state->last_precision = options->text.precision;
+        inputs[i] = (cui_core_ordered_input){.root = entry.id,
+                                            .step = cui_tfw_frame_step,
+                                            .user = field,
+                                            .disabled = disabled,
+                                            .blur = cui_tfw_frame_blur};
+    }
+    cui_tfw_frame_batch *batch = cui_core_ordered_reserve(ui, sizeof(pending));
+    if (!batch || !cui_core_begin_ordered_frame(ui, w, h, dt, inputs, count))
+        return CUI_TIME_TEXT_INVALID_ARGUMENT;
+    pending.ready = cui_frame_input_snapshot_ready(ui);
+    *batch = pending;
+    return CUI_TIME_TEXT_OK;
+}
+
+cui_tfw_frame_field *cui_tfw_frame_start(cui_context *ui, cui_id id, cui_str name) {
+    if (!id || (!name.data && name.length) || !cui_frame_sequence(ui) ||
+        !cui_pointer_scope_allowed(ui, 0) || cui_last_error(ui) != CUI_OK)
+        return NULL;
+    cui_tfw_frame_batch *batch = cui_core_ordered_data(ui);
+    if (!batch || (batch->ready && !cui_frame_input_snapshot_ready(ui)))
+        return NULL;
+    for (size_t i = 0; i < batch->count; i++) {
+        cui_tfw_frame_field *f = &batch->fields[i];
+        if (f->entry.id == id && !f->submitted &&
+            cui_time_field_v1_equal(*f->entry.value, f->before)) {
+            f->submitted = true;
+            cui_tfw_submit(ui, id, name, &f->state, &f->value, f->entry.options, true);
+            return f;
+        }
+    }
+    return NULL;
+}
+
+cui_time_field_result_v1 cui_tfw_frame_apply(cui_context *ui, cui_tfw_frame_field *f,
+                                             cui_time_handler handler) {
+    cui_time_field_result_v1 r = {.status = CUI_TIME_TEXT_INVALID_ARGUMENT};
+    cui_tfw_frame_batch *batch = cui_core_ordered_data(ui);
+    if (!f || !batch || cui_last_error(ui) != CUI_OK ||
+        (batch->ready && !cui_frame_input_snapshot_ready(ui)))
+        return r;
+    cui_core_ordered_publish(ui, f->entry.id);
+    r.status = CUI_TIME_TEXT_OK;
+    r.validation = (cui_time_text_status_v1)f->state.validation;
+    r.changed = !cui_time_field_v1_equal(f->before, f->value);
+    r.rejected_count = f->rejected;
+    f->state.last_frame_sequence = cui_frame_sequence(ui);
+    f->state.last_value = f->value;
+    *f->entry.state = f->state;
+    *f->entry.value = f->value;
+    if (r.changed)
+        cui_invalidate(ui);
+    cui_core_ordered_observing(ui, true);
+    cui_time_field_v1_observe(ui, f->entry.id, f->before, f->entry.value, f->entry.options, handler,
+                              &r);
+    cui_core_ordered_observing(ui, false);
+    return r;
+}
+
+cui_time_field_result_v1 cui_base_time_field_from_frame_v1(cui_context *ui, cui_id id, cui_str name,
+                                                           cui_time_handler handler) {
+    return cui_tfw_frame_apply(ui, cui_tfw_frame_start(ui, id, name), handler);
+}
+
 /* src/components/cui_time_field_v1.c */
 /* SPDX-License-Identifier: MIT */
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_TIME_FIELD_V1_INTERNAL_H
 #define CUI_TIME_FIELD_V1_INTERNAL_H
 
+typedef struct {
+    cui_time_field_frame_entry_v1 entry;
+    cui_time_field_state_v1 state;
+    cui_time before, value;
+    size_t rejected;
+    bool submitted;
+} cui_tfw_frame_field;
+cui_tfw_frame_field *cui_tfw_frame_start(cui_context *, cui_id, cui_str);
+cui_time_field_result_v1 cui_tfw_frame_apply(cui_context *, cui_tfw_frame_field *,
+                                             cui_time_handler);
 bool cui_time_field_v1_equal(cui_time, cui_time);
 cui_str cui_time_field_v1_name(const cui_time_field_options_v1 *, unsigned);
 cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *, cui_id, cui_str,
@@ -811,7 +1051,8 @@ static cui_str cui_tfw_label(cui_time value, const cui_time_field_options_v1 *o,
 }
 static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
                           const cui_time_field_state_v1 *s, const cui_time *t,
-                          const cui_time_field_options_v1 *o, const cui_design_metrics *design) {
+                          const cui_time_field_options_v1 *o, const cui_design_metrics *design,
+                          bool ordered) {
     cui_time_locale_v1 ascii;
     cui_time_locale_init_v1(&ascii);
     const cui_time_locale_v1 *l = o->text.locale ? o->text.locale : &ascii;
@@ -845,7 +1086,7 @@ static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
                      .background = theme->surface,
                      .border = invalid ? theme->danger : theme->border,
                      .border_width = 1};
-    bool active = !design || (!disabled && cui_pointer_scope_allowed(ui, 0));
+    bool active = (!design && !ordered) || (!disabled && cui_pointer_scope_allowed(ui, 0));
     float cell_padding = 2;
     if (design) {
         field.height = design->control_height;
@@ -868,7 +1109,7 @@ static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
         if (i == 3)
             cui_text(ui, l->period_separator, font, theme->muted);
         cui_id child = cui_time_segment_id(id, i);
-        bool focused = focus == child && active;
+        bool focused = (ordered ? focus == id && s->segment == i : focus == child) && active;
         if (design && focused && !theme->hide_focus_ring) {
             float r = theme->radius;
             (void)cui_set_outline(ui, 2, theme->focus, (cui_corner_radii){r, r, r, r});
@@ -940,7 +1181,7 @@ cui_time_field_result_v1 cui_time_field_with_size_v1(cui_context *ui, cui_id id,
     cui_time before = t ? *t : (cui_time){0};
     r = cui_time_field_v1_compose(ui, id, name, s, t, o);
     if (r.status == CUI_TIME_TEXT_OK) {
-        cui_tfw_paint(ui, id, theme, s, t, o, scaled ? &design : NULL);
+        cui_tfw_paint(ui, id, theme, s, t, o, scaled ? &design : NULL, false);
         if (cui_last_error(ui) != CUI_OK)
             r.status = CUI_TIME_TEXT_INVALID_ARGUMENT;
         cui_time_field_v1_observe(ui, id, before, t, o, handler, &r);
@@ -952,6 +1193,23 @@ cui_time_field_result_v1 cui_time_field_v1(cui_context *ui, cui_id id, const cui
                                            const cui_time_field_options_v1 *o,
                                            cui_time_handler handler) {
     return cui_time_field_with_size_v1(ui, id, theme, name, s, t, o, CUI_DESIGN_INHERIT, handler);
+}
+cui_time_field_result_v1 cui_time_field_from_frame_v1(cui_context *ui, cui_id id,
+                                                      const cui_theme *theme, cui_str name,
+                                                      cui_design_size size,
+                                                      cui_time_handler handler) {
+    cui_time_field_result_v1 r = {.status = CUI_TIME_TEXT_INVALID_ARGUMENT};
+    cui_design_metrics design;
+    bool scaled = size != CUI_DESIGN_INHERIT;
+    if (!cui_tfw_theme(theme) ||
+        (scaled && !cui_design_measure(size, theme->font_size / 16, &design)))
+        return r;
+    cui_tfw_frame_field *field = cui_tfw_frame_start(ui, id, name);
+    if (!field || cui_last_error(ui) != CUI_OK)
+        return r;
+    cui_tfw_paint(ui, id, theme, &field->state, &field->value, field->entry.options,
+                  scaled ? &design : NULL, true);
+    return cui_tfw_frame_apply(ui, field, handler);
 }
 
 #endif

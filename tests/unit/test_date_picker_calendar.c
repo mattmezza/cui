@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_date_picker_calendar.h"
 #include "cui/cui_software.h"
+#include "date_semantic_details.h"
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
@@ -313,7 +314,7 @@ static void equal(fixture *a, fixture *b, unsigned char *pa, unsigned char *pb) 
     for (size_t i = 0; i < na; i++) {
         CHECK(sa[i].id == sb[i].id && sa[i].role == sb[i].role &&
               sa[i].disabled == sb[i].disabled && sa[i].name.length == sb[i].name.length);
-        CHECK(!memcmp(&sa[i].details, &sb[i].details, sizeof sa[i].details));
+        CHECK(details_equal(&sa[i].details, &sb[i].details));
         CHECK(!sa[i].name.length || !memcmp(sa[i].name.data, sb[i].name.data, sa[i].name.length));
     }
     CHECK(a->draw.count == b->draw.count);

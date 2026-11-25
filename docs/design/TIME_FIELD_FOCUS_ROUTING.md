@@ -184,3 +184,53 @@ canvas focus before removing the proxy. Headless Chromium tests composition,
 candidate alignment and stale proxy input. Chromium and Firefox verify real
 Tab in both directions with the proxy active. Physical IME, accessibility
 mapping and foreign authoring remain open.
+
+## Accessibility projection checkpoint
+
+At `35b76932`, the Chromium accessibility tree focuses a textbox named
+“Canvas text input” with an empty value. The mirrored Hour and Minute nodes
+expose their button text as a value. The AccessKit mapping similarly lacks
+the committed textual value. The frozen reference publishes the formatted
+time on a `TimeInput` root. The ordered C model already provides the
+information needed to define accessible names, values and segment bounds.
+[Frozen root](https://raw.githubusercontent.com/longbridge/gpui-kit/87d10ae5e1299d1be18670a37570c5402f952e34/crates/base/src/time_field.rs#L532-L572)
+
+Proposed portable contract
+
+- Append time input and spinbutton roles. The ordered TimeField root owns
+  logical focus and its formatted committed value. Its segments carry their
+  localized committed text, discrete range, current numeric value and
+  selected segment. The ordinary field retains its roles and routing.
+- Carry optional semantic text separately from the label, description and
+  transient input. Copy it on submission into the bounded frame text
+  storage. A lazily allocated index, charged to the context resource
+  budget, tracks text alongside the semantic snapshot without changing
+  public structs. It is absent until a component uses it. Accessors exclude
+  password and secret nodes, failed frames and nonfinalized data.
+- AccessKit publishes the root and segment values, retaining their strings
+  under its existing snapshot bounds. It keeps focus on the root time-input
+  node. Browser proxies can expose a named spinbutton for the active
+  segment, with numeric bounds, the localized committed value and the
+  formatted field time as context. That accessible metadata leaves the
+  proxy's native input buffer free for composition. The browser uses a
+  group for the time-input root and hides the mirrored active segment while
+  its equivalent proxy is present. [Spinbutton guidance](https://www.w3.org/WAI/ARIA/apg/patterns/spinbutton/)
+- Retain existing focus dispatch. Segment display, keyboard selection,
+  platform focus and support for accessibility value editing are distinct.
+  An adapter may expose the current value without advertising new actions.
+  An accessibility request to select or edit a passive child needs its own
+  admission and ordered-dispatch tests.
+
+Appending the formatted time to the name would change a control's stable
+label. Carrying it in the description would conflate the value with help
+text. Storing it in the DOM input buffer would change the browser's typing,
+selection and duplicate-commit behavior. Enlarging the semantic structs
+would change the layout of public arrays and by-value calls. A semantic
+value accessor preserves that layout, allows adapters to compare values
+independently and keeps memory bounded by the existing context budgets.
+
+Verify portable source and distribution snapshots, value changes independent
+of selection, UTF-8, hidden and secret nodes, source lifetimes and overflow.
+Verify AccessKit publication and stable focus, then real Chromium AX tree
+values and focus alongside keyboard and IME regression tests. Actual
+screen-reader behavior still requires physical-host checks.

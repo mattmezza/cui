@@ -96,16 +96,26 @@ subsets. Detailed ledgers and headers remain authoritative.
 
 ### Next component slices
 
-Verify reported regressions against the current gallery as each slice lands.
+Verify reported regressions against the current gallery as each slice lands. Ship the verified builders with the next release. VideoPlayer audio controls are the next new component API.
 
-| Order | Components | Concrete outcome |
+| Order | Component | Next outcome |
 | --- | --- | --- |
-| 1 | Icon, Badge, Skeleton | Publish the verified configured Icon/Badge builders and responsive Skeleton demos with the next release. |
-| 2 | Sidebar, Resizable, Tabs, TitleBar | Private X11 verifies the responsive starter, bounded Tabs Shift-wheel, overflow selection and SDL divider movement. TitleBar draws client controls for SDL borderless windows and the gallery simulates traffic lights. Physical input, Cocoa traffic lights and native drag/system-menu integration remain open. |
-| 3 | DataTable, Table, VirtualList | DataTable wheel speed matches Scrollable. Private X11 verifies same-frame inbox hover. The 4,000-row CPU workload fell to 13.992 ms median. Headless Chromium verifies Table's independent custom header and alternate rows in light/dark themes, and DataTable stripes, keyed selection, sorting and scrolling. Broader family and deployment acceptance remains open. See [table colors](docs/TABLE.md#row-and-header-colors). |
-| 4 | Video, VideoPlayer | Verify seek artwork, video-only fullscreen and audio in the gallery. Add mute/volume to the reusable controls and document one reproducible native audio provider example. |
-| 5 | Dialog, Popover, HoverCard, Select, Combobox, Command | Prevent held-input Dialog reopening. Verify appropriate dismissal and focus restoration, viewport-aware overlays, and menu/result widths at desktop and touch sizes. |
-| 6 | Button, Checkbox, Radio, Switch, Slider, Input, Textarea | Finish the applicable activation/value event contracts, size and state behavior, pointer/touch checks and language examples. Prioritize text navigation and clipping regressions over new Editor features. |
+| 1 | Icon / Badge / Skeleton | Publish the verified SVG and Badge builders and responsive Skeleton example. Check custom artwork, an interactive Badge child, and the loading-to-content transition from installed consumers and the deployed gallery. |
+| 2 | VideoPlayer / Video | Add host-capability-gated mute and volume to the reusable player bar. Verify keyboard, touch and video-only fullscreen with audible media in the browser. Exercise the existing optional FFV1/PCM native example under isolated SDL audio tests. The gallery already verifies seek artwork, video-only fullscreen and unmuted decoding. [Player guide](docs/VIDEO_PLAYER.md) · [native sound example](examples/video_player_audio/README.md) |
+| 3 | Sidebar | Verify that only navigation items scroll beneath the pinned header and account footer, including during narrow-mode changes with the account menu open. |
+| 3 | Resizable | Extend the existing X11 drag, keyboard and clamp checks to an actual app shell. Verify pane movement during native resize and preserve focused content at the minimum pane width. |
+| 3 | Tabs | Verify that the overflow menu reveals the chosen tab and returns focus to it in both orientations. Keep the existing bounded Shift-wheel and touch checks. |
+| 3 | TitleBar | Exercise decorated Cocoa traffic lights and Retina placement on a Mac. Close documented native drag and system-window menu gaps by host capability. [TitleBar guide](docs/CHROME.md#title-bar) |
+| 4 | DataTable | Keep a keyed selection and the visible scroll anchor stable while a virtual inbox changes. Verify keyboard row navigation, load-more delivery and hover latency on the same workload. The 4,000-row CPU fixture reached 13.992 ms median. |
+| 4 | Table | Deploy the independent header background and alternating-row controls. Headless Chromium already verifies both themes and DataTable's stripes, keyed selection, sorting and scrolling. [Table colors](docs/TABLE.md#row-and-header-colors) |
+| 4 | VirtualList | Show variable-height inbox rows and verify that changing an offscreen row height or inserting rows above the viewport preserves the visible item. |
+| 5 | Dialog / AlertDialog | Prevent a held mouse button, touch or Space from acting on a reopened dialog. Verify intrinsic height, fixed-footer scrolling and focus restoration after keyboard or pointer dismissal. |
+| 5 | Popover / HoverCard | Fit short content to its natural height, stay inside the viewport and verify the appropriate focus, dismissal and touch behavior for each surface. |
+| 5 | Select / Combobox / Command | Align triggers and results, keep option rows at panel width, and verify keyboard selection and dismissal at desktop and touch sizes. |
+| 6 | Button / Checkbox / Radio / Switch / Slider | Check the shared size scale and hover, pressed, focus, disabled and loading states where applicable. Extend typed activation and value coverage in the bindings while preserving existing C callback timing. |
+| 6 | Input / Textarea | Verify word movement, line movement, caret/selection visibility and IME placement across wrapped or scrolled content. Keep new Editor features lower priority. |
+| 7 | DatePicker / TimeField | Exercise direct year selection, localized formatting and range bounds with keyboard and touch. Finish installed TimeField examples and IME checks. |
+| 7 | Chart / Plot | Verify that thin curves remain continuous across scales and that existing pan/pinch/zoom works without hijacking the parent scroll region when the plot cannot use the gesture. |
 
 ### Component gaps to close
 
@@ -118,7 +128,7 @@ Verify reported regressions against the current gallery as each slice lands.
 | Charts/plots | Scales, axes/ticks, series/legend, layout/motion, tooltips, selection and accessibility; verify existing pan/zoom/touch. |
 | App structure | Carousel intrinsic layout, Sidebar clipping/scrolling, Settings, Command lifecycle/width and Root/window services; verify composed apps. |
 | Text/editing | TextView parser/plugins/selection/typography, Textarea behavior and Questionnaire model/navigation/semantics. Editor expansion remains lower priority. |
-| Video/audio/speech | Verify reusable VideoPlayer controls, visible seek icons, video-only fullscreen and audio on advertised hosts; finish native provider/lifecycle gaps. Browser decoding proves no native codec/device support. |
+| Video/audio/speech | Add reusable mute/volume, verify media lifecycle and device handling on advertised hosts, and keep browser decoding evidence separate from the native FFV1/PCM example and physical audio output. |
 | Every other family | Audit current code, frozen behavior and limitations even when recorded feature rows are green. Fix outstanding reported demo regressions; do not infer whole-family completion. |
 
 For each family, verify applicable state ownership, callbacks/results,

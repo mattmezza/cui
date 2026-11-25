@@ -13,6 +13,42 @@ from threading import Thread
 from playwright.sync_api import sync_playwright
 
 
+
+def set_candidate(cdp, value):
+    cdp.send('Input.imeSetComposition',
+             {'text': value, 'selectionStart': len(value), 'selectionEnd': len(value)})
+
+
+def wait_for_paint(page, value, present=True):
+    page.wait_for_function('''([value,present])=>{
+        const e=cuiGallery.exports, d=new TextDecoder();
+        const found=Array.from({length:e.gallery_count()},(_,i)=>d.decode(
+            new Uint8Array(e.memory.buffer,e.gallery_command_text(i),
+                           e.gallery_command_length(i)))).includes(value);
+        return found===present;
+    }''', arg=[value, present])
+
+
+def ordered_segment(page, name, segment):
+    return page.evaluate('''([name,segment])=>{
+      const e=cuiGallery.exports,d=new TextDecoder();
+      const label=i=>d.decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),
+          e.gallery_semantic_length(i)));
+      for(let i=0;i<e.gallery_semantic_count();i++)
+        if(e.gallery_semantic(i,0)===9&&label(i)===name){
+          const id=e.gallery_semantic_id(i);
+          for(let j=0;j<e.gallery_semantic_count();j++)
+            if(e.gallery_semantic_parent(j)===id&&label(j)===segment){
+              const n=e.gallery_semantic_id(j);
+              return {owner:[Number(n&0xffffffffn),Number((n>>32n)&0xffffffffn)],
+                  bounds:[1,2,3,4].map(field=>e.gallery_semantic(j,field)),
+                  value:e.gallery_semantic(j,8)};
+            }
+        }
+      throw Error('Missing TimeField segment: '+name+' '+segment);
+    }''', [name, segment])
+
+
 def ordered_tab_preview(page):
     canvas = page.locator('#preview')
     mode = page.locator('#time-field-tab-mode')
@@ -26,7 +62,8 @@ def ordered_tab_preview(page):
 
     def focused(name):
         page.wait_for_function('''name=>{
-          if(document.activeElement.id!=='preview')return false;
+          const target=name==='Save schedule'?'preview':'cui-ime-input';
+          if(document.activeElement.id!==target)return false;
           const e=cuiGallery.exports,d=new TextDecoder();
           for(let i=0;i<e.gallery_semantic_count();i++)
             if(e.gallery_semantic(i,7)&&d.decode(new Uint8Array(
@@ -36,18 +73,7 @@ def ordered_tab_preview(page):
         }''', arg=name)
 
     def value(name, segment):
-        return page.evaluate('''([name,segment])=>{
-          const e=cuiGallery.exports,d=new TextDecoder();
-          const label=i=>d.decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),
-              e.gallery_semantic_length(i)));
-          for(let i=0;i<e.gallery_semantic_count();i++)
-            if(e.gallery_semantic(i,0)===9&&label(i)===name){
-              const id=e.gallery_semantic_id(i);
-              for(let j=0;j<e.gallery_semantic_count();j++)
-                if(e.gallery_semantic_parent(j)===id&&label(j)===segment)return e.gallery_semantic(j,8);
-            }
-          throw Error('Missing TimeField segment: '+name+' '+segment);
-        }''', [name, segment])
+        return ordered_segment(page, name, segment)['value']
 
     def digit_then_tab(digit, field, destination):
         # Use real key events while holding the async frame. The digit must
@@ -107,6 +133,74 @@ def ordered_tab_preview(page):
     page.keyboard.press('Tab')
     page.wait_for_function('document.activeElement.matches(".component-mode a")')
     assert page.locator('#cui-ime-input').count() == 0
+
+
+def ordered_ime_preview(page):
+    page.locator('#time-field-tab-mode').select_option('ordered')
+    page.wait_for_function('document.querySelector("#snippet").textContent.includes("schedule_frame")')
+    assert 'CUI_TIME_FIELD_IME_V1' in page.locator('#snippet').text_content()
+    page.locator('#preview').focus()
+    page.keyboard.press('Tab')
+    page.wait_for_function('document.activeElement.id==="cui-ime-input"')
+    cdp = page.context.new_cdp_session(page)
+
+    def config():
+        return page.evaluate('[1,2,3,4].map(i=>cuiGallery.exports.gallery_text_config(i)>>>0)')
+
+    def assert_anchor(segment):
+        assert config()[:2] == segment['owner']
+        x, y, w, h = segment['bounds']
+        actual = page.locator('#cui-ime-input').bounding_box()
+        canvas = page.locator('#preview').bounding_box()
+        assert x <= actual['x'] - canvas['x'] < x + w
+        assert y <= actual['y'] - canvas['y'] < y + h
+
+    hour = ordered_segment(page, 'Start time', 'Hour')
+    assert_anchor(hour)
+    page.evaluate('window.oldTimeProxy=document.activeElement')
+    initial = config()
+    set_candidate(cdp, '03')
+    wait_for_paint(page, '03')
+    assert ordered_segment(page, 'Start time', 'Hour')['value'] == 9
+    cdp.send('Input.insertText', {'text': '03'})
+    minute = ordered_segment(page, 'Start time', 'Minute')
+    page.wait_for_function('''([lo,hi])=>{
+        const e=cuiGallery.exports;
+        return (e.gallery_text_config(1)>>>0)===lo && (e.gallery_text_config(2)>>>0)===hi;
+    }''', arg=minute['owner'])
+    assert ordered_segment(page, 'Start time', 'Hour')['value'] == 3
+    assert config()[2:] != initial[2:]
+    assert_anchor(minute)
+    assert page.evaluate('''config=>{
+        const e=cuiGallery.exports;
+        return e.gallery_owned_text(0,0,0,0,0,...config)===0;
+    }''', initial)
+
+    set_candidate(cdp, '99')
+    wait_for_paint(page, '99')
+    cdp.send('Input.insertText', {'text': '99'})
+    wait_for_paint(page, '99', present=False)
+    assert ordered_segment(page, 'Start time', 'Minute')['value'] == 30
+
+    set_candidate(cdp, '42')
+    wait_for_paint(page, '42')
+    page.evaluate('''()=>{
+        const old=window.oldTimeProxy;
+        if(old.isConnected)throw Error('Old IME proxy is still attached');
+        for(const type of ['compositionstart','compositionupdate','compositionend'])
+            old.dispatchEvent(new CompositionEvent(type,{data:'55'}));
+        old.dispatchEvent(new InputEvent('input',{data:'55'}));
+        old.dispatchEvent(new FocusEvent('blur'));
+    }''')
+    set_candidate(cdp, '')
+    wait_for_paint(page, '42', present=False)
+    assert_anchor(minute)
+    assert ordered_segment(page, 'Start time', 'Minute')['value'] == 30
+
+    cdp.send('Input.insertText', {'text': '41'})
+    wait_for_paint(page, '41')
+    assert ordered_segment(page, 'Start time', 'Minute')['value'] == 41
+    assert ordered_segment(page, 'End time', 'Minute')['value'] == 45
 
 
 def main():
@@ -217,36 +311,23 @@ def main():
             page.wait_for_function('document.activeElement.id==="cui-ime-input"')
             cdp = page.context.new_cdp_session(page)
 
-            def candidate(value):
-                cdp.send('Input.imeSetComposition',
-                         {'text': value, 'selectionStart': len(value), 'selectionEnd': len(value)})
-
-            def painted(value, present=True):
-                page.wait_for_function('''([value,present])=>{
-                    const e=cuiGallery.exports, decoder=new TextDecoder();
-                    const found=Array.from({length:e.gallery_count()},(_,i)=>decoder.decode(
-                        new Uint8Array(e.memory.buffer,e.gallery_command_text(i),
-                                       e.gallery_command_length(i)))).includes(value);
-                    return found===present;
-                }''', arg=[value, present])
-
-            candidate('٢٠')
-            painted('٢٠')
+            set_candidate(cdp, '٢٠')
+            wait_for_paint(page, '٢٠')
             assert stats(16) == 103000 and stats(17) == callbacks
             cdp.send('Input.insertText', {'text': '٢٠'})
             page.wait_for_function('cuiGallery.exports.gallery_control_stats(16)===102000')
             assert stats(17) == callbacks + 1
 
-            candidate('٦٠')
-            painted('٦٠')
+            set_candidate(cdp, '٦٠')
+            wait_for_paint(page, '٦٠')
             cdp.send('Input.insertText', {'text': '٦٠'})
             page.wait_for_function('cuiGallery.exports.gallery_control_stats(18)===4')
             assert stats(16) == 102000 and stats(17) == callbacks + 1
 
-            candidate('٤٢')
-            painted('٤٢')
-            candidate('')
-            painted('٤٢', present=False)
+            set_candidate(cdp, '٤٢')
+            wait_for_paint(page, '٤٢')
+            set_candidate(cdp, '')
+            wait_for_paint(page, '٤٢', present=False)
             assert stats(16) == 102000 and stats(17) == callbacks + 1
             assert not errors, errors
             page.close()
@@ -256,6 +337,14 @@ def main():
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/#TimeField')
             page.wait_for_function('window.cuiGallery?.renderedComponent==="TimeField"')
             ordered_tab_preview(page)
+            assert not errors, errors
+            page.close()
+
+            page = browser.new_page(viewport={'width': 1280, 'height': 900})
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.goto(f'http://127.0.0.1:{server.server_port}/cui/#TimeField')
+            page.wait_for_function('window.cuiGallery?.renderedComponent==="TimeField"')
+            ordered_ime_preview(page)
             assert not errors, errors
             page.close()
 
@@ -291,7 +380,7 @@ def main():
             canvas = page.locator('#preview').bounding_box()
             page.touchscreen.tap(canvas['x'] + x + w / 2, canvas['y'] + y + h / 2)
             next_paint()
-            assert page.evaluate('document.activeElement.id==="preview"')
+            assert page.evaluate('document.activeElement.id==="cui-ime-input"')
             page.keyboard.press('ArrowUp')
             next_paint()
             assert page.evaluate('''()=>{

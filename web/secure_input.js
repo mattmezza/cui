@@ -5,82 +5,107 @@
 export function createSecureInputBridge({parent, text, composition, key, focusLost,
                                         changed, id = 'cui-secure-input'}) {
   const encoder = new TextEncoder();
-  let proxy = null, owner = 0, generation = null, composing = false;
-  let ended = null, disposed = false, resetting = false;
-  let updateSerial = 0;
+  let current = null, disposed = false;
   const bytes = value => encoder.encode(value);
   const offset = (value, endpoint) => {
     let n = Math.max(0, Math.min(value.length, endpoint));
     if (n && n < value.length && /[\uD800-\uDBFF]/.test(value[n - 1]) && /[\uDC00-\uDFFF]/.test(value[n])) n--;
     return bytes(value.slice(0, n)).length;
   };
-  function clear() { if (proxy) { proxy.value = ''; proxy.setSelectionRange(0, 0); } }
-  function emit(kind, value = '', anchor = 0, cursor = anchor) {
-    composition(kind, bytes(value), offset(value, anchor), offset(value, cursor), owner);
+  function clear(element) { element.value = ''; element.setSelectionRange(0, 0); }
+  function emit(session, kind, value = '', anchor = 0, cursor = anchor) {
+    composition(kind, bytes(value), offset(value, anchor), offset(value, cursor),
+                session.owner, session.generation, session.anchor);
     changed();
   }
   function reset(notify = true) {
-    if (composing && notify) emit('cancel');
-    composing = false; ended = null; clear();
-    if (proxy) { resetting = true; proxy.remove(); proxy = null; resetting = false; }
-    owner = 0; generation = null;
+    if (!current) return;
+    const session = current;
+    current = null;
+    clear(session.element);
+    session.element.remove();
+    if (session.composing && notify) emit(session, 'cancel');
   }
   function create(config) {
-    proxy = document.createElement(config.multiline ? 'textarea' : 'input'); proxy.id = id;
-    if (!config.multiline) proxy.type = config.type === 1 ? 'password' : 'text';
-    proxy.autocomplete = config.purpose === 2 ? 'new-password' : config.purpose === 1 ? 'current-password' : 'off';
-    proxy.spellcheck = false; proxy.setAttribute('autocorrect', 'off'); proxy.setAttribute('autocapitalize', 'off');
-    proxy.setAttribute('aria-label', config.label || 'Text input');
-    Object.assign(proxy.style, {position: 'fixed', width: '1px', height: '1px', opacity: '0.01', padding: '0', border: '0'});
-    parent.append(proxy);
-    proxy.addEventListener('compositionstart', () => { composing = true; ended = null; emit('start'); });
-    proxy.addEventListener('compositionupdate', event => {
-      if (!composing) { composing = true; emit('start'); }
-      const value = event.data || '', serial = ++updateSerial;
+    const element = document.createElement(config.multiline ? 'textarea' : 'input');
+    const session = {element, owner: config.owner, generation: config.generation,
+                     anchor: config.anchor ?? null, composing: false, ended: null, serial: 0};
+    current = session;
+    element.id = id;
+    if (session.anchor) element.tabIndex = -1;
+    if (!config.multiline) element.type = config.type === 1 ? 'password' : 'text';
+    element.autocomplete = config.purpose === 2 ? 'new-password' : config.purpose === 1 ? 'current-password' : 'off';
+    element.spellcheck = false; element.setAttribute('autocorrect', 'off'); element.setAttribute('autocapitalize', 'off');
+    element.setAttribute('aria-label', config.label || 'Text input');
+    Object.assign(element.style, {position: 'fixed', width: '1px', height: '1px', opacity: '0.01', padding: '0', border: '0'});
+    if (session.anchor) session.anchor.after(element);
+    else parent.append(element);
+    const on = (name, callback) => element.addEventListener(name, event => {
+      if (current === session) callback(event);
+    });
+    on('compositionstart', () => {
+      session.composing = true; session.ended = null; session.serial++;
+      emit(session, 'start');
+    });
+    on('compositionupdate', event => {
+      if (!session.composing) {
+        session.composing = true;
+        emit(session, 'start');
+      }
+      const value = event.data || '', serial = ++session.serial;
       // Native browser proxy selection is UTF-16. Clamp to the current preedit.
       queueMicrotask(() => {
-        if (composing && proxy && serial === updateSerial)
-          emit('update', value, proxy.selectionStart ?? value.length, proxy.selectionEnd ?? value.length);
+        if (current === session && session.composing && serial === session.serial)
+          emit(session, 'update', value, element.selectionStart ?? value.length,
+               element.selectionEnd ?? value.length);
       });
     });
-    proxy.addEventListener('compositionend', event => {
-      if (!composing) { clear(); return; }
-      const value = event.data || ''; composing = false;
-      ended = value || null; emit(value ? 'commit' : 'cancel', value); clear();
+    on('compositionend', event => {
+      if (!session.composing) { clear(element); return; }
+      const value = event.data || '';
+      session.composing = false;
+      const ended = value ? {value} : null;
+      session.ended = ended;
+      emit(session, value ? 'commit' : 'cancel', value);
+      clear(element);
       // beforeinput/input following compositionend belong to that same commit.
-      setTimeout(() => { ended = null; }, 0);
+      if (ended) setTimeout(() => {
+        if (session.ended === ended) session.ended = null;
+      }, 0);
     });
-    proxy.addEventListener('beforeinput', event => {
+    on('beforeinput', event => {
       if (event.inputType === 'insertFromPaste') return; // Browser input event supplies transient text.
-      if (!composing && ended !== null) {
-        const duplicate = event.data === ended ||
+      if (!session.composing && session.ended) {
+        const duplicate = event.data === session.ended.value ||
           (event.data == null && /Composition/.test(event.inputType));
         if (duplicate) {
           event.preventDefault();
-          if (event.cancelable) ended = null;
-        } else if (event.inputType === 'insertText') ended = null;
+          if (event.cancelable) session.ended = null;
+        } else if (event.inputType === 'insertText') session.ended = null;
       }
     });
-    proxy.addEventListener('input', event => {
-      if (composing || event.isComposing) return;
-      const value = event.data ?? proxy.value;
-      if (ended !== null && (value === ended || !value)) { ended = null; clear(); return; }
-      if (value) { text(bytes(value), owner); changed(); }
-      clear();
+    on('input', event => {
+      if (session.composing || event.isComposing) return;
+      const value = event.data ?? element.value;
+      if (session.ended && (value === session.ended.value || !value)) {
+        session.ended = null; clear(element); return;
+      }
+      if (value) { text(bytes(value), session.owner, session.generation, session.anchor); changed(); }
+      clear(element);
     });
-    proxy.addEventListener('keydown', event => {
-      if (composing || event.isComposing || event.keyCode === 229) return;
-      if (key(event, owner)) { event.preventDefault(); changed(); }
+    on('keydown', event => {
+      if (session.composing || event.isComposing || event.keyCode === 229) return;
+      if (key(event, session.owner)) { event.preventDefault(); changed(); }
     });
-    for (const name of ['copy', 'cut']) proxy.addEventListener(name, event => {
+    for (const name of ['copy', 'cut']) on(name, event => {
       // A hidden proxy has no committed content. Deny native clipboard extraction
       // as well as forwarding the shortcut to the checked CUI reducer.
       if (config.type === 1) event.preventDefault();
     });
-    proxy.addEventListener('blur', () => {
-      if (resetting) return;
-      if (composing) emit('cancel');
-      composing = false; ended = null; clear(); focusLost(owner); changed();
+    on('blur', event => {
+      if (session.composing) emit(session, 'cancel');
+      session.composing = false; session.ended = null; clear(element);
+      focusLost(session.owner, session.generation, event); changed();
     });
   }
   return {
@@ -91,13 +116,16 @@ export function createSecureInputBridge({parent, text, composition, key, focusLo
           (config.multiline && (config.type !== 0 || config.purpose !== 0))) {
         reset(); throw new TypeError('Invalid finalized CUI text input configuration');
       }
-      if (!proxy || owner !== config.owner || generation !== config.generation) {
-        reset(); owner = config.owner; generation = config.generation; create(config);
+      if (!current || current.owner !== config.owner || current.generation !== config.generation ||
+          current.anchor !== (config.anchor ?? null)) {
+        reset();
+        create(config);
       }
-      if (rect) { proxy.style.left = `${rect.x}px`; proxy.style.top = `${rect.y}px`; proxy.style.height = `${Math.max(1, rect.h)}px`; }
-      if (document.activeElement !== proxy) proxy.focus({preventScroll: true});
+      const element = current.element;
+      if (rect) { element.style.left = `${rect.x}px`; element.style.top = `${rect.y}px`; element.style.height = `${Math.max(1, rect.h)}px`; }
+      if (document.activeElement !== element) element.focus({preventScroll: true});
     },
     reset, dispose() { reset(); disposed = true; },
-    get element() { return proxy; }
+    get element() { return current?.element ?? null; }
   };
 }

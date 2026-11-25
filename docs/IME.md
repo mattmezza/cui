@@ -176,6 +176,7 @@ counts, caller capacity, source replacement and stale-focus rejection. Injected
 SDL events check scalar-to-byte conversion with an emoji and an accented
 scalar. The ordinary and ordered SDL TimeField paths cover empty editing and
 committed text in one poll and across polls. Tests also cover window focus loss
-and a queued ordered commit after the selected segment changes. The headless
-browser exercises the per-segment IME path. Physical IME interaction and
-system candidate UI require platform qualification.
+and a queued ordered commit after the selected segment changes. Headless
+Chromium exercises the per-segment and ordered TimeField paths, including
+preedit, commit, rejection, cancellation, and retired browser proxy events.
+Physical IME interaction and system candidate UI require platform qualification.

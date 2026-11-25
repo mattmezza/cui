@@ -19,8 +19,10 @@ static bool schedule_init(schedule_example *schedule) {
     schedule->start = (cui_time){9, 30, 0};
     schedule->end = (cui_time){10, 45, 0};
     schedule->saved = false;
-    return cui_time_field_options_init_v1(&schedule->options) == CUI_TIME_TEXT_OK &&
-           cui_time_field_state_init_v1(&schedule->start_state, schedule->start,
+    if (cui_time_field_options_init_v1(&schedule->options) != CUI_TIME_TEXT_OK)
+        return false;
+    schedule->options.flags |= CUI_TIME_FIELD_IME_V1;
+    return cui_time_field_state_init_v1(&schedule->start_state, schedule->start,
                                         &schedule->options) == CUI_TIME_TEXT_OK &&
            cui_time_field_state_init_v1(&schedule->end_state, schedule->end,
                                         &schedule->options) == CUI_TIME_TEXT_OK;

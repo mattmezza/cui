@@ -172,9 +172,10 @@ in Styled. With Base, register the rectangle for the selected segment when
 laying out your own field.
 
 The SDL3 adapter routes ordered preedit, empty preedit clearing and the later
-commit automatically. The preview's **Per segment with IME** mode remains
-available for browser composition. Ordered composition in the gallery still
-needs browser host integration. See the [host event contract](IME.md).
+commit automatically. The gallery supports composition in **Per segment with
+IME** and **One stop per field**. In the ordered preview the hidden text proxy
+follows the selected segment, and Tab and Shift-Tab leave the preview at its
+edges. See the [host event contract](IME.md).
 
 Run the [complete two-field form](../examples/time_field_ordered.c) from a
 configured repository. It queues one batch that edits both fields and

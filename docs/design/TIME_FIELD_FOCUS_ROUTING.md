@@ -159,7 +159,7 @@ CUI traversal.
 Headless Chromium tests real focus transfer at the canvas edges and retains a
 pending digit across Tab.
 
-## Ordered native composition
+## Ordered composition
 
 An editable segment can own the finalized host text session while Core focus
 remains on the root. The additive queue entry point admits an event only for
@@ -172,6 +172,15 @@ The reducer copies bounded preedit state and publishes it when the field
 submits. A retained draft also matches the host generation.
 
 SDL captures the pair for composition and its empty-clear/late-commit handoff.
-Headless tests cover that route and the existing per-segment path.
-Ordered browser composition, platform accessibility mapping and foreign
-authoring remain open.
+The gallery's transient text proxy captures its segment and generation at
+creation. A replaced proxy drops its remaining browser events and deferred
+selection reads. Native browser text and composition use the generation-checked
+queue. Physical key events use the ordinary ordered queue so a pending digit
+can advance the segment before a queued Tab.
+
+The ordered proxy sits beside the canvas in the DOM. When Core reaches a
+non-text widget or clears focus at an open edge, the browser host restores
+canvas focus before removing the proxy. Headless Chromium tests composition,
+candidate alignment and stale proxy input. Chromium and Firefox verify real
+Tab in both directions with the proxy active. Physical IME, accessibility
+mapping and foreign authoring remain open.

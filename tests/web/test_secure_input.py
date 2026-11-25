@@ -90,6 +90,20 @@ def main():
         page.evaluate('proof.multiline(0)');page.wait_for_timeout(50)
         assert page.locator('input#cui-secure-input').count()==1
         assert page.evaluate('proof.e.probe_config(3)')>multiline_generation
+        # Replace a proxy before its queued selection read runs, then start the
+        # next session in the same task. The retired preedit must stay retired.
+        events = page.evaluate('''async ()=>{
+            const {bridge,e} = proof;
+            const old = bridge.element, start = window.events.length;
+            old.dispatchEvent(new CompositionEvent('compositionupdate', {data:'retired'}));
+            bridge.sync({owner:e.probe_config(0), type:e.probe_config(1),
+                purpose:e.probe_config(2), generation:e.probe_config(3)+1});
+            if(bridge.element===old)throw Error('Proxy was not replaced');
+            bridge.element.dispatchEvent(new CompositionEvent('compositionstart'));
+            await Promise.resolve();
+            return window.events.slice(start).map(([kind,data])=>[kind,data]);
+        }''')
+        assert events == [['start', ''], ['cancel', ''], ['start', '']], events
         assert not errors,errors;browser.close();print('secure Input actual WASM/CDP PASS')
     finally:server.shutdown()
 if __name__=='__main__':main()

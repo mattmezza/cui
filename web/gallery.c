@@ -1885,7 +1885,8 @@ static bool gallery_begin_ordered_time(float width, float height, bool disabled)
                 return false;
         ordered_time_ready = true;
     }
-    ordered_time_options.flags = disabled ? CUI_TIME_FIELD_DISABLED_V1 : 0;
+    ordered_time_options.flags =
+        CUI_TIME_FIELD_IME_V1 | (disabled ? CUI_TIME_FIELD_DISABLED_V1 : 0);
     cui_time_field_frame_entry_v1 fields[2];
     for (unsigned i = 0; i < 2; i++)
         fields[i] = (cui_time_field_frame_entry_v1){cui_id_from(ui, ordered_time_keys[i]),
@@ -3520,6 +3521,23 @@ void gallery_composition_bytes(int phase, const char *text, size_t length, unsig
                                       .text_length = length,
                                       .composition_anchor = anchor,
                                       .composition_cursor = cursor});
+}
+/* Phase -1 is a direct browser input event, phases 0 to 3 are composition. */
+int gallery_owned_text(int phase, const char *text, size_t length, unsigned anchor, unsigned cursor,
+                       uint32_t owner_low, uint32_t owner_high, uint32_t generation_low,
+                       uint32_t generation_high) {
+    if (!ui || phase < -1 || phase > 3 || (!text && length))
+        return 0;
+    uint64_t generation = generation_low | ((uint64_t)generation_high << 32);
+    return cui_queue_text_input_event_v1(
+        ui, generation,
+        (cui_event){.type = phase < 0 ? CUI_EVENT_TEXT
+                                      : (cui_event_type)(CUI_EVENT_COMPOSITION_START + phase),
+                    .composition_target = owner_low | ((cui_id)owner_high << 32),
+                    .text_data = text,
+                    .text_length = length,
+                    .composition_anchor = anchor,
+                    .composition_cursor = cursor});
 }
 float gallery_ime_rect(unsigned field) {
     cui_rect rect;

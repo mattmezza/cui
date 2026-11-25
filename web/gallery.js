@@ -1523,7 +1523,7 @@ function selectComponent(){
  $('selection-mode').hidden=!['List','Select','Combobox','DataTable'].includes(selected.name);$('selection-mode').value='0';
  $('disabled').checked=false;document.body.classList.remove('menu-open');navigation();requestFrame();
 }
-let imeTarget=null, composing=false;
+let composing=false;
 const boundImeTargets=new WeakSet();
 function withUtf8(bytes, callback){
  const pointer=bytes.length?wasm.malloc(bytes.length):0;
@@ -1532,30 +1532,50 @@ function withUtf8(bytes, callback){
  finally {if(pointer)wasm.free(pointer);}
 }
 const secureInput=createSecureInputBridge({parent:document.body,id:'cui-ime-input',
- text:bytes=>withUtf8(bytes,(pointer,length)=>wasm.gallery_text(pointer,length)),
- composition:(kind,bytes,anchor,cursor,owner)=>{
+ text:(bytes,owner,generation,anchor)=>withUtf8(bytes,(pointer,length)=>{
+  if(anchor===canvas)queueOwnedInput(-1,pointer,length,0,0,owner,generation);
+  else wasm.gallery_text(pointer,length);
+ }),
+ composition:(kind,bytes,anchor,cursor,owner,generation,mount)=>{
   composing=kind==='start'||kind==='update';
-  const [high,low]=owner.split(':').map(Number);
-  withUtf8(bytes,(pointer,length)=>wasm.gallery_composition_bytes(
-   {start:0,update:1,commit:2,cancel:3}[kind],pointer,length,anchor,cursor,low,high));
+  const phase={start:0,update:1,commit:2,cancel:3}[kind];
+  withUtf8(bytes,(pointer,length)=>{
+   if(mount===canvas)queueOwnedInput(phase,pointer,length,anchor,cursor,owner,generation);
+   else{
+    const [high,low]=owner.split(':').map(Number);
+    wasm.gallery_composition_bytes(phase,pointer,length,anchor,cursor,low,high);
+   }
+  });
  },
  key:event=>{handleCanvasKey(event,3);return event.defaultPrevented;},
- focusLost:()=>{composing=false;wasm?.gallery_focus(0xffffffff);},changed:requestFrame});
+ focusLost:(_owner,_generation,event)=>{
+  composing=false;
+  if(event.relatedTarget!==canvas||!orderedTimeField())wasm?.gallery_focus(0xffffffff);
+ },changed:requestFrame});
+function queueOwnedInput(phase,pointer,length,anchor,cursor,owner,generation){
+ const [high,low]=owner.split(':').map(Number);
+ const [generationHigh,generationLow]=generation.split(':').map(Number);
+ wasm.gallery_owned_text(phase,pointer,length,anchor,cursor,low,high,generationLow,generationHigh);
+}
 function syncImeTarget(){
  if(!wasm?.gallery_text_config)return;
- const active=document.activeElement===canvas||document.activeElement===secureInput.element;
- if(!active||!wasm.gallery_text_config(0)){secureInput.reset();imeTarget=null;composing=false;return;}
+ const ordered=orderedTimeField(), proxyFocused=document.activeElement===secureInput.element;
+ if((document.activeElement!==canvas&&!proxyFocused)||!wasm.gallery_text_config(0)){
+  // Restore the canvas as the browser's Tab origin when CUI reaches a button or leaves.
+  if(ordered&&proxyFocused)canvas.focus({preventScroll:true});
+  secureInput.reset();composing=false;return;
+ }
  const f=n=>wasm.gallery_text_config(n)>>>0;
  const rect=canvas.getBoundingClientRect();
  secureInput.sync({owner:`${f(2)}:${f(1)}`,generation:`${f(4)}:${f(3)}`,
-  type:f(5),purpose:f(6),multiline:!!f(7),label:'Canvas text input'},
+  type:f(5),purpose:f(6),multiline:!!f(7),label:'Canvas text input',anchor:ordered?canvas:null},
   {x:rect.left+Math.max(0,wasm.gallery_ime_rect(0)),y:rect.top+Math.max(0,wasm.gallery_ime_rect(1)),h:wasm.gallery_ime_rect(3)});
- imeTarget=secureInput.element;
+ const imeTarget=secureInput.element;
  if(imeTarget&&!boundImeTargets.has(imeTarget)){
   boundImeTargets.add(imeTarget);imeTarget.tabIndex=-1;imeTarget.style.pointerEvents='none';
-  imeTarget.addEventListener('compositionstart',()=>{composing=true;});
-  imeTarget.addEventListener('compositionend',()=>{composing=false;});
-  imeTarget.addEventListener('keyup',event=>handleCanvasKey(event,4));
+  imeTarget.addEventListener('keyup',event=>{
+   if(secureInput.element===imeTarget)handleCanvasKey(event,4);
+  });
  }
 }
 const keys={Tab:1,Enter:2,' ':3,Escape:4,ArrowLeft:5,ArrowRight:6,ArrowUp:7,ArrowDown:8,Home:9,End:10,Backspace:11,Delete:12,PageUp:19,PageDown:20};
@@ -1653,7 +1673,7 @@ canvas.parentElement.addEventListener('scroll',()=>{
  if(selected?.name==='TimeField')syncImeTarget();
 },{passive:true});
 function cancelPageTouches(){for(const [id,t] of pageTouches)if(!t.owned)wasm?.gallery_touch(7,0,0,id,1);pageTouches.clear();requestFrame();}
-window.addEventListener('blur',()=>{cancelPageTouches();pointerFocusLoss();secureInput.reset();imeTarget=null;composing=false;wasm?.gallery_focus(0xffffffff);requestFrame();});window.addEventListener('hashchange',cancelPageTouches);
+window.addEventListener('blur',()=>{cancelPageTouches();pointerFocusLoss();secureInput.reset();composing=false;wasm?.gallery_focus(0xffffffff);requestFrame();});window.addEventListener('hashchange',cancelPageTouches);
 canvas.addEventListener('lostpointercapture',e=>{const t=pageTouches.get(e.pointerId);if(!t)return;pageTouches.delete(e.pointerId);if(!t.owned)wasm?.gallery_touch(7,0,0,e.pointerId,1);requestFrame();});
 canvas.addEventListener('pointercancel',e=>{const t=pageTouches.get(e.pointerId);pageTouches.delete(e.pointerId);if(!t?.owned)wasm?.gallery_touch(7,0,0,e.pointerId,e.pointerType==='touch'?1:2);requestFrame();});
 canvas.addEventListener('blur',e=>{if(secureInput.element&&e.relatedTarget===secureInput.element)return;pointerFocusLoss();wasm?.gallery_focus(0xffffffff);requestFrame();});

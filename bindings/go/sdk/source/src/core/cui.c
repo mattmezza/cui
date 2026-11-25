@@ -203,6 +203,8 @@ struct cui_context {
     uint64_t *previous_order;
     uint32_t paint_root_count;
     cui_semantic *semantics, *previous;
+    cui_str *semantic_text_values;
+    bool semantic_text_ready;
     size_t semantic_count, previous_count;
     cui_core_hover_cache hover;
     uint32_t *box_ids;
@@ -825,6 +827,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->prepaint_deferred);
     free(ui->commands);
     free(ui->semantics);
+    free(ui->semantic_text_values);
     free(ui->previous);
     free(ui->box_ids);
     free(ui->activations);
@@ -850,6 +853,8 @@ static bool cui_core_focusable(const cui_semantic *s) {
     case CUI_ROLE_RADIO:
     case CUI_ROLE_SCROLLBAR:
     case CUI_ROLE_SLIDER:
+    case CUI_ROLE_TIME_INPUT:
+    case CUI_ROLE_SPINBUTTON:
     case CUI_ROLE_TEXTBOX:
     case CUI_ROLE_TAB:
     case CUI_ROLE_OPTION:
@@ -1579,7 +1584,8 @@ static const cui_semantic *cui_core_text_input_semantic(const cui_context *ui, c
         const cui_semantic *s = &ui->semantics[i];
         bool delegated = owner != ui->focus && s->details.no_focus &&
                          s->details.focus_target == ui->focus && s->details.parent == ui->focus;
-        if (s->id == owner && s->role == CUI_ROLE_TEXTBOX && !s->disabled && !s->details.readonly &&
+        if (s->id == owner && (s->role == CUI_ROLE_TEXTBOX || s->role == CUI_ROLE_SPINBUTTON) &&
+            !s->disabled && !s->details.readonly &&
             (delegated || (owner == ui->focus && cui_core_focusable(s))) &&
             (!s->details.text_input_configured ||
              (s->details.text_input_config.type >= CUI_TEXT_INPUT_TEXT &&
@@ -2191,6 +2197,7 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
     if (ui->element_count)
         memset(ui->box_ids, 0, 2 * ui->config.max_elements * sizeof(*ui->box_ids));
     ui->semantic_count = ui->element_count = ui->scope_count = ui->depth = ui->string_used = 0;
+    ui->semantic_text_ready = false;
     ui->count = 0;
     cui_core_select_context(ui);
     Clay_SetLayoutDimensions((Clay_Dimensions){w, h});
@@ -3724,6 +3731,8 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
         ui->depth && ui->opened[ui->depth - 1] ? ui->node_stack[ui->depth - 1] : SIZE_MAX;
     if (ui->numeric)
         ui->numeric->masks[ui->semantic_count] = 0;
+    if (ui->semantic_text_values)
+        ui->semantic_text_values[ui->semantic_count] = (cui_str){0};
     ui->semantics[ui->semantic_count++] = (cui_semantic){.id = id,
                                                          .role = role,
                                                          .bounds = bounds,
@@ -4710,6 +4719,8 @@ cui_core_commands_done:
             continue;
         if (ui->numeric)
             ui->numeric->masks[visible] = ui->numeric->masks[i];
+        if (ui->semantic_text_values)
+            ui->semantic_text_values[visible] = ui->semantic_text_values[i];
         ui->semantics[visible] = ui->semantics[i];
         ui->semantic_scopes[visible] = ui->semantic_scopes[i];
         /* Distinct semantic IDs can resolve to this same painted node.
@@ -4875,6 +4886,7 @@ cui_core_commands_done:
     if (ui->ordered_frame && ui->ordered_data)
         memset(ui->ordered_data, 0, ui->ordered_bytes);
     ui->ordered_frame = false;
+    ui->semantic_text_ready = ui->error == CUI_OK;
     ui->in_frame = false;
     ui->resolving_layout = false;
     if (ui->scroll_layout && ui->error != CUI_OK)
@@ -4926,6 +4938,13 @@ const cui_semantic *cui_semantics(cui_context *ui, size_t *count) {
     if (count)
         *count = ui ? ui->semantic_count : 0;
     return ui ? ui->semantics : NULL;
+}
+cui_str cui_semantic_text_value_v1(const cui_context *ui, size_t i) {
+    if (!ui || !ui->semantic_text_ready || ui->in_frame || ui->error != CUI_OK ||
+        i >= ui->semantic_count || !ui->semantic_text_values || ui->semantics[i].details.secret ||
+        ui->semantics[i].details.password)
+        return (cui_str){0};
+    return ui->semantic_text_values[i];
 }
 cui_id cui_semantic_parent(cui_context *ui, cui_id id) {
     if (!ui || !id || ui->in_frame)
@@ -5533,7 +5552,7 @@ bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
     if (!cui_core_mutation(ui))
         return false;
     if (!cui_core_active(ui) || !id || cui_core_inert(ui) || role < CUI_ROLE_NONE ||
-        role > CUI_ROLE_RADIOGROUP)
+        role > CUI_ROLE_SPINBUTTON)
         return false;
     for (size_t i = 0; i < ui->semantic_count; i++)
         if (ui->semantics[i].id == id) {
@@ -5632,11 +5651,47 @@ void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details d
         if (ui->semantics[i].id == id) {
             details.description = cui_core_copy_string(ui, details.description);
             ui->semantics[i].details = details;
+            if ((details.secret || details.password) && ui->semantic_text_values)
+                ui->semantic_text_values[i] = (cui_str){0};
             if (ui->release_pending_target == id &&
                 (!details.release_key_activation || !cui_core_focusable(&ui->semantics[i])))
                 ui->release_pending = false;
             return;
         }
+}
+bool cui_set_semantic_text_value_v1(cui_context *ui, cui_id id, cui_str value) {
+    if (!id || (value.length && !value.data) || !cui_core_active(ui) || cui_core_inert(ui))
+        return false;
+    for (size_t i = 0; i < ui->semantic_count; i++) {
+        const cui_semantic *semantic = &ui->semantics[i];
+        if (semantic->id != id)
+            continue;
+        if (semantic->details.secret || semantic->details.password)
+            return false;
+        if (!value.length) {
+            if (ui->semantic_text_values)
+                ui->semantic_text_values[i] = (cui_str){0};
+            return true;
+        }
+        if (value.length < ui->config.frame_bytes && memchr(value.data, 0, value.length))
+            return false;
+        if (!ui->semantic_text_values) {
+            size_t bytes = ui->config.max_elements * sizeof(*ui->semantic_text_values);
+            if (bytes > ui->config.resource_bytes - ui->resource_bytes ||
+                !(ui->semantic_text_values = calloc(1, bytes))) {
+                cui_core_capacity(ui, "semantic text index", id, ui->resource_bytes, bytes,
+                                  ui->config.resource_bytes);
+                return false;
+            }
+            ui->resource_bytes += bytes;
+        }
+        cui_str copy = cui_core_copy_string(ui, value);
+        if (!copy.length)
+            return false;
+        ui->semantic_text_values[i] = copy;
+        return true;
+    }
+    return false;
 }
 void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled) {
     if (ui && !id) {
@@ -5947,6 +6002,9 @@ bool cui_set_text_input_config(cui_context *ui, cui_id owner, cui_text_input_con
                                               config.purpose != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED;
             ui->semantics[i].details.password =
                 config.purpose != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED;
+            if ((ui->semantics[i].details.secret || ui->semantics[i].details.password) &&
+                ui->semantic_text_values)
+                ui->semantic_text_values[i] = (cui_str){0};
             return true;
         }
     return false;

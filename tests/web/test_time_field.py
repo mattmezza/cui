@@ -35,7 +35,7 @@ def ordered_segment(page, name, segment):
       const label=i=>d.decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),
           e.gallery_semantic_length(i)));
       for(let i=0;i<e.gallery_semantic_count();i++)
-        if(e.gallery_semantic(i,0)===9&&label(i)===name){
+        if(e.gallery_semantic(i,0)===43&&label(i)===name){
           const id=e.gallery_semantic_id(i);
           for(let j=0;j<e.gallery_semantic_count();j++)
             if(e.gallery_semantic_parent(j)===id&&label(j)===segment){
@@ -127,7 +127,7 @@ def ordered_tab_preview(page):
     page.keyboard.press('Shift+Tab')
     focused('Save schedule')
     page.locator('#disabled').check()
-    page.locator('#accessible [aria-label="Start time"] [role=textbox][disabled]').first.wait_for(
+    page.locator('#accessible [aria-label="Start time"] [role=spinbutton][aria-disabled=true]').first.wait_for(
         state='attached')
     canvas.focus()
     page.keyboard.press('Tab')
@@ -144,6 +144,28 @@ def ordered_ime_preview(page):
     page.wait_for_function('document.activeElement.id==="cui-ime-input"')
     cdp = page.context.new_cdp_session(page)
 
+    def assert_focused_value(name, number, text, whole, composing=False):
+        focused = []
+        for node in cdp.send('Accessibility.getFullAXTree')['nodes']:
+            properties = {item['name']: item['value']['value']
+                          for item in node.get('properties', []) if 'value' in item['value']}
+            if node.get('role', {}).get('value') == 'spinbutton' and properties.get('focused'):
+                focused.append((node, properties))
+        assert len(focused) == 1, focused
+        node, properties = focused[0]
+        assert node['name']['value'] == name
+        assert node['description']['value'] == whole
+        assert node['value']['value'] == number
+        proxy = page.locator('#preview + input')
+        assert proxy.get_attribute('aria-valuetext') == text
+        assert properties['valuemin'] == 0
+        assert properties['valuemax'] == (23 if name.endswith('Hour') else 59)
+        assert page.locator('#accessible [role=spinbutton][aria-hidden=true]').count() == 1
+        assert page.locator('#accessible [role=group][aria-label="Start time"]').get_attribute(
+            'aria-description') == whole
+        if not composing:
+            assert proxy.input_value() == ''
+
     def config():
         return page.evaluate('[1,2,3,4].map(i=>cuiGallery.exports.gallery_text_config(i)>>>0)')
 
@@ -157,11 +179,13 @@ def ordered_ime_preview(page):
 
     hour = ordered_segment(page, 'Start time', 'Hour')
     assert_anchor(hour)
+    assert_focused_value('Start time, Hour', 9, '09', '09:30')
     page.evaluate('window.oldTimeProxy=document.activeElement')
     initial = config()
     set_candidate(cdp, '03')
     wait_for_paint(page, '03')
     assert ordered_segment(page, 'Start time', 'Hour')['value'] == 9
+    assert_focused_value('Start time, Hour', 9, '09', '09:30', composing=True)
     cdp.send('Input.insertText', {'text': '03'})
     minute = ordered_segment(page, 'Start time', 'Minute')
     page.wait_for_function('''([lo,hi])=>{
@@ -171,6 +195,7 @@ def ordered_ime_preview(page):
     assert ordered_segment(page, 'Start time', 'Hour')['value'] == 3
     assert config()[2:] != initial[2:]
     assert_anchor(minute)
+    assert_focused_value('Start time, Minute', 30, '30', '03:30')
     assert page.evaluate('''config=>{
         const e=cuiGallery.exports;
         return e.gallery_owned_text(0,0,0,0,0,...config)===0;
@@ -201,6 +226,7 @@ def ordered_ime_preview(page):
     wait_for_paint(page, '41')
     assert ordered_segment(page, 'Start time', 'Minute')['value'] == 41
     assert ordered_segment(page, 'End time', 'Minute')['value'] == 45
+    assert_focused_value('Start time, Minute', 41, '41', '03:41')
 
 
 def main():
@@ -376,7 +402,7 @@ def main():
             page.locator('#time-field-tab-mode').select_option('ordered')
             page.wait_for_function('document.querySelector("#snippet").textContent.includes("schedule_frame")')
             stage.scroll_into_view_if_needed()
-            x, y, w, h = box('Minute', 6)
+            x, y, w, h = ordered_segment(page, 'Start time', 'Minute')['bounds']
             canvas = page.locator('#preview').bounding_box()
             page.touchscreen.tap(canvas['x'] + x + w / 2, canvas['y'] + y + h / 2)
             next_paint()
@@ -386,7 +412,7 @@ def main():
             assert page.evaluate('''()=>{
                 const e=cuiGallery.exports,d=new TextDecoder();
                 for(let i=0;i<e.gallery_semantic_count();i++)
-                    if(e.gallery_semantic(i,0)===6&&d.decode(new Uint8Array(
+                    if(e.gallery_semantic(i,0)===44&&d.decode(new Uint8Array(
                         e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))==='Minute')
                         return e.gallery_semantic(i,8)===31;
                 return false;

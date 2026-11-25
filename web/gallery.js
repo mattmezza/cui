@@ -1211,8 +1211,21 @@ async function clipboardAction(action){
 }
 const semanticNodes = new Map();
 let semanticStory = null;
-const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link','listitem','log','toolbar','separator','region','radiogroup'];
+const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link','listitem','log','toolbar','separator','region','radiogroup','group','spinbutton'];
+const timeInputRole=43;
 const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25,29,30,32,33,36];
+function semanticTextValue(i){
+ return stringAt(wasm.gallery_semantic_text_value(i),wasm.gallery_semantic_text_value_length(i));
+}
+function syncSpinbutton(element,index){
+ const f=n=>wasm.gallery_semantic(index,n);
+ element.setAttribute('role','spinbutton');
+ for(const [name,value] of [
+  ['valuenow',f(8)],['valuemin',f(12)],['valuemax',f(13)],
+  ['valuetext',semanticTextValue(index)],['readonly',Boolean(f(26))],
+  ['disabled',Boolean(f(5))]
+ ])element.setAttribute(`aria-${name}`,String(value));
+}
 function syncSemantics(){
  const root=$('accessible'),seen=new Set(),entries=[];
  let hasScrollablePanel=false;
@@ -1230,7 +1243,8 @@ function syncSemantics(){
   if(role==='text')el.textContent=name;
   el.setAttribute('aria-label',name);
   if(f(33)&&el.tagName!=='BUTTON'){el.tabIndex=-1;el.setAttribute('aria-disabled',String(Boolean(f(5))));el.onfocus=()=>{if(!f(5)){wasm.gallery_focus(i);requestFrame();}};el.onkeydown=e=>{const key=keyIdentity(e.key);if(key&&!f(5)){e.preventDefault();wasm.gallery_keyboard_event(3,key,mods(e),Number(e.repeat),Number(e.isComposing),Number(role==='textbox'&&plainCharacterInput(e)));requestFrame();}};}else if(el.tagName!=='BUTTON'){el.removeAttribute('tabindex');el.onfocus=null;el.onkeydown=null;}
-  const description=stringAt(wasm.gallery_semantic_description(i),wasm.gallery_semantic_description_length(i));
+  const description=f(0)===timeInputRole?semanticTextValue(i):
+   stringAt(wasm.gallery_semantic_description(i),wasm.gallery_semantic_description_length(i));
   if(description)el.setAttribute('aria-description',description);else el.removeAttribute('aria-description');
   if(role==='columnheader'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);requestFrame();};}
   if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=e=>{
@@ -1257,7 +1271,12 @@ function syncSemantics(){
   if(role==='textbox'){el.setAttribute('aria-readonly',String(Boolean(f(26))));el.setAttribute('aria-required',String(Boolean(f(27))));el.setAttribute('aria-invalid',String(Boolean(f(28))));el.setAttribute('aria-multiline',String(Boolean(f(29))));}
   if(role==='progressbar'){el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));if(f(14))el.removeAttribute('aria-valuenow');else el.setAttribute('aria-valuenow',String(f(8)));}
   if(role==='slider'||role==='scrollbar'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
-  if(role==='slider'&&selected.name==='VideoPlayer'&&name==='Volume')el.setAttribute('aria-valuetext',description);else el.removeAttribute('aria-valuetext');
+  if(role==='spinbutton'){
+   syncSpinbutton(el,i);
+   if(secureInput.element?.dataset.cuiSemanticId===id)el.setAttribute('aria-hidden','true');
+   else el.removeAttribute('aria-hidden');
+  }else if(role==='slider'&&selected.name==='VideoPlayer'&&name==='Volume')el.setAttribute('aria-valuetext',description);
+  else el.removeAttribute('aria-valuetext');
   if(accountTrigger)el.setAttribute('aria-haspopup','dialog');else el.removeAttribute('aria-haspopup');
   if(accountTrigger||selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
   entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${wasm.gallery_semantic_controls(i)}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
@@ -1557,6 +1576,24 @@ function queueOwnedInput(phase,pointer,length,anchor,cursor,owner,generation){
  const [generationHigh,generationLow]=generation.split(':').map(Number);
  wasm.gallery_owned_text(phase,pointer,length,anchor,cursor,low,high,generationLow,generationHigh);
 }
+function orderedImeSemantics(owner){
+ let segment=-1,field=-1;
+ for(let i=0;i<wasm.gallery_semantic_count();i++)
+  if(BigInt.asUintN(64,wasm.gallery_semantic_id(i))===owner){segment=i;break;}
+ if(segment<0)return;
+ const parent=wasm.gallery_semantic_parent(segment);
+ for(let i=0;i<wasm.gallery_semantic_count();i++)
+  if(wasm.gallery_semantic_id(i)===parent){field=i;break;}
+ if(field<0)return;
+ const label=i=>stringAt(wasm.gallery_semantic_name(i),wasm.gallery_semantic_length(i));
+ return element=>{
+  syncSpinbutton(element,segment);
+  element.dataset.cuiSemanticId=`cui-semantic-${wasm.gallery_semantic_id(segment)}`;
+  element.setAttribute('aria-label',`${label(field)}, ${label(segment)}`);
+  element.setAttribute('aria-description',semanticTextValue(field));
+  element.setAttribute('aria-invalid',String(Boolean(wasm.gallery_semantic(field,28))));
+ };
+}
 function syncImeTarget(){
  if(!wasm?.gallery_text_config)return;
  const ordered=orderedTimeField(), proxyFocused=document.activeElement===secureInput.element;
@@ -1568,7 +1605,8 @@ function syncImeTarget(){
  const f=n=>wasm.gallery_text_config(n)>>>0;
  const rect=canvas.getBoundingClientRect();
  secureInput.sync({owner:`${f(2)}:${f(1)}`,generation:`${f(4)}:${f(3)}`,
-  type:f(5),purpose:f(6),multiline:!!f(7),label:'Canvas text input',anchor:ordered?canvas:null},
+  type:f(5),purpose:f(6),multiline:!!f(7),label:'Canvas text input',anchor:ordered?canvas:null,
+  decorate:ordered?orderedImeSemantics((BigInt(f(2))<<32n)|BigInt(f(1))):undefined},
   {x:rect.left+Math.max(0,wasm.gallery_ime_rect(0)),y:rect.top+Math.max(0,wasm.gallery_ime_rect(1)),h:wasm.gallery_ime_rect(3)});
  const imeTarget=secureInput.element;
  if(imeTarget&&!boundImeTargets.has(imeTarget)){

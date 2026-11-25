@@ -704,7 +704,7 @@
       },
       "limitations": [
         "The legacy scalar route and the optional localized builders are tested subsets in all five languages. The localized builders own their configuration and expose copied aggregate change observations. See localized_time_field_v1_source_checkpoint.",
-        "Direct C options and state, pure locale text helpers, opt-in IME preedit, the explicit Styled size and appearance entry point, and ordered frames with one global stop per field remain unbound."
+        "Direct C options and state, pure locale text helpers, opt-in IME preedit, the explicit Styled size and appearance entry point, and ordered frames with localized semantic text and one global stop per field remain unbound."
       ]
     },
     {

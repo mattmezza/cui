@@ -272,7 +272,9 @@ typedef enum {
     CUI_ROLE_TOOLBAR,
     CUI_ROLE_SEPARATOR,
     CUI_ROLE_REGION,
-    CUI_ROLE_RADIOGROUP
+    CUI_ROLE_RADIOGROUP,
+    CUI_ROLE_TIME_INPUT,
+    CUI_ROLE_SPINBUTTON
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -877,6 +879,15 @@ void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value);
 /* Refine a submitted current-frame role without replacing its other metadata. */
 bool cui_set_semantic_role(cui_context *, cui_id, cui_role);
 void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details details);
+/* Copy an optional public, committed UTF-8 value for a submitted semantic.
+ * Empty text clears it. Embedded NUL, missing IDs and secret/password
+ * nodes are ineligible. The lazily allocated index uses resource_bytes and
+ * the copied value uses frame_bytes. Capacity failure invalidates the frame. */
+bool cui_set_semantic_text_value_v1(cui_context *, cui_id, cui_str);
+/* Index into the finalized cui_semantics array for this context. The value
+ * is borrowed through the next successful frame begin or context teardown.
+ * Missing, secret/password, in-progress and failed snapshots return empty. */
+cui_str cui_semantic_text_value_v1(const cui_context *, size_t semantic_index);
 void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled);
 /* Signed source ordering, independent of Tab eligibility. Last setter wins. */
 void cui_set_tab_index(cui_context *ui, cui_id id, int index);

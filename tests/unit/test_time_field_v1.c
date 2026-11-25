@@ -1028,6 +1028,24 @@ static cui_time_field_result_v1 ordered_ime_frame(fixture *f, ordered_observer *
     } else
         assert(!composing && !preedit.length);
     f->draw = cui_end_frame(f->ui);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(f->ui, &count);
+    char committed[CUI_TIME_TEXT_MAX_BYTES_V1 + 1];
+    size_t length;
+    cui_time_text_options_v1 display = f->options.text;
+    display.flags = 0;
+    assert(cui_time_format_v1(f->time, &display, committed, sizeof committed, &length) ==
+           CUI_TIME_TEXT_OK);
+    assert(count >= 3 && semantics[0].id == 20 && semantics[0].role == CUI_ROLE_TIME_INPUT);
+    cui_str exposed = cui_semantic_text_value_v1(f->ui, 0);
+    assert(exposed.length == length && !memcmp(exposed.data, committed, length));
+    for (size_t i = 1; i < count; ++i) {
+        assert(semantics[i].role == CUI_ROLE_SPINBUTTON);
+        assert(semantics[i].details.selected ==
+               (semantics[i].id == cui_time_segment_id(20, f->state.segment)));
+        assert(!semantics[i].focused && semantics[i].tab_stop_disabled);
+        assert(cui_semantic_text_value_v1(f->ui, i).length);
+    }
     if (expected) {
         bool painted = false;
         for (size_t i = 0; i < f->draw.count; ++i) {
@@ -1039,6 +1057,39 @@ static cui_time_field_result_v1 ordered_ime_frame(fixture *f, ordered_observer *
         assert(painted);
     }
     return result;
+}
+
+static void ordered_localized_semantics(bool styled) {
+    fixture f;
+    init(&f, styled);
+    cui_time_locale_v1 locale;
+    assert(cui_time_locale_init_v1(&locale) == CUI_TIME_TEXT_OK);
+    static const char *const digits[] = {"٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"};
+    for (size_t i = 0; i < 10; ++i)
+        locale.digits[i] = cui_string(digits[i]);
+    locale.pm = cui_string("م");
+    f.options.text.locale = &locale;
+    f.options.text.cycle = CUI_TIME_TEXT_H12;
+    f.options.text.precision = CUI_TIME_TEXT_SECOND;
+    f.options.text.flags = CUI_TIME_TEXT_HAS_MAXIMUM_V1;
+    f.options.text.maximum = (cui_time){17, 0, 0};
+    f.options.flags = CUI_TIME_FIELD_DISABLED_V1 | CUI_TIME_FIELD_READONLY_V1;
+    f.time = (cui_time){21, 5, 7};
+    assert(cui_time_field_state_init_v1(&f.state, f.time, &f.options) == CUI_TIME_TEXT_OK);
+    cui_id id = styled ? 20 : 30;
+    cui_time_field_frame_entry_v1 entry = {id, &f.state, &f.time, &f.options};
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
+    ordered_observer observer = {f.ui, id, &f.time, 0};
+    assert(ordered_story(&f, id, &observer).status == CUI_TIME_TEXT_OK);
+    cui_end_frame(f.ui);
+    size_t count;
+    const cui_semantic *s = cui_semantics(f.ui, &count);
+    assert(count == 5 && s[0].disabled && s[0].details.readonly && s[0].details.invalid);
+    assert(!strcmp(cui_semantic_text_value_v1(f.ui, 0).data, "٠٩:٠٥:٠٧ م"));
+    assert(!strcmp(cui_semantic_text_value_v1(f.ui, 4).data, "م"));
+    assert(s[4].value == 1 && s[4].details.minimum == 0 && s[4].details.maximum == 1);
+    assert(!cui_accessibility_action_supported(f.ui, id, CUI_ACCESSIBILITY_FOCUS));
+    cui_destroy(f.ui);
 }
 
 static bool offer(fixture *f, cui_text_input_state input, cui_event_type type, cui_str text,
@@ -1308,6 +1359,7 @@ int main(void) {
         readiness_recovery(styled != 0);
         composition_edits(styled != 0, CUI_DESIGN_INHERIT);
         composition_handoff(styled != 0);
+        ordered_localized_semantics(styled != 0);
     }
     atomic_preflight();
     pixels_and_text();

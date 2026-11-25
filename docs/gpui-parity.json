@@ -4998,7 +4998,8 @@
         "tests/unit/test_ordered_time_field_routing.c",
         "tests/unit/test_time_field_v1_headers.c",
         "tests/web/test_time_field.py",
-        "tests/unit/test_sdl3.c"
+        "tests/unit/test_sdl3.c",
+        "tests/integration/test_accessibility_native.c"
       ],
       "status": "tested",
       "platforms": {
@@ -5008,7 +5009,7 @@
       },
       "limitations": [
         "Legacy segmented ASCII and additive localized options coexist. Bridge and foreign builders expose localized options and copied observations through the subset described in docs/binding-coverage.json.",
-        "Ordinary localized fields use global segment Tab stops. The opt-in direct C frame API has one root stop per admitted TimeField, ordered keyboard and pointer editing, and prior-snapshot geometry. Headless Chromium checks real Tab in both directions across the canvas boundary with the IME proxy active. Direct C, injected SDL, and headless Chromium cover ordered composition. Tabular glyph styling, arbitrary root styling and physical accessibility remain open. See docs/design/TIME_FIELD_FOCUS_ROUTING.md.",
+        "Ordinary localized fields use global segment Tab stops. The opt-in direct C frame API has one root stop per admitted TimeField, ordered keyboard and pointer editing, and prior-snapshot geometry. Headless Chromium checks Tab in both directions and the active segment's accessible name, numeric value and full-time context. Direct C, injected SDL, and headless Chromium cover ordered composition. A private Linux AT-SPI client verifies the time role, localized description, and segment role and numeric range. Tabular glyph styling, arbitrary root styling, platform editing and physical assistive technology remain open. See docs/design/TIME_FIELD_FOCUS_ROUTING.md.",
         "Direct C has opt-in shared size metrics, stable centered cells, input and selection tokens, disabled opacity and a focus band independent of the invalid border. The WASM gallery exposes the scale. Existing binding widgets preserve their appearance.",
         "Direct C composition and borrowed preedit are opt-in. Chromium verifies localized preedit paint, atomic commit, rejection and cancellation. Private Xvfb tests injected SDL3 empty-edit and same-owner commit handoff. Physical IME, composition-range styling and bridge exposure remain open."
       ],
@@ -5061,7 +5062,19 @@
           ]
         },
         {
-          "name": "ordered platform accessibility integration",
+          "name": "ordered TimeField committed semantic values in C, Chromium AX and Linux AT-SPI",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_core.c",
+            "tests/unit/test_time_field_v1.c",
+            "tests/unit/test_accessibility.c",
+            "tests/integration/test_accessibility_native.c",
+            "tests/web/test_time_field.py",
+            "docs/ACCESSIBILITY.md"
+          ]
+        },
+        {
+          "name": "ordered platform accessibility editing and screen-reader validation",
           "status": "not_started",
           "evidence": []
         },

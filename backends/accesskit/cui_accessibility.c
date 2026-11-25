@@ -23,6 +23,7 @@ extern accesskit_unix_adapter *cui_accesskit_unix_adapter_new_owned(
     accesskit_deactivation_handler_callback, void *, void (*)(void *));
 typedef struct {
     cui_semantic semantic;
+    cui_str text_value;
     uint64_t token, parent;
     unsigned actions;
 } record;
@@ -145,8 +146,10 @@ static accesskit_role role(cui_semantic s) {
                                            ACCESSKIT_ROLE_TOOLBAR,
                                            ACCESSKIT_ROLE_SPLITTER,
                                            ACCESSKIT_ROLE_REGION,
-                                           ACCESSKIT_ROLE_RADIO_GROUP};
-    _Static_assert(sizeof roles / sizeof roles[0] == CUI_ROLE_RADIOGROUP + 1, "role mapping");
+                                           ACCESSKIT_ROLE_RADIO_GROUP,
+                                           ACCESSKIT_ROLE_TIME_INPUT,
+                                           ACCESSKIT_ROLE_SPIN_BUTTON};
+    _Static_assert(sizeof roles / sizeof roles[0] == CUI_ROLE_SPINBUTTON + 1, "role mapping");
     return s.role == CUI_ROLE_TEXTBOX && s.details.password    ? ACCESSKIT_ROLE_PASSWORD_INPUT
            : s.role == CUI_ROLE_TEXTBOX && s.details.multiline ? ACCESSKIT_ROLE_MULTILINE_TEXT_INPUT
                                                                : roles[s.role];
@@ -187,7 +190,15 @@ static accesskit_tree_update *make_tree(void *opaque) {
             accesskit_node_set_value_with_length(n, v.name.data, v.name.length);
         else
             accesskit_node_set_label_with_length(n, v.name.data, v.name.length);
-        accesskit_node_set_description_with_length(n, d.description.data, d.description.length);
+        if (v.role != CUI_ROLE_LABEL && r->text_value.length)
+            accesskit_node_set_value_with_length(n, r->text_value.data, r->text_value.length);
+        /* The Linux AT-SPI backend exposes numeric values but has no text
+           interface for a TimeInput without an AccessKit text-run hierarchy. */
+        cui_str description = d.description;
+        if (!description.length && r->text_value.length &&
+            (v.role == CUI_ROLE_TIME_INPUT || v.role == CUI_ROLE_SPINBUTTON))
+            description = r->text_value;
+        accesskit_node_set_description_with_length(n, description.data, description.length);
         accesskit_node_set_bounds(n, rectangle(v.bounds));
         if (v.disabled)
             accesskit_node_set_disabled(n);
@@ -227,7 +238,7 @@ static accesskit_tree_update *make_tree(void *opaque) {
                                                   ? ACCESSKIT_ORIENTATION_HORIZONTAL
                                                   : ACCESSKIT_ORIENTATION_VERTICAL);
         if (v.role == CUI_ROLE_SLIDER || v.role == CUI_ROLE_PROGRESSBAR ||
-            v.role == CUI_ROLE_SCROLLBAR) {
+            v.role == CUI_ROLE_SCROLLBAR || v.role == CUI_ROLE_SPINBUTTON) {
             accesskit_node_set_numeric_value(n, v.value);
             accesskit_node_set_min_numeric_value(n, d.minimum);
             accesskit_node_set_max_numeric_value(n, d.maximum);
@@ -419,7 +430,8 @@ static bool same_snapshot(snapshot *a, snapshot *b) {
         if (x.token != y.token || x.parent != y.parent || x.actions != y.actions ||
             u.role != v.role || u.disabled != v.disabled || u.checked != v.checked ||
             u.focused != v.focused || u.value != v.value || !same_rect(u.bounds, v.bounds) ||
-            !same_string(u.name, v.name) || !same_string(d.description, e.description))
+            !same_string(u.name, v.name) || !same_string(d.description, e.description) ||
+            !same_string(x.text_value, y.text_value))
             return false;
 #define EQ(field)                                                                                  \
     if (d.field != e.field)                                                                        \
@@ -504,17 +516,19 @@ bool cui_accessibility_update(cui_accessibility *a, cui_context *ui,
     if (!valid_rect(window.outer) || !valid_rect(window.inner) || !valid_string(window.title))
         error = CUI_A11Y_INVALID;
     for (size_t i = 0; i < count && error == CUI_A11Y_OK; ++i) {
-        if (!sem[i].id || sem[i].role < CUI_ROLE_NONE || sem[i].role > CUI_ROLE_RADIOGROUP ||
+        cui_str value = cui_semantic_text_value_v1(ui, i);
+        if (!sem[i].id || sem[i].role < CUI_ROLE_NONE || sem[i].role > CUI_ROLE_SPINBUTTON ||
             sem[i].details.orientation < CUI_ORIENTATION_UNSPECIFIED ||
             sem[i].details.orientation > CUI_ORIENTATION_VERTICAL || !valid_rect(sem[i].bounds) ||
             !valid_string(sem[i].name) || !valid_string(sem[i].details.description) ||
-            !isfinite(sem[i].value) || !isfinite(sem[i].details.minimum) ||
+            !valid_string(value) || !isfinite(sem[i].value) || !isfinite(sem[i].details.minimum) ||
             !isfinite(sem[i].details.maximum) || !isfinite(sem[i].details.scroll_x) ||
             !isfinite(sem[i].details.scroll_y) || !isfinite(sem[i].details.scroll_max_x) ||
             !isfinite(sem[i].details.scroll_max_y))
             error = CUI_A11Y_INVALID;
         else if (!add_string(&bytes, sem[i].name, a->config.string_bytes) ||
-                 !add_string(&bytes, sem[i].details.description, a->config.string_bytes))
+                 !add_string(&bytes, sem[i].details.description, a->config.string_bytes) ||
+                 (value.length && !add_string(&bytes, value, a->config.string_bytes)))
             error = CUI_A11Y_CAPACITY;
     }
     mtx_lock(&a->mutex);
@@ -537,6 +551,9 @@ bool cui_accessibility_update(cui_accessibility *a, cui_context *ui,
         *r = (record){.semantic = sem[i]};
         r->semantic.name = copy_string(next, &offset, sem[i].name);
         r->semantic.details.description = copy_string(next, &offset, sem[i].details.description);
+        cui_str value = cui_semantic_text_value_v1(ui, i);
+        if (value.length)
+            r->text_value = copy_string(next, &offset, value);
         if (previous && previous->semantic.role == sem[i].role)
             r->token = previous->token;
         else {

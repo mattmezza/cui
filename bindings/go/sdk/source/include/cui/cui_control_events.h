@@ -68,7 +68,7 @@ cui_base_check_events(cui_context *ui, cui_id id, cui_str name, cui_check_state 
     if (!ui || !id || (name.length && !name.data) || value < CUI_CHECK_UNCHECKED ||
         value > CUI_CHECK_MIXED || options.on_change || options.change_user ||
         (options.custom_role &&
-         (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)))
+         (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_SPINBUTTON)))
         return result;
     result.valid = true;
     result.submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;

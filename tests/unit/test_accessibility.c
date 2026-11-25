@@ -164,7 +164,33 @@ static void test_numeric_mailbox(void) {
     cui_accessibility_destroy(a); /* Destroy with a copied value pending. */
     cui_destroy(ui);
 }
+static void test_text_snapshot(void) {
+    cui_context *ui = make();
+    cui_accessibility *a =
+        cui_accessibility_create((cui_accessibility_config){.max_nodes = 2, .string_bytes = 32});
+    assert(a);
+    const char *const values[] = {"09:30", "09:31", "09:31",
+                                  "this value exceeds the adapter string budget"};
+    uint64_t token = 0;
+    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i) {
+        assert(cui_begin_frame(ui, 300, 200, .016f));
+        cui_interact(ui, 42, CUI_ROLE_TIME_INPUT, cui_string("Departure"), false, false, 0);
+        assert(cui_set_semantic_text_value_v1(ui, 42, cui_string(values[i])));
+        cui_end_frame(ui);
+        assert(cui_accessibility_update(a, ui, window()) == (i < 3));
+        if (i == 0)
+            token = cui_accessibility_token(a, 42);
+        assert(token && cui_accessibility_token(a, 42) == token);
+        cui_accessibility_stats stats = cui_accessibility_get_stats(a);
+        assert(stats.snapshots == (i ? 2 : 1));
+        assert(stats.status == (i < 3 ? CUI_A11Y_OK : CUI_A11Y_CAPACITY));
+    }
+    cui_accessibility_destroy(a);
+    cui_destroy(ui);
+}
+
 int main(void) {
+    test_text_snapshot();
     assert(!cui_accessibility_create((cui_accessibility_config){.max_nodes = SIZE_MAX}));
     cui_context *ui = make();
     cui_accessibility *a = cui_accessibility_create(
@@ -315,7 +341,7 @@ int main(void) {
         struct timespec t = {0, 5000000};
         thrd_sleep(&t, NULL);
     }
-    assert(cui_accessibility_test_live() == 0 && cui_accessibility_test_released() == 104);
+    assert(cui_accessibility_test_live() == 0 && cui_accessibility_test_released() == 105);
     puts("accessibility snapshot/generation/mailbox tests passed");
     return 0;
 }

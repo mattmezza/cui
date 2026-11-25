@@ -183,7 +183,7 @@ non-text widget or clears focus at an open edge, the browser host restores
 canvas focus before removing the proxy. Headless Chromium tests composition,
 candidate alignment and stale proxy input. Chromium and Firefox verify real
 Tab in both directions with the proxy active. Physical IME, accessibility
-mapping and foreign authoring remain open.
+editing and foreign authoring remain open.
 
 ## Accessibility projection checkpoint
 
@@ -234,3 +234,13 @@ of selection, UTF-8, hidden and secret nodes, source lifetimes and overflow.
 Verify AccessKit publication and stable focus, then real Chromium AX tree
 values and focus alongside keyboard and IME regression tests. Actual
 screen-reader behavior still requires physical-host checks.
+
+The portable roles and text accessor now back both adapters. A private Linux
+AT-SPI client reads the localized formatted time through the platform's
+description fallback and reads the segment's numeric range. Chromium's AX
+tree reports the focused proxy as a spinbutton with its segment name,
+numeric value and formatted field time while composing. Chromium derives
+the editable node's AX value text from its native input buffer, even when
+the host supplies an explicit `aria-valuetext`. The authored attribute still
+carries the localized segment token, and the numeric value and full-time
+description continue to describe committed state during preedit.

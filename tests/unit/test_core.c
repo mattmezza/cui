@@ -312,7 +312,7 @@ static void test_scroll_gesture_metadata(void) {
     cui_interact(ui, 1, CUI_ROLE_GROUP, cui_string("Gallery"), false, false, 0);
     assert(cui_set_semantic_role(ui, 1, CUI_ROLE_REGION));
     assert(cui_set_semantic_role(ui, 1, CUI_ROLE_RADIOGROUP));
-    assert(!cui_set_semantic_role(ui, 1, (cui_role)(CUI_ROLE_RADIOGROUP + 1)));
+    assert(!cui_set_semantic_role(ui, 1, (cui_role)(CUI_ROLE_SPINBUTTON + 1)));
     cui_end_box(ui);
     cui_end_frame(ui);
     assert(cui_semantics(ui, &count)[0].role == CUI_ROLE_RADIOGROUP && count == 1);
@@ -516,6 +516,68 @@ static void test_contexts_errors(void) {
     assert(!cui_queue_event(small, (cui_event){0}));
     assert(cui_last_error(small) == CUI_ERROR_CAPACITY);
     cui_destroy(small);
+}
+
+static void test_semantic_text_value(void) {
+    cui_context *ui = make();
+    begin(ui);
+    char value[] = "午後";
+    control(ui, 1, false);
+    assert(cui_set_semantic_text_value_v1(ui, 1, cui_string(value)));
+    memset(value, 'x', sizeof value - 1);
+    assert(!cui_semantic_text_value_v1(ui, 0).length);
+    assert(!cui_set_semantic_text_value_v1(ui, 1, (cui_str){"a\0b", 3}));
+    assert(!cui_set_semantic_text_value_v1(ui, 99, cui_string("missing")));
+    control(ui, 2, false);
+    assert(cui_set_semantic_text_value_v1(ui, 2, cui_string("clear me")));
+    cui_set_semantic_details(ui, 2, (cui_semantic_details){.secret = true});
+    assert(!cui_set_semantic_text_value_v1(ui, 2, cui_string("blocked")));
+    cui_set_semantic_details(ui, 2, (cui_semantic_details){0});
+    control(ui, 3, false);
+    assert(cui_set_semantic_text_value_v1(ui, 3, cui_string("clear me")));
+    assert(cui_set_semantic_text_value_v1(ui, 3, (cui_str){0}));
+    cui_end_frame(ui);
+    cui_str actual = cui_semantic_text_value_v1(ui, 0);
+    assert(actual.length == sizeof value - 1 && !strcmp(actual.data, "午後"));
+    for (size_t i = 1; i <= 3; ++i)
+        assert(!cui_semantic_text_value_v1(ui, i).length);
+
+    begin(ui);
+    control(ui, 2, false);
+    assert(cui_set_semantic_text_value_v1(ui, 2, cui_string("new")));
+    cui_interact(ui, 4, CUI_ROLE_TEXTBOX, cui_string("measured"), false, false, 0);
+    assert(cui_set_semantic_text_value_v1(ui, 4, cui_string("discarded")));
+    cui_begin_box(ui, 4, (cui_box){.layout_only = true});
+    cui_end_box(ui);
+    control(ui, 1, true);
+    cui_end_frame(ui);
+    assert(!strcmp(cui_semantic_text_value_v1(ui, 0).data, "new"));
+    assert(!cui_semantic_text_value_v1(ui, 1).length);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    assert(count == 2 && semantics[1].id == 1);
+
+    begin(ui);
+    control(ui, 1, false);
+    assert(cui_set_semantic_text_value_v1(ui, 1, cui_string("unpublished")));
+    char overflow[2048];
+    assert(!cui_set_semantic_text_value_v1(ui, 1, (cui_str){overflow, sizeof overflow}));
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_clear_error(ui);
+    assert(!cui_semantic_text_value_v1(ui, 0).length);
+    cui_destroy(ui);
+
+    ui = cui_create((cui_config){.width = 300, .height = 200, .resource_bytes = 1});
+    assert(ui);
+    begin(ui);
+    control(ui, 1, false);
+    assert(cui_set_semantic_text_value_v1(ui, 1, (cui_str){0}));
+    assert(!cui_set_semantic_text_value_v1(ui, 1, cui_string("no index budget")));
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    assert(!cui_semantic_text_value_v1(ui, 0).length);
+    cui_destroy(ui);
 }
 
 static void test_clipped_hit_and_arena(void) {
@@ -3626,6 +3688,7 @@ int main(void) {
     test_underlay_capacity_and_hidden();
     test_table_semantic_roles();
     test_scroll_gesture_metadata();
+    test_semantic_text_value();
     test_event_scope();
     test_discard_previous_scope_input();
     test_activation_cancellation();

@@ -145,6 +145,17 @@ static int provider(int commands, int output) {
         assert(result.status == CUI_SLIDER_MODEL_OK);
         node(ui, 46, CUI_ROLE_SLIDER, "Passive slider", (cui_rect){170, 120, 100, 30}, false, NULL,
              NULL);
+        node(ui, 47, CUI_ROLE_TIME_INPUT, "Departure time", (cui_rect){20, 165, 130, 25}, false,
+             NULL, NULL);
+        node(ui, 48, CUI_ROLE_SPINBUTTON, "Departure minute", (cui_rect){95, 165, 48, 25}, false,
+             NULL, NULL);
+        cui_set_semantic_details(
+            ui, 48,
+            (cui_semantic_details){
+                .parent = 47, .no_focus = true, .focus_target = 47, .maximum = 59});
+        cui_update_semantic(ui, 48, false, 30);
+        assert(cui_set_semantic_text_value_v1(ui, 47, cui_string("٠٩:٣٠")));
+        assert(cui_set_semantic_text_value_v1(ui, 48, cui_string("٣٠")));
         cui_end_box(ui);
         cui_end_frame(ui);
         assert(cui_last_error(ui) == CUI_OK);
@@ -307,6 +318,20 @@ int main(int argc, char **argv) {
     }
     assert(controller);
     g_array_unref(relations);
+    AtspiAccessible *time = find(desktop, "Departure time", 0);
+    assert(time && atspi_accessible_get_role(time, &error) == ATSPI_ROLE_DATE_EDITOR && !error);
+    char *description = atspi_accessible_get_description(time, &error);
+    assert(!error && description && !strcmp(description, "٠٩:٣٠"));
+    g_free(description);
+    AtspiAccessible *minute = find(time, "Departure minute", 0);
+    assert(minute && atspi_accessible_get_role(minute, &error) == ATSPI_ROLE_SPIN_BUTTON && !error);
+    AtspiValue *minute_value = atspi_accessible_get_value_iface(minute);
+    assert(minute_value && atspi_value_get_current_value(minute_value, &error) == 30 && !error);
+    assert(atspi_value_get_minimum_value(minute_value, &error) == 0 && !error);
+    assert(atspi_value_get_maximum_value(minute_value, &error) == 59 && !error);
+    g_object_unref(minute_value);
+    g_object_unref(minute);
+    g_object_unref(time);
     AtspiAccessible *volume = find(desktop, "Native volume", 0);
     AtspiAccessible *passive = find(desktop, "Passive slider", 0);
     assert(volume && passive);

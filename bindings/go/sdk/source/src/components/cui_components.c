@@ -1370,7 +1370,7 @@ static bool cui_components_checkbox_render(cui_context *ui, cui_id id, const cui
     cui_design_metrics design;
     if (!ui || !t || !value || *value < CUI_CHECK_UNCHECKED || *value > CUI_CHECK_MIXED ||
         (options.custom_role &&
-         (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)) ||
+         (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_SPINBUTTON)) ||
         !cui_components_design(t, options.design_size, &design))
         return false;
     cui_str name = options.accessibility_label.length ? options.accessibility_label : label;
@@ -3328,7 +3328,7 @@ static cui_component_action_result cui_components_checkbox_events_render(
     if (!ui || !id || !theme || (name.length && !name.data) || value < CUI_CHECK_UNCHECKED ||
         value > CUI_CHECK_MIXED || options.on_change || options.change_user ||
         (options.custom_role &&
-         (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)) ||
+         (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_SPINBUTTON)) ||
         !cui_components_design(theme, options.design_size, &design))
         return result;
     result.valid = true;

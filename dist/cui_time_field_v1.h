@@ -193,6 +193,8 @@ cui_time_field_result_v1 cui_tfw_frame_apply(cui_context *, cui_tfw_frame_field 
                                              cui_time_handler);
 bool cui_time_field_v1_equal(cui_time, cui_time);
 cui_str cui_time_field_v1_name(const cui_time_field_options_v1 *, unsigned);
+cui_str cui_time_field_v1_value_label(cui_time, const cui_time_field_options_v1 *,
+                                      const cui_time_locale_v1 *, unsigned, char *);
 cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *, cui_id, cui_str,
                                                    cui_time_field_state_v1 *, cui_time *,
                                                    const cui_time_field_options_v1 *);
@@ -305,6 +307,17 @@ static unsigned cui_tfw_value(cui_time t, const cui_time_field_options_v1 *o, un
     if (segment == 2)
         return t.second;
     return t.hour >= 12;
+}
+cui_str cui_time_field_v1_value_label(cui_time t, const cui_time_field_options_v1 *o,
+                                      const cui_time_locale_v1 *locale, unsigned segment,
+                                      char *buffer) {
+    unsigned value = cui_tfw_value(t, o, segment);
+    if (segment == CUI_TIME_FIELD_PERIOD_V1)
+        return value ? locale->pm : locale->am;
+    cui_str first = locale->digits[value / 10], second = locale->digits[value % 10];
+    memcpy(buffer, first.data, first.length);
+    memcpy(buffer + first.length, second.data, second.length);
+    return (cui_str){buffer, first.length + second.length};
 }
 static bool cui_tfw_replace(cui_time_field_state_v1 *s, cui_time *t,
                             const cui_time_field_options_v1 *o, unsigned value) {
@@ -578,20 +591,39 @@ static bool cui_tfw_compose_value(cui_time_field_state_v1 *s, cui_time *t,
 static void cui_tfw_submit(cui_context *ui, cui_id id, cui_str name,
                            const cui_time_field_state_v1 *s, const cui_time *t,
                            const cui_time_field_options_v1 *o, bool ordered) {
-    (void)s;
     bool disabled = (o->flags & CUI_TIME_FIELD_DISABLED_V1) != 0;
-    cui_interact(ui, id, CUI_ROLE_GROUP, name, disabled, false, 0);
-    if (ordered)
-        cui_set_semantic_details(ui, id, (cui_semantic_details){.focusable = true});
+    bool readonly = (o->flags & CUI_TIME_FIELD_READONLY_V1) != 0;
+    cui_time_locale_v1 ascii;
+    const cui_time_locale_v1 *locale = o->text.locale;
+    cui_interact(ui, id, ordered ? CUI_ROLE_TIME_INPUT : CUI_ROLE_GROUP, name, disabled, false, 0);
+    if (ordered) {
+        cui_time_text_options_v1 display = o->text;
+        display.flags = 0; /* The committed value is still visible outside validation bounds. */
+        if (!locale) {
+            cui_time_locale_init_v1(&ascii);
+            locale = &ascii;
+        }
+        char value[CUI_TIME_TEXT_MAX_BYTES_V1 + 1];
+        size_t length;
+        bool invalid =
+            s->validation != CUI_TIME_TEXT_OK || (o->flags & CUI_TIME_FIELD_OWNER_INVALID_V1);
+        cui_set_semantic_details(
+            ui, id,
+            (cui_semantic_details){.focusable = true, .readonly = readonly, .invalid = invalid});
+        if (cui_time_format_v1(*t, &display, value, sizeof(value), &length) == CUI_TIME_TEXT_OK)
+            (void)cui_set_semantic_text_value_v1(ui, id, (cui_str){value, length});
+    }
     cui_set_tab_stop(ui, id, ordered);
     for (unsigned i = 0; i < 4; i++)
         if (cui_tfw_visible(o, i)) {
             cui_id child = cui_time_segment_id(id, i);
-            cui_interact(ui, child, CUI_ROLE_TEXTBOX, cui_time_field_v1_name(o, i), disabled, false,
+            cui_interact(ui, child, ordered ? CUI_ROLE_SPINBUTTON : CUI_ROLE_TEXTBOX,
+                         cui_time_field_v1_name(o, i), disabled, false,
                          (float)cui_tfw_value(*t, o, i));
             cui_set_semantic_details(
                 ui, child,
-                (cui_semantic_details){.readonly = (o->flags & CUI_TIME_FIELD_READONLY_V1) != 0,
+                (cui_semantic_details){.readonly = readonly,
+                                       .selected = ordered && i == s->segment,
                                        .no_focus = ordered,
                                        .focus_target = ordered ? id : 0,
                                        .parent = id,
@@ -600,6 +632,11 @@ static void cui_tfw_submit(cui_context *ui, cui_id id, cui_str name,
                                                   : i == 3 ? 1
                                                            : 59});
             cui_set_tab_stop(ui, child, !ordered);
+            if (ordered) {
+                char value[2 * CUI_TIME_TOKEN_MAX_BYTES_V1];
+                (void)cui_set_semantic_text_value_v1(
+                    ui, child, cui_time_field_v1_value_label(*t, o, locale, i, value));
+            }
         }
 }
 cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, cui_str name,
@@ -1128,6 +1165,8 @@ cui_time_field_result_v1 cui_tfw_frame_apply(cui_context *, cui_tfw_frame_field 
                                              cui_time_handler);
 bool cui_time_field_v1_equal(cui_time, cui_time);
 cui_str cui_time_field_v1_name(const cui_time_field_options_v1 *, unsigned);
+cui_str cui_time_field_v1_value_label(cui_time, const cui_time_field_options_v1 *,
+                                      const cui_time_locale_v1 *, unsigned, char *);
 cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *, cui_id, cui_str,
                                                    cui_time_field_state_v1 *, cui_time *,
                                                    const cui_time_field_options_v1 *);
@@ -1141,19 +1180,6 @@ void cui_time_field_v1_observe(cui_context *, cui_id, cui_time, cui_time *,
 static bool cui_tfw_theme(const cui_theme *t) {
     return t && isfinite(t->font_size) && t->font_size > 0 && isfinite(t->padding) &&
            t->padding >= 0 && isfinite(t->radius) && t->radius >= 0;
-}
-static cui_str cui_tfw_label(cui_time value, const cui_time_field_options_v1 *o,
-                             const cui_time_locale_v1 *l, unsigned segment, char *buffer) {
-    if (segment == 3)
-        return value.hour >= 12 ? l->pm : l->am;
-    unsigned n = segment == 0
-                     ? (o->text.cycle ? (value.hour % 12 ? value.hour % 12 : 12) : value.hour)
-                 : segment == 1 ? value.minute
-                                : value.second;
-    cui_str a = l->digits[n / 10], b = l->digits[n % 10];
-    memcpy(buffer, a.data, a.length);
-    memcpy(buffer + a.length, b.data, b.length);
-    return (cui_str){buffer, a.length + b.length};
 }
 static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
                           const cui_time_field_state_v1 *s, const cui_time *t,
@@ -1239,7 +1265,7 @@ static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
         }
         cui_begin_box(ui, child, cell);
         char buffer[32];
-        cui_str label = show_preedit ? preedit : cui_tfw_label(*t, o, l, i, buffer);
+        cui_str label = show_preedit ? preedit : cui_time_field_v1_value_label(*t, o, l, i, buffer);
         cui_color foreground = disabled             ? theme->muted
                                : focused && !design ? theme->on_primary
                                                     : theme->text;

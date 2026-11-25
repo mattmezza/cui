@@ -162,6 +162,14 @@ to try both fields and Save. Tab and Shift-Tab leave the preview at its edges
 using normal browser navigation. The gallery checks the routing decision
 after applying queued input and before the browser's default action.
 
+Ordered fields expose the committed localized time on a
+`CUI_ROLE_TIME_INPUT` root. Each `CUI_ROLE_SPINBUTTON` segment exposes its
+current number, range, localized value and selection. Read text with
+`cui_semantic_text_value_v1` after frame completion. The root remains the
+sole keyboard stop. In the browser preview the selected segment has an
+accessible name and value while its native input buffer handles transient
+composition. See the [accessibility contract](ACCESSIBILITY.md#committed-text-values).
+
 For ordered C editing with IME, set `CUI_TIME_FIELD_IME_V1` in each field's
 options before admission. Keyboard focus stays on the field root. After a
 completed frame, `cui_get_text_input_config` returns the editable segment and

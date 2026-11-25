@@ -6,19 +6,6 @@ static bool cui_tfw_theme(const cui_theme *t) {
     return t && isfinite(t->font_size) && t->font_size > 0 && isfinite(t->padding) &&
            t->padding >= 0 && isfinite(t->radius) && t->radius >= 0;
 }
-static cui_str cui_tfw_label(cui_time value, const cui_time_field_options_v1 *o,
-                             const cui_time_locale_v1 *l, unsigned segment, char *buffer) {
-    if (segment == 3)
-        return value.hour >= 12 ? l->pm : l->am;
-    unsigned n = segment == 0
-                     ? (o->text.cycle ? (value.hour % 12 ? value.hour % 12 : 12) : value.hour)
-                 : segment == 1 ? value.minute
-                                : value.second;
-    cui_str a = l->digits[n / 10], b = l->digits[n % 10];
-    memcpy(buffer, a.data, a.length);
-    memcpy(buffer + a.length, b.data, b.length);
-    return (cui_str){buffer, a.length + b.length};
-}
 static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
                           const cui_time_field_state_v1 *s, const cui_time *t,
                           const cui_time_field_options_v1 *o, const cui_design_metrics *design,
@@ -103,7 +90,7 @@ static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
         }
         cui_begin_box(ui, child, cell);
         char buffer[32];
-        cui_str label = show_preedit ? preedit : cui_tfw_label(*t, o, l, i, buffer);
+        cui_str label = show_preedit ? preedit : cui_time_field_v1_value_label(*t, o, l, i, buffer);
         cui_color foreground = disabled             ? theme->muted
                                : focused && !design ? theme->on_primary
                                                     : theme->text;

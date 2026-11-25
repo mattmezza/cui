@@ -162,7 +162,7 @@ bool cui_base_check_ex(cui_context *ui, cui_id id, cui_str name, cui_check_state
                        cui_check_options o) {
     if (!ui || !cui_frame_is_submitting(ui) || !id || !value || *value < CUI_CHECK_UNCHECKED ||
         *value > CUI_CHECK_MIXED || (name.length && !name.data) ||
-        (o.custom_role && (o.role < CUI_ROLE_NONE || o.role > CUI_ROLE_RADIOGROUP)))
+        (o.custom_role && (o.role < CUI_ROLE_NONE || o.role > CUI_ROLE_SPINBUTTON)))
         return false;
     cui_check_state before = *value;
     cui_check_state requested =

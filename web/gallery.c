@@ -7621,6 +7621,12 @@ const char *gallery_semantic_description(unsigned i) {
 unsigned gallery_semantic_description_length(unsigned i) {
     return i < semantic_count ? (unsigned)semantics[i].details.description.length : 0;
 }
+const char *gallery_semantic_text_value(unsigned i) {
+    return cui_semantic_text_value_v1(ui, i).data;
+}
+unsigned gallery_semantic_text_value_length(unsigned i) {
+    return (unsigned)cui_semantic_text_value_v1(ui, i).length;
+}
 void gallery_table_pin(int pinned) {
     if (!table || table_pinned == (pinned != 0))
         return;

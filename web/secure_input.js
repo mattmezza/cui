@@ -123,6 +123,7 @@ export function createSecureInputBridge({parent, text, composition, key, focusLo
       }
       const element = current.element;
       if (rect) { element.style.left = `${rect.x}px`; element.style.top = `${rect.y}px`; element.style.height = `${Math.max(1, rect.h)}px`; }
+      config.decorate?.(element);
       if (document.activeElement !== element) element.focus({preventScroll: true});
     },
     reset, dispose() { reset(); disposed = true; },

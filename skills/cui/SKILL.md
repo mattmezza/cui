@@ -323,6 +323,9 @@ frame, including InputGroup composition. During resize, caret/selection scroll
 and IME geometry may lag by one frame; read `docs/INPUT.md`. Do not describe this
 containment fix as complete responsive text-input behavior.
 
+For bounded Tabs, retain scroll state and set `bar_extent`. The gallery and
+SDL3 support Shift-wheel for horizontal scrolling. See
+`docs/TABS_SCROLL_CHAINING.md` for input ownership and host limitations.
 For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots alive
 through frame completion and ensure the container fits the panels' combined
 min/max range. A pane at its constraint cannot move farther in that direction.

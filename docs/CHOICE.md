@@ -34,6 +34,11 @@ controls retain their own IDs and behavior and do not select a tab automatically
 Headless tests exercise custom bodies and both controls in all five variants and
 all four themes, including disabled semantics and ordered keyboard selection.
 
+For a bounded strip, retain a `cui_tab_scroll_state` and set both `options.scroll`
+and a positive `options.bar_extent`. The gallery and SDL3 adapter route
+Shift-wheel horizontally when the wheel supplies only a vertical delta. Ordinary
+vertical wheel works on vertical strips. See [scroll input and boundary handoff](TABS_SCROLL_CHAINING.md).
+
 As in GPUI Kit's documented closable-tab example, a custom tab body can compose a
 separate small close button beside its label. Give the close button a distinct
 stable ID, a meaningful accessible name/description and the tab's disabled state.

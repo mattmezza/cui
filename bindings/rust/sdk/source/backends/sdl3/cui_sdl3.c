@@ -51,6 +51,7 @@ struct cui_sdl3 {
     size_t glyph_bytes;
     uint64_t clock, hits, misses, frame, frame_ticks;
     bool frame_clock_started, event_pending, callback_mode;
+    bool wheel_shift;
     bool motion_pending;
     cui_event motion;
     SDL_Event pending_event;
@@ -358,6 +359,13 @@ static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided,
             v.y = e.wheel.mouse_y;
             v.dx = e.wheel.x;
             v.dy = e.wheel.y;
+            if (s->wheel_shift) {
+                v.modifiers = CUI_MOD_SHIFT;
+                if (v.dx == 0) {
+                    v.dx = v.dy;
+                    v.dy = 0;
+                }
+            }
             break;
         case SDL_EVENT_KEY_DOWN:
         case SDL_EVENT_KEY_UP:
@@ -369,6 +377,9 @@ static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided,
                           ((e.key.mod & SDL_KMOD_CTRL) ? CUI_MOD_CTRL : 0) |
                           ((e.key.mod & SDL_KMOD_ALT) ? CUI_MOD_ALT : 0) |
                           ((e.key.mod & SDL_KMOD_GUI) ? CUI_MOD_META : 0);
+            /* SDL wheel events have no modifier snapshot. Use ordered key
+             * events so a later Shift release cannot affect an earlier wheel. */
+            s->wheel_shift = !s->input_suspended && (v.modifiers & CUI_MOD_SHIFT);
             break;
         case SDL_EVENT_TEXT_EDITING:
             if (s->input_suspended || reset_input) {
@@ -415,6 +426,7 @@ static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided,
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             s->input_suspended = true;
+            s->wheel_shift = false;
             s->ime_composing = s->ime_commit_pending = false;
             v.type = CUI_EVENT_CANCEL;
             leave_after = true;

@@ -24,6 +24,24 @@ TMPDIR=/home/matteo/.cache/cui-validation/tmp-storage/tabs \
   --output /home/matteo/.cache/cui-validation/tabs-final-browser
 ```
 
-Playwright is pinned to 1.58.0 and defaults to its installed Chromium 1208 executable. `--case touch` isolates the touch diagnostic; default execution includes the full suite. The browser fixture uses the same Shift-plus-vertical-wheel translation as the gallery; native SDL Shift-wheel parity remains outside this change.
+Playwright is pinned to 1.58.0 and defaults to its installed Chromium 1208 executable. `--case touch` isolates the touch diagnostic; default execution includes the full suite. The browser fixture uses the same Shift-plus-vertical-wheel translation as the gallery.
 
 The warning-enabled native build completed without warnings. Full CTest passed 119/120; only `distribution` failed because generated distribution sources are integrator-owned and stale after this source edit. Focused `test_choice` passed with AddressSanitizer, UndefinedBehaviorSanitizer and leak detection. Logs are `tabs-native-build.log`, `tabs-native-ctest.log`, and `tabs-asan.log` in the validation directory. No physical OS touch, native window-leave or full Tabs/scrollbar parity certification is inferred from these tests.
+
+## Native SDL_Renderer Shift-wheel
+
+The SDL3 adapter routes a vertical-only wheel delta horizontally while its
+window has observed Shift held. It uses keyboard snapshots in dispatch order
+and clears the retained Shift state when the window loses focus. SDL supplies
+no modifier snapshot with a wheel event. If Shift is already held when the
+window gains focus, remapping starts after the adapter receives a key event
+reporting Shift. The adapter preserves simultaneous axes, fractional ticks,
+and the signs supplied by SDL, including natural scrolling.
+
+`tests/integration/test_sdl_tabs_wheel.c` passes window-addressed SDL events
+through the wait/poll path on private X11. It verifies that Shift-wheel moves
+the first tab by 40 units and consumes the delta, that release in the same
+batch leaves the following wheel vertical, that diagonal input preserves both
+axes, and that loss of focus clears Shift. An ordinary wheel still moves a
+bounded vertical strip. The original adapter failed the 40-unit assertion.
+Physical wheel/trackpad, Cocoa and Wayland input remain unverified by this test.

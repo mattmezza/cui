@@ -6277,11 +6277,13 @@
       "public_header": "include/cui/cui_choice.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_choice.c"
+        "tests/unit/test_choice.c",
+        "tests/integration/test_sdl_tabs_wheel.c"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
+        "linux_x11": "tested_partial",
         "wasm_browser": "tested_partial"
       },
       "limitations": [
@@ -6333,6 +6335,14 @@
           "evidence": [
             "tests/unit/test_choice.c",
             "tests/web/test_tabs_scroll_chaining.py",
+            "docs/TABS_SCROLL_CHAINING.md"
+          ]
+        },
+        {
+          "name": "ordered SDL Shift-wheel translation in bounded strips",
+          "status": "tested",
+          "evidence": [
+            "tests/integration/test_sdl_tabs_wheel.c",
             "docs/TABS_SCROLL_CHAINING.md"
           ]
         }

@@ -2150,10 +2150,11 @@
       ],
       "state_ownership": "Caller retains selected cui_id, item array and optional motion/scroll state.",
       "interaction": "Returns selection changes; cui_tab_panel_fn composes selected panel content.",
-      "usage": "Submit tab descriptors and current selected key; keep optional animation state across frames.",
+      "usage": "Submit tab descriptors and current selected key. For a bounded strip retain scroll state and specify bar_extent. The gallery and SDL3 adapter translate Shift plus vertical-only wheel into horizontal scrolling.",
       "docs": [
         "docs/CHOICE.md",
-        "docs/TABS_EVENTS.md"
+        "docs/TABS_EVENTS.md",
+        "docs/TABS_SCROLL_CHAINING.md"
       ],
       "callback_symbols": [
         "cui_tab_panel_fn"

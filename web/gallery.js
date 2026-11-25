@@ -1251,7 +1251,10 @@ function syncSemantics(){
   if(accountTrigger||selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
   entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${wasm.gallery_semantic_controls(i)}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
  }
- for(const id of ['scrollbar-policy','scrollbar-width','scrollbar-radius','scrollbar-track-control'])$(id).hidden=!hasScrollablePanel;
+ // A wrapped toolbar can move the canvas when a popup closes on pointer down.
+ // Keep the input coordinates stable until the captured gesture ends.
+ if(!pageTouches.size&&hoverPointerCapture===null)
+  for(const id of ['scrollbar-policy','scrollbar-width','scrollbar-radius','scrollbar-track-control'])$(id).hidden=!hasScrollablePanel;
  for(const [id,el] of semanticNodes)if(!seen.has(id)){el.remove();semanticNodes.delete(id);}
  const byId=new Map(entries.map(entry=>[entry.el.id,entry]));
  const depth=(entry,visited=new Set())=>{if(visited.has(entry.el.id))return 0;visited.add(entry.el.id);const parent=byId.get(entry.parent);return parent?1+depth(parent,visited):0;};

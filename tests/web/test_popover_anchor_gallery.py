@@ -45,7 +45,7 @@ def main():
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True)
             for mobile, dpr in ((False, 1), (False, 2), (True, 2)):
-                context = browser.new_context(viewport={'width':390 if mobile else 1280,'height':1000},has_touch=mobile,device_scale_factor=dpr)
+                context = browser.new_context(viewport={'width':360 if mobile else 1280,'height':1000},has_touch=mobile,device_scale_factor=dpr)
                 a = Audit.__new__(Audit)
                 a.page = context.new_page(); a.errors = []; a.active_touch = False
                 a.page.set_default_timeout(5000)
@@ -86,7 +86,16 @@ def main():
                                         return e.gallery_semantic(i, 6) === checked;
                                 return false;
                             }''', arg=[checkbox['id'], checked])
-                    activate(checkbox)
+                    if mobile:
+                        point = a.point(checkbox)
+                        canvas = a.page.locator('#preview')
+                        before = canvas.bounding_box()
+                        a.dispatch('touchStart', [point])
+                        a.page.wait_for_function('!cuiGallery.exports.gallery_surface_open(3)')
+                        assert canvas.bounding_box() == before, 'Dismissal moved the canvas during a touch'
+                        a.dispatch('touchEnd', [])
+                    else:
+                        activate(checkbox)
                     wait_checked(1 - checkbox['f'][6])
                     assert not a.page.evaluate(SNAPSHOT)['open']
                     assert a.value(checkbox, 6) != checkbox['f'][6]

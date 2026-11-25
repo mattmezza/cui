@@ -136,7 +136,9 @@ def main():
                                  ...[1,2,3,4].map(f=>e.gallery_command(i,f))]);}''')
                 profile = [line for line in lines if line[0] != 'Hover or focus here']
                 assert len(profile) >= 3 and profile[0][0] == 'Alex Morgan', profile
-                assert profile[-1][0].endswith('use them.'), profile
+                body = ' '.join(line[0] for line in profile[1:])
+                assert body == ('Alex designs tools for teams and keeps a notebook full of '
+                                'ideas from the people who use them.'), profile
                 for _, tx, ty, tw, th in profile:
                     assert tx >= x and ty >= y and tx + tw <= x + w + .1
                     assert ty + th < y + h

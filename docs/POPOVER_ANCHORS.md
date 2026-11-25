@@ -200,3 +200,9 @@ join assertions retain exact values. This known raster difference is not claimed
 as GPUI pixel parity. Browser keyboard opening, Escape, and mouse/touch outside
 dismissal cover the focus paths above. Native focus and accessibility depend on
 the host.
+
+The browser gallery keeps the preview toolbar's scrollbar controls in place
+through a captured gesture. A touch press can close an overflowing Popover
+before release. Deferring the toolbar reflow preserves the canvas position
+so the same tap can activate the control underneath. The mobile regression
+renders the closed Popover between touch-down and touch-up.

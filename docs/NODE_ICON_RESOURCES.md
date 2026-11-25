@@ -63,7 +63,7 @@ The example installs a local asset from SVG bytes and reads its pixels.
   `copy_icon_asset()` to inspect the current catalog and copy embedded SVG.
 
 Current Node and TypeScript source supports these resource operations against
-alpha.4's C bridge. The retained `icon()` and `badge()` builders still use
-catalog names and scalar text. Configured retained Icon, Badge and Spinner
-authoring remains open in Node and TypeScript.
+alpha.4's C bridge. Use the current bridge and addon to share these resources
+between the configured retained Icon and Badge builders.
+[Configured Icon and Badge inbox](NODE_ICON_BADGE.md).
 [Bridge contract and limits](BRIDGE_ICON_RESOURCES.md).

@@ -506,6 +506,6 @@ per-frame results in retained C nodes. Probe presentation separately from the
 alpha.4 resource API. `docs/BRIDGE_BADGE.md` covers the optional C container and
 its child events, artwork and indicator result. Keep resources on the app's owner
 thread. Python supports those resources and retained builders. Run the Python
-inbox example from `docs/PYTHON_ICON_BADGE.md`. JavaScript and TypeScript can
-prepare and copy owned SVGs through `docs/NODE_ICON_RESOURCES.md`. Their retained
-Icon and Badge builders and the Go/Rust resource facades remain open.
+inbox example from `docs/PYTHON_ICON_BADGE.md` or use the JavaScript and TypeScript
+builders in `docs/NODE_ICON_BADGE.md`. Go and Rust currently use legacy named
+Icons and scalar text Badges.

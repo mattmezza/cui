@@ -88,55 +88,32 @@ static int tf_resolve(localized_time_api *a) {
     return (a->versions() & 1u) && a->config_size() == 616 && a->result_size() == 80 &&
            a->change_size() == 64;
 }
-static uint32_t tf_load32(const unsigned char *p) {
-    return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
-}
-static void tf_word_in(void *record, const unsigned char *wire, size_t at) {
-    uint32_t word = tf_load32(wire + at);
-    memcpy((unsigned char *)record + at, &word, sizeof word);
-}
-static void tf_word_out(unsigned char *wire, const void *record, size_t at) {
-    uint32_t word;
-    memcpy(&word, (const unsigned char *)record + at, sizeof word);
-    for (unsigned i = 0; i < 4; ++i)
-        wire[at + i] = (unsigned char)(word >> (8 * i));
-}
-static void tf_big_in(void *record, const unsigned char *wire, size_t at) {
-    uint64_t value = (uint64_t)tf_load32(wire + at) | (uint64_t)tf_load32(wire + at + 4) << 32;
-    memcpy((unsigned char *)record + at, &value, sizeof value);
-}
-static void tf_big_out(unsigned char *wire, const void *record, size_t at) {
-    uint64_t value;
-    memcpy(&value, (const unsigned char *)record + at, sizeof value);
-    for (unsigned i = 0; i < 8; ++i)
-        wire[at + i] = (unsigned char)(value >> (8 * i));
-}
 static void tf_config_in(cui_bridge_time_field_config_v1 *out, const unsigned char *wire) {
     memcpy(out, wire, sizeof(*out));
     for (size_t at = 0; at < 56; at += 4)
-        tf_word_in(out, wire, at);
-    tf_big_in(out, wire, 56);
+        wire_word_in(out, wire, at);
+    wire_big_in(out, wire, 56);
     for (size_t i = 0; i < 14; ++i)
-        tf_word_in(out, wire, 64 + 20 * i);
+        wire_word_in(out, wire, 64 + 20 * i);
     for (size_t i = 0; i < 4; ++i)
-        tf_word_in(out, wire, 344 + 68 * i);
+        wire_word_in(out, wire, 344 + 68 * i);
 }
 static napi_value tf_copy(napi_env env, const void *record, size_t size) {
     unsigned char wire[616];
     memcpy(wire, record, size);
     if (size == 616) {
         for (size_t at = 0; at < 56; at += 4)
-            tf_word_out(wire, record, at);
-        tf_big_out(wire, record, 56);
+            wire_word_out(wire, record, at);
+        wire_big_out(wire, record, 56);
         for (size_t i = 0; i < 14; ++i)
-            tf_word_out(wire, record, 64 + 20 * i);
+            wire_word_out(wire, record, 64 + 20 * i);
         for (size_t i = 0; i < 4; ++i)
-            tf_word_out(wire, record, 344 + 68 * i);
+            wire_word_out(wire, record, 344 + 68 * i);
     } else {
         for (size_t at = 0; at < size; at += 4)
             if (at != 24 && at != 28)
-                tf_word_out(wire, record, at);
-        tf_big_out(wire, record, 24);
+                wire_word_out(wire, record, at);
+        wire_big_out(wire, record, 24);
     }
     napi_value result;
     return napi_create_buffer_copy(env, size, wire, NULL, &result) == napi_ok ? result : NULL;

@@ -186,7 +186,7 @@ module.exports = function iconResources(native) {
 
   return {
     exports: {IconResource, IconSource, IconError, IconAvailability},
-    supports, liveHandle, IconResource,
+    supports, appAlive, liveHandle, IconResource, textBytes, bridgeFloat, uint,
     defaultLimits: app => Object.freeze(call(app, OP.DEFAULT_LIMITS)),
     catalogCount: app => call(app, OP.CATALOG_COUNT),
     catalogEntry: (app, i) => Object.freeze(call(app, OP.CATALOG_ENTRY, uint(i, 0xffffffff, 'catalog index'))),

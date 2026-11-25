@@ -504,3 +504,131 @@ export interface App {
   query_icon(name: string): IconAvailabilityValue;
   copy_icon_asset(name: string): string | undefined;
 }
+
+export type IconSize = 'inherited' | 'xsmall' | 'small' | 'medium' | 'large' | 'custom';
+export type IconAlign = 'start' | 'center' | 'end';
+export type IconEdges = readonly [number, number, number, number];
+export interface IconBoxStyleInput {
+  width?: number;
+  height?: number;
+  padding?: number;
+  gap?: number;
+  radius?: number;
+  backgroundRgba?: number;
+  borderRgba?: number;
+  borderWidth?: number;
+  alignX?: IconAlign;
+  alignY?: IconAlign;
+  offsetX?: number;
+  offsetY?: number;
+  /** TL, TR, BL, BR. Null uses the common radius. */
+  corners?: IconEdges | null;
+  /** L, R, T, B. Null uses the common border width. */
+  borderEdges?: IconEdges | null;
+  maxWidth?: number;
+  maxHeight?: number;
+  opacity?: number | null;
+  /** L, R, T, B. Null uses the common padding. */
+  paddingEdges?: IconEdges | null;
+  row?: boolean;
+  clip?: boolean;
+  fixedWidth?: boolean;
+  fixedHeight?: boolean;
+  layoutOnly?: boolean;
+  inert?: boolean;
+  widthPercent?: boolean;
+  heightPercent?: boolean;
+}
+export interface IconConstraintsInput {
+  minWidth?: number | null;
+  minHeight?: number | null;
+  maxWidth?: number | null;
+  maxHeight?: number | null;
+}
+export interface IconOptionsInput {
+  size?: IconSize;
+  designSize?: DesignSize;
+  customSize?: number;
+  inheritedTextSize?: number;
+  width?: number | null;
+  height?: number | null;
+  opacity?: number | null;
+  remSize?: number;
+  /** 0xRRGGBBAA. Null uses the inherited tint. */
+  colorRgba?: number | null;
+  inheritedColorRgba?: number | null;
+  transform?: IconTransform | null;
+  decorative?: boolean;
+  style?: IconBoxStyleInput | null;
+  constraints?: IconConstraintsInput | null;
+  debugPlaceholder?: boolean;
+}
+export type IconOptions = Readonly<Omit<Required<IconOptionsInput>, 'style' | 'constraints'> & {
+  style: Readonly<Required<IconBoxStyleInput>> | null;
+  constraints: Readonly<Required<IconConstraintsInput>> | null;
+}>;
+export interface RetainedIconConfig {
+  readonly resource: IconResource;
+  readonly options: IconOptions;
+  readonly name: string;
+}
+export interface RetainedIconResult {
+  readonly frameSequence: bigint;
+  readonly iconError: IconErrorValue;
+  readonly frameStatus: number;
+}
+export interface ConfiguredIcon extends Node {
+  configure(resource: IconResource, options?: IconOptionsInput, semantic?: {name?: string}): this;
+  get_config(): RetainedIconConfig | undefined;
+  result(): RetainedIconResult | undefined;
+  reset(): this;
+}
+export const ConfiguredIcon: {
+  new(key: string | undefined, resource: IconResource, options?: IconOptionsInput,
+    semantic?: {name?: string; fallback?: string | null}): ConfiguredIcon;
+};
+export function configured_icon(key: string | undefined, resource: IconResource,
+  options?: IconOptionsInput, semantic?: {name?: string; fallback?: string | null}): ConfiguredIcon;
+export function icon_rotation(radians: number): IconTransform;
+
+export type BadgeControlSize = 'medium' | 'small' | 'large' | 'xsmall';
+type BadgeSharedInput = {
+  count?: number | bigint;
+  maximum?: number | bigint;
+  size?: BadgeControlSize;
+  designSize?: DesignSize;
+  colorRgba?: number | null;
+  name?: string;
+};
+export type BadgeConfigInput = BadgeSharedInput & (
+  | {variant?: 'count' | 'dot'; namedIcon?: ''; artwork?: null; artworkOptions?: null}
+  | {variant: 'icon'; namedIcon: string; artwork?: null; artworkOptions?: null}
+  | {variant: 'icon'; namedIcon?: ''; artwork: IconResource; artworkOptions?: IconOptionsInput | null}
+);
+export type BadgeConfig = Readonly<Required<Omit<BadgeSharedInput, 'count' | 'maximum'>> & {
+  count: bigint;
+  maximum: bigint;
+} & (
+  | {variant: 'count' | 'dot'; namedIcon: ''; artwork: null; artworkOptions: null}
+  | {variant: 'icon'; namedIcon: string; artwork: null; artworkOptions: null}
+  | {variant: 'icon'; namedIcon: ''; artwork: IconResource; artworkOptions: IconOptions}
+)>;
+export interface ConfiguredBadgeResult {
+  readonly frameSequence: bigint;
+  readonly iconError: IconErrorValue | null;
+  readonly frameStatus: number;
+  readonly submitted: boolean;
+}
+export interface ConfiguredBadge extends Composite {
+  configure(config: BadgeConfigInput): this;
+  get_config(): BadgeConfig;
+  result(): ConfiguredBadgeResult | undefined;
+  indicator_bounds(): Readonly<Bounds> | undefined;
+  disabled(value?: boolean): this;
+}
+export const ConfiguredBadge: {new(key?: string, config?: BadgeConfigInput): ConfiguredBadge};
+export function configured_badge(key?: string, config?: BadgeConfigInput): ConfiguredBadge;
+export interface App {
+  supports_icon_presentation(): boolean;
+  supports_configured_badge(): boolean;
+}

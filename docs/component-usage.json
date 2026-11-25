@@ -205,6 +205,7 @@
         "docs/BADGE.md",
         "docs/BRIDGE_BADGE.md",
         "docs/PYTHON_ICON_BADGE.md",
+        "docs/NODE_ICON_BADGE.md",
         "docs/COMPONENTS.md",
         "docs/ELEMENT_SHADOWS.md"
       ],
@@ -512,7 +513,8 @@
         "docs/BRIDGE_ICON_RESOURCES.md",
         "docs/BRIDGE_ICON_PRESENTATION.md",
         "docs/PYTHON_ICON_BADGE.md",
-        "docs/NODE_ICON_RESOURCES.md"
+        "docs/NODE_ICON_RESOURCES.md",
+        "docs/NODE_ICON_BADGE.md"
       ],
       "callback_symbols": [
         "cui_icon_loader_fn"

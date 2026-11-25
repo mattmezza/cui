@@ -8,6 +8,7 @@
 #include <float.h>
 #include <math.h>
 #include <node_api.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2041,10 +2042,35 @@ static napi_value numeric_object(napi_env env, const char *const *names, const d
     return obj;
 }
 
+static uint32_t load_le32(const unsigned char *p) {
+    return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
+}
+static void wire_word_in(void *record, const unsigned char *wire, size_t at) {
+    uint32_t word = load_le32(wire + at);
+    memcpy((unsigned char *)record + at, &word, sizeof word);
+}
+static void wire_word_out(unsigned char *wire, const void *record, size_t at) {
+    uint32_t word;
+    memcpy(&word, (const unsigned char *)record + at, sizeof word);
+    for (unsigned i = 0; i < 4; ++i)
+        wire[at + i] = (unsigned char)(word >> (8 * i));
+}
+static void wire_big_in(void *record, const unsigned char *wire, size_t at) {
+    uint64_t value = (uint64_t)load_le32(wire + at) | (uint64_t)load_le32(wire + at + 4) << 32;
+    memcpy((unsigned char *)record + at, &value, sizeof value);
+}
+static void wire_big_out(unsigned char *wire, const void *record, size_t at) {
+    uint64_t value;
+    memcpy(&value, (const unsigned char *)record + at, sizeof value);
+    for (unsigned i = 0; i < 8; ++i)
+        wire[at + i] = (unsigned char)(value >> (8 * i));
+}
+
 #include "slider_model_internal.h"
 #include "time_field_localized_internal.h"
 #include "skeleton_presentation_internal.h"
 #include "icon_resources_internal.h"
+#include "icon_badge_internal.h"
 
 static napi_value init(napi_env env, napi_value exports) {
 #define EXPORT(name, fn, data)                                                                     \
@@ -2166,6 +2192,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("timeFieldLocalized", time_field_localized, 0);
     EXPORT("skeletonPresentation", skeleton_presentation, 0);
     EXPORT("iconResource", icon_resource, 0);
+    EXPORT("iconNode", icon_node, 0);
+    EXPORT("configuredBadge", configured_badge, 0);
 #undef EXPORT
     return exports;
 }

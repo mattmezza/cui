@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Language authoring coverage; tested_subset never means complete component parity.",
-  "bridge_node_kinds": 81,
+  "bridge_node_kinds": 82,
   "additional_kinds": [
     "Row",
     "Column",
@@ -78,7 +78,7 @@
       "omissions": [
         {
           "header": "include/cui/cui_bridge.h",
-          "languages": ["javascript", "typescript", "go", "rust"],
+          "languages": ["go", "rust"],
           "types": [
             "cui_bridge_badge_config_v1",
             "cui_bridge_badge_result_v1"
@@ -88,7 +88,7 @@
             "cui_bridge_badge_configure_v1",
             "cui_bridge_badge_get_result_v1"
           ],
-          "note": "C and Python support configured Badge children and owned SVG. JavaScript, TypeScript, Go and Rust expose the scalar text pill."
+          "note": "C, Python, JavaScript and TypeScript support configured Badge children and owned SVG. Go and Rust expose the scalar text pill."
         }
       ]
     },
@@ -246,7 +246,7 @@
       "omissions": [
         {
           "header": "include/cui/cui_bridge.h",
-          "languages": ["javascript", "typescript", "go", "rust"],
+          "languages": ["go", "rust"],
           "types": [
             "cui_bridge_icon_options_v1",
             "cui_bridge_icon_result_v1"
@@ -255,7 +255,7 @@
             "cui_bridge_icon_configure_node_v1",
             "cui_bridge_icon_get_node_result_v1"
           ],
-          "note": "C and Python support owned resources and retained Icon configuration. JavaScript, TypeScript, Go and Rust use named Icons."
+          "note": "C, Python, JavaScript and TypeScript support owned resources and retained Icon configuration. Go and Rust use named Icons."
         },
         {
           "header": "include/cui/cui_icon.h",
@@ -1287,12 +1287,13 @@
       "go": "documented_omission",
       "rust": "documented_omission"
     },
-    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript and TypeScript expose owned SVG resources and catalog/cache utilities. Python also provides configured retained Icon and Badge builders with copied results and indicator geometry. See the guide for optional provider support.",
+    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript and TypeScript expose owned SVG resources and catalog/cache utilities. Those three builders also provide configured retained Icon and Badge with copied results and indicator geometry. See the guide for optional provider support.",
     "guide": "docs/BRIDGE_ICON_RESOURCES.md",
     "presentation_guide": "docs/BRIDGE_ICON_PRESENTATION.md",
     "badge_guide": "docs/BRIDGE_BADGE.md",
     "python_guide": "docs/PYTHON_ICON_BADGE.md",
     "node_resources_guide": "docs/NODE_ICON_RESOURCES.md",
+    "node_components_guide": "docs/NODE_ICON_BADGE.md",
     "receipt": "docs/validation/bridge-icon-resources-root.json"
   }
 }

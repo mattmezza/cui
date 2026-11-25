@@ -100,4 +100,4 @@ The retained C bridge also composes Badge nodes around ordinary retained
 children with copied descriptors, shared SVG handles and frame results. Python
 also exposes this route. JavaScript, TypeScript, Go and Rust currently offer the
 standalone text pill. [Retained C guide](BRIDGE_BADGE.md),
-[Python guide](PYTHON_ICON_BADGE.md).
+[Python guide](PYTHON_ICON_BADGE.md) · [Node and TypeScript guide](NODE_ICON_BADGE.md).

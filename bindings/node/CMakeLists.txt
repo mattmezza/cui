@@ -310,3 +310,53 @@ if(CUI_NODE_TSC_EXECUTABLE)
  add_test(NAME node_icon_resources_types COMMAND "${CUI_NODE_TSC_EXECUTABLE}" --noEmit --strict
   --target ES2020 --module commonjs --skipLibCheck ${CMAKE_CURRENT_SOURCE_DIR}/test/icon-resources.types.ts)
 endif()
+
+add_test(NAME node_icon_badge COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} --test
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/icon-badge.test.cjs)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ add_library(cui_node_icon_badge_mutation SHARED test/icon-badge-mutation-provider.c)
+ target_include_directories(cui_node_icon_badge_mutation PRIVATE ../../include)
+ target_link_libraries(cui_node_icon_badge_mutation PRIVATE ${CMAKE_DL_LIBS})
+ target_compile_options(cui_node_icon_badge_mutation PRIVATE -Wall -Wextra -Wpedantic -Werror)
+ foreach(mode invalid-copy invalid-result)
+  add_test(NAME node_icon_badge_${mode} COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> LD_PRELOAD=$<TARGET_FILE:cui_node_icon_badge_mutation>
+   CUI_ICON_BADGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+   CUI_ICON_BADGE_PROVIDER=${mode} ${NODE_EXECUTABLE} --test
+   ${CMAKE_CURRENT_SOURCE_DIR}/test/icon-badge.test.cjs)
+ endforeach()
+ if(TARGET cui_node_icon_alpha4)
+  add_test(NAME node_icon_badge_alpha4 COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_icon_alpha4> CUI_ICON_BADGE_PROVIDER=alpha4
+   ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/icon-badge.test.cjs)
+ endif()
+ set(CUI_NODE_BADGE_PARTIAL_LIBRARY "" CACHE FILEPATH "Existing bridge with incomplete Badge symbols")
+ if(CUI_NODE_BADGE_PARTIAL_LIBRARY)
+  if(NOT EXISTS "${CUI_NODE_BADGE_PARTIAL_LIBRARY}")
+   message(FATAL_ERROR "CUI_NODE_BADGE_PARTIAL_LIBRARY must name an existing bridge library")
+  endif()
+  add_library(cui_node_badge_partial MODULE addon.c)
+  target_include_directories(cui_node_badge_partial PRIVATE ${NODE_API_INCLUDE_DIR} ../../include)
+  target_link_libraries(cui_node_badge_partial PRIVATE "${CUI_NODE_BADGE_PARTIAL_LIBRARY}" m ${CMAKE_DL_LIBS})
+  target_compile_options(cui_node_badge_partial PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  set_target_properties(cui_node_badge_partial PROPERTIES PREFIX "" SUFFIX ".node")
+  add_test(NAME node_icon_badge_partial COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_badge_partial> CUI_ICON_BADGE_PROVIDER=partial-badge
+   ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/icon-badge.test.cjs)
+ endif()
+endif()
+add_test(NAME node_icon_badge_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/icon-badge-inbox.cjs)
+if(CUI_BRIDGE_NATIVE_TESTS)
+ add_test(NAME node_icon_badge_native COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> SDL_RENDER_DRIVER=software ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/icon-badge-inbox.cjs "${CUI_TEST_FONT}" --smoke)
+endif()
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_icon_badge_types COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> "${Python3_EXECUTABLE}"
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-icon-badge-types.py --tsc "${CUI_NODE_TSC_EXECUTABLE}"
+  --node "${NODE_EXECUTABLE}" --output ${CMAKE_CURRENT_BINARY_DIR}/icon-badge-types)
+endif()

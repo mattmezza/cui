@@ -8,6 +8,7 @@ const addonPath = process.env.CUI_NODE_ADDON || (fs.existsSync(packaged) || sour
   ? packaged : path.resolve(__dirname, '../../build-node/cui.node'));
 const native = require(addonPath);
 const {BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,ShadowPart,canonicalPart}=require('./shadows.cjs')(native);
+const designSizes = Object.freeze({inherit:0,xs:1,sm:2,base:3,md:4,lg:5,xl:6,"2xl":7,"3xl":8,"4xl":9,"5xl":10,"6xl":11,"7xl":12,"8xl":13,"9xl":14});
 const NODE = Symbol('CUI node');
 let nextKey = 1;
 const disabledKinds = new Set([4,5,6,7,8,9,12,13,14,15,17,18,19,20,21,22,23,28,29,40,41,42,43,44,48,54,55,56,57,58,59,60,61,65,66,67,68,69,71,73,74,75,77,78,79]);
@@ -104,7 +105,7 @@ class Node {
   ghost() { return this._variant(3); }
   design_size(value) {
     if (this.kind === 4) return this.size(value);
-    const names = {inherit:0,xs:1,sm:2,base:3,md:4,lg:5,xl:6,"2xl":7,"3xl":8,"4xl":9,"5xl":10,"6xl":11,"7xl":12,"8xl":13,"9xl":14};
+    const names = designSizes;
     if (![30,44].includes(this.kind) || typeof value !== 'string' || !Object.hasOwn(names,value)) throw new TypeError('design_size requires Button, Avatar or Stepper and a supported size');
     if (this.owner) native.setDesignSize(this.owner.handle,this[NODE],names[value]);
     this.designSizeValue=names[value]; return this;
@@ -131,7 +132,7 @@ class Node {
   lg() { return this._size(5); }
   large() { return this.lg(); }
   xl() { return this._size(6); }
-  size(value) { const names = {inherit:0,xs:1,sm:2,base:3,md:4,lg:5,xl:6,"2xl":7,"3xl":8,"4xl":9,"5xl":10,"6xl":11,"7xl":12,"8xl":13,"9xl":14}; if (!Object.hasOwn(names, value)) throw new TypeError("invalid button size"); return this._size(names[value]); }
+  size(value) { const names = designSizes; if (!Object.hasOwn(names, value)) throw new TypeError("invalid button size"); return this._size(names[value]); }
   _round(value) { this._button(); this.roundingValue = value; if (this.owner) native.setRounding(this.owner.handle, this[NODE], value); return this; }
   rounded_theme() { return this._round(0); }
   rounded_none() { return this._round(1); }
@@ -361,6 +362,8 @@ function dock(key,text=""){return new Node(79,text).key(key);}
 const sliderModels = require('./slider-model.cjs')(native, Node, NODE, keyFor);
 const localizedTimes = require('./time-field-localized.cjs')(native, Node, NODE, keyFor);
 const icons = require('./icon-resources.cjs')(native);
+const iconBadges = require('./icon-badge.cjs')(native, Node, NODE, icons, designSizes);
+containers.add(iconBadges.badgeKind);
 const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
 class App {
   constructor(options = {}) {
@@ -384,8 +387,12 @@ class App {
     skeletons.preflight(this, root);
     sliderModels.preflight(this, root);
     localizedTimes.preflight(this, root);
+    iconBadges.preflight(this, root);
     const attach = (node, parent) => {
-      node[NODE] = node.kind===81 ? sliderModels.mount(this,node,parent && parent[NODE]) : native.makeNode(this.handle, parent && parent[NODE], node.kind, node.keyValue);
+      const parentHandle = parent && parent[NODE];
+      if (node.kind === 81) node[NODE] = sliderModels.mount(this, node, parentHandle);
+      else if (node.kind === iconBadges.badgeKind) node[NODE] = iconBadges.createBadge(this, node, parentHandle);
+      else node[NODE] = native.makeNode(this.handle, parentHandle, node.kind, node.keyValue);
       node.owner = this;
       const id = native.nodeId(node[NODE]); this.nodes.set(keyFor(id), node);
       if(node.kind===76)native.setRootPadding(this.handle,node[NODE],node.rootPaddingValue);
@@ -404,6 +411,7 @@ class App {
       if(node.kind===55)native.setTime(this.handle,node[NODE],...node.timeValue);
       localizedTimes.mount(this,node);
       skeletons.mount(this, node);
+      iconBadges.mount(this, node);
       if([57,58].includes(node.kind))native.setDate(this.handle,node[NODE],...node.dateValue);
       if(node.kind===56)native.setColor(this.handle,node[NODE],node.colorValue);
       if(node.kind===69){native.setChartKind(this.handle,node[NODE],node.chartKindValue);native.setChart(this.handle,node[NODE],node.chartDataValue);}
@@ -442,7 +450,7 @@ class App {
   _remove(node) {
     this._alive();
     native.removeNode(this.handle, node[NODE]);
-    const clear = current => { localizedTimes.release(current); if(current.kind===81)current.requestValue=null; this.nodes.delete(keyFor(native.nodeId(current[NODE]))); current.owner = null; for (const child of current.childrenValue) clear(child); };
+    const clear = current => { localizedTimes.release(current); iconBadges.release(current); if(current.kind===81)current.requestValue=null; this.nodes.delete(keyFor(native.nodeId(current[NODE]))); current.owner = null; for (const child of current.childrenValue) clear(child); };
     clear(node);
     if (node === this.root) this.root = null;
     if (node.parent) node.parent.childrenValue = node.parent.childrenValue.filter(child => child !== node);
@@ -538,6 +546,8 @@ class App {
     if(this.localizedTimeEnabled && !this.closed && !this.disposed)delivered+=localizedTimes.dispatch(this);
     return delivered;
   }
+  supports_icon_presentation() { return iconBadges.supported(this, 'iconNode'); }
+  supports_configured_badge() { return iconBadges.supported(this, 'configuredBadge'); }
   supports_icon_resources() { return icons.supports(this); }
   icon_resource(source, limits) { return new icons.IconResource(this, source, limits); }
   default_icon_limits() { return icons.defaultLimits(this); }
@@ -584,11 +594,11 @@ class App {
   theme_preset(index) {this._alive();if(!Number.isInteger(index)||index<0||index>0xffffffff)throw new TypeError("invalid theme index");native.setThemePreset(this.handle,index);return this;}
   current_theme_preset() {this._alive();return native.getThemePreset(this.handle);}
   stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } return this; }
-  close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values()){localizedTimes.release(node);if(node.kind===81)node.requestValue=null;} return this; }
-  dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values()){localizedTimes.release(node);if(node.kind===81)node.requestValue=null;} this.nodes.clear(); } }
+  close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);if(node.kind===81)node.requestValue=null;} return this; }
+  dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);if(node.kind===81)node.requestValue=null;} this.nodes.clear(); } }
 }
 module.exports = {radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
 
 Object.assign(module.exports, sliderModels.exports);
 
-Object.assign(module.exports, localizedTimes.exports, skeletons.exports, icons.exports);
+Object.assign(module.exports, localizedTimes.exports, skeletons.exports, icons.exports, iconBadges.exports);

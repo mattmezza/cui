@@ -474,7 +474,8 @@
       "tests": [
         "tests/unit/test_components.c",
         "tests/unit/test_bridge_badge.c",
-        "bindings/python/test_icons.py"
+        "bindings/python/test_icons.py",
+        "bindings/node/test/icon-badge.test.cjs"
       ],
       "status": "tested",
       "platforms": {
@@ -484,7 +485,7 @@
       "limitations": [
         "Count, zero hiding, overflow, dot, configurable SVG icon, four sizes, colors and arbitrary content composition are headless tested; source corner geometry is covered on the first frame.",
         "Generic inherited style refinement remains ordinary Core composition; browser-specific interaction and visual evidence is recorded separately.",
-        "The retained C and Python APIs support count, dot, named artwork and owned SVG around child nodes. JavaScript, TypeScript, Go and Rust builders use the scalar text pill."
+        "The retained C, Python, JavaScript and TypeScript APIs support count, dot, named artwork and owned SVG around child nodes. Go and Rust builders use the scalar text pill."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1543,7 +1544,8 @@
         "tests/unit/test_icon_accessibility_source.c",
         "tests/unit/test_bridge_icon_presentation.c",
         "bindings/python/test_icons.py",
-        "bindings/node/test/icon-resources.test.cjs"
+        "bindings/node/test/icon-resources.test.cjs",
+        "bindings/node/test/icon-badge.test.cjs"
       ],
       "status": "tested",
       "platforms": {
@@ -1552,7 +1554,7 @@
       "limitations": [
         "123 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.",
         "Icon is decorative by default. Callers can set an explicit accessible name or choose decorative rendering. Native assistive-technology coverage remains open.",
-        "Optional retained C and Python presentation and Badge composition support copied configuration and app-owned resources. JavaScript and TypeScript expose the resource utilities. Configured authoring in JavaScript, TypeScript, Go and Rust remains open."
+        "Optional retained C and Python presentation and Badge composition support copied configuration and app-owned resources. JavaScript and TypeScript also expose both the resource utilities and configured retained nodes. Configured authoring in Go and Rust remains open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

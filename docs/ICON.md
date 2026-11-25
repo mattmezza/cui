@@ -238,8 +238,9 @@ gaps preclude a full-family parity claim.
 Alpha.4 includes app-owned resources with copied SVG, path maps and bitmap
 utilities. Working source adds a retained Icon node with copied styling and a
 per-frame result. Configured Badge can share the same resource. Those APIs are
-also available to Python builders in working source. Extended authoring in
-JavaScript, TypeScript, Go and Rust remains open.
+also available to Python, JavaScript and TypeScript builders in working source.
+Extended authoring in Go and Rust remains open.
 [Resource contract](BRIDGE_ICON_RESOURCES.md),
 [retained presentation](BRIDGE_ICON_PRESENTATION.md),
-[Python guide](PYTHON_ICON_BADGE.md).
+[Python guide](PYTHON_ICON_BADGE.md),
+[Node and TypeScript guide](NODE_ICON_BADGE.md).

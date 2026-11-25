@@ -126,6 +126,9 @@ Closing the native window disposes the app. Use `stop()` to stop scheduling,
 The [TypeScript example](../bindings/typescript/examples/save.ts) uses the same
 builders and [type declarations](../bindings/typescript/index.d.ts). Node type
 stripping executes the example; it does not perform static type checking.
+The Icon and Badge inbox demonstrates shared SVG, nested controls and
+layout that stays in place as a callback clears a count.
+[JavaScript and TypeScript inbox](NODE_ICON_BADGE.md).
 
 ## Styling, state and callbacks
 

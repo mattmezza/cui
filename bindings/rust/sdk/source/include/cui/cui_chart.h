@@ -251,6 +251,9 @@ typedef struct {
     cui_chart_curve curve; /* natural is source default */
     float
         line_width; /* Cartesian line/area stroke in bitmap pixels; zero selects 2, capped at 16. */
+    /* Line: 8 logical-pixel circular markers, with bitmap scale capped at 16 per axis.
+     * When false, source point layout omits markers and legacy layout keeps its small point marks.
+     * Radar uses its existing vertex markers. */
     bool show_dots;
     double radar_max_value, radar_outer_radius; /* zero selects source defaults */
     float radar_label_gap;                      /* zero selects source 10px */

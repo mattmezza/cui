@@ -41,6 +41,14 @@ outline at 2× raster density. The browser regression samples actual canvas
 pixels for all three curves at desktop and narrow widths, 1× and 2× display
 scales, and the default light and dark themes.
 
+Set `show_dots = true` on a Line Chart to draw an eight-logical-pixel
+circular marker at each datum in every series. Markers use their series'
+stroke colors, scale with the presented bitmap up to 16× per axis, and
+follow the chart's reveal. In the [source point layout](CHART_SOURCE_POINT_AXIS.md),
+Line Charts start with markers off. Legacy Line Charts keep their small
+point marks when this option is false. Radar uses the same option for its
+vertex marks, and Area keeps its existing point treatment.
+
 ## Shared Sankey solver
 
 Chart Sankey topology/relaxation and end-width calculation now delegate to the

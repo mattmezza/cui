@@ -8,6 +8,7 @@ cui_chart_options options = {
     .data = points, .count = point_count,
     .width = 320, .height = 180,
     .layout_mode = CUI_CHART_LAYOUT_SOURCE_POINT,
+    .show_dots = true,
     .interaction_mode = CUI_PLOT_INTERACTION_CURRENT_FRAME,
 };
 cui_chart(ui, chart_id, &chart_state, &options, cui_string("Revenue"));
@@ -16,6 +17,12 @@ cui_chart(ui, chart_id, &chart_state, &options, cui_string("Revenue"));
 Source mode reserves 18 raster pixels for the x axis, places the x-label top at the axis plus 6 pixels, and uses `max(point_count, count)` point slots. A zero point count therefore uses the data length; a smaller requested count also uses the data length. `hide_x_axis` removes the gutter. The independent legacy `hide_axes` switch still suppresses composition labels without changing raster geometry. The shared query `cui_chart_point_axis_layout` reports the effective slots and gutter without reading or retaining data arrays; it checks kind, enum, count (1–4096), and point-count capacity (at most 1,000,000), leaving both outputs untouched on failure. Output storage must be disjoint.
 
 Raster point positions, hit selection, grid/tick domain positions, measured y-axis gutter, hover crosshair endpoint, x-label placement, and source cache fingerprints consume this geometry. Raster pixels are scaled into `logical_width`/`logical_height` when supplied; label typography continues to use the existing 10-unit host font contract. Arbitrary custom label content is not introduced.
+
+Line draws the stroke by default. With `show_dots = true`, Line also paints
+eight-logical-pixel markers at each visible series point, including a
+single datum. The bitmap edges and reveal clip the marks. The raster cache
+includes the effective marker size, so a scaling change can redraw the
+markers even when the data revision is unchanged.
 
 Legacy mode keeps the 20-pixel gutter and existing label offsets. Render and point-coordinate APIs continue to reject a nonzero point count smaller than the data length. The historically permissive raw legacy hit-test geometry remains unchanged. Source mode is rejected for other chart kinds and invalid enums are rejected before styled UI/state changes. Base render validation continues to preserve raster/state on invalid options. Source cache keys use effective slot counts, so equivalent normalized requests reuse a frame; legacy zero-mode cache keys retain their existing structure.
 

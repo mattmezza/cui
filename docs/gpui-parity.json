@@ -7131,6 +7131,16 @@
           "scope": "Chromium canvas pixels for Natural, Linear and Step after in default light and dark at 1× and 2× display scales. The C raster still accepts caller-specified bitmap pixel widths."
         },
         {
+          "name": "optional eight-logical-pixel Line markers in series colors",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart_source_point_axis.c",
+            "tests/web/test_chart_appearance_gallery.py",
+            "docs/CHART_SOURCE_POINT_AXIS.md"
+          ],
+          "scope": "Source point layout defaults to no static markers. Native raster tests cover multiple series, endpoint and reveal clipping, scale-sensitive cache invalidation, a single datum and legacy defaults. Chromium samples actual Canvas pixels when the option is enabled and disabled at 1× and 2×."
+        },
+        {
           "name": "line and area curves plus radar multi-series",
           "status": "tested",
           "evidence": [

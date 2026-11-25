@@ -2346,7 +2346,7 @@
       ],
       "state_ownership": "Caller retains cui_chart_state, its RGBA pixel buffer/byte capacity, data arrays and resources used by options.",
       "interaction": "Hit testing identifies data; tooltip/format/paint callbacks customize output and are not application action callbacks.",
-      "usage": "Submit data/options each frame. For a scaled Line or Area bitmap, convert the desired logical stroke width to bitmap pixels with the scale ratio. Route application actions from explicit hit testing or child controls.",
+      "usage": "Submit data/options each frame. For a scaled Line or Area bitmap, convert the desired logical stroke width to bitmap pixels with the scale ratio. With CUI_CHART_LAYOUT_SOURCE_POINT, set show_dots on a Line to add eight-logical-pixel series markers. Route application actions from explicit hit testing or child controls.",
       "docs": [
         "docs/CHART.md",
         "docs/CHART_TYPED_TOOLTIP.md",

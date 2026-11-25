@@ -663,6 +663,26 @@ cui_plot_result cui_chart_point_coordinates(const cui_chart_options *o, size_t i
     *y = (float)py;
     return CUI_PLOT_OK;
 }
+/* Preserve logical marker size in supersampled bitmaps and bound raster work. */
+static double cui_chart_dot_radius(unsigned pixels, float logical) {
+    return 4 * (logical > 0 ? fmin(16, (double)pixels / logical) : 1);
+}
+static void cui_chart_point_dot(cui_chart_state *s, const cui_chart_options *o, double cx,
+                                double cy, double rx, double ry, cui_color color) {
+    int x0 = (int)fmax(0, floor(cx - rx - .5));
+    int x1 = (int)fmin(o->width, ceil(cx + rx + .5));
+    int y0 = (int)fmax(0, floor(cy - ry - .5));
+    int y1 = (int)fmin(o->height, ceil(cy + ry + .5));
+    double edge = fmin(rx, ry);
+    for (int y = y0; y < y1; ++y)
+        for (int x = x0; x < x1; ++x) {
+            double distance = hypot((x + .5 - cx) / rx, (y + .5 - cy) / ry);
+            double coverage = fmin(1, fmax(0, .5 + (1 - distance) * edge));
+            cui_color covered = color;
+            covered.a = (unsigned char)lround(color.a * coverage);
+            cui_chart_pixel(s, o, x, y, covered);
+        }
+}
 static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o, size_t series,
                                   double left, double right, double top, double bottom, double lo,
                                   double hi, double baseline) {
@@ -735,11 +755,19 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
             }
         }
     }
+    bool dots = o->kind == CUI_CHART_LINE && o->show_dots;
+    if (o->kind == CUI_CHART_LINE && o->layout_mode == CUI_CHART_LAYOUT_SOURCE_POINT && !dots)
+        return;
+    double rx = dots ? cui_chart_dot_radius(o->width, o->logical_width) : 0;
+    double ry = dots ? cui_chart_dot_radius(o->height, o->logical_height) : 0;
     for (size_t i = 0; i < o->count; i++) {
         double x, y;
         cui_chart_series_point(o, series, i, left, right, lo, hi, top, bottom, &x, &y);
-        cui_chart_rect(s, o, (int)lround(x) - 1, (int)lround(y) - 1, (int)lround(x) + 2,
-                       (int)lround(y) + 2, color);
+        if (dots)
+            cui_chart_point_dot(s, o, x, y, rx, ry, color);
+        else
+            cui_chart_rect(s, o, (int)lround(x) - 1, (int)lround(y) - 1, (int)lround(x) + 2,
+                           (int)lround(y) + 2, color);
     }
 }
 static cui_color cui_chart_blend_color(cui_color a, cui_color b, double t) {
@@ -1413,6 +1441,10 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, o->bar_alignment);
     h = cui_chart_mix(h, o->custom_bar_padding);
     h = cui_chart_mix(h, o->show_dots);
+    if (o->kind == CUI_CHART_LINE && o->show_dots) {
+        h = cui_chart_mix(h, cui_chart_bits(cui_chart_dot_radius(o->width, o->logical_width)));
+        h = cui_chart_mix(h, cui_chart_bits(cui_chart_dot_radius(o->height, o->logical_height)));
+    }
     h = cui_chart_mix(h, cui_chart_bits(o->value_axis_gutter));
     h = cui_chart_mix(h, o->custom_horizontal_bar_gutters);
     h = cui_chart_mix(h, cui_chart_bits(o->bar_category_gutter));

@@ -1127,7 +1127,10 @@ Additional event includes: `cui/cui_virtual_events.h`.
 
 **Interaction:** Hit testing identifies data; tooltip/format/paint callbacks customize output and are not application action callbacks.
 
-**Usage:** Submit data/options each frame; route application actions from explicit hit testing or child controls.
+**Usage:** Submit data and options each frame. Scale the bitmap stroke width to
+match the display density. With `CUI_CHART_LAYOUT_SOURCE_POINT`, set
+`show_dots` to add eight-logical-pixel markers to a Line Chart. Route
+application actions from explicit hit testing or child controls.
 
 API: `cui_chart`, `cui_chart_hit_test`. [Public header](../include/cui/cui_chart.h); [guide](CHART.md).
 

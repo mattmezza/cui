@@ -677,6 +677,8 @@ if (cui_questionnaire_begin_with_keyboard(ui, root_id, &theme, &state, options,
 
  Speech:'cui_speech_init(&state, workspace, recognizer, input, on_event, user);\ncui_speech_button(ui, id, &theme, &state, options, now);\ncui_speech_waveform(ui, waveform_id, &theme, &state, waveform, now);',
  Chart:`cui_chart_options options = cui_chart_theme(config, &theme);
+options.layout_mode = CUI_CHART_LAYOUT_SOURCE_POINT;
+options.show_dots = true; /* Optional Line Chart markers. */
 /* Resolve a two-logical-pixel outline when the bitmap is scaled. */
 if (options.logical_height > 0)
     options.line_width = 2.0f * options.height / options.logical_height;
@@ -1060,7 +1062,9 @@ function render(){
  wasm.gallery_command_palette_options(Number($('command-modal').checked),Number($('command-loading').checked),Number($('command-filterable').checked));
  wasm.gallery_text_view_motion(Number($('motion-duration').value),Number($('motion-stagger').value),Number($('motion-easing').value));
  wasm.gallery_text_view_options(Number($('text-view-format').value),Number($('text-view-scroll').checked),Number($('text-view-fade').checked));
- wasm.gallery_chart_options(Number($('chart-kind').value),Number($('chart-curve').value),Number($('chart-dots').checked),Number($('chart-labels').checked),Number($('chart-animate').checked));
+ const chartKind=Number($('chart-kind').value), chartHasDots=chartKind===0||chartKind===4;
+ $('chart-dots-control').hidden=selected.name!=='Chart'||!chartHasDots;
+ wasm.gallery_chart_options(chartKind,Number($('chart-curve').value),Number(chartHasDots&&$('chart-dots').checked),Number($('chart-labels').checked),Number($('chart-animate').checked));
  wasm.gallery_chart_content(Number($('chart-custom-rows').checked));
  wasm.gallery_chart_appearance(Number($('chart-tooltip-appearance').value));
  wasm.gallery_speech_options(Number($('speech-size').value),Number($('speech-unavailable').checked));

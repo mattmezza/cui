@@ -90,6 +90,81 @@ static void geometry(void) {
     assert(cui_chart_render(&state, &o) == CUI_PLOT_INVALID);
     assert(!memcmp(before, pixels, sizeof pixels));
 }
+static unsigned marker_pixel(const unsigned char *pixels, unsigned x, unsigned y) {
+    return pixels[((size_t)y * 128 + x) * 4];
+}
+static void line_markers(void) {
+    cui_chart_datum data[] = {{.value = 5}, {.value = 5}, {.value = 5}};
+    double extra_values[] = {7, 7, 7};
+    cui_chart_series extra = {.values = extra_values, .count = 3, .color = {180, 0, 0, 255}};
+    unsigned char pixels[128 * 100 * 4];
+    cui_chart_state state = {.pixels = pixels, .byte_capacity = sizeof pixels};
+    cui_chart_options o = {.kind = CUI_CHART_LINE,
+                           .data = data,
+                           .count = 3,
+                           .extra_series = &extra,
+                           .extra_series_count = 1,
+                           .width = 128,
+                           .height = 100,
+                           .hide_grid = true,
+                           .hide_axes = true,
+                           .hide_x_axis = true,
+                           .has_domain = true,
+                           .domain_min = 0,
+                           .domain_max = 10,
+                           .series = {{255, 0, 0, 255}},
+                           .background = {0, 0, 0, 255},
+                           .curve = CUI_CHART_CURVE_LINEAR,
+                           .layout_mode = CUI_CHART_LAYOUT_SOURCE_POINT,
+                           .data_revision = 1};
+    float x, y, extra_x, extra_y;
+    assert(cui_chart_point_coordinates(&o, 1, 0, &x, &y) == CUI_PLOT_OK && x == 64 && y == 55);
+    assert(cui_chart_point_coordinates(&o, 1, 1, &extra_x, &extra_y) == CUI_PLOT_OK &&
+           extra_x == x && extra_y == 37);
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK);
+    uint64_t revision = state.revision;
+    assert(marker_pixel(pixels, 64, 55) == 255 && marker_pixel(pixels, 64, 56) < 30);
+    assert(marker_pixel(pixels, 64, 58) == 0 && marker_pixel(pixels, 64, 40) == 0);
+
+    o.show_dots = true;
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK && state.revision == revision + 1);
+    assert(marker_pixel(pixels, 64, 58) > 225 && marker_pixel(pixels, 64, 59) == 0);
+    assert(marker_pixel(pixels, 67, 58) == 0); /* A circle leaves its corner clear. */
+    assert(marker_pixel(pixels, 64, 40) > 150);
+    assert(marker_pixel(pixels, 0, 58) > 225 && marker_pixel(pixels, 127, 58) > 225);
+    revision = state.revision;
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK && state.revision == revision);
+
+    o.logical_width = 64;
+    o.logical_height = 50;
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK && state.revision == revision + 1);
+    assert(marker_pixel(pixels, 64, 62) > 225 && marker_pixel(pixels, 64, 63) == 0);
+    assert(marker_pixel(pixels, 71, 62) == 0);
+    assert(marker_pixel(pixels, 20, 52) == 0); /* A 2× dot leaves the stroke width alone. */
+    o.reveal_enabled = true;
+    o.reveal_progress = .5f;
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK);
+    assert(marker_pixel(pixels, 63, 60) == 255 && marker_pixel(pixels, 64, 60) == 0);
+    assert(marker_pixel(pixels, 127, 60) == 0);
+
+    o.logical_width = o.logical_height = 0;
+    o.reveal_enabled = false;
+    o.extra_series_count = 0;
+    o.count = 1;
+    o.show_dots = false;
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK);
+    assert(marker_pixel(pixels, 64, 55) == 0); /* No line segment for one datum. */
+    o.show_dots = true;
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK);
+    assert(marker_pixel(pixels, 64, 58) > 225);
+    o.show_dots = false;
+    o.layout_mode = CUI_CHART_LAYOUT_LEGACY;
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK);
+    assert(marker_pixel(pixels, 64, 56) == 255 && marker_pixel(pixels, 64, 58) == 0);
+    o.show_dots = true;
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK);
+    assert(marker_pixel(pixels, 64, 58) > 225);
+}
 static cui_size measure(void *user, cui_str text, float font, cui_text_style style) {
     (void)user;
     (void)style;
@@ -156,6 +231,7 @@ static void styled(void) {
 }
 int main(void) {
     geometry();
+    line_markers();
     styled();
     return 0;
 }

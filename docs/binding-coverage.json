@@ -924,7 +924,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "The five builders use the legacy chart layout. Source point layout and optional Line markers are available through the direct C options."
+      ]
     },
     {
       "name": "Command",

@@ -2720,6 +2720,13 @@ foreach(entry source distribution)
  add_test(NAME test_frame_input_snapshot_${entry} COMMAND test_frame_input_snapshot_${entry})
 endforeach()
 
+# Private same-TU experiment for one-stop TimeField event order.
+add_executable(test_ordered_time_field_routing tests/unit/test_ordered_time_field_routing.c)
+target_link_libraries(test_ordered_time_field_routing PRIVATE cui)
+target_include_directories(test_ordered_time_field_routing PRIVATE third_party/clay)
+cui_warnings(test_ordered_time_field_routing)
+add_test(NAME ordered_time_field_routing COMMAND test_ordered_time_field_routing)
+
 # Typed Base Slider black-box contract; share one actual Core object with the
 # frozen legacy scalar oracle. No whole portable library is needed here.
 add_library(slider_model_core_fixture OBJECT src/core/cui.c)

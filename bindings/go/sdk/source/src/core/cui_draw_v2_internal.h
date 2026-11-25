@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_DRAW_V2_INTERNAL_H
 #define CUI_DRAW_V2_INTERNAL_H
-static bool cui_core_begin_frame(cui_context *, float, float, float, bool);
+static bool cui_core_begin_frame(cui_context *, float, float, float, bool,
+                                 const cui_core_ordered_input *);
 static size_t cui_core_command_limit(const cui_context *ui) {
     return ui->frame_v2 ? ui->v2->command_limit : ui->config.max_commands;
 }
@@ -24,7 +25,7 @@ static size_t cui_core_v2_min(size_t a, size_t b) {
     return a < b ? a : b;
 }
 bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
-    return cui_core_begin_frame(ui, w, h, dt, false);
+    return cui_core_begin_frame(ui, w, h, dt, false, NULL);
 }
 /* A rejected V2 begin expires new input/numeric authority, including failures
  * before common begin. Preserve existing diagnostics, queues and V1 dispatch. */
@@ -132,7 +133,7 @@ bool cui_begin_frame_v2(cui_context *ui, float w, float h, float dt,
     state->owner_limit = owners;
     state->features = value.required_features;
     ui->v2 = state;
-    if (!cui_core_begin_frame(ui, w, h, dt, true))
+    if (!cui_core_begin_frame(ui, w, h, dt, true, NULL))
         return cui_core_v2_begin_rejected(ui);
     return true;
 capacity:

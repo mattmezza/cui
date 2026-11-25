@@ -112,3 +112,33 @@ checkpoint records the proposed behavior and the compatibility tests.
    geometry. Publish the new coverage only after the C route, gallery and
    applicable bindings have evidence. Physical input and screen-reader
    acceptance require their own checks.
+
+## Private Core experiment
+
+The [same-translation-unit test](../../tests/unit/test_ordered_time_field_routing.c)
+drives the actual Core event queue and the V1 localized digit reducer. It passes
+one temporary admission to the internal frame entry point. The root uses the
+existing global stop and delegates child pointer focus to itself. The reducer
+uses a typed stack copy, with separate decisions for consuming input and
+handling an internal Tab. Core performs normal target selection, traversal and
+activation evidence recording. The two public frame entry points use the
+ordinary path.
+
+The trace covers a digit and boundary Tab reaching the following button with
+the original Enter snapshot, a consumed digit keeping Tab inside the field,
+and a rejected value still advancing selection. It also checks reverse exit,
+re-entry retaining selection, real segment hits, accessibility focus on the
+root, modifiers and composition guards, and opt-in rejection for missing,
+disabled and modal-blocked prior roots. An empty follow-up checks for replay.
+The failure fixture discards the working copy after an invalidated frame and
+checks recovery and absence of replay. A change to minute precision checks
+that a formerly visible Second hit cannot select the now-hidden segment.
+
+The next C layer needs admission tied to real widget submission, explicit
+lifetimes and state application, current eligibility and geometry identity,
+and consistent handling of disabled or omitted participants. It also needs to
+define the last rejection point for a staged edit. Later layout or rendering
+failure can occur after synchronous observers have already acted. The private
+test exercises discarding the edit before application. Browser default
+behavior, actual IME editing, root accessibility mapping and foreign
+authoring still need their own paths and verification.

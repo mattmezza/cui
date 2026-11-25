@@ -1567,9 +1567,33 @@ static void cui_core_finalize_text_input(cui_context *ui) {
         next.owner = 0;
     ui->text_input_state = next;
 }
+/* Private prototype for one explicitly admitted compound control. The reducer
+ * receives actual routed events and may only edit borrowed working storage.
+ * Its decision about a Tab default is independent of input consumption. */
+typedef struct {
+    bool consume, tab_moved;
+} cui_core_ordered_result;
+typedef struct {
+    cui_id root;
+    cui_core_ordered_result (*step)(void *user, const cui_event *, cui_id target);
+    void *user;
+} cui_core_ordered_input;
+
 #include "cui_draw_v2_internal.h"
 
-static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bool v2) {
+static bool cui_core_ordered_ready(const cui_context *ui, const cui_core_ordered_input *input) {
+    if (!input->root || !input->step || !cui_accessibility_numeric_snapshot_ready(ui))
+        return false;
+    for (size_t i = 0; i < ui->previous_count; ++i) {
+        const cui_semantic *s = &ui->previous[i];
+        if (s->id == input->root && cui_core_focusable(s) && cui_core_tab_stop(s) &&
+            !s->details.handles_tab && cui_core_previous_allowed(ui, i))
+            return true;
+    }
+    return false;
+}
+static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bool v2,
+                                 const cui_core_ordered_input *ordered) {
     if (!cui_core_mutation(ui))
         return false;
     if (!ui)
@@ -1583,6 +1607,8 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
         cui_core_fail_at(ui, CUI_ERROR_LAYOUT, v2 ? "cui_begin_frame_v2" : "cui_begin_frame");
         return false;
     }
+    if (ordered && !cui_core_ordered_ready(ui, ordered))
+        return false;
     ui->frame_v2 = v2;
     ui->v2_failed = false;
     if (ui->v2) {
@@ -1813,6 +1839,17 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
             ui->pointer_position_known = true;
             ui->pointer_present = true;
         }
+        bool ordered_tab_moved = false;
+        if (ordered && ui->event_targets[i] == ordered->root && ui->focus == ordered->root) {
+            bool tab = e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_TAB;
+            bool ordinary_tab = tab && !e.repeat && !(e.modifiers & ~CUI_MOD_SHIFT);
+            if ((e.type == CUI_EVENT_KEY_DOWN && (!tab || ordinary_tab)) ||
+                (e.type == CUI_EVENT_TEXT && ui->composition_owner != ordered->root)) {
+                cui_core_ordered_result step = ordered->step(ordered->user, &e, ordered->root);
+                ui->event_consumed[i] = step.consume;
+                ordered_tab_moved = ordinary_tab && step.tab_moved;
+            }
+        }
         if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
             cui_id hit = cui_core_hit(ui, e.x, e.y), target = hit;
             bool blocked = cui_core_pointer_blocked(ui, hit);
@@ -1835,6 +1872,10 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
                 if (hit || ui->previous_top_modal == SIZE_MAX)
                     cui_core_set_focus(ui, target);
                 ui->focus_visible = false;
+                if (ordered && target == ordered->root) {
+                    cui_core_ordered_result step = ordered->step(ordered->user, &e, hit);
+                    ui->event_consumed[i] = step.consume;
+                }
             }
         } else if (e.type == CUI_EVENT_POINTER_UP && e.pointer_button == CUI_POINTER_PRIMARY) {
             bool touch_drag = false;
@@ -1886,8 +1927,10 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
         } else if (e.type == CUI_EVENT_KEY_DOWN && !e.repeat) {
             ui->release_pending = false;
             if (e.key == CUI_KEY_TAB) {
-                bool handled = false;
-                if (!(e.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)))
+                bool handled = ordered_tab_moved;
+                if (handled)
+                    ui->focus_visible = true;
+                else if (!(e.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)))
                     for (size_t n = 0; n < ui->previous_count; n++)
                         if (ui->previous[n].id == ui->focus &&
                             ui->previous[n].details.handles_tab && !ui->previous[n].disabled &&
@@ -1918,7 +1961,7 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
             ui->event_activation_slots[i] = ui->activation_count - 1;
         }
     }
-    /* Routing completes before component reducers run. Present capture loss
+    /* Routing completes before ordinary component reducers run. Present capture loss
      * before the replacement scroll/gesture event, retaining every event's
      * target, ownership and activation metadata. Cancelling after STARTED would
      * otherwise clear the new owner's freshly created gesture state. */

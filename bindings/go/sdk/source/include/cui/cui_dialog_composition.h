@@ -113,14 +113,11 @@ bool cui_dialog_sizing_default_v1(cui_surface_options, cui_dialog_sizing_v1 *out
  * Nonpositive available width is rejected before callbacks; no tree is submitted.
  * Defaults preserve source minimum96 even when viewport maximum is smaller.
  * Previous-input geometry is admitted only for an adjacent successful snapshot
- * in the same open lifetime. Unready ordinary composition consumes only remaining
- * previous owner-scope events; this does not accept actions or disable paint.
+ * in the same open lifetime. Unready ordinary composition discards previous
+ * owner-scope input and captures using cui_discard_previous_scope_input.
  * surface.body_viewport/body_content/body_maximum hold admitted previous-input
  * geometry, not current completed layout. Current ranges are published in Body
  * semantics at end_frame; current rectangles use completed[] after success.
- * Pointer/key/contact capture retains existing Core lifetime semantics. Closing
- * and reopening does not promise cancellation of every held child press; this
- * API adds layout composition, not an input-lifetime reset operation.
  * Invalid descriptors return valid=false before callbacks. Late Core failures
  * can follow callbacks; no rollback of application side effects is promised.
  * Existing surface/alert begin/end routes and synchronous dismissal unchanged. */

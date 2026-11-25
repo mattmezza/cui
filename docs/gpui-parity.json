@@ -87,6 +87,7 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_surface.c",
+        "tests/unit/test_dialog_composition_actions.c",
         "tests/web/test_browser.py"
       ],
       "status": "tested",
@@ -137,6 +138,15 @@
           "evidence": [
             "tests/unit/test_surface.c",
             "docs/validation/gcc-surface-tracking.txt"
+          ]
+        },
+        {
+          "name": "scoped input cancellation across composed close and reopen",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_core.c",
+            "tests/unit/test_dialog_composition_actions.c",
+            "docs/DIALOG_COMPOSITION.md"
           ]
         }
       ],
@@ -5193,6 +5203,7 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_surface.c",
+        "tests/unit/test_dialog_composition_actions.c",
         "tests/web/test_browser.py"
       ],
       "status": "tested",
@@ -5240,6 +5251,15 @@
           "evidence": [
             "tests/unit/test_surface.c",
             "docs/validation/gcc-surface-tracking.txt"
+          ]
+        },
+        {
+          "name": "scoped input cancellation across composed close and reopen",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_core.c",
+            "tests/unit/test_dialog_composition_actions.c",
+            "docs/DIALOG_COMPOSITION.md"
           ]
         }
       ],

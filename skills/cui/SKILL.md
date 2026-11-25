@@ -211,10 +211,10 @@ acquire this feature automatically. For the additive C six-slot route, read
 `cui_dialog_open_v1`, and resolve sizing against the current viewport each frame.
 Header/Title/Description remain independent; Content has intrinsic minimum,
 Body scrolls, Footer remains outside Inner. Present-empty differs from OMIT.
-Old helpers stay unchanged; previous-input caches are not current geometry.
-Held child input across reopen follows existing Core behavior. Root/host/five
-foreign facade slots and full lifecycle/parity remain unfinished. Read the guide's
-current validation limits before treating any example or backend as verified.
+The composed route discards previous scoped input and captures before submitting
+the first frame after reopening. Use its open helper for every lifetime.
+Root/host ownership and foreign slot builders remain open. Read the guide's
+validation scope for each example and backend.
 
 For C Button phase-dependent shadows, read `docs/BUTTON_STYLES.md` and
 `include/cui/cui_button_styles.h`: the additive surface facade copies at most

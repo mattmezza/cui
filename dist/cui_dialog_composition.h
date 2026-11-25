@@ -114,14 +114,11 @@ bool cui_dialog_sizing_default_v1(cui_surface_options, cui_dialog_sizing_v1 *out
  * Nonpositive available width is rejected before callbacks; no tree is submitted.
  * Defaults preserve source minimum96 even when viewport maximum is smaller.
  * Previous-input geometry is admitted only for an adjacent successful snapshot
- * in the same open lifetime. Unready ordinary composition consumes only remaining
- * previous owner-scope events; this does not accept actions or disable paint.
+ * in the same open lifetime. Unready ordinary composition discards previous
+ * owner-scope input and captures using cui_discard_previous_scope_input.
  * surface.body_viewport/body_content/body_maximum hold admitted previous-input
  * geometry, not current completed layout. Current ranges are published in Body
  * semantics at end_frame; current rectangles use completed[] after success.
- * Pointer/key/contact capture retains existing Core lifetime semantics. Closing
- * and reopening does not promise cancellation of every held child press; this
- * API adds layout composition, not an input-lifetime reset operation.
  * Invalid descriptors return valid=false before callbacks. Late Core failures
  * can follow callbacks; no rollback of application side effects is promised.
  * Existing surface/alert begin/end routes and synchronous dismissal unchanged. */
@@ -636,13 +633,8 @@ cui_dialog_compose_resolved(cui_context *ui, cui_dialog_layout_v1 *l, cui_surfac
         return result;
     }
     l->private_flags |= CUI_DIALOG_BUSY;
-    if (sequence && !input_ready) {
-        size_t count;
-        cui_frame_events(ui, &count);
-        for (size_t i = 0; i < count; ++i)
-            if (!cui_event_consumed(ui, i) && cui_event_within_scope(ui, i, l->surface->overlay.id))
-                cui_consume_event(ui, i);
-    }
+    if (sequence && !input_ready)
+        (void)cui_discard_previous_scope_input(ui, l->surface->overlay.id);
     if (sequence && !body_input_ready) {
         /* Cancel old context-owned drag through the public hidden helper. No
          * stale geometry, timer touch, allocation or input reduction. */

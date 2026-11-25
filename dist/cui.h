@@ -1117,6 +1117,13 @@ void cui_focus(cui_context *ui, cui_id id);
 bool cui_pointer_scope_allowed(cui_context *, cui_id owned_scope);
 bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal);
 void cui_end_focus_scope(cui_context *ui);
+/* Use at the start of a fresh lifetime, inside the active scope before
+ * submitting its children. Discard undelivered events routed through the
+ * previous frame to that scope or its descendants. Clear their held pointer
+ * and key captures and block their touch gestures until contact ends.
+ * This keeps focus and the original event targets, and does not dispatch
+ * callbacks or synthesize events. Returns whether it discarded any input. */
+bool cui_discard_previous_scope_input(cui_context *ui, cui_id scope);
 /* Withdraw current scope descendants before painting a closing popup. Paired
  * begin/end remain required. Restores a previous-frame enabled trigger, if any. */
 bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger);
@@ -14782,6 +14789,73 @@ bool cui_event_hit_within_scope(cui_context *ui, size_t index, cui_id scope) {
     }
     return hit != SIZE_MAX &&
            cui_core_event_target_in_scope(ui, index, scope, ui->previous[hit].id);
+}
+
+static bool cui_core_previous_scope_owns(const cui_context *ui, size_t scope, cui_id id) {
+    if (!id)
+        return false;
+    if (ui->previous_focus_scopes[scope].id == id)
+        return true;
+    for (size_t i = 0; i < ui->previous_count; ++i)
+        if (ui->previous[i].id == id)
+            return cui_core_scope_contains(ui->previous_focus_scopes,
+                                           ui->previous_semantic_scopes[i], scope);
+    /* Escape and modal barriers can route to a scope ID without a box. */
+    for (size_t i = 0; i < ui->previous_focus_scope_count; ++i)
+        if (ui->previous_focus_scopes[i].id == id && ui->previous_focus_scopes[i].active)
+            return cui_core_scope_contains(ui->previous_focus_scopes, i, scope);
+    return false;
+}
+
+bool cui_discard_previous_scope_input(cui_context *ui, cui_id scope) {
+    if (!cui_frame_sequence(ui) || !scope || !ui->focus_depth || !cui_core_mutation(ui))
+        return false;
+    const cui_core_focus_scope *active = &ui->focus_scopes[ui->focus_stack[ui->focus_depth - 1]];
+    if (!active->active || active->id != scope)
+        return false;
+    size_t previous = 0;
+    while (previous < ui->previous_focus_scope_count &&
+           ui->previous_focus_scopes[previous].id != scope)
+        previous++;
+    if (previous == ui->previous_focus_scope_count || !ui->previous_focus_scopes[previous].active)
+        return false;
+
+    bool found = false;
+    for (size_t i = 0; i < ui->event_count; ++i) {
+        if (!cui_core_previous_scope_owns(ui, previous, ui->event_targets[i]))
+            continue;
+        found |= cui_cancel_event_activation(ui, i);
+        if (!cui_event_consumed(ui, i))
+            found |= cui_consume_event(ui, i);
+    }
+    bool pointer = cui_core_previous_scope_owns(ui, previous, ui->capture);
+    bool pressed_touch =
+        pointer && ui->capture_start_valid && ui->capture_start.type == CUI_POINTER_TOUCH;
+    if (cui_core_previous_scope_owns(ui, previous, ui->space_capture)) {
+        ui->space_capture = 0;
+        found = true;
+    }
+    if (ui->release_pending &&
+        cui_core_previous_scope_owns(ui, previous, ui->release_pending_target)) {
+        ui->release_pending = false;
+        found = true;
+    }
+    for (size_t i = 0; i < sizeof ui->contacts / sizeof ui->contacts[0]; ++i) {
+        if (!ui->contacts[i].active)
+            continue;
+        bool same_press = pressed_touch && ui->contacts[i].id == ui->capture_start.contact &&
+                          ui->contacts[i].device == ui->capture_start.device;
+        if (same_press || cui_core_previous_scope_owns(ui, previous, ui->contacts[i].owner) ||
+            cui_core_previous_scope_owns(ui, previous, ui->contacts[i].viewport)) {
+            ui->contacts[i].blocked = true;
+            ui->contacts[i].owner = 0;
+            ui->contacts[i].viewport = 0;
+            found = true;
+        }
+    }
+    if (pointer)
+        cui_core_clear_capture(ui);
+    return found || pointer;
 }
 
 bool cui_pointer_scope_allowed(cui_context *ui, cui_id owned_scope) {

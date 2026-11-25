@@ -439,13 +439,8 @@ cui_dialog_compose_resolved(cui_context *ui, cui_dialog_layout_v1 *l, cui_surfac
         return result;
     }
     l->private_flags |= CUI_DIALOG_BUSY;
-    if (sequence && !input_ready) {
-        size_t count;
-        cui_frame_events(ui, &count);
-        for (size_t i = 0; i < count; ++i)
-            if (!cui_event_consumed(ui, i) && cui_event_within_scope(ui, i, l->surface->overlay.id))
-                cui_consume_event(ui, i);
-    }
+    if (sequence && !input_ready)
+        (void)cui_discard_previous_scope_input(ui, l->surface->overlay.id);
     if (sequence && !body_input_ready) {
         /* Cancel old context-owned drag through the public hidden helper. No
          * stale geometry, timer touch, allocation or input reduction. */

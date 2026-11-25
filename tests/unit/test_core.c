@@ -240,6 +240,61 @@ static void test_event_scope(void) {
     assert(!cui_event_within_scope(ui, 0, 900));
     cui_destroy(ui);
 }
+
+static void test_discard_previous_scope_input(void) {
+    cui_context *ui = make();
+    begin(ui);
+    scope_event_scene(ui, false);
+    cui_end_frame(ui);
+    cui_rect sibling = cui_bounds(ui, 2);
+    assert(sibling.w > 0 && sibling.h > 0);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 10, 10, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_DOWN, sibling.x + 10, sibling.y + 10, 0, 0);
+
+    begin(ui);
+    assert(cui_event_activation(ui, 1) == 1 && cui_pressed(ui, 2));
+    assert(!cui_discard_previous_scope_input(ui, 900));
+    assert(cui_begin_focus_scope(ui, 900, false));
+    assert(!cui_discard_previous_scope_input(ui, 902));
+    assert(cui_discard_previous_scope_input(ui, 900));
+    assert(!cui_discard_previous_scope_input(ui, 900));
+    assert(cui_event_consumed(ui, 0) && cui_event_consumed(ui, 1));
+    assert(cui_event_target(ui, 1) == 1 && cui_event_activation(ui, 1) == 0);
+    assert(!cui_event_consumed(ui, 2) && cui_event_target(ui, 2) == 2);
+    assert(cui_focused(ui) == 2 && cui_pressed(ui, 2));
+    assert(cui_begin_focus_scope(ui, 901, false));
+    assert(!control(ui, 1, false).activated);
+    cui_end_focus_scope(ui);
+    cui_end_focus_scope(ui);
+    assert(cui_begin_focus_scope(ui, 902, false));
+    assert(control(ui, 2, false).pressed);
+    cui_end_focus_scope(ui);
+    cui_end_frame(ui);
+
+    queue(ui, CUI_EVENT_POINTER_UP, sibling.x + 10, sibling.y + 10, 0, 0);
+    begin(ui);
+    assert(cui_begin_focus_scope(ui, 902, false));
+    assert(control(ui, 2, false).activated);
+    cui_end_focus_scope(ui);
+    cui_end_frame(ui);
+
+    begin(ui);
+    scope_event_scene(ui, false);
+    cui_end_frame(ui);
+    cui_focus(ui, 1);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ESCAPE, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 901);
+    assert(cui_begin_focus_scope(ui, 900, false));
+    assert(cui_discard_previous_scope_input(ui, 900));
+    assert(cui_event_consumed(ui, 0) && cui_event_target(ui, 0) == 901);
+    cui_end_focus_scope(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 static void test_scroll_gesture_metadata(void) {
     cui_context *ui = make();
     for (unsigned phase = CUI_SCROLL_PHASE_STARTED; phase <= CUI_SCROLL_PHASE_CANCELLED; ++phase)
@@ -3572,6 +3627,7 @@ int main(void) {
     test_table_semantic_roles();
     test_scroll_gesture_metadata();
     test_event_scope();
+    test_discard_previous_scope_input();
     test_activation_cancellation();
     test_input();
     test_strings_and_draw();

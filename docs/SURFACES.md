@@ -53,6 +53,6 @@ The separate C Base/Styled six-slot route is documented in
 intrinsic sizing, independent Header/Title/Description, Content/Body allocation
 and Footer ownership using Core layout V2. The legacy helpers documented above
 keep their fixed or previous-measurement behavior. Retain the new layout storage
-through end_frame and use its open helper for each new lifetime. Existing held
-input capture behavior remains; this is not a universal input cancellation API.
-Root/host and all five foreign slot builders remain separate work.
+through end_frame and use its open helper for each new lifetime. The first
+composed frame drops previous scoped activations and captures, including held
+mouse, touch and Space. Root/host and foreign slot builders remain open.

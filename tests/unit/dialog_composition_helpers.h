@@ -32,7 +32,8 @@ struct dialog_fixture {
     cui_surface_result decision, closed_reason;
     cui_id focus_closed;
     float width, height, ancestor_opacity;
-    bool styled, veto, action_footer, text_title, omit_submit, inert, layout_only, poison;
+    bool styled, veto, action_footer, direct_footer, text_title, omit_submit, inert, layout_only,
+        poison;
 };
 void dialog_fixture_init(dialog_fixture *, bool styled, cui_font *);
 void dialog_fixture_destroy(dialog_fixture *);

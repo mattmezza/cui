@@ -1116,6 +1116,13 @@ void cui_focus(cui_context *ui, cui_id id);
 bool cui_pointer_scope_allowed(cui_context *, cui_id owned_scope);
 bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal);
 void cui_end_focus_scope(cui_context *ui);
+/* Use at the start of a fresh lifetime, inside the active scope before
+ * submitting its children. Discard undelivered events routed through the
+ * previous frame to that scope or its descendants. Clear their held pointer
+ * and key captures and block their touch gestures until contact ends.
+ * This keeps focus and the original event targets, and does not dispatch
+ * callbacks or synthesize events. Returns whether it discarded any input. */
+bool cui_discard_previous_scope_input(cui_context *ui, cui_id scope);
 /* Withdraw current scope descendants before painting a closing popup. Paired
  * begin/end remain required. Restores a previous-frame enabled trigger, if any. */
 bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger);

@@ -144,13 +144,20 @@ reduction and cleared when not admitted. Current completed ranges come from the
 Body semantic after successful end_frame; current rectangles come from
 `layout.completed`. These state cache fields are not a current-paint oracle.
 
-Input uses the previous valid completed snapshot. The draft admits previous Body
+Input uses the previous valid completed snapshot. Composition admits previous Body
 geometry only for an adjacent successful submission in the same open lifetime.
-It does not add an input-lifetime reset operation: **held pointer, touch or Space
-capture can retain existing Core behavior across close/reopen**. No cancellation
-marker, dispatcher rewrite or guarantee of suppressing every old held child
-press is included. Root/native-host ownership, all five foreign facade builders
-and stronger lifecycle closure remain separate unfinished work.
+When there is no such snapshot, composition calls
+`cui_discard_previous_scope_input` before invoking slot callbacks. It consumes
+events routed to the previous owner or its nested scopes and cancels their
+pending activations separately. It releases their held mouse and key captures
+and blocks their in-flight touch contacts until lift. The first composed frame
+still paints enabled controls and restores normal focus. Subsequent events use
+the newly published layout. Use `cui_dialog_open_v1` for each new lifetime.
+
+This applies to C Base and Styled Dialog and AlertDialog, including caller-authored
+controls. Core keeps event targets available for inspection. Application-owned
+gesture models remain the application's responsibility. Root/native-host
+ownership and foreign slot builders remain open.
 
 Inspect both `cui_dialog_submit_result` and the error after `cui_end_frame`.
 `valid=false` rejects a descriptor or reports a later submission failure;

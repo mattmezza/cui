@@ -34,7 +34,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the six-slot C composition API or the Core focus-scope input cancellation helper."
+      ]
     },
     {
       "name": "Alert",
@@ -732,7 +735,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the six-slot C composition API or the Core focus-scope input cancellation helper."
+      ]
     },
     {
       "name": "Dock",

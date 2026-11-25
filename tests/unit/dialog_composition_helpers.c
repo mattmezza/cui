@@ -42,7 +42,13 @@ static void slot(cui_context *ui, const cui_dialog_frame *token, void *user) {
     }
     if (f->action_footer && d->kind == CUI_DIALOG_FOOTER) {
         cui_begin_box(ui, 102, (cui_box){.width = -1, .height = 40, .fixed_height = true});
-        if (f->styled) {
+        if (f->direct_footer) {
+            cui_begin_box(ui, 101, (cui_box){.width = 100, .height = 24, .fixed_height = true});
+            if (cui_interact(ui, 101, CUI_ROLE_BUTTON, cui_string("Action"), false, false, 0)
+                    .activated)
+                ++f->actions;
+            cui_end_box(ui);
+        } else if (f->styled) {
             if (cui_dialog_action_v1(
                     ui, token, &f->theme, 101, cui_string("Accept"), CUI_DIALOG_CONFIRM,
                     (cui_button_options){

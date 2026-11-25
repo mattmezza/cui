@@ -7323,7 +7323,7 @@
             "docs/TABLE.md"
           ],
           "limitations": [
-            "Opt-in C helpers preserve a row key and pixel offset. Retained builders support ordinary keyed replacement with a 32-row cap. C, Python, JavaScript, TypeScript and Go expose larger snapshots. Automatic remote updates remain open."
+            "Opt-in C helpers preserve a row key and pixel offset. Retained builders support ordinary keyed replacement with a 32-row cap. C, Python, JavaScript, TypeScript, Go and Rust expose larger snapshots. Automatic remote updates remain open."
           ]
         },
         {
@@ -7494,7 +7494,19 @@
             "docs/RUST_BUILDERS.md"
           ],
           "limitations": [
-            "Bundled and shared providers return copied demand. The native inbox polls from the existing after-frame hook, and the application owns requests. Rust authoring uses the 32-row setter."
+            "Bundled and shared providers return copied demand. The native inbox polls from the existing after-frame hook, and the application owns requests. Ordinary Rust snapshots have a 32-row limit."
+          ]
+        },
+        {
+          "name": "Rust bounded retained DataTable snapshots beyond 32 rows",
+          "status": "tested",
+          "evidence": [
+            "bindings/rust/tests/data_table_capacity.rs",
+            "bindings/rust/examples/data_table_paging.rs",
+            "docs/RUST_BUILDERS.md"
+          ],
+          "limitations": [
+            "Both capacity V1 exports must be present. Rust copies the bounded snapshot to the provider and validates paging against its active capacity. Remote transport is application-owned."
           ]
         },
         {

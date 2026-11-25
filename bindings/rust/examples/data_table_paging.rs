@@ -23,6 +23,7 @@ const ROWS: &[&[&str]] = &[
 ];
 const KEYS: &[u32] = &[101, 102, 103, 104, 105, 106, 107, 108, 201, 202, 203, 204];
 const INITIAL: usize = 8;
+const LARGER_ROWS: u32 = 40;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Ticket {
@@ -33,12 +34,15 @@ struct Ticket {
 struct Inbox {
     table: Node,
     status: Node,
+    rows: Vec<[String; 2]>,
+    keys: Vec<u32>,
+    capacity: Option<u32>,
     generation: u64,
     pending: Option<Ticket>,
 }
 
 impl Inbox {
-    fn new(app: &mut App) -> Result<Self> {
+    fn new(app: &mut App, capacity: Option<u32>) -> Result<Self> {
         let root = app
             .build_root(Kind::RootView, "root")?
             .root_padding(16.)?
@@ -50,9 +54,18 @@ impl Inbox {
         app.build_child(content, Kind::Label, "title")?
             .text("Inbox")?
             .finish();
-        let table = app
-            .build_child(content, Kind::DataTable, "inbox")?
-            .data_table_keyed(HEADERS, &ROWS[..INITIAL], &KEYS[..INITIAL])?
+        let table = app.build_child(content, Kind::DataTable, "inbox")?;
+        let table = if let Some(capacity) = capacity {
+            table.data_table_keyed_capacity(
+                HEADERS,
+                &ROWS[..INITIAL],
+                &KEYS[..INITIAL],
+                capacity,
+            )?
+        } else {
+            table.data_table_keyed(HEADERS, &ROWS[..INITIAL], &KEYS[..INITIAL])?
+        };
+        let table = table
             .visual_size(360., 160.)?
             .data_table_load_more(0)?
             .finish();
@@ -60,9 +73,26 @@ impl Inbox {
             .build_child(content, Kind::Label, "status")?
             .text("8 messages")?
             .finish();
+        let mut rows: Vec<_> = ROWS
+            .iter()
+            .map(|row| [row[0].to_owned(), row[1].to_owned()])
+            .collect();
+        let mut keys = KEYS.to_vec();
+        if capacity.is_some() {
+            for row in rows.len() as u32..LARGER_ROWS {
+                rows.push([
+                    format!("Project update {}", row + 1),
+                    "Workspace".to_owned(),
+                ]);
+                keys.push(300 + row);
+            }
+        }
         Ok(Self {
             table,
             status,
+            rows,
+            keys,
+            capacity,
             generation: 1,
             pending: None,
         })
@@ -97,9 +127,22 @@ impl Inbox {
         if self.pending != Some(ticket) {
             return Ok(false);
         }
-        app.data_table_keyed(self.table, HEADERS, ROWS, KEYS)?;
+        let cells: Vec<_> = self
+            .rows
+            .iter()
+            .map(|row| [row[0].as_str(), row[1].as_str()])
+            .collect();
+        let rows: Vec<_> = cells.iter().map(|row| row.as_slice()).collect();
+        if let Some(capacity) = self.capacity {
+            app.data_table_keyed_capacity(self.table, HEADERS, &rows, &self.keys, capacity)?;
+        } else {
+            app.data_table_keyed(self.table, HEADERS, &rows, &self.keys)?;
+        }
         self.pending = None;
-        app.text(self.status, "12 messages · End of inbox")?;
+        app.text(
+            self.status,
+            &format!("{} messages · End of inbox", rows.len()),
+        )?;
         Ok(true)
     }
 
@@ -134,7 +177,7 @@ impl Inbox {
         let selected = app.data_table_cell_bounds(self.table, 6, 0)?;
         click(app, selected)?;
         app.frame(0.016)?;
-        assert_eq!(*changes.borrow(), [f64::from(KEYS[6])]);
+        assert_eq!(*changes.borrow(), [f64::from(self.keys[6])]);
         self.retry(app)?;
         app.step(0.016)?;
         let next = self.start_page(app)?.expect("retry demand");
@@ -142,18 +185,25 @@ impl Inbox {
         assert!(!self.complete(app, cancelled)?);
         assert!(self.complete(app, next)?);
         assert_eq!(app.frame(0.016)?, 0);
-        assert_eq!(app.data_table_state(self.table)?.row, KEYS[6]);
+        assert_eq!(app.data_table_state(self.table)?.row, self.keys[6]);
         assert_eq!(app.data_table_cell_bounds(self.table, 6, 0)?.y, selected.y);
-        assert_eq!(app.data_table_cell(self.table, 11, 0)?, ROWS[11][0]);
-        app.scroll(first.x + 10., first.y + 10., 0., -20.)?;
+        let last = self.rows.len() - 1;
+        assert_eq!(
+            app.data_table_cell(self.table, last as u32, 0)?,
+            self.rows[last][0]
+        );
+        app.scroll(first.x + 10., first.y + 10., 0., -(self.rows.len() as f32))?;
         app.step(0.016)?;
         assert!(self.start_page(app)?.is_none());
         if smoke {
-            let cell = app.data_table_cell_bounds(self.table, 10, 0)?;
+            let cell = app.data_table_cell_bounds(self.table, (last - 1) as u32, 0)?;
             click(app, cell)?;
             let mut ran = false;
             app.run_with(|active| {
-                assert_eq!(*changes.borrow(), [f64::from(KEYS[6]), f64::from(KEYS[10])]);
+                assert_eq!(
+                    *changes.borrow(),
+                    [f64::from(self.keys[6]), f64::from(self.keys[last - 1])]
+                );
                 assert!(self.start_page(active)?.is_none());
                 ran = true;
                 active.close()
@@ -174,6 +224,7 @@ fn click(app: &mut App, rect: Rect) -> Result<()> {
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let smoke = args.iter().any(|arg| arg == "--smoke");
+    let larger = args.iter().any(|arg| arg == "--larger");
     let font = args.iter().position(|arg| arg == "--font").map(|index| {
         args.get(index + 1)
             .expect("--font requires a path")
@@ -198,11 +249,27 @@ fn main() -> Result<()> {
     } else {
         App::headless(480., 320.)?
     };
-    if !app.supports_data_table_paging() || !app.supports_keyed_data_table() {
-        eprintln!("The paged inbox requires a bridge with paging and keyed replacement.");
+    if !app.supports_data_table_paging() {
+        eprintln!("The paged inbox requires a bridge with paging.");
         return Err(Error(9));
     }
-    let mut inbox = Inbox::new(&mut app)?;
+    let capacity = if larger {
+        let Some(maximum) = app
+            .data_table_max_row_capacity()
+            .filter(|max| *max >= LARGER_ROWS)
+        else {
+            eprintln!("--larger requires an opt-in capacity of at least {LARGER_ROWS} rows.");
+            return Err(Error(9));
+        };
+        Some(maximum.min(128))
+    } else {
+        if !app.supports_keyed_data_table() {
+            eprintln!("The paged inbox requires a bridge with keyed replacement.");
+            return Err(Error(9));
+        }
+        None
+    };
+    let mut inbox = Inbox::new(&mut app, capacity)?;
     if font.is_some() && !smoke {
         inbox.run(&mut app)
     } else {

@@ -173,7 +173,7 @@ independent. The copy remains valid after removing the table or dropping the app
 Keep the service cursor and one in-flight request in application state.
 Rows stay interactive while paging is off. Check that a response still belongs
 to the current request before using `data_table_keyed` to append it. Enable
-paging again if the source has more rows. The Rust builder holds up to 32 rows.
+paging again if the source has more rows. The ordinary setter holds up to 32 rows.
 
 Use `App::run_with` to poll demand and ready completions in a synchronous
 after-frame hook, or poll after `step` in a manual loop. Apply responses on
@@ -184,6 +184,53 @@ selection during loading, retry, stale-response rejection and anchored append.
 ```sh
 cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --example data_table_paging
 cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --features native --example data_table_paging -- --font /path/to/font.ttf
+```
+
+### Retain more than 32 rows in Rust
+
+Query `app.data_table_max_row_capacity()` before opting in. It returns `None`
+when the linked provider lacks the capacity API. The ordinary positional and
+keyed methods keep their 32-row limit. On a compatible provider, choose a limit
+that fits the full snapshot you intend to keep.
+
+```rust
+use cui_builders::{App, Error, Kind, Result};
+
+fn inbox(app: &mut App) -> Result<()> {
+    let capacity = app.data_table_max_row_capacity().ok_or(Error(9))?.min(128);
+    if capacity < 40 {
+        return Err(Error(3));
+    }
+    let headers = ["Subject"];
+    let root = app.root(Kind::Column, "root")?;
+    let table = app.build_child(root, Kind::DataTable, "inbox")?
+        .data_table_keyed_capacity(&headers, &[&["Project update"]], &[101], capacity)?
+        .visual_size(360., 160.)?
+        .data_table_load_more(0)?
+        .finish();
+
+    // On the UI thread, replace the full snapshot after accepting a page.
+    app.data_table_keyed_capacity(
+        table, &headers, &[&["Project update"], &["Release notes"]], &[101, 102], capacity,
+    )?;
+    Ok(())
+}
+```
+
+The current provider accepts up to 10,000 rows within its 32 MiB app-wide
+native retained budget. The limit leaves unfilled rows unallocated. Headers
+and cells support up to 128 UTF-8 bytes each. Use a distinct nonzero key for
+each row, or empty slices for rows and keys when the snapshot is empty.
+Keyed replacement preserves the viewport and selection for surviving keys.
+Failed replacement keeps the active snapshot and capacity. Each paging record
+reports its snapshot's capacity.
+
+The offline inbox grows from 8 to 40 rows and checks scroll position,
+selection and stale-response rejection. Run it from the repository root.
+
+```sh
+cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --example data_table_paging -- --larger
+cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --features native --example data_table_paging -- --larger --font /path/to/font.ttf
 ```
 
 ## Composed workspace example

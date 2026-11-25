@@ -946,7 +946,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "All five bindings support keyed replacement and opt-in near-end polling on compatible providers. Ordinary setters accept 32 rows. Python, JavaScript, TypeScript and Go expose opt-in capacity for up to 10,000 rows. Rust uses the ordinary limit. Custom cells and network transport are outside the bridge contract."
+        "All five bindings support keyed replacement, opt-in near-end polling and opt-in capacity for up to 10,000 rows on compatible providers. Ordinary setters accept 32 rows. Custom cells and network transport are outside the bridge contract."
       ]
     },
     {

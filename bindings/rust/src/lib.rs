@@ -858,6 +858,136 @@ fn data_table_keyed_setter() -> Option<DataTableKeyedSetter> {
     None
 }
 
+const DATA_TABLE_DEFAULT_ROWS: u32 = 32;
+const DATA_TABLE_MAX_ROWS: u32 = 10_000;
+const DATA_TABLE_TEXT_BYTES: usize = 128;
+
+type SetDataTableCapacity = unsafe extern "C" fn(
+    *mut c_void,
+    RawNode,
+    *const *const c_char,
+    u32,
+    *const *const c_char,
+    *const u32,
+    u32,
+    u32,
+) -> u32;
+type MaxDataTableCapacity = unsafe extern "C" fn() -> u32;
+
+#[derive(Clone, Copy)]
+struct DataTableCapacityApi {
+    maximum: MaxDataTableCapacity,
+    set: SetDataTableCapacity,
+}
+
+impl DataTableCapacityApi {
+    fn usable_maximum(self) -> Option<u32> {
+        let maximum = unsafe { (self.maximum)() }.min(DATA_TABLE_MAX_ROWS);
+        (maximum != 0).then_some(maximum)
+    }
+}
+
+#[cfg(cui_bridge_static)]
+fn data_table_capacity_api() -> Option<DataTableCapacityApi> {
+    extern "C" {
+        fn cui_bridge_data_table_max_row_capacity_v1() -> u32;
+        fn cui_bridge_data_table_set_keyed_capacity_v1(
+            app: *mut c_void,
+            node: RawNode,
+            headers: *const *const c_char,
+            column_count: u32,
+            cells: *const *const c_char,
+            row_keys: *const u32,
+            row_count: u32,
+            row_capacity: u32,
+        ) -> u32;
+    }
+    Some(DataTableCapacityApi {
+        maximum: cui_bridge_data_table_max_row_capacity_v1,
+        set: cui_bridge_data_table_set_keyed_capacity_v1,
+    })
+}
+
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn data_table_capacity_api() -> Option<DataTableCapacityApi> {
+    static API: std::sync::OnceLock<Option<DataTableCapacityApi>> = std::sync::OnceLock::new();
+    *API.get_or_init(|| unsafe {
+        let maximum = notification_symbol_v1(
+            b"cui_bridge_data_table_max_row_capacity_v1\0"
+                .as_ptr()
+                .cast(),
+        );
+        let set = notification_symbol_v1(
+            b"cui_bridge_data_table_set_keyed_capacity_v1\0"
+                .as_ptr()
+                .cast(),
+        );
+        if maximum.is_null() || set.is_null() {
+            return None;
+        }
+        Some(DataTableCapacityApi {
+            maximum: std::mem::transmute::<*mut c_void, MaxDataTableCapacity>(maximum),
+            set: std::mem::transmute::<*mut c_void, SetDataTableCapacity>(set),
+        })
+    })
+}
+
+#[cfg(not(any(cui_bridge_static, unix, windows)))]
+fn data_table_capacity_api() -> Option<DataTableCapacityApi> {
+    None
+}
+
+enum DataTableSetter<'a> {
+    Positional,
+    Keyed(DataTableKeyedSetter, &'a [u32]),
+    Capacity(SetDataTableCapacity, &'a [u32], u32),
+}
+
+fn read_data_table_state(app: *mut c_void, node: RawNode) -> Result<DataTableState> {
+    let mut state = DataTableState {
+        row: 0,
+        column: 0,
+        sort_column: 0,
+        sort_direction: 0,
+    };
+    check(unsafe {
+        cui_bridge_data_table_get_state(
+            app,
+            node,
+            &mut state.row,
+            &mut state.column,
+            &mut state.sort_column,
+            &mut state.sort_direction,
+        )
+    })?;
+    Ok(state)
+}
+
+#[cfg(test)]
+mod data_table_capacity_tests {
+    use super::{App, Kind};
+
+    #[test]
+    fn removes_capacity_records_for_entire_subtrees() {
+        let mut app = App::headless(480., 320.).unwrap();
+        let root = app.root(Kind::Column, "root").unwrap();
+        let group = app.child(root, Kind::Column, "group").unwrap();
+        let nested = app.child(group, Kind::DataTable, "nested").unwrap();
+        let peer = app.child(root, Kind::DataTable, "peer").unwrap();
+        let headers = &["Subject"];
+        app.data_table_keyed_capacity(nested, headers, &[], &[], 48)
+            .unwrap();
+        app.data_table_keyed_capacity(peer, headers, &[], &[], 64)
+            .unwrap();
+        assert_eq!(app.data_table_capacities.len(), 2);
+        app.remove(group).unwrap();
+        assert_eq!(app.data_table_capacities.len(), 1);
+        assert_eq!(app.data_table_capacities.get(&peer.raw), Some(&64));
+        app.remove(peer).unwrap();
+        assert!(app.data_table_capacities.is_empty());
+    }
+}
+
 #[repr(C)]
 #[derive(Default)]
 struct DataTableLoadMoreRaw {
@@ -1094,6 +1224,7 @@ pub struct App {
     raw: *mut c_void,
     id: u64,
     callbacks: HashMap<(RawNode, u32), Rc<RefCell<Callback>>>,
+    data_table_capacities: HashMap<RawNode, u32>,
     running: bool,
     slider: Option<slider_model::State>,
     time_localized: Option<time_localized::State>,
@@ -1285,6 +1416,7 @@ impl App {
             raw,
             id,
             callbacks: HashMap::new(),
+            data_table_capacities: HashMap::new(),
             running: false,
             slider: None,
             time_localized: None,
@@ -1321,6 +1453,11 @@ impl App {
         let raw = self.valid(n)?;
         check(unsafe { cui_bridge_node_remove(self.raw, raw) })?;
         self.callbacks.retain(|(node, _), _| *node != raw);
+        let app = self.raw;
+        // Native removal also removes descendants. Check the generation of
+        // every tracked table so a recycled slot cannot inherit a capacity.
+        self.data_table_capacities
+            .retain(|node, _| *node != raw && read_data_table_state(app, *node).is_ok());
         self.slider_removed(raw);
         if let Some(state) = &mut self.time_localized {
             let app = self.raw;
@@ -1571,12 +1708,18 @@ impl App {
         Ok((label, value))
     }
     pub fn data_table(&mut self, n: Node, headers: &[&str], rows: &[&[&str]]) -> Result<&mut Self> {
-        self.set_data_table(n, headers, rows, None)
+        self.set_data_table(n, headers, rows, None, None)
     }
 
     /// Whether the linked bridge can replace DataTable rows by key.
     pub fn supports_keyed_data_table(&self) -> bool {
         data_table_keyed_setter().is_some()
+    }
+
+    /// The usable opt-in row limit, or `None` if the linked provider lacks the
+    /// capacity API. The ordinary setters accept up to 32 rows.
+    pub fn data_table_max_row_capacity(&self) -> Option<u32> {
+        data_table_capacity_api().and_then(DataTableCapacityApi::usable_maximum)
     }
 
     /// Whether the linked bridge provides the complete, compatible paging API.
@@ -1612,11 +1755,17 @@ impl App {
             return Ok(None);
         }
         check(status)?;
+        let capacity = self
+            .data_table_capacities
+            .get(&n)
+            .copied()
+            .unwrap_or(DATA_TABLE_DEFAULT_ROWS);
         if raw.reserved != 0
             || raw.frame == 0
             || raw.visible_begin > raw.visible_end
             || raw.visible_end > raw.row_count
             || raw.row_count >= raw.capacity
+            || raw.capacity != capacity
             || (raw.row_count == 0) != (raw.last_row_key == 0)
         {
             return Err(Error(8));
@@ -1642,7 +1791,26 @@ impl App {
         rows: &[&[&str]],
         row_keys: &[u32],
     ) -> Result<&mut Self> {
-        self.set_data_table(n, headers, rows, Some(row_keys))
+        self.set_data_table(n, headers, rows, Some(row_keys), None)
+    }
+
+    /// Replace the copied keyed matrix and capacity together. Use distinct,
+    /// nonzero row keys that remain stable across updates. Pass empty rows and
+    /// keys for an empty snapshot. A failed update leaves the previous matrix,
+    /// selection, viewport and capacity active.
+    ///
+    /// The capacity must be positive and no greater than
+    /// [App::data_table_max_row_capacity]. Providers without the extension
+    /// return `Error(9)`.
+    pub fn data_table_keyed_capacity(
+        &mut self,
+        n: Node,
+        headers: &[&str],
+        rows: &[&[&str]],
+        row_keys: &[u32],
+        row_capacity: u32,
+    ) -> Result<&mut Self> {
+        self.set_data_table(n, headers, rows, Some(row_keys), Some(row_capacity))
     }
 
     fn set_data_table(
@@ -1651,50 +1819,108 @@ impl App {
         headers: &[&str],
         rows: &[&[&str]],
         row_keys: Option<&[u32]>,
+        row_capacity: Option<u32>,
     ) -> Result<&mut Self> {
         let n = self.valid(n)?;
+        let limit = row_capacity.unwrap_or(DATA_TABLE_DEFAULT_ROWS);
         if headers.is_empty()
             || headers.len() > 16
-            || rows.len() > 32
+            || limit == 0
+            || limit > DATA_TABLE_MAX_ROWS
+            || rows.len() > limit as usize
             || rows.iter().any(|r| r.len() != headers.len())
             || row_keys.is_some_and(|keys| keys.len() != rows.len())
         {
             return Err(Error(3));
         }
-        let keyed = match row_keys {
-            Some(keys) => Some((data_table_keyed_setter().ok_or(Error(9))?, keys)),
-            None => None,
+        let setter = match (row_keys, row_capacity) {
+            (Some(keys), Some(capacity)) => {
+                let api = data_table_capacity_api().ok_or(Error(9))?;
+                if capacity > api.usable_maximum().ok_or(Error(9))? {
+                    return Err(Error(3));
+                }
+                if !self.data_table_capacities.contains_key(&n) {
+                    self.data_table_capacities
+                        .try_reserve(1)
+                        .map_err(|_| Error(6))?;
+                }
+                DataTableSetter::Capacity(api.set, keys, capacity)
+            }
+            (Some(keys), None) => {
+                DataTableSetter::Keyed(data_table_keyed_setter().ok_or(Error(9))?, keys)
+            }
+            (None, None) => DataTableSetter::Positional,
+            (None, Some(_)) => return Err(Error(3)),
         };
-        let header_strings: Vec<CString> =
-            headers.iter().map(|h| string(h)).collect::<Result<_>>()?;
-        let cell_strings: Vec<CString> = rows
+        let count = headers.len() * (rows.len() + 1);
+        let strings = headers
             .iter()
-            .flat_map(|r| r.iter())
-            .map(|c| string(c))
-            .collect::<Result<_>>()?;
-        let header_ptrs: Vec<*const c_char> = header_strings.iter().map(|s| s.as_ptr()).collect();
-        let cell_ptrs: Vec<*const c_char> = cell_strings.iter().map(|s| s.as_ptr()).collect();
+            .copied()
+            .chain(rows.iter().flat_map(|r| r.iter().copied()));
+        let bytes = strings.clone().try_fold(count, |bytes, text| {
+            if text.len() > DATA_TABLE_TEXT_BYTES || text.as_bytes().contains(&0) {
+                return Err(Error(3));
+            }
+            Ok(bytes + text.len())
+        })?;
+        let mut packed = Vec::new();
+        packed.try_reserve_exact(bytes).map_err(|_| Error(6))?;
+        for text in strings.clone() {
+            packed.extend_from_slice(text.as_bytes());
+            packed.push(0);
+        }
+        let mut pointers = Vec::new();
+        pointers.try_reserve_exact(count).map_err(|_| Error(6))?;
+        let mut offset = 0;
+        for text in strings {
+            pointers.push(packed[offset..].as_ptr().cast::<c_char>());
+            offset += text.len() + 1;
+        }
+        // The packed bytes and both pointer ranges remain live until C returns.
+        let header_ptrs = pointers.as_ptr();
+        let cell_ptrs = if rows.is_empty() {
+            std::ptr::null()
+        } else {
+            pointers[headers.len()..].as_ptr()
+        };
+        let columns = headers.len() as u32;
+        let row_count = rows.len() as u32;
         check(unsafe {
-            match keyed {
-                Some((set, keys)) => set(
+            match setter {
+                DataTableSetter::Capacity(set, keys, capacity) => set(
                     self.raw,
                     n,
-                    header_ptrs.as_ptr(),
-                    headers.len() as u32,
-                    cell_ptrs.as_ptr(),
+                    header_ptrs,
+                    columns,
+                    cell_ptrs,
                     keys.as_ptr(),
-                    rows.len() as u32,
+                    row_count,
+                    capacity,
                 ),
-                None => cui_bridge_data_table_set(
+                DataTableSetter::Keyed(set, keys) => set(
                     self.raw,
                     n,
-                    header_ptrs.as_ptr(),
-                    headers.len() as u32,
-                    cell_ptrs.as_ptr(),
-                    rows.len() as u32,
+                    header_ptrs,
+                    columns,
+                    cell_ptrs,
+                    keys.as_ptr(),
+                    row_count,
+                ),
+                DataTableSetter::Positional => cui_bridge_data_table_set(
+                    self.raw,
+                    n,
+                    header_ptrs,
+                    columns,
+                    cell_ptrs,
+                    row_count,
                 ),
             }
         })?;
+        if let Some(capacity) = row_capacity {
+            self.data_table_capacities.insert(n, capacity);
+        } else {
+            self.data_table_capacities.remove(&n);
+        }
         Ok(self)
     }
     pub fn data_table_cell(&self, n: Node, row: u32, column: u32) -> Result<String> {
@@ -1715,24 +1941,7 @@ impl App {
         String::from_utf8(buf[..required.saturating_sub(1) as usize].to_vec()).map_err(|_| Error(7))
     }
     pub fn data_table_state(&self, n: Node) -> Result<DataTableState> {
-        let n = self.valid(n)?;
-        let mut state = DataTableState {
-            row: 0,
-            column: 0,
-            sort_column: 0,
-            sort_direction: 0,
-        };
-        check(unsafe {
-            cui_bridge_data_table_get_state(
-                self.raw,
-                n,
-                &mut state.row,
-                &mut state.column,
-                &mut state.sort_column,
-                &mut state.sort_direction,
-            )
-        })?;
-        Ok(state)
+        read_data_table_state(self.raw, self.valid(n)?)
     }
     pub fn data_table_selection_mode(
         &mut self,
@@ -2678,6 +2887,19 @@ impl<'a> Builder<'a> {
     ) -> Result<Self> {
         self.app
             .data_table_keyed(self.node, headers, rows, row_keys)?;
+        Ok(self)
+    }
+    /// Set the keyed snapshot and its explicit row capacity. Check
+    /// [App::data_table_max_row_capacity] before opting in.
+    pub fn data_table_keyed_capacity(
+        self,
+        headers: &[&str],
+        rows: &[&[&str]],
+        row_keys: &[u32],
+        row_capacity: u32,
+    ) -> Result<Self> {
+        self.app
+            .data_table_keyed_capacity(self.node, headers, rows, row_keys, row_capacity)?;
         Ok(self)
     }
     pub fn data_table_selection_mode(self, mode: DataTableSelectionMode) -> Result<Self> {

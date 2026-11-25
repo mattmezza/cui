@@ -436,10 +436,34 @@ if(CUI_RUST_KEYED_DATA_TABLE_TESTS)
   test --offline --locked -j1 --test data_table_paging)
  cui_rust_data_table_test(data_table_paging_example "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
   run --offline --locked -j1 --example data_table_paging)
+ cui_rust_data_table_test(data_table_capacity_dynamic "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
+  test --offline --locked -j1 --test data_table_capacity -- --test-threads=1)
+ cui_rust_data_table_test(data_table_capacity_static "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+  test --offline --locked -j1 --test data_table_capacity -- --test-threads=1)
+ cui_rust_data_table_test(data_table_capacity_removal "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+  test --offline --locked -j1 --lib -- --exact data_table_capacity_tests::removes_capacity_records_for_entire_subtrees)
+ cui_rust_data_table_test(data_table_capacity_example "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+  run --offline --locked -j1 --example data_table_paging -- --larger)
+ add_library(cui_rust_capacity_query_fixture SHARED ${CUI_BRIDGE_ROOT}/bindings/tests/data_table_capacity_provider.c)
+ add_library(cui_rust_capacity_setter_fixture SHARED ${CUI_BRIDGE_ROOT}/bindings/tests/data_table_capacity_provider.c)
+ target_compile_definitions(cui_rust_capacity_setter_fixture PRIVATE CUI_TEST_CAPACITY_SETTER_ONLY)
+ foreach(export query setter)
+  target_include_directories(cui_rust_capacity_${export}_fixture PRIVATE ${CUI_BRIDGE_ROOT}/include)
+  cui_warnings(cui_rust_capacity_${export}_fixture)
+ endforeach()
+ foreach(mode limited zero large rejected)
+  set(fixture cui_rust_capacity_query_fixture)
+  if(mode STREQUAL "rejected")
+   set(fixture cui_rust_capacity_setter_fixture)
+  endif()
+  cui_rust_data_table_test(data_table_capacity_${mode} "${CUI_RUST_SKELETON_TARGET_DIR}"
+   "${_cui_rust_table_shared};LD_PRELOAD=$<TARGET_FILE:${fixture}>;CUI_DATA_TABLE_CAPACITY_FIXTURE=${mode}" 0
+   test --offline --locked -j1 --test data_table_capacity -- --exact optional_provider_preserves_ordinary_tables)
+ endforeach()
  add_library(cui_rust_paging_fixture SHARED ${CUI_BRIDGE_ROOT}/bindings/tests/data_table_paging_provider.c)
  target_include_directories(cui_rust_paging_fixture PRIVATE ${CUI_BRIDGE_ROOT}/include)
  cui_warnings(cui_rust_paging_fixture)
- foreach(mode exact frame reserved window visible capacity key size)
+ foreach(mode exact frame reserved window visible capacity different_capacity explicit_capacity key size)
   set(selection copied_record_is_validated)
   if(mode STREQUAL "size")
    set(selection incompatible_provider_leaves_positional_tables_usable)
@@ -468,6 +492,14 @@ if(CUI_RUST_KEYED_DATA_TABLE_TESTS)
   cui_rust_data_table_test(data_table_paging_partial "${CUI_RUST_SKELETON_TARGET_DIR}"
    "${_cui_rust_table_older};LD_PRELOAD=$<TARGET_FILE:cui_rust_partial_paging_fixture>;CUI_DATA_TABLE_PAGING_FIXTURE=partial" 1
    test --offline --locked -j1 --test data_table_paging -- --exact incompatible_provider_leaves_positional_tables_usable)
+  cui_rust_data_table_test(data_table_capacity_legacy "${CUI_RUST_SKELETON_TARGET_DIR}"
+   "${_cui_rust_table_older};CUI_DATA_TABLE_CAPACITY_FIXTURE=legacy" 1
+   test --offline --locked -j1 --test data_table_capacity -- --exact optional_provider_preserves_ordinary_tables)
+  foreach(export query setter)
+   cui_rust_data_table_test(data_table_capacity_${export}_only "${CUI_RUST_SKELETON_TARGET_DIR}"
+    "${_cui_rust_table_older};LD_PRELOAD=$<TARGET_FILE:cui_rust_capacity_${export}_fixture>;CUI_DATA_TABLE_CAPACITY_FIXTURE=${export}-only" 1
+    test --offline --locked -j1 --test data_table_capacity -- --exact optional_provider_preserves_ordinary_tables)
+  endforeach()
  endif()
  if(CUI_BRIDGE_NATIVE_TESTS)
   cui_rust_data_table_test(keyed_data_table_native "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
@@ -476,6 +508,10 @@ if(CUI_RUST_KEYED_DATA_TABLE_TESTS)
    run --offline --locked -j1 --example data_table_paging -- --font ${CUI_TEST_FONT} --smoke)
   cui_rust_data_table_test(data_table_paging_native_bundled "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
    run --offline --locked -j1 --features native --example data_table_paging -- --font ${CUI_TEST_FONT} --smoke)
+  cui_rust_data_table_test(data_table_capacity_native "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
+   run --offline --locked -j1 --example data_table_paging -- --font ${CUI_TEST_FONT} --smoke --larger)
+  cui_rust_data_table_test(data_table_capacity_native_bundled "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+   run --offline --locked -j1 --features native --example data_table_paging -- --font ${CUI_TEST_FONT} --smoke --larger)
  endif()
 endif()
 if(CUI_BRIDGE_NATIVE_TESTS)

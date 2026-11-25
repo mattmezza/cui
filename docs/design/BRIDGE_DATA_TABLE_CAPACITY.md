@@ -1,11 +1,11 @@
 # Retained DataTable capacity checkpoint
 
-The opt-in C, Python, JavaScript, TypeScript and Go APIs are implemented on the
-integration branch.
+The opt-in C, Python, JavaScript, TypeScript, Go and Rust APIs are implemented
+on the integration branch.
 The ordinary setters accept up to 32 rows. See the
 [supported API](../BRIDGE_COMPONENTS.md#retain-more-than-32-datatable-rows-in-c)
 and [measured workload](../PERFORMANCE.md#retained-c-datatable-snapshots).
-The design below records the approach and remaining language work.
+The design below records the approach and remaining delivery work.
 
 ## Starting constraints
 
@@ -105,9 +105,10 @@ full. No event payload size or callback timing needs to change.
    behavior for narrow and wide matrices. Compare the old and modern paths
    at 32 rows to detect small-table regressions. Verify the number of
    submitted visible cells stays bounded as row count increases.
-4. **Python, JS/TS and Go verified. Rust open.** Check the complete symbol
+4. **All five language bindings verified.** Check the complete symbol
    group and the provider limit before marshalling. Keep installed legacy
    providers usable with their prior matrices. Add larger authored inboxes
    and verify copied input, rollback and the same scroll behavior.
-5. **Open for bindings and gallery.** Update bridge guides, status metadata, packaged SDKs, the consumer skill
-   and gallery examples as each supported surface is verified.
+5. **Publication open.** Guides, status metadata, source SDKs and the consumer
+   skill cover the larger snapshots. Installed examples verify local artifacts.
+   Release the matching packages with the corresponding library and gallery.

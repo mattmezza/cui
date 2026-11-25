@@ -156,6 +156,10 @@ fn copied_record_is_validated() {
     let mut app = App::headless(480., 320.).unwrap();
     assert!(app.supports_data_table_paging());
     let table = positional_table(&mut app);
+    if mode == "explicit_capacity" {
+        app.data_table_keyed_capacity(table, HEADERS, ROWS, KEYS, 48)
+            .unwrap();
+    }
     app.configure_data_table_load_more(table, true, 0).unwrap();
     app.step(0.016).unwrap();
     let observed = app.poll_data_table_load_more(table);

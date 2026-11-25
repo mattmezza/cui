@@ -380,7 +380,10 @@ For larger snapshots query `app.DataTableMaxRowCapacity()` and use
 provider lacks the opt-in API. See `docs/GO_BUILDERS.md` and
 `bindings/go/examples/data_table_live/main.go`. In Rust, use
 `Builder::data_table_keyed` or `App::data_table_keyed` after checking
-`app.supports_keyed_data_table()`. See `docs/RUST_BUILDERS.md` and
+`app.supports_keyed_data_table()`. For larger snapshots, query
+`app.data_table_max_row_capacity()` and use `data_table_keyed_capacity` on
+the app or builder. The query returns `None` when the provider lacks it.
+See `docs/RUST_BUILDERS.md` and
 `bindings/rust/examples/data_table_live.rs`.
 For paging, use `result.load_more` with an app-owned in-flight flag and keep
 the current rows interactive. See **Paged inbox** and the paging guide in

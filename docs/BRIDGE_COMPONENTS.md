@@ -169,7 +169,8 @@ when loading the bridge dynamically. The C provider supports capacities up to
 10,000 rows. See the corresponding language APIs for
 [Python](BINDING_BUILDERS.md#retain-more-than-32-rows-in-python),
 [JavaScript and TypeScript](BINDING_BUILDERS.md#retain-more-than-32-rows-in-javascript-or-typescript),
-and [Go](GO_BUILDERS.md#retain-more-than-32-rows-in-go).
+[Go](GO_BUILDERS.md#retain-more-than-32-rows-in-go), and
+[Rust](RUST_BUILDERS.md#retain-more-than-32-rows-in-rust).
 
 The setter copies headers and cells of up to 128 UTF-8 bytes each, with up to
 16 columns. Pass zero rows and NULL cells and keys for an empty table. The

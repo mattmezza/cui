@@ -604,6 +604,11 @@ add_test(NAME virtual_model_distribution COMMAND dist_virtual_model)
 
 
 add_test(NAME component_usage_docs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_component_usage.py)
+add_executable(test_hover_snapshot tests/unit/test_hover_snapshot.c)
+target_link_libraries(test_hover_snapshot PRIVATE cui)
+cui_warnings(test_hover_snapshot)
+add_test(NAME hover_snapshot COMMAND test_hover_snapshot)
+
 foreach(name diagnostics component_usability bootstrap core text_wrapping base components render effects edit editor overlay virtual virtual_styled dock dock_styled plot plot_styled content disclosure choice numeric picker tree input table scroll surface form otp status message media description chrome resizable icon toolbar sidebar textarea touch_textarea touch_page_host controlled_siblings settings carousel command root text_view chart speech questionnaire questionnaire_styled questionnaire_keyboard questionnaire_snapshots questionnaire_observer questionnaire_progress questionnaire_presentation questionnaire_geometry control_family_audit radio_group checkbox_motion checkbox_source contextual_text alert_bubble_slots pointer_focus_policy status_motion button_behavior advanced_family_audit table_selection_contracts core_prepaint_contract_fixture theme_registry prepaint plot_chart_owner_motion input_reference_contracts)
  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/test_${name}.c)
   add_executable(test_${name} tests/unit/test_${name}.c)
@@ -1311,6 +1316,10 @@ install(DIRECTORY include/cui DESTINATION include)
 add_executable(cui_bench tests/benchmarks/bench.c)
 target_link_libraries(cui_bench PRIVATE cui)
 cui_warnings(cui_bench)
+
+add_executable(cui_bench_hover EXCLUDE_FROM_ALL tests/benchmarks/bench_hover.c)
+target_link_libraries(cui_bench_hover PRIVATE cui)
+cui_warnings(cui_bench_hover)
 option(CUI_BUILD_CPP_EXAMPLE "Build C++ ABI consumer when a compiler is available" ON)
 if(CUI_BUILD_CPP_EXAMPLE)
  include(CheckLanguage)

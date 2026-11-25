@@ -497,7 +497,9 @@ accessibility coverage; inspect the per-language wire conformance guide.
 Read `docs/EVENT_HOVER.md` and the full `include/cui/cui.h` contract before using
 `cui_event_hovered`. It reads an indexed pointer event against prior clipped
 semantic geometry, independent of consumption/capture; it does not publish
-current paint bounds or perform event propagation. Enabled movable Table headers
+current paint bounds or perform event propagation. Use `cui_hovered` for the
+latest pointer position and ordinary hover styling. Virtualize long lists
+when layout permits; see `docs/PERFORMANCE.md`. Enabled movable Table headers
 own touch reorder while body/nonmovable header pan remains available. Follow
 `docs/TABLE.md`; do not infer Dialog reopen or all-consumer lifecycle completion.
 

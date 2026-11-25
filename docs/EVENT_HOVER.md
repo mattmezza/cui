@@ -42,6 +42,16 @@ it for selected event decisions rather than as a generic per-node observer.
 There is no event propagation or dispatch architecture change. The API is C11;
 foreign high-level builder facades are not introduced by this addition.
 
+## Latest-pointer hover
+
+`cui_hovered` reads the latest pointer position and the previous completed
+semantic snapshot. It considers prior clipping and modal eligibility. A
+focusable semantic in a higher layer or paint root can occlude a target;
+direct queries can still identify disabled targets and overlapping controls
+in the same root. The implementation reuses the hit list across queries at
+the same position and refreshes it after a new snapshot. See
+[the performance workload](PERFORMANCE.md#core-hover-with-individually-submitted-rows).
+
 ## Table touch behavior
 
 An enabled movable column header sets the existing `touch_drag_priority` semantic

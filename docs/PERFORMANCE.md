@@ -33,6 +33,38 @@ cmake --build build --target test_sdl_inbox_hover
 python scripts/test_local.py --build-dir build -- -R '^sdl_inbox_hover$' -V
 ```
 
+## Core hover with individually submitted rows
+
+`cui_bench_hover` submits every row into a 500×480 clipped box. It moves the
+pointer across the visible rows and verifies exactly one matching ID after
+the first frame. It queries all submitted IDs against the prior snapshot
+before composing each new frame. This measures CPU time without a renderer.
+
+GCC 16.2.1 Release, one CPU on the Core Ultra 5 235U, 25 measured frames
+after the initial frame. Times are p50 / p95 in milliseconds.
+
+| Rows | Hover before | Hover after | Whole frame before | Whole frame after |
+| ---: | ---: | ---: | ---: | ---: |
+| 100 | .010 / .011 | .002 / .002 | .101 / .108 | .092 / .103 |
+| 1,000 | .697 / .709 | .010 / .014 | 4.061 / 4.120 | 3.367 / 3.807 |
+| 4,000 | 10.701 / 11.012 | .038 / .041 | 56.922 / 58.750 | 46.340 / 47.675 |
+
+The first query scans the clipped semantic snapshot for the pointer location.
+Subsequent queries reuse up to 32 overlapping semantic indices. More than
+32 overlaps can still require a scan for the requested ID. The foremost
+focusable paint root is found across all overlaps. The cache uses 296 bytes
+per context on the measured 64-bit build and makes no heap allocations.
+
+Row submission still accounts for 36.585 ms of the median 4,000-row frame.
+Core still composes all submitted rows. Use a virtualized component for long
+lists when the layout permits it. See the separate native DataTable workload
+above for SDL rendering and presentation timings.
+
+```sh
+cmake --build build --target cui_bench_hover
+./build/cui_bench_hover
+```
+
 ## Hosted check scheduling
 
 Portable CI runs at most two CTest processes at once and sets

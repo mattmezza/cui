@@ -8402,6 +8402,7 @@ freely, subject to the following restrictions:
 #define CUI_CORE_STACK_MAX 256
 #define CUI_CORE_EVENT_MAX 256
 #define CUI_CORE_DISPATCH_MAX (2 * CUI_CORE_EVENT_MAX)
+#define CUI_CORE_HOVER_HITS_MAX 32
 typedef struct {
     uint32_t clay_id;
     cui_id id;
@@ -8445,6 +8446,12 @@ typedef struct {
     cui_rect bounds, clip, visible;
     bool found, modal_allowed;
 } cui_core_geometry;
+typedef struct {
+    size_t hits[CUI_CORE_HOVER_HITS_MAX];
+    size_t count, foremost_focusable, overflow_start;
+    float x, y;
+    bool ready;
+} cui_core_hover_cache;
 struct cui_prepaint_writer {
     cui_context *ui;
     size_t registration;
@@ -8550,6 +8557,7 @@ struct cui_context {
     uint32_t paint_root_count;
     cui_semantic *semantics, *previous;
     size_t semantic_count, previous_count;
+    cui_core_hover_cache hover;
     cui_id *ids, *activations;
     size_t id_count, activation_count;
     cui_event queued[CUI_CORE_EVENT_MAX], events[CUI_CORE_DISPATCH_MAX];
@@ -14353,6 +14361,7 @@ cui_core_commands_done:
     }
     ui->numeric_snapshot_ready = ui->error == CUI_OK && !ui->numeric_frame_invalid;
     ui->previous_count = ui->semantic_count;
+    ui->hover.ready = false;
     if (ui->composition_owner != ui->focus)
         ui->composition_owner = 0;
     cui_core_finalize_text_input(ui);
@@ -15181,21 +15190,54 @@ bool cui_event_hovered(cui_context *ui, size_t event_index, cui_id id) {
     return false;
 }
 
+static bool cui_core_hover_hit(const cui_context *ui, size_t index) {
+    return cui_core_inside(ui->previous_hits[index], ui->pointer_x, ui->pointer_y) &&
+           cui_core_previous_allowed(ui, index);
+}
+static bool cui_core_hover_root_above(const cui_context *ui, size_t front, size_t back) {
+    return ui->previous_layers[front] > ui->previous_layers[back] ||
+           (ui->previous_layers[front] == ui->previous_layers[back] &&
+            (ui->previous_order[front] >> 32) > (ui->previous_order[back] >> 32));
+}
+static void cui_core_hover_prepare(cui_context *ui) {
+    cui_core_hover_cache *cache = &ui->hover;
+    if (cache->ready && cache->x == ui->pointer_x && cache->y == ui->pointer_y)
+        return;
+    cache->x = ui->pointer_x;
+    cache->y = ui->pointer_y;
+    cache->count = 0;
+    cache->foremost_focusable = SIZE_MAX;
+    cache->overflow_start = SIZE_MAX;
+    /* Only overlapping regions can match a query. Keep the foremost
+       occluding root across all hits, including any beyond the cache. */
+    for (size_t i = 0; i < ui->previous_count; i++) {
+        if (!cui_core_hover_hit(ui, i))
+            continue;
+        if (cache->count < CUI_CORE_HOVER_HITS_MAX)
+            cache->hits[cache->count++] = i;
+        else if (cache->overflow_start == SIZE_MAX)
+            cache->overflow_start = i;
+        if (cui_core_focusable(&ui->previous[i]) &&
+            (cache->foremost_focusable == SIZE_MAX ||
+             cui_core_hover_root_above(ui, i, cache->foremost_focusable)))
+            cache->foremost_focusable = i;
+    }
+    cache->ready = true;
+}
 bool cui_hovered(cui_context *ui, cui_id id) {
     if (!ui || !id || cui_core_inert(ui) || !cui_core_pointer_available(ui))
         return false;
-    for (size_t i = 0; i < ui->previous_count; i++)
-        if (ui->previous[i].id == id && cui_core_previous_allowed(ui, i) &&
-            cui_core_inside(ui->previous_hits[i], ui->pointer_x, ui->pointer_y)) {
-            for (size_t j = 0; j < ui->previous_count; j++)
-                if ((ui->previous_layers[j] > ui->previous_layers[i] ||
-                     (ui->previous_layers[j] == ui->previous_layers[i] &&
-                      (ui->previous_order[j] >> 32) > (ui->previous_order[i] >> 32))) &&
-                    cui_core_previous_allowed(ui, j) && cui_core_focusable(&ui->previous[j]) &&
-                    cui_core_inside(ui->previous_hits[j], ui->pointer_x, ui->pointer_y))
-                    return false;
-            return true;
-        }
+    cui_core_hover_prepare(ui);
+    const cui_core_hover_cache *cache = &ui->hover;
+    size_t front = cache->foremost_focusable;
+    for (size_t n = 0; n < cache->count; n++) {
+        size_t i = cache->hits[n];
+        if (ui->previous[i].id == id)
+            return front == SIZE_MAX || !cui_core_hover_root_above(ui, front, i);
+    }
+    for (size_t i = cache->overflow_start; i < ui->previous_count; i++)
+        if (ui->previous[i].id == id && cui_core_hover_hit(ui, i))
+            return front == SIZE_MAX || !cui_core_hover_root_above(ui, front, i);
     return false;
 }
 

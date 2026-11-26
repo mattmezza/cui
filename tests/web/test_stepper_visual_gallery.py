@@ -131,16 +131,20 @@ def main():
                     assert len(indicators) == 3, indicators
                     return sorted(indicators, key=lambda c: c['y' if vertical else 'x'])
 
-                def mouse_on(command, fraction, press=None):
+                def hover_indicator(command, fraction):
                     canvas = page.locator('#preview')
                     canvas.scroll_into_view_if_needed()
                     canvas_box = canvas.bounding_box()
-                    before = page.evaluate('cuiGallery.frame')
                     page.mouse.move(canvas_box['x'] + command['x'] + command['w'] * fraction,
                                     canvas_box['y'] + command['y'] + command['h'] / 2)
-                    if press == 'down':
-                        page.mouse.down()
-                    page.wait_for_function('previous=>cuiGallery.frame>previous', arg=before)
+
+                def wait_for_indicator_paint(previous):
+                    page.wait_for_function(
+                        """previous => (""" + COMMANDS + """)().some(command =>
+                            ['type', 'x', 'y', 'w', 'h', 'radius'].every(
+                                key => command[key] === previous[key]) &&
+                            command.color.some((channel, i) => channel !== previous.color[i]))""",
+                        arg=previous, timeout=5000)
 
                 assert page.locator('#stepper-mode').input_value() == '2'
                 assert page.locator('#stepper-axis').input_value() == '2'
@@ -151,11 +155,13 @@ def main():
                 if not touch:
                     # The unchecked indicator has independent paint for hover and capture.
                     review = indicators[1]
-                    mouse_on(review, .28)
+                    hover_indicator(review, .28)
+                    wait_for_indicator_paint(review)
                     hovered = fill_geometry(False)[1]
                     assert hovered['color'] != review['color'], (review, hovered)
                     assert sample(hovered, .28) == hovered['color']
-                    mouse_on(review, .28, 'down')
+                    page.mouse.down()
+                    wait_for_indicator_paint(hovered)
                     pressed = fill_geometry(False)[1]
                     assert pressed['color'] != hovered['color'], (pressed, hovered)
                     assert sample(pressed, .28) == pressed['color']

@@ -560,6 +560,7 @@ cui_picker_calendar_traced(cui_context *ui, cui_id id, cui_calendar_state *s,
     for (size_t e = 0; e < count && !o.disabled; ++e) {
         cui_id activation = cui_event_activation(ui, e);
         if (month_toggle && activation == cui_calendar_month_toggle_id(id)) {
+            selector_keyboard_source = 0;
             if (s->view == CUI_CALENDAR_MONTHS) {
                 s->view = CUI_CALENDAR_DAYS;
                 cui_focus(ui, cui_calendar_month_toggle_id(id));
@@ -581,6 +582,7 @@ cui_picker_calendar_traced(cui_context *ui, cui_id id, cui_calendar_state *s,
             continue;
         }
         if (activation == cui_calendar_navigation_id(id, 5)) {
+            selector_keyboard_source = 0;
             if (month_toggle && s->view == CUI_CALENDAR_YEARS) {
                 s->view = CUI_CALENDAR_DAYS;
                 cui_focus(ui, cui_calendar_navigation_id(id, 5));
@@ -636,10 +638,15 @@ cui_picker_calendar_traced(cui_context *ui, cui_id id, cui_calendar_state *s,
                                    : cui_calendar_month_enabled((unsigned)s->month.year, item, o);
                 }
             }
-            if (activation && selector_keyboard && selector_target == selector_keyboard_source)
+            /* Later keys can still target the dispatch-time cell on the old year page.
+               Keep that source for the current view, with the live selection cursor. */
+            bool owns =
+                selector_keyboard && selector_target && selector_target == selector_keyboard_source;
+            if (activation && owns)
                 chosen = years ? cui_calendar_year_enabled(current, o)
                                : cui_calendar_month_enabled((unsigned)s->month.year, current, o);
             if (chosen) {
+                selector_keyboard_source = 0;
                 if (years) {
                     s->month.year = (int)current;
                     s->year_cursor = current;
@@ -695,16 +702,11 @@ cui_picker_calendar_traced(cui_context *ui, cui_id id, cui_calendar_state *s,
                 }
                 continue;
             }
-            cui_id target = cui_event_target(ui, e);
-            bool owns = false;
-            for (unsigned item = first; item <= last; item++)
-                owns |= target ==
-                        (years ? cui_calendar_year_id(id, item) : cui_calendar_month_id(id, item));
             if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_ESCAPE)
-                owns |= (month_toggle && target == cui_calendar_month_toggle_id(id)) ||
-                        target == cui_calendar_navigation_id(id, 5) ||
-                        target == cui_calendar_navigation_id(id, 1) ||
-                        target == cui_calendar_navigation_id(id, 4);
+                owns |= (month_toggle && selector_target == cui_calendar_month_toggle_id(id)) ||
+                        selector_target == cui_calendar_navigation_id(id, 5) ||
+                        selector_target == cui_calendar_navigation_id(id, 1) ||
+                        selector_target == cui_calendar_navigation_id(id, 4);
             int scan_direction = 0;
             bool page_edge = false;
             if (events[e].type == CUI_EVENT_KEY_DOWN && owns) {
@@ -744,6 +746,7 @@ cui_picker_calendar_traced(cui_context *ui, cui_id id, cui_calendar_state *s,
                     continue;
                 }
                 if (key == CUI_KEY_ESCAPE) {
+                    selector_keyboard_source = 0;
                     s->view = CUI_CALENDAR_DAYS;
                     cui_focus(ui, month_toggle && !years ? cui_calendar_month_toggle_id(id)
                                                          : cui_calendar_navigation_id(id, 5));

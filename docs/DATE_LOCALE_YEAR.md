@@ -74,6 +74,9 @@ year page by 20 years, or change the displayed year in month view. In day view,
 PageUp/PageDown change month (Ctrl/Meta changes year); existing arrow and
 Ctrl/Meta-arrow behavior remains available. Enter/Space use ordinary control
 activation. Focus follows the selected year, month and first enabled day.
+Rapidly queued keys use the updated cursor across year pages within the same
+frame. Switching from years to months requires an activation targeted at the
+month grid for the next step.
 Escape returns from a year/month view to days; in DatePicker, a second Escape
 closes the popup and restores trigger focus.
 
@@ -103,6 +106,8 @@ It exercises all seven locales in both Calendar and DatePicker with mouse and
 actual Chromium CDP touch (28 cases), checks centered/equal-width year grids,
 localized month and weekday ordering, actual selected model value 19800229,
 localized trigger paint/accessibility, popup closing and two-stage Escape.
+Two further cases exercise batched year navigation and keyboard selection,
+including focus transfer through year, month, day and the DatePicker trigger.
 It uses configuration DOM controls and real component input, never direct
 reducer calls. Screenshots/reports are written to `/tmp/cui-date-locale-year`.
 This does not establish physical mobile device, OS IME or every font coverage.

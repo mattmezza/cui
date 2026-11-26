@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 import threading
 from playwright.sync_api import sync_playwright
-from test_touch_components import Audit
+from test_touch_components import Audit, SNAPSHOT
 
 LOCALES=[('Choose year','Previous year','February','02/29/1980'),
  ('Choose year','Previous year','February','29/02/1980'),
@@ -25,6 +25,42 @@ def activate(a,target,touch):
     if touch:a.tap(target)
     else:
         point=a.point(target);a.page.mouse.click(point['x'],point['y']);a.page.wait_for_timeout(80)
+
+def wait_focused(a, name):
+    a.page.wait_for_function(
+        f'(name) => ({SNAPSHOT})().some(node => node.name === name && node.f[7])',
+        arg=name)
+
+def keyboard_year_batch(a, family):
+    a.route(family)
+    a.configure('date-locale', 2)
+    if family == 'DatePicker':
+        activate(a, a.target(role=1, predicate=lambda s: s['name'].endswith('2026')), False)
+    activate(a, a.target('Scegli anno', 1), False)
+    wait_focused(a, '2026')
+    a.page.evaluate('''() => {
+        // One DOM task feeds actual gallery key listeners before the next animation frame.
+        const canvas = document.querySelector('canvas');
+        for (const key of ['PageUp', 'PageUp', 'PageUp', 'End', 'Enter', 'Enter']) {
+            for (const type of ['keydown', 'keyup'])
+                canvas.dispatchEvent(new KeyboardEvent(type, {key, bubbles: true, cancelable: true}));
+        }
+    }''')
+    wait_focused(a, 'ottobre')
+    a.page.keyboard.press('Home')
+    wait_focused(a, 'gennaio')
+    a.page.keyboard.press('ArrowRight')
+    wait_focused(a, 'febbraio')
+    a.page.keyboard.press('Enter')
+    wait_focused(a, '01/02/1980')
+    for day in (8, 15, 22, 29):
+        a.page.keyboard.press('ArrowDown')
+        wait_focused(a, f'{day:02}/02/1980')
+    a.page.keyboard.press('Enter')
+    a.page.wait_for_function('cuiGallery.exports.gallery_date_value() === 19800229')
+    if family == 'DatePicker':
+        assert a.page.evaluate('cuiGallery.exports.gallery_modal()') == 0
+        wait_focused(a, '29/02/1980')
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -86,9 +122,16 @@ def main():
                         results.append({'family':family,'locale':kind,'touch':touch,'date':formatted})
                         print(f'PASS {family} locale={kind} touch={touch}',flush=True)
                         a.page.close()
+                a = Audit(browser, args.url)
+                keyboard_year_batch(a, family)
+                assert not a.errors, a.errors
+                results.append({'family': family, 'locale': 2, 'keyboard_batch': True,
+                                'date': '29/02/1980'})
+                print(f'PASS {family} batched year navigation and keyboard selection', flush=True)
+                a.page.close()
             browser.close()
         (args.output/'report.json').write_text(json.dumps(results,indent=2)+'\n')
-        print(f'{len(results)}/28 date locale/year cases passed')
+        print(f'{len(results)}/30 date locale/year cases passed')
     finally:
         if server:server.shutdown()
 if __name__=='__main__':main()

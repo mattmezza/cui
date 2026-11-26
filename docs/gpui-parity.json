@@ -3385,6 +3385,7 @@
           "evidence": [
             "tests/unit/test_picker.c",
             "tests/unit/test_calendar_presentation.c",
+            "tests/web/test_date_locale_year.py",
             "docs/design/CALENDAR_KEYBOARD_LOCALIZATION_AUDIT.md"
           ]
         },
@@ -3751,7 +3752,15 @@
           "evidence": []
         },
         {
-          "name": "keyboard/localization/accessibility",
+          "name": "localized keyboard traversal across year pages, dates and the popup trigger",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c",
+            "tests/web/test_date_locale_year.py"
+          ]
+        },
+        {
+          "name": "complete platform accessibility and localization",
           "status": "not_started",
           "evidence": []
         },

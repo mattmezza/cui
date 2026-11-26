@@ -10,6 +10,7 @@ const native = require(addonPath);
 const {BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,ShadowPart,canonicalPart}=require('./shadows.cjs')(native);
 const designSizes = Object.freeze({inherit:0,xs:1,sm:2,base:3,md:4,lg:5,xl:6,"2xl":7,"3xl":8,"4xl":9,"5xl":10,"6xl":11,"7xl":12,"8xl":13,"9xl":14});
 const NODE = Symbol('CUI node');
+const CAROUSEL_SLOT = Symbol('Carousel slot');
 const ATTACHMENT_SLOT = Symbol('Attachment slot');
 const attachmentStatuses = Object.freeze({pending:0, uploading:1, processing:2, failed:3, complete:4});
 let nextKey = 1;
@@ -124,6 +125,16 @@ function preflightNodeOptions(app, node, insideDecoration = false, insideAttachm
   }
   if (node.radioTabIndexValue !== null && !app.supports_radio_tab_index())
     throw new Error(radioTabIndexUnavailable);
+  const carouselSlot = node[CAROUSEL_SLOT];
+  if (carouselSlot) {
+    if (node.parent?.kind !== (carouselSlot === 3 ? 20 : 65) ||
+        (carouselSlot === 3 && node.parent?.parent?.kind !== 65))
+      throw new TypeError('Carousel slot requires its direct Carousel or Carousel Item owner');
+    if (!app.supports_carousel_slots()) throw new Error('Carousel slots unavailable');
+  }
+  for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent)
+    if (ancestor[CAROUSEL_SLOT] && !radioContentKinds.has(node.kind))
+      throw new TypeError('Carousel slots require passive children');
   const slot = node[ATTACHMENT_SLOT];
   if (slot) {
     if (node.parent?.kind !== 52) throw new TypeError('Attachment slot requires direct Attachment parent');
@@ -242,10 +253,20 @@ class Node {
         roles.add(role);
       }
     }
+    if (this.kind === 65 || this.kind === 20) {
+      const roles = new Set(this.childrenValue.map(child => child[CAROUSEL_SLOT]));
+      for (const child of children) {
+        const role = child?.[CAROUSEL_SLOT];
+        if (!role) continue;
+        if (roles.has(role)) throw new TypeError('duplicate Carousel slot role');
+        roles.add(role);
+      }
+    }
     for (const item of children) {
       if (!(item instanceof Node) || item.parent || item.owner) throw new TypeError('child must be an unattached CUI node');
       if (item[ATTACHMENT_SLOT] && !isAttachment) throw new TypeError('Attachment slot requires direct Attachment parent');
-      if(groups.has(this.kind) && item.kind!==20) throw new TypeError('groups require item children');
+      if (item[CAROUSEL_SLOT] && this.kind !== (item[CAROUSEL_SLOT] === 3 ? 20 : 65)) throw new TypeError('Carousel slot requires its direct owner');
+      if(groups.has(this.kind) && item.kind!==20 && !(this.kind===65 && [1,2].includes(item[CAROUSEL_SLOT]))) throw new TypeError('groups require item children');
       item.parent = this; this.childrenValue.push(item);
     }
     return this;
@@ -781,6 +802,15 @@ function title_bar(key,text="") {const node=new Node(49,text);return key===undef
 function icon(key,text="") {const node=new Node(50,text);return key===undefined?node:node.key(key);}
 function message(key,text="") {const node=new Node(51,text);return key===undefined?node:node.key(key);}
 const attachmentSlotRoles = Object.freeze({media: 1, overlay: 2, metadata: 3, actions: 4});
+function carousel_slot(key, role, label) {
+  const roles = {previous: 1, next: 2, marker: 3};
+  if (typeof role !== 'string' || !Object.hasOwn(roles, role)) throw new TypeError('invalid Carousel slot role');
+  if (typeof key !== 'string' || !key || key.includes('\0') || Buffer.byteLength(key) > 4096) throw new TypeError('invalid Carousel slot key');
+  if (label !== undefined && (typeof label !== 'string' || label.includes('\0') || Buffer.byteLength(label) > 4096)) throw new TypeError('invalid Carousel slot label');
+  const node = new Node(1, label).key(key);
+  node[CAROUSEL_SLOT] = roles[role];
+  return node;
+}
 function attachment_slot(key, role, preferredWidth = 0) {
   if (typeof role !== 'string' || !Object.hasOwn(attachmentSlotRoles, role))
     throw new TypeError('invalid Attachment slot role');
@@ -870,7 +900,8 @@ class App {
     const attach = (node, parent) => {
       const parentHandle = parent && parent[NODE];
       const slot = node[ATTACHMENT_SLOT];
-      if (slot) node[NODE] = native.attachmentSlot(this.handle, parentHandle, slot.role, node.keyValue, slot.width);
+      if (node[CAROUSEL_SLOT]) node[NODE] = native.carouselSlot(this.handle, parentHandle, node[CAROUSEL_SLOT], node.keyValue);
+      else if (slot) node[NODE] = native.attachmentSlot(this.handle, parentHandle, slot.role, node.keyValue, slot.width);
       else if (node.kind === 81) node[NODE] = sliderModels.mount(this, node, parentHandle);
       else if (node.kind === iconBadges.badgeKind) node[NODE] = iconBadges.createBadge(this, node, parentHandle);
       else node[NODE] = native.makeNode(this.handle, parentHandle, node.kind, node.keyValue);
@@ -1138,6 +1169,10 @@ class App {
   supports_disclosure_heading() { return disclosures.supportsHeading(this); }
   supports_disclosure_divider() { return disclosures.supportsDivider(this); }
   supports_disclosure_presentation() { return disclosures.supports(this); }
+  supports_carousel_slots() {
+    this._alive();
+    return typeof native.carouselSlots === 'function' && typeof native.carouselSlot === 'function' && native.carouselSlots(this.handle);
+  }
   supports_attachment_slots() {
     this._alive();
     return typeof native.attachmentSlots === 'function' && typeof native.attachmentSlot === 'function' &&
@@ -1196,7 +1231,7 @@ class App {
   close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);ratingOptions.release(node);if(node.kind===81)node.requestValue=null;} return this; }
   dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);ratingOptions.release(node);if(node.kind===81)node.requestValue=null;} this.nodes.clear(); } }
 }
-module.exports = {RadioPaintLayer,radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,attachment_slot,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
+module.exports = {carousel_slot,RadioPaintLayer,radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,attachment_slot,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
 
 Object.assign(module.exports, sliderModels.exports);
 

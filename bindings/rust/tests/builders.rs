@@ -1089,6 +1089,48 @@ fn carousel_controls() {
 }
 
 #[test]
+fn carousel_slots() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let legacy = std::env::var("CUI_TEST_LEGACY_CAROUSEL_SLOTS").as_deref() == Ok("1");
+    assert_eq!(app.supports_carousel_slots(), !legacy);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let rail = app.child(root, Kind::Carousel, "carousel").unwrap();
+    if legacy {
+        assert_eq!(
+            app.build_carousel_slot(rail, CarouselSlot::Next, "next").err(),
+            Some(Error::CAROUSEL_SLOTS_UNAVAILABLE)
+        );
+        return;
+    }
+    app.carousel_controls(rail, CarouselControls { arrows: true, pagination: true }).unwrap();
+    let first = app.child(rail, Kind::Item, "first").unwrap();
+    let second = app.child(rail, Kind::Item, "second").unwrap();
+    let slot = app.build_carousel_slot(second, CarouselSlot::Marker, "marker").unwrap()
+        .text("Second slide").unwrap().finish();
+    assert!(app.child(slot, Kind::Button, "nested-button").is_err());
+    let art = app.child(slot, Kind::Label, "art").unwrap();
+    app.text(art, "2").unwrap();
+    let observed = Rc::new(Cell::new(None));
+    let callback = observed.clone();
+    app.on_change_event(rail, move |event| callback.set(event.selected)).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.selected(rail).unwrap(), Some(first));
+    let bounds = app.bounds(art).unwrap();
+    let button = app.numeric_part_bounds(rail, 4).unwrap();
+    let x = bounds.x + bounds.width / 2.;
+    let y = bounds.y + bounds.height / 2.;
+    assert!(bounds.width > 0. && x >= button.x && x < button.x + button.width);
+    assert!(y >= button.y && y < button.y + button.height);
+    app.pointer(Phase::Down, x, y).unwrap();
+    app.pointer(Phase::Up, x, y).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(app.selected(rail).unwrap(), Some(second));
+    assert_eq!(observed.get(), Some(second));
+}
+
+#[test]
 fn resizable_panel_drag() {
     let _guard = NATIVE.lock().unwrap();
     let mut app = App::headless(500., 300.).unwrap();

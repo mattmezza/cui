@@ -1360,6 +1360,49 @@ func TestCarouselControls(t *testing.T) {
 	}
 }
 
+func TestCarouselSlots(t *testing.T) {
+	a := app(t)
+	supported, err := a.SupportsCarouselSlots()
+	check(t, err)
+	legacy := os.Getenv("CUI_TEST_LEGACY_CAROUSEL_SLOTS") == "1"
+	if supported == legacy {
+		t.Fatalf("Carousel slots capability = %t, legacy test = %t", supported, legacy)
+	}
+	art := Label("2").Key("marker-art")
+	marker := CarouselSlot("marker", CarouselSlotMarker).Text("Second slide").Children(art)
+	first, second := Item("first", "First"), Item("second", "Second").Children(marker)
+	rail := Carousel("carousel").CarouselControls(CarouselControls{Pagination: true}).Children(
+		CarouselSlot("next", CarouselSlotNext), first, second)
+	root := Column("root").Children(rail)
+	if legacy {
+		if err := a.Mount(root); err != ErrCarouselSlotsUnavailable {
+			t.Fatalf("expected unavailable before mounting, got %v", err)
+		}
+		check(t, a.Mount(Column("fallback").Children(Carousel("plain").Children(Item("slide", "Slide")))))
+		return
+	}
+	var selected *Node
+	rail.OnChange(func(event Event) { selected = event.Selected })
+	check(t, a.Mount(root))
+	check(t, a.Step(.016))
+	button, err := a.NumericPartBounds(rail, 4)
+	check(t, err)
+	bounds, err := a.Bounds(art)
+	check(t, err)
+	x, y := bounds.X+bounds.Width/2, bounds.Y+bounds.Height/2
+	if bounds.Width <= 0 || x < button.X || x >= button.X+button.Width || y < button.Y || y >= button.Y+button.Height {
+		t.Fatalf("marker artwork lies outside its button: %+v in %+v", bounds, button)
+	}
+	check(t, a.QueuePointer(PointerDown, x, y))
+	check(t, a.QueuePointer(PointerUp, x, y))
+	check(t, a.Step(.016))
+	count, err := a.Dispatch()
+	check(t, err)
+	if count != 1 || selected != second {
+		t.Fatal("custom content did not leave activation and selection to the marker")
+	}
+}
+
 func TestResizable(t *testing.T) {
 	a := app(t)
 	first := Item("first", "First panel").PanelSize(240)

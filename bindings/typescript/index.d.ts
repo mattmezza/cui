@@ -892,3 +892,9 @@ export function attachment_slot(key: string, role: 'actions', preferred_width: n
 export function attachment_slot(key: string, role: Exclude<AttachmentSlotRole, 'actions'>, preferred_width?: 0): AttachmentSlot;
 export interface Attachment { children(...items: (AttachmentSlot | AttachmentSlot[])[]): this }
 export interface App { supports_attachment_slots(): boolean }
+
+/** Passive control content; previous/next belong to Carousel, marker to a direct Carousel Item. */
+export type CarouselSlotRole = 'previous' | 'next' | 'marker';
+export interface CarouselSlot extends Container {}
+export function carousel_slot(key: string, role: CarouselSlotRole, label?: string): CarouselSlot;
+export interface App { supports_carousel_slots(): boolean }

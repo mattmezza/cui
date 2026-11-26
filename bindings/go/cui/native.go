@@ -709,6 +709,8 @@ static cui_bridge_status (*carousel_set_basis)(cui_bridge_app *, cui_bridge_node
 static cui_bridge_status (*carousel_set_axis)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static cui_bridge_status (*carousel_set_looping)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static cui_bridge_status (*carousel_set_controls)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static cui_bridge_status (*carousel_create_slot)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                                                 const char *, cui_bridge_node *);
 static void go_carousel_initialize(void) {
  if (bridge_lib) {
   go_load_optional_symbol(&carousel_set_basis, sizeof carousel_set_basis,
@@ -719,6 +721,8 @@ static void go_carousel_initialize(void) {
                           "cui_bridge_set_carousel_looping_v1");
   go_load_optional_symbol(&carousel_set_controls, sizeof carousel_set_controls,
                           "cui_bridge_set_carousel_controls_v1");
+  go_load_optional_symbol(&carousel_create_slot, sizeof carousel_create_slot,
+                          "cui_bridge_carousel_slot_create_v1");
  }
 #if defined(CUI_GO_STATIC)
  else {
@@ -726,6 +730,7 @@ static void go_carousel_initialize(void) {
   carousel_set_axis = cui_bridge_set_carousel_axis_v1;
   carousel_set_looping = cui_bridge_set_carousel_looping_v1;
   carousel_set_controls = cui_bridge_set_carousel_controls_v1;
+  carousel_create_slot = cui_bridge_carousel_slot_create_v1;
  }
 #endif
 }
@@ -746,6 +751,11 @@ static cui_bridge_status go_carousel_set_looping(cui_bridge_app *a, cui_bridge_n
 static int go_carousel_controls_supported(void) { return carousel_set_controls != NULL; }
 static cui_bridge_status go_carousel_set_controls(cui_bridge_app *a, cui_bridge_node carousel, uint32_t mask) {
  return carousel_set_controls(a, carousel, mask);
+}
+static int go_carousel_slots_supported(void) { return carousel_create_slot != NULL; }
+static cui_bridge_status go_carousel_create_slot(cui_bridge_app *a, cui_bridge_node owner,
+ uint32_t role, const char *key, cui_bridge_node *out) {
+ return carousel_create_slot(a, owner, role, key, out);
 }
 
 static int bridge_open(const char *path) {
@@ -931,6 +941,7 @@ type Node struct {
 	attachmentPreview                    *attachmentPreview
 	attachmentActions                    AttachmentActions
 	attachmentSlot                       AttachmentSlotRole
+	carouselSlot                         CarouselSlotRole
 	attachmentSlotWidth                  float32
 	carouselBasis                        float32
 	carouselAxis                         CarouselAxis
@@ -2068,6 +2079,9 @@ func (a *App) Mount(root *Node) error {
 		if err := a.validateAttachmentSlots(n, parent); err != nil {
 			return err
 		}
+		if err := a.validateCarouselSlots(n, parent); err != nil {
+			return err
+		}
 		if n.carouselAxis == CarouselVertical && C.go_carousel_axis_supported() == 0 {
 			return ErrCarouselAxisUnavailable
 		}
@@ -2086,7 +2100,7 @@ func (a *App) Mount(root *Node) error {
 			}
 		}
 		if content && !radioContentKind(n.kind) {
-			return errors.New("RadioGroup Item decorations require passive content")
+			return errors.New("Control decorations require passive content")
 		}
 		if len(n.radioPaints) != 0 {
 			if n.kind == int(C.CUI_BRIDGE_ITEM) && (parent == nil || parent.kind != int(C.CUI_BRIDGE_RADIO_GROUP)) {
@@ -2264,10 +2278,10 @@ func (a *App) Mount(root *Node) error {
 		if n.kind >= 3 && n.kind != 52 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 63 && n.kind != 64 && n.kind != 65 && n.kind != 66 && n.kind != 70 && n.kind != 73 && n.kind != 74 && n.kind != 75 && n.kind != 76 && n.kind != 78 && n.kind != 79 && n.kind != 80 && n.kind != configuredBadgeKind && len(n.children) > 0 {
 			return errors.New("leaf has children")
 		}
-		if (n.kind == 54 || n.kind == 60 || n.kind == 64 || n.kind == 65 || n.kind == 66 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 79) && len(n.children) > 64 {
+		if (n.kind == 54 || n.kind == 60 || n.kind == 64 || n.kind == 66 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 79) && len(n.children) > 64 {
 			return errors.New("tree exceeds 64 Items")
 		}
-		if n.kind == 17 || n.kind == 18 || n.kind == 19 || n.kind == 21 || n.kind == 22 || n.kind == 23 || n.kind == 40 || n.kind == 41 || n.kind == 44 || n.kind == 45 || n.kind == 47 || n.kind == 48 || n.kind == 49 || n.kind == 54 || n.kind == 60 || n.kind == 61 || n.kind == 64 || n.kind == 65 || n.kind == 66 || n.kind == 70 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 79 {
+		if n.kind == 17 || n.kind == 18 || n.kind == 19 || n.kind == 21 || n.kind == 22 || n.kind == 23 || n.kind == 40 || n.kind == 41 || n.kind == 44 || n.kind == 45 || n.kind == 47 || n.kind == 48 || n.kind == 49 || n.kind == 54 || n.kind == 60 || n.kind == 61 || n.kind == 64 || n.kind == 66 || n.kind == 70 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 79 {
 			for _, ch := range n.children {
 				if ch == nil || ch.kind != 20 {
 					return errors.New("group children must be Item")
@@ -2275,7 +2289,7 @@ func (a *App) Mount(root *Node) error {
 			}
 		}
 		for _, ch := range n.children {
-			if err := visit(ch, n, d+1, content || n.radioContent, slotContent || n.attachmentSlot != 0); err != nil {
+			if err := visit(ch, n, d+1, content || n.radioContent || n.carouselSlot != 0, slotContent || n.attachmentSlot != 0); err != nil {
 				return err
 			}
 		}
@@ -2301,6 +2315,10 @@ func (a *App) Mount(root *Node) error {
 		var h C.cui_bridge_node
 		if n.attachmentSlot != 0 {
 			if e := result(C.go_attachment_slot_create(a.ptr, p, C.uint32_t(n.attachmentSlot), key, C.float(n.attachmentSlotWidth), &h)); e != nil {
+				return e
+			}
+		} else if n.carouselSlot != 0 {
+			if e := result(C.go_carousel_create_slot(a.ptr, p, C.uint32_t(n.carouselSlot), key, &h)); e != nil {
 				return e
 			}
 		} else if n.kind == 81 {
@@ -4105,6 +4123,92 @@ type CarouselControls struct {
 
 // ErrCarouselControlsUnavailable means the loaded bridge lacks retained controls.
 var ErrCarouselControlsUnavailable = errors.New("Carousel controls require cui_bridge_set_carousel_controls_v1")
+
+// CarouselSlotRole identifies the control whose artwork a passive Row replaces.
+type CarouselSlotRole uint32
+
+const (
+	CarouselSlotPrevious CarouselSlotRole = iota + 1
+	CarouselSlotNext
+	CarouselSlotMarker
+)
+
+// ErrCarouselSlotsUnavailable indicates that the provider lacks the slot factory.
+var ErrCarouselSlotsUnavailable = errors.New("Carousel slots require cui_bridge_carousel_slot_create_v1")
+
+// CarouselSlot creates a passive content row. Place Previous and Next directly
+// in a Carousel and Marker directly in a slide Item. Text overrides the
+// accessible name. The children supply the visible content.
+func CarouselSlot(key string, role CarouselSlotRole) *Node {
+	n := Row(key)
+	if role < CarouselSlotPrevious || role > CarouselSlotMarker {
+		n.err = errors.New("invalid Carousel slot role")
+	}
+	n.carouselSlot = role
+	return n
+}
+
+// SupportsCarouselSlots reports whether the loaded bridge supports custom content.
+func (a *App) SupportsCarouselSlots() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_carousel_slots_supported() != 0, nil
+}
+
+func (a *App) validateCarouselSlots(n, parent *Node) error {
+	const carousel = int(C.CUI_BRIDGE_CAROUSEL)
+	const item = int(C.CUI_BRIDGE_ITEM)
+	if n.carouselSlot != 0 {
+		if parent == nil ||
+			(n.carouselSlot == CarouselSlotMarker && parent.kind != item) ||
+			(n.carouselSlot != CarouselSlotMarker && parent.kind != carousel) {
+			return errors.New("invalid Carousel slot owner")
+		}
+		if C.go_carousel_slots_supported() == 0 {
+			return ErrCarouselSlotsUnavailable
+		}
+	}
+	switch n.kind {
+	case carousel:
+		var roles [4]bool
+		slides := 0
+		for _, child := range n.children {
+			if child == nil {
+				return errors.New("invalid Carousel child")
+			}
+			switch child.carouselSlot {
+			case 0:
+				if child.kind != item {
+					return errors.New("Carousel children must be Items or arrow slots")
+				}
+				slides++
+			case CarouselSlotPrevious, CarouselSlotNext:
+				if roles[child.carouselSlot] {
+					return errors.New("duplicate Carousel arrow slot")
+				}
+				roles[child.carouselSlot] = true
+			default:
+				return errors.New("invalid Carousel arrow slot")
+			}
+		}
+		if slides > 64 {
+			return errors.New("Carousel exceeds 64 Items")
+		}
+	case item:
+		marker := false
+		for _, child := range n.children {
+			if child == nil || child.carouselSlot == 0 {
+				continue
+			}
+			if marker || child.carouselSlot != CarouselSlotMarker || parent == nil || parent.kind != carousel {
+				return errors.New("invalid or duplicate Carousel marker slot")
+			}
+			marker = true
+		}
+	}
+	return nil
+}
 
 // SupportsCarouselControls reports whether the loaded bridge supports retained navigation controls.
 func (a *App) SupportsCarouselControls() (bool, error) {

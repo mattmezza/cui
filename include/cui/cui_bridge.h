@@ -1290,6 +1290,25 @@ enum { CUI_BRIDGE_CAROUSEL_ARROWS_V1 = 1u << 0, CUI_BRIDGE_CAROUSEL_PAGINATION_V
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_controls_v1(cui_bridge_app *,
                                                                      cui_bridge_node carousel,
                                                                      uint32_t mask);
+enum {
+    CUI_BRIDGE_CAROUSEL_SLOT_PREVIOUS_V1 = 1,
+    CUI_BRIDGE_CAROUSEL_SLOT_NEXT_V1,
+    CUI_BRIDGE_CAROUSEL_SLOT_MARKER_V1
+};
+/* Create a passive content row. Previous/Next belong to a Carousel, and a
+ * Marker belongs to a direct slide Item. One slot per owner and role. Keys
+ * follow ordinary node ownership and uniqueness. Set its text to override
+ * the button's accessible name; empty uses the default. Allowed descendants
+ * are Row, Column, Label, Badge, Avatar, Kbd, Tag, Icon and Image. Contents
+ * paint within the built-in control's bounds. Empty slots keep built-in
+ * artwork. Slots render only when their control group is enabled. Removing
+ * a slot restores the built-in presentation. Activation still belongs to
+ * the control, and selection still reports the slide handle. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_carousel_slot_create_v1(cui_bridge_app *,
+                                                                    cui_bridge_node owner,
+                                                                    uint32_t role,
+                                                                    const char *key_utf8,
+                                                                    cui_bridge_node *out_slot);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_total(cui_bridge_app *, cui_bridge_node,
                                                       uint32_t total);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_step_status(cui_bridge_app *, cui_bridge_node item,

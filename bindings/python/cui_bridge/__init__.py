@@ -163,6 +163,10 @@ class _API:
         bind_disclosure_api(self, bind)
         from .attachment_options import bind_api as bind_attachment_api
         bind_attachment_api(self, bind)
+        self.create_carousel_slot = None
+        if hasattr(lib, "cui_bridge_carousel_slot_create_v1"):
+            self.create_carousel_slot = bind("carousel_slot_create_v1", C.c_int, C.c_void_p,
+                                            _Handle, C.c_uint32, C.c_char_p, C.POINTER(_Handle))
         self.create_attachment_slot = None
         if hasattr(lib, "cui_bridge_attachment_slot_create_v1"):
             self.create_attachment_slot = bind("attachment_slot_create_v1", C.c_int, C.c_void_p,
@@ -570,6 +574,7 @@ class Widget:
         self._text_format = 0
         self._panel_size = None
         self._attachment = 0
+        self._carousel_slot = None
         self._attachment_slot: tuple[int, float] | None = None
         self._image = None
         self._time = (0, 0, 0)
@@ -606,7 +611,7 @@ class Widget:
             raise RuntimeError("Mount children before attaching the tree")
         if any(not isinstance(child, Widget) for child in children):
             raise TypeError("children must be widgets")
-        if self.kind in _GROUP and any(child.kind != "item" for child in children):
+        if self.kind in _GROUP and any(child.kind != "item" and not (self.kind == "carousel" and child._carousel_slot in (1, 2)) for child in children):
             raise ValueError("groups require item children")
         if any((child._attachment_slot is not None) != is_attachment for child in children):
             raise ValueError("use attachment_slot() as a direct child of an Attachment")
@@ -615,6 +620,14 @@ class Widget:
                      if (slot := child._attachment_slot) is not None]
             if len(set(roles)) != len(roles):
                 raise ValueError("Attachment accepts one slot per role")
+        if self.kind in ("carousel", "item"):
+            roles = [child._carousel_slot for child in (*self._children, *children)
+                     if child._carousel_slot is not None]
+            if len(set(roles)) != len(roles):
+                raise ValueError("Carousel accepts one slot per role")
+        for child in children:
+            if child._carousel_slot is not None and self.kind != ("item" if child._carousel_slot == 3 else "carousel"):
+                raise ValueError("Carousel slot requires its direct Carousel or Item owner")
         self._children.extend(children)
         return self
 
@@ -1910,6 +1923,21 @@ def attachment(key: str, text: str = "") -> Widget:
     return Widget("attachment", key, text)
 
 
+CarouselSlotRole = Literal["previous", "next", "marker"]
+
+def carousel_slot(key: str, role: CarouselSlotRole, label: str | None = None) -> Widget:
+    """Retained passive control content; marker slots belong to direct Carousel Items."""
+    if not isinstance(key, str) or not _utf8(key):
+        raise ValueError("Carousel slot key must be nonempty")
+    if role not in ("previous", "next", "marker"):
+        raise ValueError("invalid Carousel slot role")
+    if label is not None:
+        _utf8(label)
+    result = Widget("row", key, label or "")
+    result._carousel_slot = {"previous": 1, "next": 2, "marker": 3}[role]
+    return result
+
+
 def attachment_slot(key: str, role: AttachmentSlotRole, preferred_width: float = 0) -> Widget:
     """Create a preview fallback, overlay, metadata column or action row."""
     if not _utf8(key):
@@ -2211,6 +2239,15 @@ class App:
             attachment_preflight(node, self)
             from .attachment_actions import preflight as actions_preflight
             actions_preflight(node, self)
+            if node._carousel_slot is not None:
+                expected = "item" if node._carousel_slot == 3 else "carousel"
+                if parent is None or parent.kind != expected or (expected == "item" and
+                        (not lineage or len(lineage) < 2 or lineage[-2].kind != "carousel")):
+                    raise ValueError("Carousel slot requires its direct Carousel or Carousel Item owner")
+                if not self.supports_carousel_slots():
+                    raise RuntimeError("Carousel slots unavailable in this bridge")
+            if any(ancestor._carousel_slot for ancestor in lineage) and node.kind not in _RADIO_CONTENT_KINDS:
+                raise ValueError("Carousel slots require passive children")
             if node._attachment_slot is not None:
                 if parent is None or parent.kind != "attachment":
                     raise ValueError("Attachment slots require a direct Attachment parent")
@@ -2299,6 +2336,9 @@ class App:
                     mount_node(self, node, parent_handle, key, handle)
                 elif isinstance(node, ConfiguredBadge):
                     node._create_badge(self, parent_handle, key, handle)
+                elif node._carousel_slot is not None:
+                    self._api.check(self._api.create_carousel_slot(self._ptr, parent_handle,
+                        node._carousel_slot, _utf8(key), C.byref(handle)))
                 elif node._attachment_slot is not None:
                     role, width = node._attachment_slot
                     self._api.check(self._api.create_attachment_slot(self._ptr, parent_handle, role,
@@ -2312,6 +2352,8 @@ class App:
                 self._by_handle[(handle.slot, handle.generation)] = node
                 if node.kind == "root_view": node._change("set_root_padding",node._root_padding)
                 if node.kind == "otp_input": node._change("set_total",node._total)
+                if node._carousel_slot is not None and node._text:
+                    node._change("set_text", _utf8(node._text))
                 if _KIND[node.kind] >= 3 and node.kind != "configured_badge":
                     node._change("set_text", _utf8(node._text))
                 if isinstance(node, ConfiguredIcon):
@@ -2850,6 +2892,10 @@ class App:
         from .attachment_options import supported
         return supported(self, True)
 
+    def supports_carousel_slots(self) -> bool:
+        self._ensure_open()
+        return self._api.create_carousel_slot is not None
+
     def supports_attachment_slots(self) -> bool:
         self._ensure_open()
         return self._api.create_attachment_slot is not None
@@ -3099,3 +3145,5 @@ __all__ += ["AttachmentOptions", "AttachmentTextStyle", "AttachmentStatus",
             "AttachmentSlotRole", "attachment_slot"]
 
 __all__ += ["AttachmentActionNotificationV1", "ComponentNotificationV1"]
+
+__all__ += ["CarouselSlotRole", "carousel_slot"]

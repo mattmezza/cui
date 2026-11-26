@@ -1,8 +1,13 @@
-use crate::{check, App, Builder, Error, Node, RawNode, Result};
-use std::{ffi::c_void, sync::OnceLock};
+use crate::{check, string, App, Builder, Error, Node, RawNode, Result};
+use std::{
+    ffi::{c_char, c_void},
+    sync::OnceLock,
+};
 
 type SetBasis = unsafe extern "C" fn(*mut c_void, RawNode, f32) -> u32;
 type SetOption = unsafe extern "C" fn(*mut c_void, RawNode, u32) -> u32;
+type CreateSlot =
+    unsafe extern "C" fn(*mut c_void, RawNode, u32, *const c_char, *mut RawNode) -> u32;
 
 /// The primary direction of a retained Carousel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -17,6 +22,18 @@ pub enum CarouselAxis {
 pub struct CarouselControls {
     pub arrows: bool,
     pub pagination: bool,
+}
+
+/// The passive content of a retained Carousel control.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u32)]
+pub enum CarouselSlot {
+    /// Owned by the Carousel.
+    Previous = 1,
+    /// Owned by the Carousel.
+    Next = 2,
+    /// Owned by the direct slide Item.
+    Marker = 3,
 }
 
 fn setter() -> Option<SetBasis> {
@@ -136,6 +153,38 @@ fn resolve_controls() -> Option<SetOption> {
     None
 }
 
+fn slot_factory() -> Option<CreateSlot> {
+    static FACTORY: OnceLock<Option<CreateSlot>> = OnceLock::new();
+    *FACTORY.get_or_init(resolve_slot_factory)
+}
+
+#[cfg(cui_bridge_static)]
+fn resolve_slot_factory() -> Option<CreateSlot> {
+    extern "C" {
+        fn cui_bridge_carousel_slot_create_v1(
+            app: *mut c_void,
+            owner: RawNode,
+            role: u32,
+            key: *const c_char,
+            out_slot: *mut RawNode,
+        ) -> u32;
+    }
+    Some(cui_bridge_carousel_slot_create_v1)
+}
+
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn resolve_slot_factory() -> Option<CreateSlot> {
+    unsafe {
+        let symbol = crate::notification_symbol_v1(c"cui_bridge_carousel_slot_create_v1".as_ptr());
+        (!symbol.is_null()).then(|| std::mem::transmute::<*mut c_void, CreateSlot>(symbol))
+    }
+}
+
+#[cfg(not(any(cui_bridge_static, unix, windows)))]
+fn resolve_slot_factory() -> Option<CreateSlot> {
+    None
+}
+
 impl Error {
     /// The loaded bridge lacks the optional Carousel basis setter.
     pub const CAROUSEL_BASIS_UNAVAILABLE: Self = Self(9);
@@ -145,6 +194,8 @@ impl Error {
     pub const CAROUSEL_LOOPING_UNAVAILABLE: Self = Self(9);
     /// The loaded bridge lacks the optional Carousel controls setter.
     pub const CAROUSEL_CONTROLS_UNAVAILABLE: Self = Self(9);
+    /// The loaded bridge lacks the optional Carousel content-slot factory.
+    pub const CAROUSEL_SLOTS_UNAVAILABLE: Self = Self(9);
 }
 
 impl App {
@@ -177,6 +228,31 @@ impl App {
     /// Whether the loaded bridge supports retained Carousel arrows and slide markers.
     pub fn supports_carousel_controls(&self) -> bool {
         controls_setter().is_some()
+    }
+
+    /// Whether the loaded bridge can customize Carousel control content.
+    pub fn supports_carousel_slots(&self) -> bool {
+        slot_factory().is_some()
+    }
+
+    /// Create a passive row for a built-in control. Use the row's text for an
+    /// accessible name override and add children for the artwork.
+    pub fn build_carousel_slot(
+        &mut self,
+        owner: Node,
+        role: CarouselSlot,
+        key: &str,
+    ) -> Result<Builder<'_>> {
+        let owner = self.valid(owner)?;
+        let create = slot_factory().ok_or(Error::CAROUSEL_SLOTS_UNAVAILABLE)?;
+        let key = string(key)?;
+        let mut raw = RawNode::default();
+        check(unsafe { create(self.raw, owner, role as u32, key.as_ptr(), &mut raw) })?;
+        let node = Node {
+            raw,
+            app_id: self.id,
+        };
+        Ok(Builder { app: self, node })
     }
 
     /// Configure the built-in controls without changing the selected slide.

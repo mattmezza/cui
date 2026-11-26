@@ -5864,6 +5864,19 @@
           "scope": "Independent opt-in control groups, copied Item selection, disabled boundaries, retained marker wrapping and omitted-control input cleanup. The gallery demonstrates inline placement with touch and copyable C usage."
         },
         {
+          "name": "passive retained arrow and marker content with stable slide ownership",
+          "status": "tested",
+          "evidence": [
+            "bindings/bridge/tests/test_bridge_components.c",
+            "bindings/python/test_carousel_slots.py",
+            "bindings/node/test/carousel-slots.test.cjs",
+            "bindings/node/test/carousel-slots.types.ts",
+            "bindings/go/cui/native_test.go",
+            "bindings/rust/tests/builders.rs"
+          ],
+          "scope": "Optional content and accessible-name overrides inside the built-in buttons, stable slide-owned markers, shared button activation and slide selection. The built-in layout defines retained button dimensions and placement."
+        },
+        {
           "name": "themed SVG controls, accessible item positions and inherited disabled state",
           "status": "tested",
           "evidence": [

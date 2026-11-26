@@ -648,7 +648,7 @@ static void bridge_radio_item_paint(cui_context *ui, void *user, cui_id id, bool
     scan->next_slot = node->next_sibling;
     bridge_radio_option_paint(ui, node, id, checked, disabled, paint);
 }
-static bool bridge_radio_content_kind(cui_bridge_kind kind) {
+static bool bridge_passive_content_kind(cui_bridge_kind kind) {
     switch (kind) {
     case CUI_BRIDGE_ROW:
     case CUI_BRIDGE_COLUMN:
@@ -669,7 +669,7 @@ static bool bridge_radio_content_children(const cui_bridge_app *app,
                                           const cui_bridge_node_record *parent) {
     for (uint32_t slot = parent->first_child; slot; slot = app->nodes[slot].next_sibling) {
         const cui_bridge_node_record *child = &app->nodes[slot];
-        if (!bridge_radio_content_kind(child->kind) || !bridge_radio_content_children(app, child))
+        if (!bridge_passive_content_kind(child->kind) || !bridge_radio_content_children(app, child))
             return false;
     }
     return true;
@@ -1820,9 +1820,11 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app->radio_tooltips);
     free(app);
 }
+/* Tags used only by the versioned factories. Attachment owns values 1–4. */
+enum { BRIDGE_CAROUSEL_SLOT_BASE = 8 };
 static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
                                             cui_bridge_kind kind, const char *key_utf8,
-                                            uint32_t attachment_role, cui_bridge_node *out_node) {
+                                            uint32_t slot_tag, cui_bridge_node *out_node) {
     cui_bridge_status status = bridge_ready(app);
     if (status != CUI_BRIDGE_OK)
         return status;
@@ -1831,6 +1833,9 @@ static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node
     if (!out_node || kind < CUI_BRIDGE_ROW || kind > CUI_BRIDGE_SETTINGS)
         return CUI_BRIDGE_INVALID_ARGUMENT;
     bool root = parent.slot == 0 && parent.generation == 0;
+    uint32_t carousel_role =
+        slot_tag > BRIDGE_CAROUSEL_SLOT_BASE ? slot_tag - BRIDGE_CAROUSEL_SLOT_BASE : 0;
+    uint32_t attachment_role = carousel_role ? 0 : slot_tag;
     cui_bridge_node_record *p = NULL;
     if (root) {
         if (app->root ||
@@ -1906,7 +1911,8 @@ static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node
              p->kind == CUI_BRIDGE_STATUS_BAR || p->kind == CUI_BRIDGE_TOOLBAR ||
              p->kind == CUI_BRIDGE_TITLE_BAR || p->kind == CUI_BRIDGE_TREE ||
              p->kind == CUI_BRIDGE_FORM || p->kind == CUI_BRIDGE_INPUT_GROUP ||
-             p->kind == CUI_BRIDGE_MESSAGE_SCROLLER || p->kind == CUI_BRIDGE_CAROUSEL ||
+             p->kind == CUI_BRIDGE_MESSAGE_SCROLLER ||
+             (p->kind == CUI_BRIDGE_CAROUSEL && !carousel_role) ||
              p->kind == CUI_BRIDGE_RESIZABLE || p->kind == CUI_BRIDGE_TABLE ||
              p->kind == CUI_BRIDGE_COMMAND || p->kind == CUI_BRIDGE_VIRTUAL_LIST ||
              p->kind == CUI_BRIDGE_SIDEBAR || p->kind == CUI_BRIDGE_QUESTIONNAIRE ||
@@ -1933,7 +1939,7 @@ static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node
             uint32_t count = 0;
             for (uint32_t sibling = p->first_child; sibling;
                  sibling = app->nodes[sibling].next_sibling)
-                count++;
+                count += app->nodes[sibling].carousel_slot_role == 0;
             if (count >= ((p->kind == CUI_BRIDGE_QUESTIONNAIRE ||
                            (p->kind == CUI_BRIDGE_ITEM && p->parent &&
                             app->nodes[p->parent].kind == CUI_BRIDGE_QUESTIONNAIRE))
@@ -1945,7 +1951,9 @@ static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node
         for (uint32_t ancestor = parent.slot; ancestor; ancestor = app->nodes[ancestor].parent) {
             if (++depth > CUI_BRIDGE_MAX_DEPTH)
                 return CUI_BRIDGE_CAPACITY;
-            if (app->nodes[ancestor].radio_item_content && !bridge_radio_content_kind(kind))
+            if ((app->nodes[ancestor].radio_item_content ||
+                 app->nodes[ancestor].carousel_slot_role) &&
+                !bridge_passive_content_kind(kind))
                 return CUI_BRIDGE_INVALID_STATE;
             if (app->nodes[ancestor].attachment_role && kind == CUI_BRIDGE_NOTIFICATION)
                 return CUI_BRIDGE_INVALID_STATE; /* Notifications use the app-wide stack. */
@@ -2024,6 +2032,7 @@ static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node
         .live = true,
         .kind = kind,
         .attachment_role = attachment_role,
+        .carousel_slot_role = carousel_role,
         .owner = app,
         .own_slot = slot,
         .parent = root ? 0 : parent.slot,
@@ -2235,7 +2244,7 @@ cui_bridge_status cui_bridge_node_remove(cui_bridge_app *app, cui_bridge_node ha
         }
     } else
         app->root = 0;
-    if (node->attachment_role)
+    if (node->attachment_role || node->carousel_slot_role)
         cui_invalidate(app->ui);
     bridge_remove_subtree(app, handle.slot);
     return CUI_BRIDGE_OK;
@@ -2264,7 +2273,7 @@ cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_bridge_node handl
             app->nodes[ancestor].questionnaire &&
             app->nodes[ancestor].questionnaire->state.initialized)
             return CUI_BRIDGE_INVALID_STATE;
-    if (node->kind < CUI_BRIDGE_LABEL)
+    if (node->kind < CUI_BRIDGE_LABEL && !node->carousel_slot_role)
         return CUI_BRIDGE_INVALID_STATE;
     if (node->kind == CUI_BRIDGE_NOTIFICATION && bridge_notification_entry(app, node->id))
         return CUI_BRIDGE_INVALID_STATE;
@@ -2316,6 +2325,8 @@ cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_bridge_node handl
         return status;
     free(node->text);
     node->text = copy;
+    if (node->carousel_slot_role)
+        cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
 cui_bridge_status cui_bridge_chart_set_data(cui_bridge_app *app, cui_bridge_node handle,
@@ -3036,6 +3047,41 @@ cui_bridge_status cui_bridge_set_carousel_controls_v1(cui_bridge_app *app, cui_b
     node->carousel_controls = mask;
     return CUI_BRIDGE_OK;
 }
+static cui_bridge_node_record *
+bridge_carousel_slot(cui_bridge_app *app, const cui_bridge_node_record *owner, uint32_t role) {
+    for (uint32_t child = owner->first_child; child; child = app->nodes[child].next_sibling)
+        if (app->nodes[child].carousel_slot_role == role)
+            return &app->nodes[child];
+    return NULL;
+}
+cui_bridge_status cui_bridge_carousel_slot_create_v1(cui_bridge_app *app, cui_bridge_node owner,
+                                                     uint32_t role, const char *key,
+                                                     cui_bridge_node *out_slot) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, owner, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!out_slot || role < CUI_BRIDGE_CAROUSEL_SLOT_PREVIOUS_V1 ||
+        role > CUI_BRIDGE_CAROUSEL_SLOT_MARKER_V1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    bool marker = role == CUI_BRIDGE_CAROUSEL_SLOT_MARKER_V1;
+    if (marker ? !(node->kind == CUI_BRIDGE_ITEM && node->parent &&
+                   app->nodes[node->parent].kind == CUI_BRIDGE_CAROUSEL)
+               : node->kind != CUI_BRIDGE_CAROUSEL)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (bridge_carousel_slot(app, node, role))
+        return CUI_BRIDGE_INVALID_STATE;
+    status = bridge_node_create(app, owner, CUI_BRIDGE_ROW, key, BRIDGE_CAROUSEL_SLOT_BASE + role,
+                                out_slot);
+    if (status == CUI_BRIDGE_OK)
+        cui_invalidate(app->ui);
+    return status;
+}
+static uint32_t bridge_carousel_slide_at_or_after(const cui_bridge_app *app, uint32_t child) {
+    while (child && app->nodes[child].carousel_slot_role)
+        child = app->nodes[child].next_sibling;
+    return child;
+}
 cui_bridge_status cui_bridge_set_scroll_extent(cui_bridge_app *app, cui_bridge_node handle,
                                                float width, float height) {
     cui_bridge_node_record *node;
@@ -3215,7 +3261,8 @@ cui_bridge_status cui_bridge_set_selected(cui_bridge_app *app, cui_bridge_node g
         node->kind != CUI_BRIDGE_TREE && node->kind != CUI_BRIDGE_CAROUSEL)
         return CUI_BRIDGE_INVALID_STATE;
     if (!item.slot && !item.generation) {
-        if (node->kind == CUI_BRIDGE_CAROUSEL && node->first_child)
+        if (node->kind == CUI_BRIDGE_CAROUSEL &&
+            bridge_carousel_slide_at_or_after(app, node->first_child))
             return CUI_BRIDGE_INVALID_ARGUMENT;
         node->value = 0;
         return CUI_BRIDGE_OK;
@@ -5099,7 +5146,8 @@ static void bridge_carousel_slide(cui_context *ui, const cui_theme *theme, size_
     cui_bridge_node_record *item = &binding->app->nodes[binding->slots[index]];
     cui_text(ui, cui_string(item->text), binding->app->theme.font_size, binding->app->theme.text);
     for (uint32_t child = item->first_child; child; child = binding->app->nodes[child].next_sibling)
-        bridge_render_node(binding->app, child);
+        if (!binding->app->nodes[child].carousel_slot_role)
+            bridge_render_node(binding->app, child);
 }
 static void bridge_carousel_change(size_t index, void *user) {
     bridge_carousel_binding *binding = user;
@@ -5119,25 +5167,60 @@ enum {
 static cui_id bridge_carousel_part_id(cui_id id, unsigned part) {
     return id | (UINT64_C(1) << (59u - part));
 }
+static void bridge_carousel_slot_content(cui_context *ui, const cui_theme *theme, size_t index,
+                                         void *user) {
+    (void)index;
+    const cui_bridge_node_record *slot = user;
+    cui_bridge_app *app = slot->owner;
+    cui_color previous_text = app->theme.text;
+    app->theme.text = theme->text;
+    cui_begin_box(ui, slot->id,
+                  (cui_box){.width = -1,
+                            .height = -1,
+                            .row = true,
+                            .clip = true,
+                            .inert = true,
+                            .gap = slot->gap,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER});
+    for (uint32_t child = slot->first_child; child; child = app->nodes[child].next_sibling)
+        bridge_render_node(app, child);
+    cui_end_box(ui);
+    app->theme.text = previous_text;
+}
+static cui_carousel_control_options
+bridge_carousel_control_options(cui_bridge_app *app, const cui_bridge_node_record *owner,
+                                uint32_t role, float size, cui_str default_label) {
+    cui_bridge_node_record *slot = bridge_carousel_slot(app, owner, role);
+    return (cui_carousel_control_options){
+        .size = CUI_CAROUSEL_CONTROL_CUSTOM,
+        .custom_size = size,
+        .label = slot && slot->text[0] ? cui_string(slot->text) : default_label,
+        .content = slot && slot->first_child ? bridge_carousel_slot_content : NULL,
+        .user = slot};
+}
 static void bridge_carousel_arrows(cui_context *ui, const cui_theme *theme,
                                    cui_carousel_state *state, cui_id root, void *user) {
-    (void)user;
+    bridge_carousel_binding *binding = user;
+    const cui_bridge_node_record *owner = &binding->app->nodes[binding->slot];
     float size = fminf(32, state->frame_width);
     cui_begin_box(
         ui, 0,
         (cui_box){
             .width = -1, .row = state->frame_width >= 72, .gap = 8, .align_x = CUI_ALIGN_CENTER});
-    cui_carousel_control_options options = {.size = CUI_CAROUSEL_CONTROL_CUSTOM,
-                                            .custom_size = size};
-    cui_carousel_control_inline(ui, bridge_carousel_part_id(root, BRIDGE_CAROUSEL_PREVIOUS), theme,
-                                state, root, false, options);
-    cui_carousel_control_inline(ui, bridge_carousel_part_id(root, BRIDGE_CAROUSEL_NEXT), theme,
-                                state, root, true, options);
+    cui_carousel_control_inline(
+        ui, bridge_carousel_part_id(root, BRIDGE_CAROUSEL_PREVIOUS), theme, state, root, false,
+        bridge_carousel_control_options(binding->app, owner, CUI_BRIDGE_CAROUSEL_SLOT_PREVIOUS_V1,
+                                        size, (cui_str){0}));
+    cui_carousel_control_inline(
+        ui, bridge_carousel_part_id(root, BRIDGE_CAROUSEL_NEXT), theme, state, root, true,
+        bridge_carousel_control_options(binding->app, owner, CUI_BRIDGE_CAROUSEL_SLOT_NEXT_V1, size,
+                                        (cui_str){0}));
     cui_end_box(ui);
 }
 static void bridge_carousel_pagination(cui_context *ui, const cui_theme *theme,
                                        cui_carousel_state *state, cui_id root, void *user) {
-    (void)user;
+    bridge_carousel_binding *binding = user;
     if (!state->count)
         return;
     float size = fminf(24, state->frame_width);
@@ -5156,9 +5239,9 @@ static void bridge_carousel_pagination(cui_context *ui, const cui_theme *theme,
             cui_carousel_pagination_item(
                 ui, bridge_carousel_part_id(state->items[i].id, BRIDGE_CAROUSEL_MARKER), theme,
                 state, root, i,
-                (cui_carousel_control_options){.size = CUI_CAROUSEL_CONTROL_CUSTOM,
-                                               .custom_size = size,
-                                               .label = cui_string(label)});
+                bridge_carousel_control_options(
+                    binding->app, &binding->app->nodes[binding->slots[i]],
+                    CUI_BRIDGE_CAROUSEL_SLOT_MARKER_V1, size, cui_string(label)));
         }
         cui_end_box(ui);
     }
@@ -5195,7 +5278,8 @@ static void bridge_render_carousel(cui_bridge_app *app, uint32_t slot,
     binding->slot = slot;
     size_t count = 0, selected = SIZE_MAX;
     bool has_basis = false;
-    for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {
+    for (uint32_t child = bridge_carousel_slide_at_or_after(app, node->first_child); child;
+         child = bridge_carousel_slide_at_or_after(app, app->nodes[child].next_sibling)) {
         cui_bridge_node_record *slide = &app->nodes[child];
         binding->slots[count] = child;
         binding->items[count] = (cui_carousel_item){.id = slide->id,
@@ -5221,10 +5305,14 @@ static void bridge_render_carousel(cui_bridge_app *app, uint32_t slot,
     options.now_seconds = app->now_seconds;
     options.disabled = node->disabled;
     options.label = cui_string(node->text);
-    if (node->carousel_controls & CUI_BRIDGE_CAROUSEL_ARROWS_V1)
+    if (node->carousel_controls & CUI_BRIDGE_CAROUSEL_ARROWS_V1) {
         options.controls = bridge_carousel_arrows;
-    if (node->carousel_controls & CUI_BRIDGE_CAROUSEL_PAGINATION_V1)
+        options.controls_user = binding;
+    }
+    if (node->carousel_controls & CUI_BRIDGE_CAROUSEL_PAGINATION_V1) {
         options.pagination = bridge_carousel_pagination;
+        options.pagination_user = binding;
+    }
     if (!cui_carousel_with_basis(app->ui, node->id, &app->theme, node->carousel_state,
                                  binding->items, count, options, has_basis ? binding->basis : NULL))
         app->frame_error = CUI_BRIDGE_CORE_ERROR;
@@ -6755,9 +6843,9 @@ static cui_id bridge_carousel_numeric_part(cui_bridge_app *app, const cui_bridge
                                            uint32_t part) {
     if (part == 1 || part == 2)
         return bridge_carousel_part_id(node->id, part - 1);
-    uint32_t slide = node->first_child;
+    uint32_t slide = bridge_carousel_slide_at_or_after(app, node->first_child);
     for (uint32_t index = 3; slide && index < part; ++index)
-        slide = app->nodes[slide].next_sibling;
+        slide = bridge_carousel_slide_at_or_after(app, app->nodes[slide].next_sibling);
     return slide ? bridge_carousel_part_id(app->nodes[slide].id, BRIDGE_CAROUSEL_MARKER) : 0;
 }
 cui_bridge_status cui_bridge_numeric_part_bounds(cui_bridge_app *app, cui_bridge_node handle,

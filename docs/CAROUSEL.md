@@ -160,6 +160,32 @@ on the builder or the corresponding App method. Probe
 `supports_carousel_controls()` (Go `SupportsCarouselControls()`) when using
 older bridge libraries and omit the option if the provider lacks it.
 
+### Customize retained control content
+
+Create a passive content row with `cui_bridge_carousel_slot_create_v1`.
+Previous and Next slots belong to the Carousel. A Marker slot belongs to its
+direct slide Item, so it follows the slide when its position changes. Each
+owner allows one slot per role. Enable the corresponding control group to
+show it. The 64-slide limit applies to slide Items.
+
+Use the slot's text as the accessible name and give its children the visible
+content. An empty name restores the default. An empty row keeps the built-in
+artwork. Rows and columns can compose labels, badges, avatars, keyboard
+hints, tags, icons and images. Content is centered and clipped to the
+built-in button bounds. The button keeps focus, activation, disabled state
+and its ordinary selection event, even when a pointer lands on its artwork.
+Removing the slot restores the default control.
+
+Python, JavaScript and TypeScript use `carousel_slot(key, role, label)` with
+`"previous"`, `"next"` or `"marker"`. Go uses
+`cui.CarouselSlot(key, cui.CarouselSlotNext).Text(label)`. Rust uses
+`app.build_carousel_slot(owner, CarouselSlot::Next, key)?.text(label)?`.
+Probe `supports_carousel_slots()` (Go `SupportsCarouselSlots()`) when loading
+an older provider. Ordinary arrows and markers can still be enabled if
+their capability is available.
+
+### Bounds and runnable example
+
 For host-driven input and tests, the existing numeric part bounds API reports
 positions from the latest completed frame. Parts 1 and 2 are Previous and Next.
 Part `3 + i` is the marker for zero-based slide index `i`. Disabled controls
@@ -186,7 +212,7 @@ with cui.App(width=640, height=360) as app:
         for slide in slides:
             slide.carousel_basis(0.5)
 
-    rail = cui.carousel("dashboard").visual_size(320, 200).children(*slides)
+    rail = cui.carousel("dashboard").visual_size(320, 200)
     vertical = app.supports_carousel_axis()
     if vertical:
         rail.carousel_axis("vertical")
@@ -196,6 +222,14 @@ with cui.App(width=640, height=360) as app:
     controls = app.supports_carousel_controls()
     if controls:
         rail.carousel_controls()
+        if app.supports_carousel_slots():
+            rail.children(cui.carousel_slot("forward", "next", "Next dashboard").children(
+                cui.label("+"),
+            ))
+            slides[-1].children(cui.carousel_slot("reports-marker", "marker", "Go to reports").children(
+                cui.label("R"),
+            ))
+    rail.children(*slides)
     app.mount(cui.column("root").children(rail))
     app.step()
     if controls:
@@ -219,10 +253,10 @@ with cui.App(width=640, height=360) as app:
         assert rail.selected() is slides[-1]
 ```
 
-Retained Carousel uses default spacing. Use the immediate C API for custom
-control content and presentation. Use `cui_carousel_control_inline` to place an
-axis-aware navigation button in ordinary flow, or `cui_carousel_control` to
-position it at the sides of the slide viewport.
+Retained Carousel uses default control size and spacing. Immediate C supports
+custom button boxes and layout. Use `cui_carousel_control_inline` for an
+axis-aware navigation button in ordinary flow or `cui_carousel_control` for
+controls positioned at the sides of the slide viewport.
 
 ## Input ownership
 

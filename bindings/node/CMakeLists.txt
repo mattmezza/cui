@@ -705,3 +705,12 @@ if(CUI_NODE_VERSION VERSION_GREATER_EQUAL "22.18")
   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/attachment_slots.ts)
 endif()
+
+add_test(NAME node_carousel_slots COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ --test ${CMAKE_CURRENT_SOURCE_DIR}/test/carousel-slots.test.cjs)
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_carousel_slots_types COMMAND ${CUI_NODE_TSC_EXECUTABLE}
+  --noEmit --strict --target ES2022 --module node16 --moduleResolution node16
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/carousel-slots.types.ts)
+endif()

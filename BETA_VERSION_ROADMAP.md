@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.5**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.5) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
 | Public website | Interactive WASM gallery and docs at alpha.5. The live site reports source revision `3106a5bb`, which passed [Pages verification](https://github.com/mattmezza/cui/actions/runs/45691841974). |
-| Working source | Alpha.5 released from `57aeb20b`. Hosted CI, native bindings, browser and installed-artifact checks pass. Full parity remains open. |
+| Working source | Alpha.6 candidate batches the ordered TimeField, live text geometry, Chart/Plot and navigation fixes. Exact release validation is in progress. |
 | Packages | Alpha.5 GitHub assets and verified Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green

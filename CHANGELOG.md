@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.0-alpha.6
+
+- The localized TimeField offers an opt-in single Tab stop with internal
+  segment navigation, IME composition and size and appearance options in C.
+  Chromium and the Linux accessibility adapter expose the committed value and
+  the active segment. The language packages retain their localized builder
+  APIs and include reproducible examples. Ordered IME stays a direct C API.
+- Growing Input and InputGroup controls place the caret, selection and IME
+  anchor using the current frame's width during live resize. Textarea keeps
+  carets at wrapped line edges visible and supports Alt+Arrow word navigation.
+- Line charts render continuous strokes across display scales and can show
+  circular points at a logical size. Plot retains the full initial touch
+  displacement and can hand a declined vertical drag to the browser page.
+- Carousel arrows and pagination inherit the viewport's disabled state.
+  Calendar and DatePicker keep queued keyboard navigation across year pages
+  and require a fresh activation to choose the month.
+
+All 78 catalog families have tested subsets. Full-family verification, physical
+platform checks and publication to PyPI, npm and crates.io remain open.
+
 ## 0.1.0-alpha.5 — 2026-11-25
 
 - DataTable keeps the visible row and selection across keyed updates. C, Python,

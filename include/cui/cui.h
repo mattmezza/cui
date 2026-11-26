@@ -1124,6 +1124,10 @@ cui_interaction cui_interaction_state(const cui_context *, cui_id);
  * position only, not hover/occlusion/capture. Outputs must be distinct. Null or
  * nonfinite coordinates return false and leave both outputs unchanged. */
 bool cui_pointer_position(const cui_context *, float *x, float *y);
+/* Source of the currently available pointer position. False with no known
+ * position, after pointer leave, or for invalid arguments. Does not claim a
+ * hit or a capture. A retained touch position is not a hover signal. */
+bool cui_pointer_source(const cui_context *, cui_pointer_type *out);
 
 /* Current primary-pointer or Space capture; submit behavior before querying. */
 bool cui_pressed(cui_context *ui, cui_id id);

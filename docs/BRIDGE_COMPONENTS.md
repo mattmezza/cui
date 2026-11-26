@@ -693,7 +693,10 @@ provider reports an error.
 
 #### Style heading layers and dividers from language builders
 
-Python, JavaScript, TypeScript, Go and Rust support the three heading layers.
+Python, JavaScript, TypeScript, Go and Rust support normal, expanded and
+disabled heading layers. Hover, keyboard-focus and press title layers are
+available through the immediate C presenters.
+[Immediate C title styles](DISCLOSURE.md#style-titles-for-pointer-and-keyboard)
 Set them on an Accordion for shared styles, its direct Item for per-field
 overrides, or a Collapsible for its own heading. Probe heading and divider
 support independently before configuring a provider. A divider belongs to

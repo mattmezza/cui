@@ -91,6 +91,27 @@ typedef struct {
     size_t item_count;
     const cui_disclosure_separator_style *separator;
 } cui_disclosure_appearance;
+/* Optional title refinements for cui_*_present_with_title_states. NULL
+ * typography or an unset custom_color inherits the corresponding field. */
+typedef struct {
+    const cui_typography_token *typography;
+    bool custom_color;
+    cui_color color;
+} cui_disclosure_title_style;
+typedef struct {
+    cui_disclosure_title_style hovered, focus_visible, pressed;
+} cui_disclosure_title_states;
+/* Built-in enabled titles only. After normal/expanded appearance, apply
+ * hovered, keyboard-visible focus, then pressed (pointer or Space capture).
+ * An item overrides shared fields within each state. Collapsible uses item 0.
+ * Hover uses Core's previous hit geometry and current mouse or pen position.
+ * Tokens, arrays and colors are read during submission. A different title
+ * metric can reflow FIT rows. Supply a bounded trigger box for fixed geometry. */
+typedef struct {
+    cui_disclosure_title_states trigger;
+    const cui_disclosure_title_states *items;
+    size_t item_count;
+} cui_disclosure_title_interactions;
 /* Optional presentation for the styled _present entry points. Width zero fits
  * content, -1 fills the parent, and a positive width uses logical pixels.
  * Per-trigger/panel box overrides replace their default boxes. A custom header

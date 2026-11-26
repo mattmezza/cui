@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Accordion and Collapsible built-in titles can use separate hover,
+  keyboard-focus and press typography and color in immediate C. The gallery
+  demonstrates all three states with copyable examples.
+
 ## 0.1.0-alpha.10
 
 - Accordion and Collapsible offer responsive widths, shared size presets and

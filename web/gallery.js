@@ -1032,7 +1032,8 @@ function render(){
  const gaps=[0,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
  const accordion=selected.name==='Accordion',disclosure=accordion||selected.name==='Collapsible';
  const disclosureMode=Number($('disclosure-mode').value);
- const largeDisclosureHeadings=disclosure&&disclosureMode===5&&designScale>=8;
+ const styledDisclosureHeadings=disclosureMode===5||disclosureMode===6;
+ const largeDisclosureHeadings=disclosure&&styledDisclosureHeadings&&designScale>=8;
  const timeField=selected.name==='TimeField';
  const orderedTime=orderedTimeField();
  const timeFieldHeight=designHeights[designScale]*($('density').value==='1'?.875:1);
@@ -1061,8 +1062,8 @@ function render(){
  if(disclosure){
   const rows=accordion?(disclosureMode===3?5:3):1;
   const multiple=$('disclosure-multiple').checked;
-  const panelRoom=multiple&&(disclosureMode===1||disclosureMode===2||disclosureMode===5)?440:210;
-  const wrappedRoom=disclosureMode===5?(largeDisclosureHeadings?5:2)*designHeights[designScale]+120:0;
+  const panelRoom=multiple&&(disclosureMode===1||disclosureMode===2||styledDisclosureHeadings)?440:210;
+  const wrappedRoom=styledDisclosureHeadings?(largeDisclosureHeadings?5:2)*designHeights[designScale]+120:0;
   height=Math.max(height,rows*(designHeights[designScale]+gaps[designScale])+panelRoom+wrappedRoom);
  }
  if(orderedTime)height=Math.max(360,2*timeFieldHeight+224);
@@ -1226,7 +1227,7 @@ function render(){
  }
  if(selected.name==='Rating')$('snippet').textContent=ratingUsage(designScale,$('disabled').checked,
      $('rating-shape').value==='1',$('rating-half').checked,$('rating-preview').checked);
- if(disclosure)$('snippet').textContent=disclosureMode===5?disclosureHeadingUsage(accordion):snippets[selected.name];
+ if(disclosure)$('snippet').textContent=styledDisclosureHeadings?disclosureHeadingUsage(accordion,disclosureMode===6):snippets[selected.name];
  if(pagination)$('snippet').textContent=paginationUsage(designScale,$('disabled').checked,paginationMode,paginationPages,paginationFrench,paginationCustom);
  if(controlShadowsEnabled()&&['Button','Checkbox','Switch','Slider'].includes(selected.name))$('snippet').textContent=controlShadowUsage(selected.name,Number($('control-size').value),Number($('design-size').value));
  if(selected.name==='Radio') {

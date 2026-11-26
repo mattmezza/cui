@@ -93,6 +93,77 @@ def verify_joined_accordion(page):
     assert '.joined = true' in page.locator('#snippet').text_content()
 
 
+
+def verify_interactive_disclosure_headings(browser, url):
+    sample = """({name, weight, italic}) => {
+        const e = cuiGallery.exports, decode = new TextDecoder();
+        for (let i = 0; i < e.gallery_semantic_count(); i++) {
+            if (e.gallery_semantic(i,0) !== 1) continue;
+            const label = decode.decode(new Uint8Array(e.memory.buffer,
+                e.gallery_semantic_name(i), e.gallery_semantic_length(i)));
+            if (label !== name) continue;
+            const bounds = [1,2,3,4].map(f => e.gallery_semantic(i,f));
+            const [,y,,height] = bounds;
+            const titles = [];
+            for (let j = 0; j < e.gallery_count(); j++) {
+                const top = e.gallery_command(j,2);
+                if (e.gallery_command(j,0) === 2 && top >= y && top < y+height)
+                    titles.push([e.gallery_command(j,22), e.gallery_command(j,23)]);
+            }
+            return titles.length && titles.every(t => t[0] === weight && t[1] === italic)
+                ? {bounds, lines: titles.length} : null;
+        }
+    }"""
+    expanded = """({name, value}) => document.querySelector(
+        `#accessible button[aria-label="${name}"]`)?.getAttribute('aria-expanded') === value"""
+    for component, name in (('Accordion', 'Getting started with workspace access and sharing'),
+                            ('Collapsible', 'Show details')):
+        page = browser.new_page(viewport={'width': 390, 'height': 840}, has_touch=True)
+        try:
+            page.goto(f'{url}#{component}')
+            page.wait_for_function('name => window.cuiGallery?.renderedComponent === name', arg=component)
+            page.locator('#disclosure-mode').select_option('6')
+            row = page.locator(f'#accessible button[aria-label="{name}"]')
+            if row.get_attribute('aria-expanded') == 'true':
+                row.evaluate('element => element.click()')
+            page.wait_for_function(expanded, arg={'name': name, 'value': 'false'})
+
+            def title(weight, italic=False):
+                return page.wait_for_function(sample, arg={
+                    'name': name, 'weight': weight, 'italic': int(italic)
+                }).json_value()
+
+            initial = title(1)
+            if component == 'Accordion':
+                assert initial['lines'] > 1
+            canvas = page.locator('#preview')
+            canvas.scroll_into_view_if_needed()
+            canvas_rect = canvas.bounding_box()
+            x, y, _, _ = initial['bounds']
+            x += canvas_rect['x'] + 12
+            y += canvas_rect['y'] + 8
+            page.mouse.move(x, y)
+            title(2)
+            canvas.focus()
+            page.keyboard.press('Tab')
+            title(3)
+            page.mouse.down()
+            title(2, italic=True)
+            page.mouse.up()
+            page.wait_for_function(expanded, arg={'name': name, 'value': 'true'})
+            page.mouse.move(0, 0)
+            title(3)
+            page.touchscreen.tap(x, y)
+            page.wait_for_function(expanded, arg={'name': name, 'value': 'false'})
+            title(1)
+            page.locator('#disabled').check()
+            page.mouse.move(x, y)
+            title(1, italic=True)
+            assert '_present_with_title_states(' in page.locator('#snippet').text_content()
+        finally:
+            page.close()
+
+
 def verify_disclosure_heading_appearance(page):
     name = 'Getting started with workspace access and sharing'
     page.evaluate('location.hash="Accordion"')
@@ -689,6 +760,7 @@ def main():
                 verify_disclosure_accessibility(page, 'Accordion')
                 verify_disclosure_accessibility(page, 'Collapsible')
                 verify_disclosure_heading_appearance(page)
+                verify_interactive_disclosure_headings(browser, f'http://127.0.0.1:{server.server_port}/cui/')
                 print('Disclosure composition, styling and semantic activation passed.')
                 browser.close()
                 return
@@ -2366,6 +2438,7 @@ def main():
             verify_disclosure_accessibility(page, 'Accordion')
             verify_disclosure_accessibility(page, 'Collapsible')
             verify_disclosure_heading_appearance(page)
+            verify_interactive_disclosure_headings(browser, f'http://127.0.0.1:{server.server_port}/cui/')
             control_change('theme', '0')
             page.evaluate('location.hash="Tag"')
             page.wait_for_function('cuiGallery.renderedComponent==="Tag"')

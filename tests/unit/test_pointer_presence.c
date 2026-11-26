@@ -63,23 +63,28 @@ int main(void) {
     assert(!info.pointer_present && !info.pointer_valid && !interaction.hovered &&
            !cui_hovered(ui, 20) && !cui_hover_within(ui, 10));
     assert(cui_pointer_cursor(ui) == CUI_CURSOR_DEFAULT);
+    cui_pointer_type source = CUI_POINTER_PEN;
+    assert(!cui_pointer_source(ui, &source) && source == CUI_POINTER_PEN);
     event(ui, CUI_EVENT_POINTER_ENTER, NAN, NAN);
     scene(ui, false, false);
     assert(info.pointer_present && !info.pointer_valid && !info.pointer_inside &&
            !info.pointer_visible && info.pointer_hit == 0);
     assert(!interaction.hovered && !cui_hovered(ui, 20) && !cui_hover_within(ui, 10) &&
            cui_pointer_cursor(ui) == CUI_CURSOR_DEFAULT);
+    assert(!cui_pointer_source(ui, &source) && source == CUI_POINTER_PEN);
     event(ui, CUI_EVENT_POINTER_MOVE, 15, 15);
     scene(ui, false, false);
     assert(info.pointer_present && info.pointer_valid && info.pointer_visible &&
            info.pointer_hit == 20);
     assert(interaction.hovered && cui_hovered(ui, 20) && cui_hover_within(ui, 10) &&
            cui_pointer_cursor(ui) == CUI_CURSOR_CROSSHAIR);
+    assert(cui_pointer_source(ui, &source) && source == CUI_POINTER_MOUSE);
     event(ui, CUI_EVENT_POINTER_DOWN, 15, 15);
     event(ui, CUI_EVENT_POINTER_LEAVE, 999, 999);
     scene(ui, false, false);
     assert(!info.pointer_present && !info.pointer_valid && !info.pointer_inside &&
            !info.pointer_visible && info.pointer_hit == 0);
+    assert(!cui_pointer_source(ui, &source) && source == CUI_POINTER_MOUSE);
     assert(info.pointer_x == 15 && info.pointer_y == 15 && info.capture == 20 &&
            cui_pressed(ui, 20) && cui_focused(ui) == 20);
     assert(!interaction.hovered && !cui_hovered(ui, 20) && !cui_hover_within(ui, 10) &&

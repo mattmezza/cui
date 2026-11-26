@@ -1125,6 +1125,10 @@ cui_interaction cui_interaction_state(const cui_context *, cui_id);
  * position only, not hover/occlusion/capture. Outputs must be distinct. Null or
  * nonfinite coordinates return false and leave both outputs unchanged. */
 bool cui_pointer_position(const cui_context *, float *x, float *y);
+/* Source of the currently available pointer position. False with no known
+ * position, after pointer leave, or for invalid arguments. Does not claim a
+ * hit or a capture. A retained touch position is not a hover signal. */
+bool cui_pointer_source(const cui_context *, cui_pointer_type *out);
 
 /* Current primary-pointer or Space capture; submit behavior before querying. */
 bool cui_pressed(cui_context *ui, cui_id id);
@@ -8744,6 +8748,7 @@ struct cui_context {
     cui_id focus, capture, space_capture;
     float pointer_x, pointer_y, dt;
     bool pointer_position_known, pointer_present;
+    cui_pointer_type pointer_source;
     struct {
         uint64_t id, device;
         float x, y, start_x, start_y;
@@ -10660,6 +10665,7 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
             ui->pointer_y = e.y;
             ui->pointer_position_known = true;
             ui->pointer_present = true;
+            ui->pointer_source = e.pointer_type;
         }
         cui_id gesture_target = 0;
         cui_id before_capture = ui->capture;
@@ -10832,6 +10838,7 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
             ui->pointer_y = e.y;
             ui->pointer_position_known = true;
             ui->pointer_present = true;
+            ui->pointer_source = e.pointer_type;
         }
         bool ordered_tab_moved = false;
         if (ordered && ordered->step && ui->event_targets[i] == ui->focus) {
@@ -16043,6 +16050,16 @@ bool cui_scroll_gesture_filter(cui_scroll_gesture *state, cui_event *event, doub
         else
             event->dx = 0;
     }
+    return true;
+}
+
+bool cui_pointer_source(const cui_context *ui, cui_pointer_type *out) {
+    if (!out || !cui_core_pointer_available(ui))
+        return false;
+    if (ui->pointer_source != CUI_POINTER_MOUSE && ui->pointer_source != CUI_POINTER_TOUCH &&
+        ui->pointer_source != CUI_POINTER_PEN)
+        return false;
+    *out = ui->pointer_source;
     return true;
 }
 

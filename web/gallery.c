@@ -1654,6 +1654,23 @@ static cui_disclosure_appearance disclosure_heading_style(const cui_theme *theme
         .separator = divider};
 }
 
+static cui_disclosure_title_interactions disclosure_title_feedback(const cui_theme *theme,
+                                                                   cui_typography_token title,
+                                                                   cui_typography_token states[3]) {
+    states[0] = states[1] = states[2] = title;
+    states[0].style.weight = CUI_TEXT_WEIGHT_SEMIBOLD;
+    states[1].style.weight = CUI_TEXT_WEIGHT_BOLD;
+    states[2].style.weight = CUI_TEXT_WEIGHT_SEMIBOLD;
+    states[2].style.italic = true;
+    return (cui_disclosure_title_interactions){
+        .trigger = {
+            .hovered = {.typography = &states[0]},
+            .focus_visible = {.typography = &states[1],
+                              .custom_color = true,
+                              .color = theme->accent},
+            .pressed = {.typography = &states[2], .custom_color = true, .color = theme->accent}}};
+}
+
 static unsigned char avatar_mask_pixels[3][96 * 96 * 4];
 static cui_avatar_image avatar_images[3];
 static bool avatar_images_ready;
@@ -5922,16 +5939,23 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_typography_token titles[3];
         cui_disclosure_separator_style divider;
         cui_disclosure_appearance appearance;
-        if (disclosure_mode == 5) {
+        cui_disclosure_title_interactions feedback;
+        cui_typography_token state_titles[3];
+        const cui_disclosure_title_interactions *title_states = NULL;
+        if (disclosure_mode == 5 || disclosure_mode == 6) {
             items[0].label = cui_string("Getting started with workspace access and sharing");
             appearance = disclosure_heading_style(&t, titles, &divider);
             presentation.appearance = &appearance;
+            if (disclosure_mode == 6) {
+                feedback = disclosure_title_feedback(&t, titles[0], state_titles);
+                title_states = &feedback;
+            }
         }
         presentation.joined = true;
         presentation.trigger_styles = styles;
         presentation.trigger_style_count = 3;
         bool animated = disclosure_mode == 1 || disclosure_mode == 2;
-        cui_accordion_present(
+        cui_accordion_present_with_title_states(
             ui, cui_id_from(ui, "accordion"), &t, items, 3, open,
             (cui_accordion_options){.collapsible = true,
                                     .disabled = disabled,
@@ -5944,7 +5968,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                     .dt = host_dt,
                                     .response = .45f,
                                     .reduced_motion = reduced_motion},
-            presentation,
+            presentation, title_states,
             disclosure_mode == 3 ? disclosure_nested_panel
             : animated           ? disclosure_panel
                                  : panel,
@@ -5963,11 +5987,18 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_typography_token titles[3];
         cui_disclosure_separator_style divider;
         cui_disclosure_appearance appearance;
-        if (disclosure_mode == 5) {
+        cui_disclosure_title_interactions feedback;
+        cui_typography_token state_titles[3];
+        const cui_disclosure_title_interactions *title_states = NULL;
+        if (disclosure_mode == 5 || disclosure_mode == 6) {
             appearance = disclosure_heading_style(&t, titles, &divider);
             presentation.appearance = &appearance;
+            if (disclosure_mode == 6) {
+                feedback = disclosure_title_feedback(&t, titles[0], state_titles);
+                title_states = &feedback;
+            }
         }
-        cui_collapsible_present(
+        cui_collapsible_present_with_title_states(
             ui, cui_id_from(ui, "collapsible"), &t, cui_string("Show details"), &collapsed,
             (cui_collapsible_options){.disabled = disabled,
                                       .borderless = disclosure_mode == 4,
@@ -5976,7 +6007,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                       .dt = host_dt,
                                       .response = .45f,
                                       .reduced_motion = reduced_motion},
-            presentation, animated ? disclosure_panel : panel, NULL, (cui_disclosure_handler){0});
+            presentation, title_states, animated ? disclosure_panel : panel, NULL,
+            (cui_disclosure_handler){0});
         break;
     }
     case 22: {
@@ -7967,7 +7999,7 @@ void gallery_table_appearance(int custom_header, int striped) {
     table_striped = striped != 0;
 }
 void gallery_disclosure_options(int mode, int multiple) {
-    if (mode >= 0 && mode <= 5 && mode != disclosure_mode) {
+    if (mode >= 0 && mode <= 6 && mode != disclosure_mode) {
         disclosure_mode = mode;
         memset(accordion_motion, 0, sizeof(accordion_motion));
         memset(accordion_nested_open, 0, sizeof(accordion_nested_open));

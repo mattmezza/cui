@@ -722,11 +722,126 @@ static void test_disclosure_inherited_appearance(void) {
     cui_destroy(ui);
 }
 
+static cui_draw_list
+disclosure_title_state_scene(cui_context *ui, const cui_disclosure_appearance *appearance,
+                             const cui_disclosure_title_interactions *interaction, bool *open,
+                             bool disabled) {
+    const cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 240, 480, .016f));
+    cui_collapsible_present_with_title_states(
+        ui, 3500, &theme, cui_string("Workspace access and sharing preferences"), open,
+        (cui_collapsible_options){.disabled = disabled},
+        (cui_disclosure_presentation){.width = 168, .appearance = appearance}, interaction, NULL,
+        NULL, (cui_disclosure_handler){0});
+    cui_draw_list list = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return list;
+}
+
+static void disclosure_test_pointer(cui_context *ui, cui_event_type event, cui_pointer_type type) {
+    const cui_rect row = cui_bounds(ui, 3500);
+    assert(cui_queue_event(ui, (cui_event){.type = event,
+                                           .x = row.x + 5,
+                                           .y = row.y + 5,
+                                           .pointer_type = type,
+                                           .pointer_id = type == CUI_POINTER_TOUCH ? 42 : 0}));
+}
+
+static void test_disclosure_title_states(void) {
+    cui_context *ui = cui_create((cui_config){.width = 240, .height = 480});
+    assert(ui);
+    const cui_theme theme = cui_theme_light();
+    const cui_typography_token normal = {.size = 14, .line_height = 18, .wrap = true};
+    const cui_typography_token hovered = {
+        .size = 22, .line_height = 30, .wrap = true, .style.weight = CUI_TEXT_WEIGHT_SEMIBOLD};
+    const cui_typography_token focused = {
+        .size = 17, .line_height = 25, .wrap = true, .style.weight = CUI_TEXT_WEIGHT_BOLD};
+    const cui_typography_token pressed = {
+        .size = 17, .line_height = 25, .wrap = true, .style.italic = true};
+    const cui_color item_color = {81, 49, 123, 255};
+    const cui_color tap_color = {49, 103, 123, 255};
+    const cui_disclosure_appearance appearance = {
+        .trigger = {.normal = {.typography = &normal},
+                    .expanded = {.custom_color = true, .color = tap_color}}};
+    cui_disclosure_title_states item = {.hovered = {.custom_color = true, .color = item_color},
+                                        .focus_visible = {.custom_color = true, .color = {0}}};
+    const cui_disclosure_title_interactions interaction = {
+        .trigger = {.hovered = {.typography = &hovered,
+                                .custom_color = true,
+                                .color = theme.accent},
+                    .focus_visible = {.typography = &focused},
+                    .pressed = {.typography = &pressed}},
+        .items = &item,
+        .item_count = 1};
+    bool open = false;
+    cui_draw_list list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    const cui_rect normal_row = cui_bounds(ui, 3500);
+    const size_t normal_lines = check_disclosure_title(list, normal_row, normal, theme.text);
+    assert(normal_lines > 1);
+    cui_pointer_type source = CUI_POINTER_PEN;
+    assert(!cui_pointer_source(ui, &source) && source == CUI_POINTER_PEN);
+
+    disclosure_test_pointer(ui, CUI_EVENT_POINTER_MOVE, CUI_POINTER_MOUSE);
+    list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    const cui_rect hover_row = cui_bounds(ui, 3500);
+    assert(hover_row.w == normal_row.w && hover_row.h > normal_row.h);
+    assert(check_disclosure_title(list, hover_row, hovered, item_color) > normal_lines);
+
+    key(ui, CUI_KEY_TAB);
+    list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    assert(cui_focused(ui) == 3500 && cui_interaction_state(ui, 3500).focus_visible);
+    assert(check_disclosure_title(list, cui_bounds(ui, 3500), focused, (cui_color){0}) > 1);
+
+    key(ui, CUI_KEY_SPACE);
+    list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    assert(!open &&
+           check_disclosure_title(list, cui_bounds(ui, 3500), pressed, (cui_color){0}) > 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+    list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    assert(open && check_disclosure_title(list, cui_bounds(ui, 3500), focused, (cui_color){0}) > 1);
+    key(ui, CUI_KEY_ENTER);
+    (void)disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    assert(!open);
+
+    disclosure_test_pointer(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_MOUSE);
+    list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    assert(cui_focused(ui) == 3500 && !cui_interaction_state(ui, 3500).focus_visible && !open);
+    assert(check_disclosure_title(list, cui_bounds(ui, 3500), pressed, item_color) > 1);
+    disclosure_test_pointer(ui, CUI_EVENT_POINTER_UP, CUI_POINTER_MOUSE);
+    list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    assert(open && check_disclosure_title(list, cui_bounds(ui, 3500), hovered, item_color) > 1);
+
+    disclosure_test_pointer(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_TOUCH);
+    list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    assert(check_disclosure_title(list, cui_bounds(ui, 3500), pressed, tap_color) > 1);
+    disclosure_test_pointer(ui, CUI_EVENT_POINTER_UP, CUI_POINTER_TOUCH);
+    for (size_t i = 0; i < 2; ++i) {
+        list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+        assert(!open && cui_pointer_source(ui, &source) && source == CUI_POINTER_TOUCH);
+        assert(check_disclosure_title(list, cui_bounds(ui, 3500), normal, theme.text) ==
+               normal_lines);
+    }
+
+    disclosure_test_pointer(ui, CUI_EVENT_POINTER_MOVE, CUI_POINTER_PEN);
+    list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    assert(cui_pointer_source(ui, &source) && source == CUI_POINTER_PEN);
+    assert(check_disclosure_title(list, cui_bounds(ui, 3500), hovered, item_color) > 1);
+    list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, true);
+    assert(check_disclosure_title(list, cui_bounds(ui, 3500), normal, theme.muted) == normal_lines);
+
+    item.hovered.typography = &(cui_typography_token){.size = NAN};
+    click(ui, 3500);
+    list = disclosure_title_state_scene(ui, &appearance, &interaction, &open, false);
+    assert(!open && list.count == 0);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_disclosure_chevron();
     test_disclosure_presentation();
     test_joined_disclosure_styles();
     test_disclosure_inherited_appearance();
+    test_disclosure_title_states();
     test_measured_reveal();
     test_configured_disclosure_springs();
     test_accordion_reveal_storage();

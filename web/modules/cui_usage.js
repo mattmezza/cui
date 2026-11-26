@@ -4,16 +4,32 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
  'CUI_DESIGN_2XL', 'CUI_DESIGN_3XL', 'CUI_DESIGN_4XL', 'CUI_DESIGN_5XL',
  'CUI_DESIGN_6XL', 'CUI_DESIGN_7XL', 'CUI_DESIGN_8XL', 'CUI_DESIGN_9XL'];
 
-export function disclosureHeadingUsage(accordion){
+export function disclosureHeadingUsage(accordion,interactive=false){
  const separator=accordion?(`cui_disclosure_separator_style divider = {
     .thickness = 2, .inset_left = 12, .inset_right = 12,
     .color = theme.border,
 };
 `):'';
- const call=accordion?(`cui_accordion_present(ui, id, &theme, items, 3, expanded,
+ const functionSuffix=interactive?'_with_title_states':'';
+ const titleArgument=interactive?' &title_states,':'';
+ const styles=interactive?`cui_typography_token hover_title = title;
+hover_title.style.weight = CUI_TEXT_WEIGHT_SEMIBOLD;
+cui_typography_token pressed_title = hover_title;
+pressed_title.style.italic = true;
+cui_disclosure_title_interactions title_states = {
+    .trigger = {
+        .hovered = {.typography = &hover_title},
+        .focus_visible = {.typography = &open_title, .custom_color = true,
+                          .color = theme.accent},
+        .pressed = {.typography = &pressed_title, .custom_color = true,
+                    .color = theme.accent},
+    },
+};
+`:'';
+ const call=accordion?(`cui_accordion_present${functionSuffix}(ui, id, &theme, items, 3, expanded,
     (cui_accordion_options){.collapsible = true, .bordered = true},
-    presentation, draw_panel, user, (cui_disclosure_handler){0});`):(`cui_collapsible_present(ui, id, &theme, label, &open,
-    (cui_collapsible_options){0}, presentation, draw_panel, user,
+    presentation,${titleArgument} draw_panel, user, (cui_disclosure_handler){0});`):(`cui_collapsible_present${functionSuffix}(ui, id, &theme, label, &open,
+    (cui_collapsible_options){0}, presentation,${titleArgument} draw_panel, user,
     (cui_disclosure_handler){0});`);
  return `cui_typography_token title = {.size = 16, .line_height = 22, .wrap = true};
 cui_typography_token open_title = title;
@@ -28,7 +44,7 @@ ${separator}cui_disclosure_appearance appearance = {
 cui_disclosure_presentation presentation = {
     .width = -1, ${accordion?'.joined = true, ':''}.appearance = &appearance,
 };
-${call}`;
+${styles}${call}`;
 }
 
 export function paginationUsage(size, disabled = false, mode = 0, visiblePages = 5, french = false, customSize = 0) {

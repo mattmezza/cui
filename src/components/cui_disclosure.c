@@ -5,21 +5,28 @@
 
 typedef struct {
     cui_disclosure_presentation options;
+    const cui_disclosure_title_interactions *title_states;
     cui_design_metrics metrics;
     bool fill_width;
 } cui_disclosure_paint;
 
+static bool cui_disclosure_typography_valid(const cui_typography_token *t, uint32_t text_caps) {
+    return !t || (cui_typography_token_valid(*t) && isfinite(t->style.letter_spacing) &&
+                  (t->style.letter_spacing == 0 || (text_caps & CUI_TEXT_CAP_LETTER_SPACING)));
+}
+
 static bool cui_disclosure_appearance_valid(const cui_disclosure_trigger_appearance *states,
                                             uint32_t text_caps) {
-    const cui_typography_token *tokens[] = {states->normal.typography, states->expanded.typography,
-                                            states->disabled.typography};
-    for (size_t i = 0; i < sizeof tokens / sizeof *tokens; ++i) {
-        const cui_typography_token *t = tokens[i];
-        if (t && (!cui_typography_token_valid(*t) || !isfinite(t->style.letter_spacing) ||
-                  (t->style.letter_spacing != 0 && !(text_caps & CUI_TEXT_CAP_LETTER_SPACING))))
-            return false;
-    }
-    return true;
+    return cui_disclosure_typography_valid(states->normal.typography, text_caps) &&
+           cui_disclosure_typography_valid(states->expanded.typography, text_caps) &&
+           cui_disclosure_typography_valid(states->disabled.typography, text_caps);
+}
+
+static bool cui_disclosure_title_states_valid(const cui_disclosure_title_states *states,
+                                              uint32_t text_caps) {
+    return cui_disclosure_typography_valid(states->hovered.typography, text_caps) &&
+           cui_disclosure_typography_valid(states->focus_visible.typography, text_caps) &&
+           cui_disclosure_typography_valid(states->pressed.typography, text_caps);
 }
 
 static bool cui_disclosure_nonnegative(float v) {
@@ -27,8 +34,9 @@ static bool cui_disclosure_nonnegative(float v) {
 }
 
 static bool cui_disclosure_resolve(cui_context *ui, const cui_theme *theme,
-                                   cui_disclosure_presentation p, size_t count,
-                                   cui_disclosure_paint *paint) {
+                                   cui_disclosure_presentation p,
+                                   const cui_disclosure_title_interactions *title_states,
+                                   size_t count, cui_disclosure_paint *paint) {
     if (!theme || !isfinite(p.width) || (p.width < 0 && p.width != -1) ||
         (p.trigger_style_count && !p.trigger_styles))
         return false;
@@ -48,6 +56,15 @@ static bool cui_disclosure_resolve(cui_context *ui, const cui_theme *theme,
              !cui_disclosure_nonnegative(s->inset_right)))
             return false;
     }
+    if (title_states) {
+        uint32_t text_caps = cui_text_capabilities(ui);
+        if ((title_states->item_count && !title_states->items) ||
+            !cui_disclosure_title_states_valid(&title_states->trigger, text_caps))
+            return false;
+        for (size_t i = 0; i < title_states->item_count && i < count; ++i)
+            if (!cui_disclosure_title_states_valid(&title_states->items[i], text_caps))
+                return false;
+    }
     cui_design_metrics m = {.font_size = theme->font_size,
                             .control_height = theme->control_height,
                             .gap = theme->gap,
@@ -58,6 +75,7 @@ static bool cui_disclosure_resolve(cui_context *ui, const cui_theme *theme,
     const cui_box *box = p.container_box;
     *paint = (cui_disclosure_paint){
         .options = p,
+        .title_states = title_states,
         .metrics = m,
         .fill_width =
             p.width != 0 || (box && (box->width != 0 || box->fixed_width || box->width_percent))};
@@ -190,6 +208,35 @@ cui_disclosure_trigger_part_for(const cui_disclosure_paint *paint, size_t index,
     return part;
 }
 
+static void cui_disclosure_apply_title_style(cui_disclosure_trigger_part *out,
+                                             cui_disclosure_title_style style) {
+    cui_disclosure_apply_part(out, (cui_disclosure_trigger_part){.typography = style.typography,
+                                                                 .custom_color = style.custom_color,
+                                                                 .color = style.color});
+}
+
+static void cui_disclosure_apply_title_interactions(cui_context *ui, cui_id id, size_t index,
+                                                    const cui_disclosure_title_interactions *styles,
+                                                    cui_disclosure_trigger_part *part) {
+    cui_interaction state = cui_interaction_state(ui, id);
+    const cui_disclosure_title_states empty = {0};
+    const cui_disclosure_title_states *item =
+        index < styles->item_count ? &styles->items[index] : &empty;
+    cui_pointer_type source;
+    if (state.hovered && cui_pointer_source(ui, &source) && source != CUI_POINTER_TOUCH) {
+        cui_disclosure_apply_title_style(part, styles->trigger.hovered);
+        cui_disclosure_apply_title_style(part, item->hovered);
+    }
+    if (state.focus_visible) {
+        cui_disclosure_apply_title_style(part, styles->trigger.focus_visible);
+        cui_disclosure_apply_title_style(part, item->focus_visible);
+    }
+    if (state.pressed) {
+        cui_disclosure_apply_title_style(part, styles->trigger.pressed);
+        cui_disclosure_apply_title_style(part, item->pressed);
+    }
+}
+
 static void cui_disclosure_title(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
                                  bool open, bool disabled, bool bounded,
                                  const cui_disclosure_paint *paint,
@@ -257,6 +304,8 @@ static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *
     box.border_width = bordered && !joined ? 1 : 0;
     cui_disclosure_trigger_part part =
         cui_disclosure_trigger_part_for(paint, index, open, disabled);
+    if (paint && paint->title_states && !disabled && !render)
+        cui_disclosure_apply_title_interactions(ui, id, index, paint->title_states, &part);
     const cui_box *override = part.box ? part.box : style;
     if (override)
         box = *override;
@@ -395,9 +444,18 @@ cui_disclosure_event_result cui_collapsible_present(cui_context *ui, cui_id id,
                                                     cui_disclosure_presentation presentation,
                                                     cui_disclosure_panel_fn panel, void *user,
                                                     cui_disclosure_handler handler) {
+    return cui_collapsible_present_with_title_states(ui, id, theme, label, open, options,
+                                                     presentation, NULL, panel, user, handler);
+}
+cui_disclosure_event_result cui_collapsible_present_with_title_states(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_str label, bool *open,
+    cui_collapsible_options options, cui_disclosure_presentation presentation,
+    const cui_disclosure_title_interactions *title_states, cui_disclosure_panel_fn panel,
+    void *user, cui_disclosure_handler handler) {
     cui_disclosure_paint paint;
     presentation.joined = false;
-    if (!ui || !id || !open || !cui_disclosure_resolve(ui, theme, presentation, 1, &paint))
+    if (!ui || !id || !open ||
+        !cui_disclosure_resolve(ui, theme, presentation, title_states, 1, &paint))
         return (cui_disclosure_event_result){0};
     return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user, handler,
                                          &paint);
@@ -499,9 +557,19 @@ cui_accordion_present(cui_context *ui, cui_id container, const cui_theme *theme,
                       const cui_disclosure_item *items, size_t count, bool *open,
                       cui_accordion_options options, cui_disclosure_presentation presentation,
                       cui_disclosure_panel_fn panel, void *user, cui_disclosure_handler handler) {
+    return cui_accordion_present_with_title_states(ui, container, theme, items, count, open,
+                                                   options, presentation, NULL, panel, user,
+                                                   handler);
+}
+
+cui_disclosure_event_result cui_accordion_present_with_title_states(
+    cui_context *ui, cui_id container, const cui_theme *theme, const cui_disclosure_item *items,
+    size_t count, bool *open, cui_accordion_options options,
+    cui_disclosure_presentation presentation, const cui_disclosure_title_interactions *title_states,
+    cui_disclosure_panel_fn panel, void *user, cui_disclosure_handler handler) {
     cui_disclosure_paint paint;
     if (!ui || !container || !items || !count || !open ||
-        !cui_disclosure_resolve(ui, theme, presentation, count, &paint))
+        !cui_disclosure_resolve(ui, theme, presentation, title_states, count, &paint))
         return (cui_disclosure_event_result){0};
     for (size_t i = 0; i < count; ++i)
         if (!items[i].id)

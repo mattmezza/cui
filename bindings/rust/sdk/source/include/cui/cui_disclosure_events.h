@@ -59,6 +59,18 @@ cui_disclosure_event_result cui_accordion_present(cui_context *, cui_id containe
                                                   cui_disclosure_presentation,
                                                   cui_disclosure_panel_fn, void *panel_user,
                                                   cui_disclosure_handler);
+/* Add optional interaction title layers without changing the presentation ABI.
+ * NULL interactions preserves _present behavior. Invalid interaction tokens or
+ * arrays leave expansion, callbacks and submission unchanged. */
+cui_disclosure_event_result cui_collapsible_present_with_title_states(
+    cui_context *, cui_id, const cui_theme *, cui_str, bool *open, cui_collapsible_options,
+    cui_disclosure_presentation, const cui_disclosure_title_interactions *, cui_disclosure_panel_fn,
+    void *panel_user, cui_disclosure_handler);
+cui_disclosure_event_result cui_accordion_present_with_title_states(
+    cui_context *, cui_id container, const cui_theme *, const cui_disclosure_item *, size_t count,
+    bool *open, cui_accordion_options, cui_disclosure_presentation,
+    const cui_disclosure_title_interactions *, cui_disclosure_panel_fn, void *panel_user,
+    cui_disclosure_handler);
 #ifdef __cplusplus
 }
 #endif

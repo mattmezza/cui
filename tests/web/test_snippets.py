@@ -25,7 +25,10 @@ const pick=(name)=>{const start=source.indexOf('const '+name+' = {');
 const context={paginationUsage,ratingUsage,timeFieldUsage};
 runInNewContext(pick('stories')+'\n'+pick('snippets')+'\nglobalThis.data={stories,snippets};',context);
 const {stories, snippets} = context.data;
-const inline = {Accordion: disclosureHeadingUsage(true), Collapsible: disclosureHeadingUsage(false)};
+const inline = {
+    Accordion: [false, true].map(interactive => disclosureHeadingUsage(true, interactive)),
+    Collapsible: [false, true].map(interactive => disclosureHeadingUsage(false, interactive)),
+};
 const standalone = {
     VirtualList: [virtualInboxUsage],
     Radio: [radioStyledUsage, radioControlledUsage],
@@ -79,8 +82,9 @@ def main():
     headers = '\n'.join(path.read_text() for path in (ROOT / 'include/cui').glob('*.h'))
     declarations = re.sub(r'/\*.*?\*/|//[^\n]*', '', headers, flags=re.S)
     inline = data['inline']
-    excerpts = list(snippets.items()) + list(inline.items()) + [
-        (story, snippet) for story, examples in standalone.items() for snippet in examples
+    excerpts = list(snippets.items()) + [
+        (story, snippet) for variants in (inline, standalone)
+        for story, examples in variants.items() for snippet in examples
     ]
     for story, snippet in excerpts:
         assert snippet.strip() and 'No complete styled browser example' not in snippet, story
@@ -96,7 +100,8 @@ def main():
         for token in set(re.findall(r'\b(CUI_[A-Z_0-9]+)\b', snippet)):
             assert token in headers, (story, token)
     compiled = [(story, '', snippets[story]) for story in stories if story in snippets]
-    compiled += [(story, '_heading', snippet) for story, snippet in inline.items()]
+    compiled += [(story, f'_heading_{i}', snippet)
+                 for story, examples in inline.items() for i, snippet in enumerate(examples)]
     extra = {
         'Video': 'cui_video_view confirmed_view = {0}; const cui_video_player_frame *decoded_frame = 0;',
         'VideoPlayer': 'cui_video_view confirmed_view = {0}; cui_video_audio_view confirmed_audio = {0}; const cui_video_player_frame *decoded_frame = 0; cui_video_request_fn queue_video_request = 0; void *video_host = 0;',

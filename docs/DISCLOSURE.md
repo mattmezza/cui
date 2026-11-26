@@ -192,8 +192,8 @@ cui_accordion_present(
 Each field inherits independently. Apply shared normal and item normal
 first, then shared and item expanded when open, then shared and item
 disabled when the trigger is disabled. A box replaces the preceding trigger box,
-including any box supplied through the component options. Hover, pressed
-and focus still use the existing paint styles without changing layout.
+including any box supplied through the component options. Trigger background
+and focus outline still use the existing paint styles.
 A title color can be transparent and the full accessible name stays
 available. Custom header callbacks still own their title and indicator.
 
@@ -218,6 +218,49 @@ active title typography and inset dividers. Retained C and the language
 builders can copy heading typography, title colors, row boxes and divider
 styles. [Retained C](BRIDGE_COMPONENTS.md#style-retained-headings-and-dividers) ·
 [Language builders](BRIDGE_COMPONENTS.md#style-heading-layers-and-dividers-from-language-builders)
+
+### Style titles for pointer and keyboard
+
+Use `cui_accordion_present_with_title_states` or
+`cui_collapsible_present_with_title_states` for hover, keyboard-focus and press
+typography and color. Keep using the same caller-owned expansion state and
+event handler. Pass `NULL` to use the ordinary presenter behavior.
+
+```c
+/* Reuse title, expanded_title, and appearance from the preceding example. */
+cui_typography_token hover_title = title;
+hover_title.style.weight = CUI_TEXT_WEIGHT_SEMIBOLD;
+cui_typography_token pressed_title = hover_title;
+pressed_title.style.italic = true;
+cui_disclosure_title_interactions title_states = {
+    .trigger = {
+        .hovered = {.typography = &hover_title},
+        .focus_visible = {.typography = &expanded_title, .custom_color = true,
+                          .color = theme.accent},
+        .pressed = {.typography = &pressed_title},
+    },
+};
+cui_accordion_present_with_title_states(
+    ui, id, &theme, items, count, expanded,
+    (cui_accordion_options){.bordered = true, .collapsible = true},
+    (cui_disclosure_presentation){.width = -1, .joined = true, .appearance = &appearance},
+    &title_states, draw_panel, user, (cui_disclosure_handler){0});
+```
+
+Layers apply to built-in, enabled titles after the normal and expanded
+appearance. Hover applies first, keyboard-visible focus next, and a primary
+pointer or Space press last. Within each layer, item fields override shared
+fields independently. Supply `items` and `item_count` for per-item styles.
+Collapsible reads the first item when present. The presenter reads the
+descriptors and typography during submission.
+
+Mouse and pen hover use the previous completed layout's hit geometry. Touch
+applies the pressed style while held and clears it on release. An intrinsic
+row can change height when the active font metrics change. For stable hit
+geometry, use a fixed trigger box with room for every style. The gallery's
+**Interactive headings** option demonstrates these states with copyable C.
+Retained C and language builders currently expose normal, expanded and
+disabled heading layers.
 
 ### Measured reveal
 

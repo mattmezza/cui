@@ -717,6 +717,23 @@ static cui_bridge_status (*carousel_set_control_sizes)(cui_bridge_app *, cui_bri
                                                        uint32_t, uint32_t);
 static cui_bridge_status (*carousel_create_slot)(cui_bridge_app *, cui_bridge_node, uint32_t,
                                                  const char *, cui_bridge_node *);
+static cui_bridge_status (*kbd_stroke_set)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                                           uint32_t, const char *, size_t, const char *, size_t);
+static int go_kbd_stroke_supported(void) { return kbd_stroke_set != NULL; }
+static cui_bridge_status go_kbd_stroke_set(cui_bridge_app *a, cui_bridge_node n, uint32_t m,
+                                           uint32_t f, const char *k, size_t kb,
+                                           const char *name, size_t nb) {
+ return kbd_stroke_set(a, n, m, f, k, kb, name, nb);
+}
+static void go_kbd_stroke_initialize(void) {
+ if (bridge_lib)
+  go_load_optional_symbol(&kbd_stroke_set, sizeof kbd_stroke_set,
+                          "cui_bridge_set_kbd_stroke_v1");
+#if defined(CUI_GO_STATIC)
+ else
+  kbd_stroke_set = cui_bridge_set_kbd_stroke_v1;
+#endif
+}
 static void go_carousel_initialize(void) {
  if (bridge_lib) {
   go_load_optional_symbol(&carousel_adjacent, sizeof carousel_adjacent,
@@ -811,6 +828,7 @@ static int bridge_open(const char *path) {
  go_disclosure_initialize();
  go_attachment_initialize();
  go_carousel_initialize();
+ go_kbd_stroke_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -851,6 +869,7 @@ static int bridge_open(const char *path) {
  go_disclosure_initialize();
  go_attachment_initialize();
  go_carousel_initialize();
+ go_kbd_stroke_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -977,6 +996,7 @@ type Node struct {
 	attachmentSlotWidth                  float32
 	carouselBasis                        float32
 	carouselFit                          bool
+	kbdStroke                            *kbdStrokeConfig
 	carouselAxis                         CarouselAxis
 	carouselLooping                      bool
 	carouselControls                     C.uint32_t
@@ -2116,6 +2136,9 @@ func (a *App) Mount(root *Node) error {
 		if err := a.validateCarouselSlots(n, parent); err != nil {
 			return err
 		}
+		if n.kbdStroke != nil && C.go_kbd_stroke_supported() == 0 {
+			return ErrKbdStrokeUnavailable
+		}
 		if n.carouselAxis == CarouselVertical && C.go_carousel_axis_supported() == 0 {
 			return ErrCarouselAxisUnavailable
 		}
@@ -2647,6 +2670,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.carouselAxis == CarouselVertical {
 			if err := result(C.go_carousel_set_axis(a.ptr, h, C.uint32_t(n.carouselAxis))); err != nil {
+				return err
+			}
+		}
+		if n.kbdStroke != nil {
+			if err := n.setKbdStroke(*n.kbdStroke); err != nil {
 				return err
 			}
 		}
@@ -6466,4 +6494,36 @@ func (n *Node) SetRadioPaint(layer RadioPaintLayer, paint RadioPaint) error {
 		n.radioPaints[layer] = paint
 	}
 	return nil
+}
+
+// SupportsKbdStroke reports whether typed shortcut presentation is available.
+func (a *App) SupportsKbdStroke() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_kbd_stroke_supported() != 0, nil
+}
+func (n *Node) setKbdStroke(c kbdStrokeConfig) error {
+	supported, err := n.app.SupportsKbdStroke()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrKbdStrokeUnavailable
+	}
+	key, name := cs(c.key), cs(c.options.AccessibleName)
+	defer C.free(unsafe.Pointer(key))
+	defer C.free(unsafe.Pointer(name))
+	var flags C.uint32_t
+	if c.options.Plain {
+		flags |= C.CUI_BRIDGE_KBD_PLAIN_V1
+	}
+	if c.options.Outline {
+		flags |= C.CUI_BRIDGE_KBD_OUTLINE_V1
+	}
+	if c.options.MacSymbols {
+		flags |= C.CUI_BRIDGE_KBD_MAC_SYMBOLS_V1
+	}
+	return result(C.go_kbd_stroke_set(n.app.ptr, n.handle, C.uint32_t(c.options.Modifiers),
+		flags, key, C.size_t(len(c.key)), name, C.size_t(len(c.options.AccessibleName))))
 }

@@ -1985,6 +1985,7 @@
       "tests": [
         "tests/unit/test_content.c",
         "tests/unit/test_kbd.c",
+        "tests/unit/test_bridge_kbd.c",
         "tests/web/test_kbd_stepper_gallery.py"
       ],
       "status": "tested",
@@ -1993,7 +1994,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Typed single-stroke hints support Unicode 17 first-scalar uppercase, pill box and typography overrides, and solid or linear text paint. Host Action/keybinding lookup, general inherited styling and retained typed hints remain open; see docs/KBD.md."
+        "Typed single-stroke hints are available in immediate C, retained C and all five language bindings. Per-hint box and typography overrides and solid or linear text paint are immediate C. Host Action/keybinding lookup and general inherited styling remain open; see docs/KBD.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2033,6 +2034,19 @@
           "evidence": [
             "tests/unit/test_kbd.c",
             "tests/web/test_kbd_stepper_gallery.py",
+            "docs/KBD.md"
+          ]
+        },
+        {
+          "name": "retained typed hint and optional provider compatibility",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_kbd.c",
+            "bindings/python/test_kbd_stroke.py",
+            "bindings/node/test/kbd-stroke.test.cjs",
+            "bindings/typescript/components.typecheck.ts",
+            "bindings/go/cui/kbd_stroke_test.go",
+            "bindings/rust/tests/builders.rs",
             "docs/KBD.md"
           ]
         },

@@ -2258,3 +2258,43 @@ fn stepper_fill_authoring() {
     }
     app.step(0.016).unwrap();
 }
+
+#[test]
+fn typed_kbd_optional_provider() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(400., 200.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let options = KbdStrokeOptions {
+        modifiers: KbdModifiers::CTRL | KbdModifiers::SHIFT,
+        outline: true,
+        ..Default::default()
+    };
+    let result = app.child_kbd_stroke(root, "save", "S", &options);
+    let supported = app.supports_kbd_stroke();
+    if let Ok(expected) = std::env::var("CUI_EXPECT_KBD_STROKE") {
+        assert_eq!(supported, expected == "1");
+    }
+    if !supported {
+        assert_eq!(result, Err(Error::KBD_STROKE_UNAVAILABLE));
+        let legacy = app.child(root, Kind::Kbd, "legacy").unwrap();
+        app.text(legacy, "Ctrl+S").unwrap();
+        app.step(0.016).unwrap();
+        return;
+    }
+    let node = result.unwrap();
+    app.step(0.016).unwrap();
+    let bounds = app.bounds(node).unwrap();
+    assert!(bounds.width > 0. && bounds.height > 0.);
+    assert_eq!(app.kbd_stroke(node, "", &options).err(), Some(Error(3)));
+    app.kbd_stroke(node, "Enter", &KbdStrokeOptions {
+        modifiers: KbdModifiers::META,
+        mac_symbols: true,
+        accessible_name: "Confirm".into(),
+        ..Default::default()
+    }).unwrap();
+    app.step(0.016).unwrap();
+    let label = app.child(root, Kind::Label, "wrong-kind").unwrap();
+    assert_eq!(app.kbd_stroke(label, "S", &options).err(), Some(Error(8)));
+    app.remove(node).unwrap();
+    assert_eq!(app.kbd_stroke(node, "S", &options).err(), Some(Error(4)));
+}

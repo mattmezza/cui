@@ -1835,6 +1835,43 @@ static napi_value set_radio_tab_index(napi_env env, napi_callback_info info) {
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 
+typedef cui_bridge_status (*kbd_stroke_fn)(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t,
+                                           const char *, size_t, const char *, size_t);
+static kbd_stroke_fn kbd_stroke_symbol(void) {
+    kbd_stroke_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_set_kbd_stroke_v1");
+    return set;
+}
+static napi_value supports_kbd_stroke(napi_env env, napi_callback_info info) {
+    (void)info;
+    napi_value result;
+    return napi_get_boolean(env, kbd_stroke_symbol() != NULL, &result) == napi_ok ? result : NULL;
+}
+static napi_value set_kbd_stroke(napi_env env, napi_callback_info info) {
+    napi_value v[6];
+    js_app *app;
+    js_node *node;
+    uint32_t modifiers, flags;
+    char *key = NULL, *name = NULL;
+    if (!args(env, info, 6, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &modifiers) || !uint_arg(env, v[3], &flags))
+        return NULL;
+    kbd_stroke_fn set = kbd_stroke_symbol();
+    if (!set)
+        return fail(env, "Typed Kbd requires cui_bridge_set_kbd_stroke_v1");
+    if (!string_arg(env, v[4], &key))
+        return NULL;
+    if (!string_arg(env, v[5], &name)) {
+        free(key);
+        return NULL;
+    }
+    cui_bridge_status code =
+        set(app->bridge, node->node, modifiers, flags, key, strlen(key), name, strlen(name));
+    free(key);
+    free(name);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 typedef cui_bridge_status (*radio_tooltip_fn)(cui_bridge_app *, cui_bridge_node, const char *,
                                               uint32_t);
 
@@ -2963,6 +3000,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setRadioMotion", set_radio_motion, 0);
     EXPORT("supportsRadioTabIndex", supports_radio_tab_index, 0);
     EXPORT("setRadioTabIndex", set_radio_tab_index, 0);
+    EXPORT("supportsKbdStroke", supports_kbd_stroke, 0);
+    EXPORT("setKbdStroke", set_kbd_stroke, 0);
     EXPORT("supportsRadioTooltip", supports_radio_tooltip, 0);
     EXPORT("setRadioTooltip", set_radio_tooltip, 0);
     EXPORT("setValue", set_num, 7);

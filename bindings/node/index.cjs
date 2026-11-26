@@ -100,6 +100,7 @@ function requestsRadioMotion(node) {
 }
 const stepperFillUnavailable = 'Stepper Fill requires cui_bridge_set_stepper_fill';
 function preflightNodeOptions(app, node, insideDecoration = false, insideAttachmentSlot = false) {
+  if (node.kbdStrokeValue && !app.supportsKbdStroke()) throw new Error('Typed Kbd requires cui_bridge_set_kbd_stroke_v1');
   if (node.carouselAxisValue === 'vertical' && !app.supports_carousel_axis()) throw new Error('Carousel axis unavailable');
   if (node.carouselControlSizesValue.some(Boolean) && !app.supports_carousel_control_sizes()) throw new Error('Carousel control sizes unavailable');
   if (node.carouselControlsValue && !app.supports_carousel_controls()) throw new Error('Carousel controls unavailable');
@@ -831,6 +832,26 @@ function bubble(key,text="") {const node=new Node(31,text);return key===undefine
 function empty_view(key,text="") {const node=new Node(32,text);return key===undefined?node:node.key(key);}
 function group_box(key,text="") {const node=new Node(33,text);return key===undefined?node:node.key(key);}
 function kbd(key,text="") {const node=new Node(34,text);return key===undefined?node:node.key(key);}
+function kbdStroke(key, strokeKey, options = {}) {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('Kbd options must be an object');
+  const {modifiers = 0, plain = false, outline = false, macSymbols = false, accessibleName = ''} = options;
+  if (!Number.isInteger(modifiers) || modifiers < 0 || modifiers > 15) throw new TypeError('invalid Kbd modifiers');
+  if ([plain, outline, macSymbols].some(value => typeof value !== 'boolean')) throw new TypeError('Kbd presentation options must be boolean');
+  const text = (value, limit, required) => {
+    if (typeof value !== 'string') throw new TypeError('Kbd text must be string');
+    if (value.length > limit) throw new TypeError('Kbd text exceeds its UTF-8 byte limit');
+    const bytes = Buffer.from(value, 'utf8');
+    if ((required && !bytes.length) || bytes.length > limit ||
+        /[\x00-\x1f\x7f\x85\u2028\u2029]/.test(value) || bytes.toString('utf8') !== value)
+      throw new TypeError('invalid Kbd UTF-8 text');
+    return value;
+  };
+  const node = kbd(key);
+  node.kbdStrokeValue = [modifiers, Number(plain) | Number(outline) << 1 | Number(macSymbols) << 2,
+    text(strokeKey, 128, true), text(accessibleName, 1024, false)];
+  return node;
+}
+
 function skeleton(key,text="") {const node=new Node(35,text);return key===undefined?node:node.key(key);}
 function spinner(key,text="") {const node=new Node(36,text);return key===undefined?node:node.key(key);}
 function tag(key,text="") {const node=new Node(37,text);return key===undefined?node:node.key(key);}
@@ -973,6 +994,7 @@ class App {
       if (node.radioTabIndexValue !== null)
         native.setRadioTabIndex(this.handle, node[NODE], true, node.radioTabIndexValue);
       if (node.radioContentValue) native.setRadioItemContent(this.handle, node[NODE], true);
+      if (node.kbdStrokeValue) native.setKbdStroke(this.handle, node[NODE], ...node.kbdStrokeValue);
       if (node.radioTooltipValue) native.setRadioTooltip(this.handle, node[NODE], ...node.radioTooltipValue);
       if ([9,14].includes(node.kind)) native.setRange(this.handle,node[NODE],...node.rangeValue);
       if([42,43].includes(node.kind))native.setTotal(this.handle,node[NODE],node.totalValue);
@@ -1225,6 +1247,10 @@ class App {
     return typeof native.supportsRadioItemContent === 'function' &&
       typeof native.setRadioItemContent === 'function' && native.supportsRadioItemContent();
   }
+  supportsKbdStroke() {
+    this._alive();
+    return typeof native.supportsKbdStroke === 'function' && typeof native.setKbdStroke === 'function' && native.supportsKbdStroke();
+  }
   supports_radio_tooltip() {
     this._alive();
     return typeof native.supportsRadioTooltip === 'function' &&
@@ -1296,7 +1322,7 @@ class App {
   close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);ratingOptions.release(node);if(node.kind===81)node.requestValue=null;} return this; }
   dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);ratingOptions.release(node);if(node.kind===81)node.requestValue=null;} this.nodes.clear(); } }
 }
-module.exports = {carousel_slot,RadioPaintLayer,radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,attachment_slot,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
+module.exports = {carousel_slot,RadioPaintLayer,radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,kbdStroke,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,attachment_slot,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
 
 Object.assign(module.exports, sliderModels.exports);
 

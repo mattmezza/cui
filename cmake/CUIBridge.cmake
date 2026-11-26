@@ -15,6 +15,10 @@ add_executable(test_bridge_core ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_br
 target_link_libraries(test_bridge_core PRIVATE cui_bridge)
 cui_warnings(test_bridge_core)
 add_test(NAME bridge_core COMMAND test_bridge_core)
+add_executable(test_bridge_kbd ${CUI_BRIDGE_ROOT}/tests/unit/test_bridge_kbd.c)
+target_link_libraries(test_bridge_kbd PRIVATE cui)
+cui_warnings(test_bridge_kbd)
+add_test(NAME bridge_kbd COMMAND test_bridge_kbd)
 add_executable(test_bridge_skeleton ${CUI_BRIDGE_ROOT}/tests/unit/test_bridge_skeleton.c)
 target_link_libraries(test_bridge_skeleton PRIVATE cui_software)
 cui_warnings(test_bridge_skeleton)
@@ -733,6 +737,9 @@ add_test(NAME bridge_python_models COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_carousel_slots COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_carousel_slots.py)
+add_test(NAME bridge_python_kbd_stroke COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge> CUI_EXPECT_KBD_STROKE=1
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_kbd_stroke.py)
 add_test(NAME bridge_python_keyed_data_table_example COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/data_table_live.py)

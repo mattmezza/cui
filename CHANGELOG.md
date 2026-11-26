@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Retained C, Python, JavaScript, TypeScript, Go and Rust can compose typed Kbd
+  hints with platform labels, plain or outline styles, and accessible names.
+  Providers without typed Kbd continue to accept literal shortcuts.
 - Style Kbd pills with a shared box, typography token and solid or gradient
   text. Bounded pills can wrap as the parent narrows.
 - Typed Kbd hints apply Unicode 17 uppercase to the first scalar. They handle

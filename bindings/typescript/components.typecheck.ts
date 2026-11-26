@@ -181,3 +181,14 @@ if (app.supports_carousel_navigation()) {
 navigationRail.carousel_step(1);
 // @ts-expect-error Navigation belongs to Carousel.
 c.button('navigation-button').carousel_adjacent();
+
+const hasTypedKbd: boolean = app.supportsKbdStroke();
+const typedKbd = c.kbdStroke('save', 'K', {modifiers: 10, plain: true, outline: false, macSymbols: true, accessibleName: 'Save'});
+c.column().children(typedKbd, c.kbd('legacy', 'Ctrl+K'));
+// @ts-expect-error typed keyboard key must be a string
+c.kbdStroke('bad', 4);
+// @ts-expect-error presentation flag must be boolean
+c.kbdStroke('bad', 'K', {plain: 1});
+// @ts-expect-error option names use camelCase
+c.kbdStroke('bad', 'K', {mac_symbols: true});
+void hasTypedKbd;

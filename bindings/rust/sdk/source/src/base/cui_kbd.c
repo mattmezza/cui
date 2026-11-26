@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_kbd.h"
+#include "cui_kbd_internal.h"
 #include <string.h>
 
 /* BEGIN GENERATED KBD UPPERCASE TABLE */
@@ -1603,17 +1604,8 @@ static size_t cui_kbd_uppercase_first(const char *key, size_t bytes, char *outpu
 size_t cui_kbd_format_stroke(cui_kbd_stroke stroke, bool mac, char *output, size_t capacity) {
     if ((stroke.modifiers & ~(CUI_MOD_CTRL | CUI_MOD_ALT | CUI_MOD_SHIFT | CUI_MOD_META)) ||
         !stroke.key.data || !stroke.key.length || stroke.key.length > CUI_KBD_KEY_MAX_BYTES ||
-        !cui_text_line_source_valid(
-            (cui_text_line_source){.paragraph = stroke.key, .byte_end = stroke.key.length}))
+        !cui_kbd_line_valid(stroke.key))
         return SIZE_MAX;
-    for (size_t i = 0; i < stroke.key.length; ++i) {
-        unsigned char c = (unsigned char)stroke.key.data[i];
-        if (c < 32 || c == 127 ||
-            (i + 2 < stroke.key.length && c == 0xe2 &&
-             (unsigned char)stroke.key.data[i + 1] == 0x80 &&
-             (unsigned char)stroke.key.data[i + 2] == 0xa8))
-            return SIZE_MAX;
-    }
     static const struct {
         const char *key, *normal, *mac;
     } names[] = {{"ctrl", "Ctrl", "⌃"},

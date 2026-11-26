@@ -185,6 +185,10 @@ class _API:
         if hasattr(lib, "cui_bridge_radio_item_set_content_v1"):
             self.radio_item_set_content = bind("radio_item_set_content_v1", C.c_int,
                                                C.c_void_p, _Handle, C.c_uint32)
+        self.set_kbd_stroke = None
+        if hasattr(lib, "cui_bridge_set_kbd_stroke_v1"):
+            self.set_kbd_stroke = bind("set_kbd_stroke_v1", C.c_int, C.c_void_p, _Handle,
+                                       C.c_uint32, C.c_uint32, C.c_char_p, C.c_size_t, C.c_char_p, C.c_size_t)
         self.radio_set_tooltip = None
         if hasattr(lib, "cui_bridge_radio_set_tooltip_v1"):
             self.radio_set_tooltip = bind("radio_set_tooltip_v1", C.c_int, C.c_void_p,
@@ -566,6 +570,7 @@ class Widget:
         self._radio_tab_index: int | None = None
         self._radio_paints: dict[RadioPaintLayer, RadioPaint] | None = None
         self._radio_content = False
+        self._kbd_stroke = None
         self._radio_tooltip: tuple[bytes, int] | None = None
         self._detail = ""
         self._open = False
@@ -1926,6 +1931,32 @@ def kbd(key: str, text: str = "") -> Widget:
     return Widget("kbd", key, text)
 
 
+def kbd_stroke(key: str, stroke_key: str, *, modifiers: int = 0,
+               plain: bool = False, outline: bool = False, mac_symbols: bool = False,
+               accessible_name: str = "") -> Widget:
+    """A retained typed keyboard stroke; requires the optional Kbd V1 bridge."""
+    if type(modifiers) is not int or not 0 <= modifiers <= 15:
+        raise ValueError("modifiers must contain only the four supported bits")
+    if any(type(value) is not bool for value in (plain, outline, mac_symbols)):
+        raise TypeError("Kbd presentation options must be bool")
+    def encode(value, limit, required=False):
+        if not isinstance(value, str):
+            raise TypeError("Kbd text must be str")
+        if len(value) > limit:
+            raise ValueError("Kbd text exceeds its UTF-8 byte limit")
+        encoded = value.encode("utf-8", "strict")
+        if ((required and not encoded) or len(encoded) > limit or
+                any(ord(c) < 32 or c in "\x7f\x85\u2028\u2029" for c in value)):
+            raise ValueError("Kbd text must be one line within its UTF-8 byte limit")
+        return encoded
+    stroke = encode(stroke_key, 128, True)
+    name = encode(accessible_name, 1024)
+    node = Widget("kbd", key)
+    node._kbd_stroke = (modifiers, int(plain) | int(outline) << 1 | int(mac_symbols) << 2,
+                        stroke, len(stroke), name, len(name))
+    return node
+
+
 def skeleton(key: str, text: str = "") -> Widget:
     return Widget("skeleton", key, text)
 
@@ -2255,6 +2286,11 @@ class App:
         if not self.supports_radio_item_content():
             raise RuntimeError("Radio decoration requires cui_bridge_radio_item_set_content_v1")
 
+    def supports_kbd_stroke(self) -> bool:
+        """Report whether the loaded bridge can format typed shortcut hints."""
+        self._ensure_open()
+        return self._api.set_kbd_stroke is not None
+
     def supports_radio_tooltip(self) -> bool:
         """Report whether the loaded bridge can attach a hint to a radio option."""
         self._ensure_open()
@@ -2351,6 +2387,8 @@ class App:
                 node._preflight_rating(self)
             if isinstance(node, Pagination):
                 node._preflight_pagination(self)
+            if node._kbd_stroke is not None and not self.supports_kbd_stroke():
+                raise RuntimeError("Typed Kbd requires cui_bridge_set_kbd_stroke_v1")
             if node._stepper_fill is not None:
                 self._require_stepper_fill()
             if node._carousel_axis == "vertical" and not self.supports_carousel_axis():
@@ -2479,6 +2517,8 @@ class App:
                         node._change("radio_set_paint", int(layer), C.byref(wire))
                 if node._radio_content:
                     node._change("radio_item_set_content", 1)
+                if node._kbd_stroke is not None:
+                    node._change("set_kbd_stroke", *node._kbd_stroke)
                 if node._radio_tooltip is not None:
                     node._change("radio_set_tooltip", *node._radio_tooltip)
                 if node.kind in {"slider", "number_input"}:
@@ -3245,3 +3285,5 @@ __all__ += ["AttachmentOptions", "AttachmentTextStyle", "AttachmentStatus",
 __all__ += ["AttachmentActionNotificationV1", "ComponentNotificationV1"]
 
 __all__ += ["CarouselSlotRole", "carousel_slot"]
+
+__all__ += ["kbd_stroke"]

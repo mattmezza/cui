@@ -109,15 +109,84 @@ Style values are read during the call. Gradient stops are copied for that
 frame, so local arrays are safe. Invalid typography and gradient definitions
 fail before the hint is submitted. To add a shadow, use
 `cui_element_set_shadow_preset` on the submitted keycap ID. Backgrounds use
-Core's solid box fill. The retained builders accept a preformatted label.
+Core's solid box fill.
 See [shared typography](TYPOGRAPHY.md) for renderer and provider requirements.
 
 Ordinary row composition fits its contents; it does not automatically turn a
 shortcut list into a responsive wrapping grid. For narrow help panels, let the
 owner split rows using the host's available-width/layout policy. Joining multiple
 strokes into one sequence or looking up host Action/context/focus/global
-bindings remains outside this API. Do not promote full Kbd parity from these
-formatting and presentation additions.
+bindings remains outside this API.
+
+## Show a shortcut in a retained UI
+
+Use a Kbd node beside the action it describes. The same formatter handles
+special key names, Unicode uppercase, and native-style modifier labels in all
+five language builders. Choose the macOS convention explicitly. Supply an
+accessible name when the symbols alone give too little spoken context.
+
+```python
+from cui_bridge import App, column, kbd, kbd_stroke, label, row
+
+with App(backend="none", width=400, height=180) as app:
+    hint = (kbd_stroke("keys", "k", modifiers=2 | 1, outline=True,
+                       accessible_name="Control Shift K")
+            if app.supports_kbd_stroke() else kbd("keys", "Ctrl+Shift+K"))
+    app.mount(column("root").children(
+        row("shortcut").children(label("action", "Open command palette"), hint)
+    ))
+    app.step()
+    print(app.bounds(hint))
+```
+
+```javascript
+const {App, column, kbd, kbdStroke, label, row} = require('@cui/native');
+const app = new App({backend: 'headless', width: 400, height: 180});
+try {
+  const hint = app.supportsKbdStroke()
+    ? kbdStroke('keys', 'k', {modifiers: 2 | 1, outline: true, accessibleName: 'Control Shift K'})
+    : kbd('keys', 'Ctrl+Shift+K');
+  app.mount(column('root').children(
+    row('shortcut').children(label('action', 'Open command palette'), hint)
+  ));
+  app.step();
+  console.log(hint.bounds());
+} finally {
+  app.dispose();
+}
+```
+
+The scripts run headlessly. See the [language guide](LANGUAGE_BINDINGS.md) for installation,
+opening a native window and running the application loop. TypeScript uses the
+same `kbdStroke` function and exports `KbdStrokeOptions`. Python and JS/TS use
+modifier bits Shift = 1, Control = 2, Alt = 4 and Meta = 8.
+
+Go creates the hint with
+`cui.KbdStroke("keys", "k", cui.KbdStrokeOptions{Modifiers: cui.KbdCtrl | cui.KbdShift, Outline: true})`.
+Probe `app.SupportsKbdStroke()` before choosing the typed or literal factory.
+`hint.ConfigureKbdStroke(key, options)` updates a mounted hint on the owner
+thread. Rust probes `app.supports_kbd_stroke()` and creates the hint with
+`app.child_kbd_stroke(parent, "keys", "k", &options)?`. Use
+`KbdModifiers::CTRL | KbdModifiers::SHIFT` in `KbdStrokeOptions`, and use
+`app.kbd_stroke(node, key, &options)?` to update it.
+
+In retained C, create a `CUI_BRIDGE_KBD` node and configure it with
+`cui_bridge_set_kbd_stroke_v1`. Pass explicit lengths in bytes. The bridge
+copies the key and accessible name during the call. The key takes 1–128
+UTF-8 bytes and an optional name takes up to 1024 bytes. The setter rejects
+multiline strings and ASCII control characters. A failed call keeps the
+previous hint. An empty accessible name uses the formatted label. Plain
+presentation takes precedence over outline. Typed hints report a passive
+label and emit no interaction events.
+
+Passing zero flags, zero modifiers, two NULL pointers and two zero lengths
+restores the literal held by the node. The literal remains available through
+`cui_bridge_get_text` and can be changed with `cui_bridge_set_text`. Older
+providers keep the literal API. The language probes detect the optional
+export before the typed node is attached. Custom box, typography and text
+paint, and standalone formatting remain immediate C APIs.
+
+## Verification
 
 The C and WASI fixtures exercise all 1,580 changed Unicode 17 uppercase
 mappings, scalar-safe truncation, overlap, untouched suffixes, the legacy
@@ -125,10 +194,12 @@ helper, geometry and accessible labels. The style fixture covers first-frame
 width, responsive wrapping, copied gradient stops and the unstyled plain
 path. The headless gallery inspects the semantic and draw labels, pill width,
 monospace style and gradient stops.
+Retained tests cover copied inputs, paint, accessible names, passive pointer
+behavior, malformed input, and literal restoration after a typed hint.
 
 ```sh
 cmake -S tests/fixtures/kbd -B /path/to/private-build -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS='-Wall -Wextra -Wpedantic -Werror'
 cmake --build /path/to/private-build --target test_kbd kbd_guide test_content
-python scripts/test_local.py --build-dir /path/to/private-build -- -R '^(kbd_source|content)$'
+python scripts/test_local.py --build-dir /path/to/private-build -- -R '^(kbd|content)$'
 ```

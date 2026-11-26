@@ -41,6 +41,7 @@ typedef struct bridge_data_table_owned bridge_data_table_owned;
 typedef struct bridge_rating_configured bridge_rating_configured;
 typedef struct bridge_disclosure_headings bridge_disclosure_headings;
 typedef struct bridge_disclosure_titles bridge_disclosure_titles;
+typedef struct bridge_kbd_owned bridge_kbd_owned;
 typedef enum {
     BRIDGE_STEPPER_BUTTONS,
     BRIDGE_STEPPER_FIXED,
@@ -53,6 +54,7 @@ typedef struct {
     uint32_t parent, first_child, last_child, next_sibling;
     cui_id id;
     char *key, *text, *detail;
+    bridge_kbd_owned *kbd;
     float gap, custom_radius;
     cui_bridge_button_variant variant;
     cui_bridge_button_size size;

@@ -50,6 +50,9 @@ add_test(NAME node_components COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/components.test.cjs)
 add_test(NAME node_extended COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/extended.test.cjs)
+add_test(NAME node_kbd_stroke COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_EXPECT_KBD_STROKE=1
+ ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/kbd-stroke.test.cjs)
 add_test(NAME node_models COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/models.test.cjs)
 add_test(NAME node_attachment_options COMMAND ${CMAKE_COMMAND} -E env

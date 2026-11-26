@@ -902,3 +902,15 @@ export type CarouselSlotRole = 'previous' | 'next' | 'marker';
 export interface CarouselSlot extends Container {}
 export function carousel_slot(key: string, role: CarouselSlotRole, label?: string): CarouselSlot;
 export interface App { supports_carousel_slots(): boolean }
+
+export interface KbdStrokeOptions {
+  /** SHIFT=1, CTRL=2, ALT=4, META=8. */
+  modifiers?: number;
+  plain?: boolean;
+  outline?: boolean;
+  macSymbols?: boolean;
+  accessibleName?: string;
+}
+/** Retained typed keyboard stroke. Requires the optional Kbd V1 bridge. */
+export function kbdStroke(key: string, strokeKey: string, options?: KbdStrokeOptions): Label;
+export interface App { supportsKbdStroke(): boolean; }

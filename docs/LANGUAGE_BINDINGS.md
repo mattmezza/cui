@@ -9,6 +9,8 @@ For UI trees authored directly in Python, JavaScript or TypeScript, use
 components in Python, JavaScript and TypeScript, with dedicated
 [Go](GO_BUILDERS.md) and [Rust](RUST_BUILDERS.md) APIs as well. See the
 [coverage table](BRIDGE_COMPONENTS.md) for the current component scope and limits.
+The [shortcut hint guide](KBD.md#show-a-shortcut-in-a-retained-ui) has a runnable
+retained UI and shows how to check whether the provider supports typed shortcuts.
 The examples below also demonstrate hosting an existing C-authored application.
 
 The examples below remain useful for embedding an application whose UI is

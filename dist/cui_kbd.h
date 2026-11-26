@@ -61,6 +61,28 @@ bool cui_kbd_styled(cui_context *, cui_id, const cui_theme *, cui_kbd_stroke, cu
 /* src/base/cui_kbd.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_KBD_INTERNAL_H
+#define CUI_KBD_INTERNAL_H
+
+enum { CUI_KBD_NAME_MAX_BYTES = 1024 };
+
+static inline bool cui_kbd_line_valid(cui_str text) {
+    if (!cui_text_line_source_valid(
+            (cui_text_line_source){.paragraph = text, .byte_end = text.length}))
+        return false;
+    for (size_t i = 0; i < text.length; ++i) {
+        unsigned char c = (unsigned char)text.data[i];
+        if (c < 32 || c == 127 ||
+            (i + 2 < text.length && c == 0xe2 && (unsigned char)text.data[i + 1] == 0x80 &&
+             (unsigned char)text.data[i + 2] == 0xa8))
+            return false;
+    }
+    return true;
+}
+
+#endif
+
 #include <string.h>
 
 /* BEGIN GENERATED KBD UPPERCASE TABLE */
@@ -1664,17 +1686,8 @@ static size_t cui_kbd_uppercase_first(const char *key, size_t bytes, char *outpu
 size_t cui_kbd_format_stroke(cui_kbd_stroke stroke, bool mac, char *output, size_t capacity) {
     if ((stroke.modifiers & ~(CUI_MOD_CTRL | CUI_MOD_ALT | CUI_MOD_SHIFT | CUI_MOD_META)) ||
         !stroke.key.data || !stroke.key.length || stroke.key.length > CUI_KBD_KEY_MAX_BYTES ||
-        !cui_text_line_source_valid(
-            (cui_text_line_source){.paragraph = stroke.key, .byte_end = stroke.key.length}))
+        !cui_kbd_line_valid(stroke.key))
         return SIZE_MAX;
-    for (size_t i = 0; i < stroke.key.length; ++i) {
-        unsigned char c = (unsigned char)stroke.key.data[i];
-        if (c < 32 || c == 127 ||
-            (i + 2 < stroke.key.length && c == 0xe2 &&
-             (unsigned char)stroke.key.data[i + 1] == 0x80 &&
-             (unsigned char)stroke.key.data[i + 2] == 0xa8))
-            return SIZE_MAX;
-    }
     static const struct {
         const char *key, *normal, *mac;
     } names[] = {{"ctrl", "Ctrl", "⌃"},
@@ -1713,6 +1726,28 @@ size_t cui_kbd_format_stroke(cui_kbd_stroke stroke, bool mac, char *output, size
 
 /* src/components/cui_kbd.c */
 /* SPDX-License-Identifier: MIT */
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_KBD_INTERNAL_H
+#define CUI_KBD_INTERNAL_H
+
+enum { CUI_KBD_NAME_MAX_BYTES = 1024 };
+
+static inline bool cui_kbd_line_valid(cui_str text) {
+    if (!cui_text_line_source_valid(
+            (cui_text_line_source){.paragraph = text, .byte_end = text.length}))
+        return false;
+    for (size_t i = 0; i < text.length; ++i) {
+        unsigned char c = (unsigned char)text.data[i];
+        if (c < 32 || c == 127 ||
+            (i + 2 < text.length && c == 0xe2 && (unsigned char)text.data[i + 1] == 0x80 &&
+             (unsigned char)text.data[i + 2] == 0xa8))
+            return false;
+    }
+    return true;
+}
+
+#endif
 
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_TEXT_PAINT_INTERNAL_H
@@ -1798,19 +1833,10 @@ bool cui_kbd_styled(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_
     char text[CUI_KBD_TEXT_CAPACITY];
     if (!ui || !id || !theme || !cui_frame_is_submitting(ui) || !isfinite(theme->font_size) ||
         theme->font_size <= 0 || theme->font_size > 512 || !isfinite(theme->radius) ||
-        theme->radius < 0 || options.accessible_name.length > 1024 ||
-        !cui_text_line_source_valid((cui_text_line_source){
-            .paragraph = options.accessible_name, .byte_end = options.accessible_name.length}) ||
+        theme->radius < 0 || options.accessible_name.length > CUI_KBD_NAME_MAX_BYTES ||
+        !cui_kbd_line_valid(options.accessible_name) ||
         cui_kbd_format_stroke(stroke, options.mac_symbols, text, sizeof text) == SIZE_MAX)
         return false;
-    for (size_t i = 0; i < options.accessible_name.length; ++i) {
-        unsigned char c = (unsigned char)options.accessible_name.data[i];
-        if (c < 32 || c == 127 ||
-            (i + 2 < options.accessible_name.length && c == 0xe2 &&
-             (unsigned char)options.accessible_name.data[i + 1] == 0x80 &&
-             (unsigned char)options.accessible_name.data[i + 2] == 0xa8))
-            return false;
-    }
     cui_str formatted = cui_string(text);
     float scale = theme->font_size / 16;
     if (options.plain)

@@ -359,7 +359,7 @@ API: `cui_image`. [Public header](../include/cui/cui_media.h); [guide](MEDIA.md)
 
 **Interaction:** Presentation only; shortcut dispatch belongs to the application.
 
-**Usage:** Submit typed single-stroke hints with Unicode first-scalar uppercase. Use the styled entry point for a shared box, typography token and text paint. The host owns shortcut registration.
+**Usage:** Submit typed single-stroke hints with Unicode first-scalar uppercase. Immediate C supports a shared box, typography and text paint. Retained C and language builders can use a typed hint with a copied accessible name. The host owns shortcut registration.
 
 API: `cui_kbd`, `cui_kbd_format`, `cui_kbd_ex`, `cui_kbd_format_stroke`, `cui_kbd_styled`. [Public header](../include/cui/cui_content.h) · [Typed hints](../include/cui/cui_kbd.h) · [Guide](KBD.md)
 

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MIT */
+#include "../base/cui_kbd_internal.h"
 #include "../base/cui_table_internal.h"
 #include "../components/cui_media_internal.h"
+#include "cui/cui_kbd.h"
 #include "cui/cui_media.h"
 #include "cui/cui_message.h"
 #include "cui/cui_stepper_presentation.h"
@@ -1243,6 +1245,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     free(node->part_shadows);
     free(node->key);
     free(node->text);
+    free(node->kbd);
     free(node->detail);
     free(node->avatar_placeholder);
     cui_edit_destroy(node->edit);
@@ -1286,6 +1289,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     }
     node->part_shadows = NULL;
     node->key = node->text = node->detail = NULL;
+    node->kbd = NULL;
     node->avatar_placeholder = NULL;
     node->edit = NULL;
     node->edit_buffer = NULL;
@@ -2251,6 +2255,53 @@ cui_bridge_status cui_bridge_node_remove(cui_bridge_app *app, cui_bridge_node ha
     bridge_remove_subtree(app, handle.slot);
     return CUI_BRIDGE_OK;
 }
+struct bridge_kbd_owned {
+    uint32_t flags, modifiers;
+    size_t key_bytes, name_bytes;
+    char text[];
+};
+
+cui_bridge_status cui_bridge_set_kbd_stroke_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                               uint32_t modifiers, uint32_t flags, const char *key,
+                                               size_t key_bytes, const char *accessible_name,
+                                               size_t name_bytes) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_KBD)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (!key && !key_bytes && !accessible_name && !name_bytes && !flags && !modifiers) {
+        if (node->kbd) {
+            free(node->kbd);
+            node->kbd = NULL;
+            cui_invalidate(app->ui);
+        }
+        return CUI_BRIDGE_OK;
+    }
+    const uint32_t valid_flags =
+        CUI_BRIDGE_KBD_PLAIN_V1 | CUI_BRIDGE_KBD_OUTLINE_V1 | CUI_BRIDGE_KBD_MAC_SYMBOLS_V1;
+    cui_kbd_stroke stroke = {.modifiers = modifiers, .key = {key, key_bytes}};
+    cui_str name = {accessible_name, name_bytes};
+    if ((flags & ~valid_flags) || name_bytes > CUI_KBD_NAME_MAX_BYTES ||
+        !cui_kbd_line_valid(name) || cui_kbd_format_stroke(stroke, false, NULL, 0) == SIZE_MAX)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    bridge_kbd_owned *owned = malloc(sizeof *owned + key_bytes + name_bytes);
+    if (!owned)
+        return CUI_BRIDGE_OUT_OF_MEMORY;
+    owned->flags = flags;
+    owned->modifiers = modifiers;
+    owned->key_bytes = key_bytes;
+    owned->name_bytes = name_bytes;
+    memcpy(owned->text, key, key_bytes);
+    if (name_bytes)
+        memcpy(owned->text + key_bytes, accessible_name, name_bytes);
+    free(node->kbd);
+    node->kbd = owned;
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+
 cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_bridge_node handle,
                                       const char *text_utf8) {
     cui_bridge_node_record *node;
@@ -6472,7 +6523,19 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
             bridge_render_node(app, child);
         cui_end_group_box(app->ui);
     } else if (node->kind == CUI_BRIDGE_KBD) {
-        cui_kbd(app->ui, node->id, &app->theme, cui_string(node->text));
+        bridge_kbd_owned *kbd = node->kbd;
+        if (kbd) {
+            cui_kbd_stroke stroke = {.modifiers = kbd->modifiers,
+                                     .key = {kbd->text, kbd->key_bytes}};
+            cui_kbd_options options = {
+                .plain = (kbd->flags & CUI_BRIDGE_KBD_PLAIN_V1) != 0,
+                .outline = (kbd->flags & CUI_BRIDGE_KBD_OUTLINE_V1) != 0,
+                .mac_symbols = (kbd->flags & CUI_BRIDGE_KBD_MAC_SYMBOLS_V1) != 0,
+                .accessible_name = {kbd->text + kbd->key_bytes, kbd->name_bytes}};
+            if (!cui_kbd_ex(app->ui, node->id, &app->theme, stroke, options))
+                app->frame_error = CUI_BRIDGE_INVALID_STATE;
+        } else
+            cui_kbd(app->ui, node->id, &app->theme, cui_string(node->text));
     } else if (node->kind == CUI_BRIDGE_ICON) {
         bridge_icon_presented *configured = bridge_icon_node(app, slot);
         if (configured) {

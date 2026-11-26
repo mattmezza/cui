@@ -274,7 +274,7 @@
           "languages": ["python", "javascript", "typescript", "go", "rust"],
           "types": ["cui_kbd_stroke", "cui_kbd_options", "cui_kbd_style"],
           "symbols": ["cui_kbd_ex", "cui_kbd_format_stroke", "cui_kbd_styled"],
-          "note": "Retained builders accept a formatted hint label. Typed C options, first-scalar Unicode formatting and the per-hint styling entry point remain immediate C APIs."
+          "note": "An optional retained provider formats a typed Unicode stroke with platform labels, outline or plain appearance, and a copied accessibility name in all five languages. These exact immediate-mode types and entry points, standalone formatting and custom per-hint box, typography and text paint remain C-only. Legacy providers accept a formatted literal."
         }
       ]
     },

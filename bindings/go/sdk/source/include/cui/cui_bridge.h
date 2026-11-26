@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_BRIDGE_H
 #define CUI_BRIDGE_H
+#include <stddef.h>
 #include <stdint.h>
 #if defined(_WIN32)
 #if defined(CUI_BRIDGE_BUILD)
@@ -1006,6 +1007,25 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_reset_target_box_shadows_v1(
     cui_bridge_app *, cui_bridge_node, uint32_t, const cui_bridge_shadow_target_v1 *);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_bridge_node node,
                                                      const char *text_utf8);
+enum {
+    CUI_BRIDGE_KBD_PLAIN_V1 = 1u,
+    CUI_BRIDGE_KBD_OUTLINE_V1 = 2u,
+    CUI_BRIDGE_KBD_MAC_SYMBOLS_V1 = 4u
+};
+/* Optional typed single stroke for a KBD node. Modifiers are CUI_BRIDGE_MOD_*
+ * bits. Zero flags gives a filled keycap; PLAIN takes precedence over OUTLINE.
+ * The key (1..128 bytes) and optional accessible name (0..1024 bytes) must be
+ * strict single-line UTF-8 without ASCII controls. Both are copied during this
+ * call. An empty accessible name uses the formatted stroke. Invalid arguments
+ * or allocation failure leave the current presentation intact.
+ * Use zero masks with NULL key/name pointers and zero lengths to restore the
+ * literal kept by set_text. This changes presentation on the next frame and
+ * emits no event. get_text continues to read the stored literal. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_kbd_stroke_v1(cui_bridge_app *, cui_bridge_node,
+                                                              uint32_t modifiers, uint32_t flags,
+                                                              const char *key, size_t key_bytes,
+                                                              const char *accessible_name,
+                                                              size_t name_bytes);
 /* State setters apply to matching component kinds only. Boolean values must be 0 or 1.
  * Number ranges must be finite with minimum < maximum and positive step.
  * Setting a range clamps the current value into it atomically. */

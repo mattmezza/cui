@@ -18,6 +18,10 @@ if backend == "sdl":
     kwargs["font_path"] = os.environ["CUI_PACKAGE_SMOKE_FONT"]
 with App(**kwargs) as app:
     assert app.supports_radio_tab_index(), "installed bridge lacks Radio ordering"
+    assert app.supports_radio_paint(), "installed bridge lacks Radio paint"
+    assert app.supports_rating_options(), "installed bridge lacks Rating options"
+    assert app.supports_stepper_fill(), "installed bridge lacks Stepper Fill"
+    assert app.supports_virtual_list_rows(), "installed bridge lacks VirtualList live rows"
     app.mount(row().children(widget))
     app.step()
     x, y, w, h = app.bounds(widget)

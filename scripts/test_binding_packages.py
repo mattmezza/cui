@@ -178,43 +178,36 @@ def main():
         shutil.copy2(ROOT / "bindings/bridge/examples/time_field_localized.py",
                      clean / "appointments.py")
         subprocess.run([str(python), "appointments.py"], cwd=clean, env=env, check=True)
-        shutil.copy2(ROOT / "bindings/python/examples/pagination.py", clean / "pagination.py")
-        subprocess.run([str(python), "pagination.py"], cwd=clean, env=env, check=True)
-        shutil.copy2(ROOT / "bindings/python/examples/radio_delivery.py", clean / "delivery.py")
-        subprocess.run([str(python), "delivery.py"], cwd=clean, env=env, check=True)
+        for example in ("pagination", "radio_delivery", "rating_options",
+                        "stepper_visual", "virtual_list_inbox"):
+            filename = f"{example}.py"
+            shutil.copy2(ROOT / "bindings/python/examples" / filename, clean / filename)
+            subprocess.run([str(python), filename], cwd=clean, env=env, check=True)
         (clean / "package.json").write_text('{"name":"cui-local-package-smoke","version":"0.0.0","private":true}')
         tarball = next(artifacts.glob("*.tgz"))
         subprocess.run(["npm", "install", "--no-audit", "--no-fund", str(tarball)], cwd=clean, env=env, check=True)
         shutil.copy2(ROOT / "tests/packaging/node_smoke.cjs", clean / "node_smoke.cjs")
         subprocess.run(["node", "node_smoke.cjs"], cwd=clean, env=env, check=True)
-        node_example = (ROOT / "bindings/node/examples/time-field-localized.cjs").read_text(encoding="utf-8")
-        (clean / "appointments.cjs").write_text(
-            node_example.replace("require('..')", "require('@cui/native')", 1), encoding="utf-8")
-        subprocess.run(["node", "appointments.cjs"], cwd=clean, env=env, check=True)
-        node_pagination = (ROOT / "bindings/node/examples/pagination-options.cjs").read_text(encoding="utf-8")
-        (clean / "pagination.cjs").write_text(
-            node_pagination.replace("require('../index.cjs')", "require('@cui/native')", 1), encoding="utf-8")
-        subprocess.run(["node", "pagination.cjs"], cwd=clean, env=env, check=True)
-        node_delivery = (ROOT / "bindings/node/examples/radio-delivery.cjs").read_text(encoding="utf-8")
-        (clean / "delivery.cjs").write_text(
-            node_delivery.replace("require('../index.cjs')", "require('@cui/native')", 1), encoding="utf-8")
-        subprocess.run(["node", "delivery.cjs"], cwd=clean, env=env, check=True)
+        for example in ("time-field-localized", "pagination-options", "radio-delivery",
+                        "rating-options", "stepper_visual", "virtual-list-inbox"):
+            filename = f"{example}.cjs"
+            code = (ROOT / "bindings/node/examples" / filename).read_text(encoding="utf-8")
+            code = code.replace("require('../index.cjs')", "require('@cui/native')")
+            code = code.replace("require('..')", "require('@cui/native')")
+            (clean / filename).write_text(code, encoding="utf-8")
+            subprocess.run(["node", filename], cwd=clean, env=env, check=True)
         subprocess.run(["npm", "install", "--save-dev", "--no-audit", "--no-fund", "--ignore-scripts", "typescript@5.8.3"], cwd=clean, env=env, check=True)
         shutil.copy2(ROOT / "tests/packaging/typescript_smoke.cts", clean / "typescript_smoke.cts")
-        ts_example = (ROOT / "bindings/typescript/examples/time_field_localized.ts").read_text(encoding="utf-8")
-        (clean / "typed-appointments.cts").write_text(
-            ts_example.replace("'../../node/index.cjs'", "'@cui/native'", 1), encoding="utf-8")
-        ts_pagination = (ROOT / "bindings/typescript/examples/pagination_options.ts").read_text(encoding="utf-8")
-        (clean / "typed-pagination.cts").write_text(
-            ts_pagination.replace("'../../node/index.cjs'", "'@cui/native'"), encoding="utf-8")
-        ts_delivery = (ROOT / "bindings/typescript/examples/radio_delivery.ts").read_text(encoding="utf-8")
-        (clean / "typed-delivery.cts").write_text(
-            ts_delivery.replace("'../../node/index.cjs'", "'@cui/native'", 1), encoding="utf-8")
+        typed_examples = ("time_field_localized", "pagination_options", "radio_delivery",
+                          "rating_options", "stepper_visual", "virtual_list_inbox")
+        for example in typed_examples:
+            code = (ROOT / "bindings/typescript/examples" / f"{example}.ts").read_text(encoding="utf-8")
+            code = code.replace("'../../node/index.cjs'", "'@cui/native'")
+            (clean / f"typed-{example}.cts").write_text(code, encoding="utf-8")
         subprocess.run(["node", "node_modules/typescript/bin/tsc", "--strict", "--module", "NodeNext",
                         "--moduleResolution", "NodeNext", "--target", "ES2022", "typescript_smoke.cts",
-                        "typed-appointments.cts", "typed-pagination.cts", "typed-delivery.cts"], cwd=clean, env=env, check=True)
-        subprocess.run(["node", "typed-appointments.cjs"], cwd=clean, env=env, check=True)
-        subprocess.run(["node", "typed-pagination.cjs"], cwd=clean, env=env, check=True)
-        subprocess.run(["node", "typed-delivery.cjs"], cwd=clean, env=env, check=True)
+                        *(f"typed-{example}.cts" for example in typed_examples)], cwd=clean, env=env, check=True)
+        for example in typed_examples:
+            subprocess.run(["node", f"typed-{example}.cjs"], cwd=clean, env=env, check=True)
 if __name__ == "__main__":
     main()

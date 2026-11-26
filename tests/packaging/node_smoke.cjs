@@ -12,6 +12,10 @@ const options = process.env.CUI_PACKAGE_SMOKE_BACKEND === 'sdl'
   ? {backend:'sdl', fontPath:process.env.CUI_PACKAGE_SMOKE_FONT} : {};
 const app = new cui.App(options);
 assert.equal(app.supports_radio_tab_index(), true, 'installed bridge lacks Radio ordering');
+assert.equal(app.supports_radio_paint(), true, 'installed bridge lacks Radio paint');
+assert.equal(app.supports_rating_options(), true, 'installed bridge lacks Rating options');
+assert.equal(app.supports_stepper_fill(), true, 'installed bridge lacks Stepper Fill');
+assert.equal(app.supportsVirtualListRows(), true, 'installed bridge lacks VirtualList live rows');
 app.mount(cui.row().children(widget)); app.step();
 const bounds = widget.bounds();
 assert(bounds.width > 0 && bounds.height > 0);

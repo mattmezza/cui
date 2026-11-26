@@ -59,30 +59,24 @@ def main():
         env.update(GOMODCACHE=str(clean / "go-modules"), GOCACHE=str(clean / "go-cache"),
                    GOPROXY=args.go_artifacts.resolve().as_uri(), GOSUMDB="off", CGO_ENABLED="1",
                    XDG_CACHE_HOME=str(clean / "runtime-cache"))
-        (consumer / "go.mod").write_text("module cui-package-smoke\n\ngo 1.23\n\nrequire github.com/mattmezza/cui/bindings/go v0.1.0-alpha.8\n")
+        (consumer / "go.mod").write_text("module cui-package-smoke\n\ngo 1.23\n\nrequire github.com/mattmezza/cui/bindings/go v0.1.0-alpha.9\n")
         shutil.copy2(ROOT / "tests/packaging/go_smoke.go", consumer / "main.go")
-        (consumer / "appointments").mkdir()
-        shutil.copy2(ROOT / "bindings/go/examples/time_field_localized/main.go",
-                     consumer / "appointments/main.go")
-        (consumer / "pagination").mkdir()
-        shutil.copy2(ROOT / "bindings/go/examples/pagination_options/main.go",
-                     consumer / "pagination/main.go")
-        (consumer / "delivery").mkdir()
-        shutil.copy2(ROOT / "bindings/go/examples/radio_delivery/main.go",
-                     consumer / "delivery/main.go")
+        examples = ("time_field_localized", "pagination_options", "radio_delivery",
+                    "rating_options", "stepper_visual", "virtual_list_inbox")
+        for example in examples:
+            destination = consumer / example
+            destination.mkdir()
+            shutil.copy2(ROOT / "bindings/go/examples" / example / "main.go", destination / "main.go")
         subprocess.run(["go", "mod", "download", "all"], cwd=consumer, env=env, check=True)
         binary = clean / "go-smoke"
         tags = "cui_dynamic" if args.go_dynamic else "cui_native" if args.native else ""
         subprocess.run(["go", "build", "-tags", tags, "-o", str(binary), "."], cwd=consumer, env=env, check=True)
-        appointments = clean / "go-appointments"
-        subprocess.run(["go", "build", "-tags", tags, "-o", str(appointments), "./appointments"],
-                       cwd=consumer, env=env, check=True)
-        pagination = clean / "go-pagination"
-        subprocess.run(["go", "build", "-tags", tags, "-o", str(pagination), "./pagination"],
-                       cwd=consumer, env=env, check=True)
-        delivery = clean / "go-delivery"
-        subprocess.run(["go", "build", "-tags", tags, "-o", str(delivery), "./delivery"],
-                       cwd=consumer, env=env, check=True)
+        go_examples = []
+        for example in examples:
+            executable = clean / f"go-{example}"
+            subprocess.run(["go", "build", "-tags", tags, "-o", str(executable), f"./{example}"],
+                           cwd=consumer, env=env, check=True)
+            go_examples.append(executable)
         # Static executables carry CUI; dynamic artifacts carry an embedded bridge.
         (clean / "go-modules").rename(clean / "unused-go-modules")
         blocked = clean / "blocked-toolchain"
@@ -93,9 +87,8 @@ def main():
             executable.chmod(0o755)
         runtime_env = dict(env, PATH=str(blocked) + os.pathsep + env["PATH"])
         subprocess.run([str(binary)], cwd=clean, env=runtime_env, check=True)
-        subprocess.run([str(appointments)], cwd=clean, env=runtime_env, check=True)
-        subprocess.run([str(pagination)], cwd=clean, env=runtime_env, check=True)
-        subprocess.run([str(delivery)], cwd=clean, env=runtime_env, check=True)
+        for executable in go_examples:
+            subprocess.run([str(executable)], cwd=clean, env=runtime_env, check=True)
         # Repeat independent consumers; dynamic cache creation must serialize writes.
         if args.go_dynamic: shutil.rmtree(clean / "runtime-cache")
         go_runtime = runtime_env
@@ -123,27 +116,22 @@ def main():
             + '[dependencies]\ncui-builders = {path="' + str(unpacked) + '"' + features + '}\n')
         shutil.copy2(ROOT / "tests/packaging/rust_smoke.rs", rust / "src/main.rs")
         (rust / "src/bin").mkdir()
-        shutil.copy2(ROOT / "bindings/rust/examples/time_field_localized.rs",
-                     rust / "src/bin/appointments.rs")
-        shutil.copy2(ROOT / "bindings/rust/examples/pagination_options.rs",
-                     rust / "src/bin/pagination.rs")
-        shutil.copy2(ROOT / "bindings/rust/examples/radio_delivery.rs",
-                     rust / "src/bin/delivery.rs")
+        for example in examples:
+            filename = f"{example}.rs"
+            shutil.copy2(ROOT / "bindings/rust/examples" / filename, rust / "src/bin" / filename)
         env["CARGO_TARGET_DIR"] = str(clean / "cargo-target")
         subprocess.run(["cargo", "build", "--offline"], cwd=rust, env=env, check=True)
         rust_binary = clean / "rust-smoke"
         shutil.copy2(clean / "cargo-target/debug/cui-package-smoke", rust_binary)
-        rust_appointments = clean / "rust-appointments"
-        shutil.copy2(clean / "cargo-target/debug/appointments", rust_appointments)
-        rust_pagination = clean / "rust-pagination"
-        shutil.copy2(clean / "cargo-target/debug/pagination", rust_pagination)
-        rust_delivery = clean / "rust-delivery"
-        shutil.copy2(clean / "cargo-target/debug/delivery", rust_delivery)
+        rust_examples = []
+        for example in examples:
+            executable = clean / f"rust-{example}"
+            shutil.copy2(clean / "cargo-target/debug" / example, executable)
+            rust_examples.append(executable)
         (clean / "cargo-target").rename(clean / "unused-cargo-target")
         (clean / "crates").rename(clean / "unused-crates")
         subprocess.run([str(rust_binary)], cwd=clean, env=runtime_env, check=True)
-        subprocess.run([str(rust_appointments)], cwd=clean, env=runtime_env, check=True)
-        subprocess.run([str(rust_pagination)], cwd=clean, env=runtime_env, check=True)
-        subprocess.run([str(rust_delivery)], cwd=clean, env=runtime_env, check=True)
+        for executable in rust_examples:
+            subprocess.run([str(executable)], cwd=clean, env=runtime_env, check=True)
 if __name__ == "__main__":
     main()

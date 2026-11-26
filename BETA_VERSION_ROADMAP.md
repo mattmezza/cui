@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.8**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.8) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
 | Public website | Interactive WASM gallery and docs at alpha.8. The Pages deployment from `363bdb7d` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45782388311) |
-| Unreleased work | Standalone Radio paint, responsive Stepper Fill and configurable Rating are integrated across C and the language bindings. Retained VirtualList keeps the visible row during live edits in C and all five language bindings. |
+| Alpha.9 candidate | Standalone Radio paint, responsive Stepper Fill and configurable Rating are integrated across C and the language bindings. Retained VirtualList keeps the visible row during live edits in C and all five language bindings. |
 | Packages | Alpha.8 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green

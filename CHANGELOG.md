@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.9
+
+- Standalone Radio shares RadioGroup's configurable indicator layers across
+  immediate C, the retained C bridge and the five language bindings. The
+  opt-in controlled C presenter issues typed selection requests and leaves
+  selection with the caller. Retained builders keep their change notifications.
+- Rating supports whole and half values, custom SVG marks and hover previews
+  that leave the committed value unchanged. The gallery and retained
+  builders show the same options.
+- Stepper Fill wraps horizontally at the available width and supports a
+  vertical axis. The gallery and retained builders expose the opt-in layout.
+- Retained VirtualList accepts up to 64 live rows and can preserve the
+  visible row across inserts and removals using stable keys. The existing
+  fixed-row interface remains available.
+
 ## 0.1.0-alpha.8
 
 - C RadioGroup can crossfade selection marks with the theme spring while

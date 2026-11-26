@@ -16,6 +16,18 @@ func main() {
 	if supported, err := app.SupportsRadioTabIndex(); err != nil || !supported {
 		panic("installed bridge lacks Radio ordering")
 	}
+	if supported, err := app.SupportsRadioPaint(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Radio paint: %v", err))
+	}
+	if supported, err := app.SupportsRatingOptions(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Rating options: %v", err))
+	}
+	if supported, err := app.SupportsStepperFill(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Stepper Fill: %v", err))
+	}
+	if supported, err := app.SupportsVirtualListRows(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks VirtualList live rows: %v", err))
+	}
 	clicks := 0
 	button := cui.Button("save").Text("Save ✓").OnClick(func(cui.Event) { clicks++ })
 	if err := app.Mount(cui.Row("root").Children(button)); err != nil {

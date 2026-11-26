@@ -28,10 +28,14 @@ def main():
             return [at(127,76),at(127,78),at(64,78)];};
           return [sample(0,3),sample(1,1),sample(1,5),e.probe_render(0,1)];
         }''',route_wasm_probe(page, wasm))
-        red=lambda c:c[0]>200 and c[1]<50
-        assert red(results[0][0]) and not red(results[0][1]),results
-        assert red(results[1][1]) and not red(results[1][2]),results
-        assert red(results[2][2]) and results[3]!=0,results
+        def stroke(pixel):
+            # Antialiased source stroke endpoints can partially cover a pixel.
+            r, g, b, a = pixel
+            return r == 255 and g == b and g < 128 and a == 255
+        white = [255, 255, 255, 255]
+        assert stroke(results[0][0]) and results[0][1] == white, results
+        assert stroke(results[1][1]) and results[1][2] == white, results
+        assert stroke(results[2][2]) and results[2][1] == white and results[3] != 0, results
         page.screenshot(path=str(out/'source-point.png'));browser.close()
     print('PASS source point-axis WASM canvas raster and legacy rejection')
 if __name__=='__main__':main()

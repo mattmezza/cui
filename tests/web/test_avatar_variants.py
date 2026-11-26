@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 import threading
 from playwright.sync_api import sync_playwright
-from test_snippets import EXTRACT
+from test_snippets import extract_usage
 from test_touch_components import SNAPSHOT
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,8 +22,7 @@ COMMANDS = '''()=>{const e=cuiGallery.exports,d=new TextDecoder();return Array.f
 
 
 def compile_usage():
-    data = json.loads(subprocess.check_output(
-        ['node', '-e', EXTRACT, str(ROOT / 'web/gallery.js')], text=True))
+    data = extract_usage()
     baseline = {c['name'] for c in json.loads((ROOT / 'docs/gpui-parity.json').read_text())['components']}
     assert len(baseline) == 78 and set(data['stories']) == baseline | {'Video', 'VideoPlayer'}
     source = ('#include "cui/cui_components.h"\n#include "cui/cui_content.h"\n'

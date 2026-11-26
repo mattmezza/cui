@@ -9,13 +9,29 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'web/gallery.js'
 EXTRACT = r'''
-const fs=require('fs'),vm=require('vm');
-const source=fs.readFileSync(process.argv[1],'utf8');
+import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {runInNewContext} from 'node:vm';
+const source=readFileSync(process.argv[1],'utf8');
+const load = name => import('data:text/javascript;base64,' +
+    readFileSync(join(process.argv[2], name)).toString('base64'));
+const {timeFieldUsage, virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage} =
+    await load('cui_usage.js');
+const {hoverCardUsage} = await load('cui_hover_card_usage.js');
 const pick=(name)=>{const start=source.indexOf('const '+name+' = {');
  if(start<0)throw Error(name+' missing');
  return source.slice(start,name==='stories'?source.indexOf('};',start)+2:source.indexOf('\n};\nlet wasm',start)+3);};
-const context={};vm.runInNewContext(pick('stories')+'\n'+pick('snippets')+'\nglobalThis.data={stories,snippets};',context);
-process.stdout.write(JSON.stringify(context.data));
+const context={timeFieldUsage};
+runInNewContext(pick('stories')+'\n'+pick('snippets')+'\nglobalThis.data={stories,snippets};',context);
+const {stories, snippets} = context.data;
+const standalone = {
+    VirtualList: [virtualInboxUsage],
+    DataTable: [liveDataTableUsage, pagedDataTableUsage],
+    HoverCard: [0, 1, 2].flatMap(mode => [0, 1, 2].map(preview => hoverCardUsage(mode, preview))),
+    TimeField: [snippets.TimeField, timeFieldUsage(3, true)],
+};
+delete snippets.TimeField; // Compile its complete source as separate translation units.
+process.stdout.write(JSON.stringify({stories, snippets, standalone}));
 '''
 
 
@@ -35,22 +51,15 @@ def arguments(source, opening):
     raise AssertionError('unclosed C call')
 
 
+def extract_usage():
+    return json.loads(subprocess.check_output(
+        ['node', '--input-type=module', '-e', EXTRACT, str(SOURCE), str(ROOT / 'web/modules')],
+        text=True))
+
+
 def main():
-    data = json.loads(subprocess.check_output(['node', '-e', EXTRACT, str(SOURCE)], text=True))
-    stories, snippets = data['stories'], data['snippets']
-    standalone = json.loads(subprocess.check_output(['node', '--input-type=module', '-e', r'''
-        import {readFileSync} from 'node:fs';
-        import {join} from 'node:path';
-        const load = name => import('data:text/javascript;base64,' +
-            readFileSync(join(process.argv[1], name)).toString('base64'));
-        const {virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage} = await load('cui_usage.js');
-        const {hoverCardUsage} = await load('cui_hover_card_usage.js');
-        process.stdout.write(JSON.stringify({
-            VirtualList: [virtualInboxUsage],
-            DataTable: [liveDataTableUsage, pagedDataTableUsage],
-            HoverCard: [0, 1, 2].flatMap(mode => [0, 1, 2].map(preview => hoverCardUsage(mode, preview)))
-        }));
-    ''', str(ROOT / 'web/modules')], text=True))
+    data = extract_usage()
+    stories, snippets, standalone = data['stories'], data['snippets'], data['standalone']
     assert all(standalone.values()) and set(standalone) <= set(stories)
     missing = sorted(set(stories) - set(snippets) - set(standalone))
     assert not missing, f'Usage excerpts missing for {missing}'
@@ -96,7 +105,7 @@ def main():
         'Icon': 'cui_icon_state state = {0}; cui_icon_options options = {0};',
         'Toggle': 'cui_id group_id = 0; cui_toggle_item items[3] = {0}; bool selected[3] = {0}; cui_toggle_group_style_options options = {0};',
         'Tag': 'cui_tag_options options = {0};',
-        'Notification': 'cui_notification_state state = {0}; cui_notification descriptor = {0}; double host_seconds = 0;',
+        'Notification': 'cui_notification_state state = {0}; cui_notification descriptor = {0}; cui_rect viewport = {0}; double host_seconds = 0;',
         'Marker': 'cui_marker_state state = {0}; cui_marker_child children[1] = {0}; size_t count = 1; cui_marker_options options = {0};',
         'OtpInput': 'cui_otp_state state = {0}; cui_otp_options options = {0};',
         'Input Group': 'cui_id group_id = 0, input_id = 0; cui_edit *editor = 0; cui_input_group_state state = {0}; cui_input_group_addon addons[1] = {0}; size_t addon_count = 1; cui_input_group_options options = {0};',
@@ -112,11 +121,10 @@ def main():
         'Editor': 'cui_id search_id = 0; cui_editor_state state = {0}; cui_editor_search_state search = {0};',
         'VirtualList': 'const cui_virtual_list *list = 0; cui_virtual_widget_state state = {0}; cui_virtual_render_item_fn paint_row = 0;',
         'Dock': 'cui_dock *dock = 0; cui_dock_view *view = 0; cui_dock_panel panels[2] = {0}; size_t count = 2;',
-        'Plot': 'cui_bitmap bitmap = {0}; cui_plot_axis_options axis = {0};',
+        'Plot': 'cui_bitmap bitmap = {0}; cui_plot_axis_options axis = {0}; cui_plot_viewport viewport = {0};',
         'Calendar': 'cui_calendar_state state = {0}; cui_date_selection selection = {0}; cui_calendar_options options = {0};',
         'DatePicker': 'cui_str label = {0}; cui_date_picker_state state = {0}; cui_date_selection selection = {0}; cui_date_picker_options options = {0};',
         'ColorPicker': 'cui_color_state state = {0}; cui_color color = {0}; cui_color_picker_options options = {0};',
-        'TimeField': 'cui_str label = {0}; cui_time_state state = {0}; cui_time time = {0}; cui_time_options options = {0};',
         'Combobox': 'cui_str label = {0}; cui_edit *query = 0; cui_choice_item items[4] = {0}, scratch[4] = {0}; cui_id selection = 0; cui_choice_popup popup = {0}; cui_choice_popup_options options = {0};',
         'Pagination': 'size_t page = 1, total_pages = 10;',
         'Rating': 'cui_str label = {0}; float rating = 0; cui_rating_options options = {0};',
@@ -131,6 +139,7 @@ def main():
         'Tabs': 'cui_choice_item items[3] = {0}; cui_id selection = 0; cui_tabs_options options = {0}; cui_tab_panel_fn draw_panel = 0;',
         'DescriptionList': 'cui_description_item items[1] = {0}; size_t count = 1; cui_description_options options = {0};',
         'StatusBar': 'cui_chrome_region left = {0}, center = {0}, right = {0}; cui_status_bar_options options = {0};',
+        'Tooltip': 'cui_rect viewport = {0};',
         'Resizable': 'cui_resizable_state state = {0}; cui_resizable_panel panels[1] = {0}; size_t count = 1; cui_resizable_options options = {0};',
         'Toolbar': 'cui_toolbar_item items[1] = {0}; size_t count = 1; cui_toolbar_options options = {0};',
         'TitleBar': 'cui_title_bar_state state = {0}; cui_chrome_item items[1] = {0}; size_t count = 1; cui_title_bar_options options = {0};',
@@ -142,7 +151,7 @@ def main():
         'Speech': 'cui_speech_state state = {0}; cui_speech_workspace workspace = {0}; cui_speech_recognizer recognizer = {0}; cui_speech_input input = {0}; cui_speech_event_fn on_event = 0; cui_speech_button_options options = {0}; cui_speech_waveform_options waveform = {0}; cui_id waveform_id = 0; double now = 0;',
         'Chart': 'cui_chart_options config = {0}; cui_chart_state state = {0};',
         'TextView': 'cui_text_view_state state = {0}; cui_text_view_workspace workspace = {0}; cui_str markdown = {0}; cui_text_view_options options = {0};',
-        'Root View': 'cui_root root = {0}; cui_root_plugin_instance plugins[1] = {0}; cui_root_registry registry = {0}; void *window = 0; cui_root_surface dialogs[2] = {0}; cui_notification_state notifications = {0}; cui_root_content_fn content = 0; double now = 0;',
+        'Root View': 'cui_root root = {0}; cui_root_plugin_instance plugins[1] = {0}; cui_root_registry registry = {0}; void *window = 0; cui_root_surface dialogs[2] = {0}; cui_notification_state notifications = {0}; cui_root_content_fn content = 0; cui_rect viewport = {0}; double now = 0;',
     }
     includes = '\n'.join(f'#include "cui/{path.name}"' for path in sorted((ROOT / 'include/cui').glob('*.h'))
                          if not path.stem.startswith(('cui_sdl', 'cui_sokol', 'cui_renderer', 'cui_software')))
@@ -159,7 +168,6 @@ static void draw_profile(cui_context *ui) { (void)ui; }
     cui_id id = 0, trigger_id = 0, scope_id = 0;
     cui_theme theme = {0};
     cui_hover_state hover = {0};
-    cui_rect viewport = {0};
     cui_platform platform = {0};
     cui_shimmer_state shimmer = {0};
     cui_message_body bodies[1] = {0};

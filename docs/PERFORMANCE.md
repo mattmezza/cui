@@ -148,6 +148,12 @@ spent 165.88 seconds on `agent_skill_contract` and 98.43 seconds on
 these timings are a baseline, not measured savings from the scheduling change.
 Hosted duration, memory use and any contention regressions still need comparison.
 
+The installed-bindings job validates the embedded and source-only Go artifacts
+in independent clean consumers. The same Rust crate is built and exercised once
+alongside the embedded Go artifact. The runner still checks that the installed
+executables work after removing build sources and blocking compiler tools.
+Hosted timing for this change is pending.
+
 ### Release tag scheduling
 
 The two alpha.6 version tags triggered six additional workflow runs after the

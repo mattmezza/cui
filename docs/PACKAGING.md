@@ -214,6 +214,9 @@ exits; wrap their invocation in `xvfb-run -a env -u WAYLAND_DISPLAY`.
 The installed artifact tests use clean temporary consumers without checkout or
 library-path overrides, exercise real frames/callbacks, and block compiler tools
 at runtime. Python native validation also checks captured Button pixels.
+The compiled runner accepts `--rust-artifacts` to include a Rust consumer.
+CI uses it once and tests the embedded and source-only Go artifacts in separate
+clean consumers.
 The package checks run the authored Radio, Rating, Stepper, VirtualList,
 Pagination and localized TimeField examples headlessly,
 including applied edits and copied observations.

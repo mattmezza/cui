@@ -198,7 +198,7 @@ jobs:
       - name: Execute clean Go and Rust consumers after removing build sources
         run: |
           rustup run 1.85.1 python scripts/test_compiled_binding_packages.py --go-artifacts build/packages/go-embedded --rust-artifacts build/packages/rust
-          rustup run 1.85.1 python scripts/test_compiled_binding_packages.py --go-artifacts build/packages/go-source --rust-artifacts build/packages/rust
+          python scripts/test_compiled_binding_packages.py --go-artifacts build/packages/go-source
 
   optional-regex:
     runs-on: ubuntu-latest

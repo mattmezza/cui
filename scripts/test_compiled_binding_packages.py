@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--go-artifacts", type=Path, required=True)
-    parser.add_argument("--rust-artifacts", type=Path, required=True)
+    parser.add_argument("--rust-artifacts", type=Path, help="Also validate the packaged Rust crate")
     parser.add_argument("--native", action="store_true")
     parser.add_argument("--go-dynamic", action="store_true", help="Validate optional cui_dynamic embedded bridge mode")
     parser.add_argument("--font", type=Path)
@@ -44,8 +44,9 @@ def main():
             env["XDG_RUNTIME_DIR"] = runtime
             command = ["xvfb-run", "-a", "-s", "-screen 0 1920x1080x24", sys.executable,
                 str(Path(__file__).resolve()), "--go-artifacts", str(args.go_artifacts.resolve()),
-                "--rust-artifacts", str(args.rust_artifacts.resolve()), "--native"]
-            command += ["--virtual-token", token]
+                "--native", "--virtual-token", token]
+            if args.rust_artifacts:
+                command += ["--rust-artifacts", str(args.rust_artifacts.resolve())]
             if args.go_dynamic: command.append("--go-dynamic")
             raise SystemExit(subprocess.run(command, env=env).returncode)
     if args.native:
@@ -105,6 +106,8 @@ def main():
         failed = subprocess.run([str(binary)], cwd=clean, env=invalid_env, capture_output=True)
         if failed.returncode == 0 or b"missing-override.so" not in failed.stderr:
             raise SystemExit("Go invalid override was hidden by default package discovery")
+        if args.rust_artifacts is None:
+            return
         crate = next(args.rust_artifacts.resolve().glob("*.crate"))
         with tarfile.open(crate) as archive:
             archive.extractall(clean / "crates", filter="data")

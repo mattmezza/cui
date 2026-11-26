@@ -90,7 +90,10 @@ are decorative, so the trigger remains a single focus and activation target.
 Use a custom header callback to compose leading artwork, a badge, or an icon
 from a caller-owned SVG state. An optional `cui_disclosure_handler` observes the
 same [applied transitions](DISCLOSURE_EVENTS.md) as the older event entry points.
-Retained language builders currently expose their existing disclosure controls.
+Retained C applications can copy sizes, icons, group options and trigger
+styles into the bridge while keeping its queued events. Typed language
+builders currently expose their existing disclosure controls.
+[Retained C guide and example](BRIDGE_COMPONENTS.md#style-retained-accordion-and-collapsible-from-c)
 
 ### Joined groups and trigger styles
 

@@ -145,7 +145,7 @@ static void cui_disclosure_title(cui_context *ui, cui_id id, const cui_theme *th
     }
     cui_text(ui, label, theme->font_size, color);
     if (!disabled) {
-        cui_begin_box(ui, id ^ UINT64_C(0x52fc0dc74f3d9a21), (cui_box){.width = -1});
+        cui_begin_box(ui, 0, (cui_box){.width = -1});
         cui_end_box(ui);
         (void)cui_icon_named(
             ui, indicator, theme, cui_string("chevron-down"),

@@ -6,17 +6,20 @@
       "api_symbols": [
         "cui_accordion",
         "cui_accordion_events",
-        "cui_accordion_present"
+        "cui_accordion_present",
+        "cui_bridge_disclosure_configure_v1",
+        "cui_bridge_disclosure_set_trigger_style_v1"
       ],
       "state_types": [
         "cui_disclosure_motion"
       ],
       "state_ownership": "Caller retains bool expansion values and optional per-panel cui_disclosure_motion arrays.",
       "interaction": "Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.",
-      "usage": "Submit stable item IDs and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width and SVG indicators. Set joined for one outer card, and use trigger_styles for per-item feedback. Keep motion alive through end_frame.",
+      "usage": "Submit stable item IDs and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width and SVG indicators. Set joined for one outer card, and use trigger_styles for per-item feedback. Keep motion alive through end_frame. The retained C bridge copies presentation and keeps queued change records.",
       "docs": [
         "docs/DISCLOSURE.md",
-        "docs/DISCLOSURE_EVENTS.md"
+        "docs/DISCLOSURE_EVENTS.md",
+        "docs/BRIDGE_COMPONENTS.md"
       ],
       "callback_symbols": [
         "cui_disclosure_panel_fn",
@@ -28,7 +31,8 @@
       "public_header": "include/cui/cui_disclosure.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_disclosure_events.h"
+        "include/cui/cui_disclosure_events.h",
+        "include/cui/cui_bridge.h"
       ]
     },
     {
@@ -337,17 +341,20 @@
         "cui_collapsible",
         "cui_collapsible_ex",
         "cui_collapsible_events",
-        "cui_collapsible_present"
+        "cui_collapsible_present",
+        "cui_bridge_disclosure_configure_v1",
+        "cui_bridge_disclosure_set_trigger_style_v1"
       ],
       "state_types": [
         "cui_disclosure_motion"
       ],
       "state_ownership": "Caller retains bool expansion values and optional per-panel cui_disclosure_motion arrays.",
       "interaction": "Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.",
-      "usage": "Submit a stable ID and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width, SVG indicators and optional trigger feedback. Keep motion alive through end_frame.",
+      "usage": "Submit a stable ID and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width, SVG indicators and optional trigger feedback. Keep motion alive through end_frame. The retained C bridge copies presentation and keeps queued change records.",
       "docs": [
         "docs/DISCLOSURE.md",
-        "docs/DISCLOSURE_EVENTS.md"
+        "docs/DISCLOSURE_EVENTS.md",
+        "docs/BRIDGE_COMPONENTS.md"
       ],
       "callback_symbols": [
         "cui_disclosure_panel_fn",
@@ -359,7 +366,8 @@
       "public_header": "include/cui/cui_disclosure.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_disclosure_events.h"
+        "include/cui/cui_disclosure_events.h",
+        "include/cui/cui_bridge.h"
       ]
     },
     {

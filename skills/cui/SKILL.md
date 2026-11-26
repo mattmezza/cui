@@ -224,7 +224,7 @@ Read these with `read PATH --source CUI_SOURCE`:
 | Layout and responsive composition | `docs/LAYOUT_GUIDE.md`, `docs/APP_RECIPES.md`, `docs/FORMS.md`, `docs/COMPOSED_APPS.md` |
 | Fonts, metrics, fallback and shaping | `docs/TYPOGRAPHY.md`, `docs/TEXT.md`, `docs/BIDI_SHAPING.md`, `docs/IME.md` |
 | Theme, density, colors and icons | `docs/DESIGN_SYSTEM.md`, `docs/THEME_GUIDE.md`, `docs/THEME_REGISTRY_GUIDE.md`, `docs/ICON.md` |
-| Accordion and Collapsible sizes, indicators, joined groups and trigger styles | `docs/DISCLOSURE.md`, `docs/DISCLOSURE_EVENTS.md` |
+| Accordion and Collapsible sizes, indicators, joined groups and trigger styles | `docs/DISCLOSURE.md`, `docs/DISCLOSURE_EVENTS.md`, `docs/BRIDGE_COMPONENTS.md#style-retained-accordion-and-collapsible-from-c` |
 | State, identity, ownership and failures | `docs/IMMEDIATE_AND_STATE.md`, `docs/IDS_AND_LIFETIMES.md`, `docs/DEBUGGING.md` |
 | Accessibility and touch | `docs/ACCESSIBILITY.md`, `docs/NATIVE_ACCESSIBILITY.md`, `docs/TOUCH_COMPONENT_COVERAGE.md` |
 | Optional regex provider | `backends/regex/README.md`, `docs/INPUT_PATTERN_FORMATTING.md` |

@@ -66,6 +66,8 @@ typedef struct {
     cui_bridge_box_shadows_v1 shadows;
     bridge_part_shadows *part_shadows;
     bridge_radio_paints *radio_paints;
+    cui_bridge_disclosure_config_v1 *disclosure_config;
+    cui_disclosure_trigger_style *disclosure_style;
     cui_button_state button_state;
     cui_checkbox_state checkbox_state;
     cui_switch_state switch_state;

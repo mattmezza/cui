@@ -1093,6 +1093,7 @@ static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *no
 #include "cui_bridge_rating_internal.h"
 #include "cui_bridge_skeleton_internal.h"
 #include "cui_bridge_pagination_internal.h"
+#include "cui_bridge_disclosure_internal.h"
 // clang-format on
 
 uint32_t cui_bridge_abi_version(void) {
@@ -1231,6 +1232,8 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     bridge_radio_tooltip_remove(node->owner, node->own_slot);
     free(node->radio_paints);
     node->radio_paints = NULL;
+    free(node->disclosure_config);
+    free(node->disclosure_style);
     free(node->part_shadows);
     free(node->key);
     free(node->text);
@@ -4128,20 +4131,22 @@ static void bridge_dock_content(cui_context *ui, uint64_t panel, void *user) {
     (void)panel;
     bridge_item_content(ui, user);
 }
+enum { BRIDGE_GROUP_MAX_ITEMS = 64 };
 typedef struct {
     cui_bridge_app *app;
-    uint32_t slots[64];
+    uint32_t slots[BRIDGE_GROUP_MAX_ITEMS];
 } bridge_group_binding;
 typedef struct {
     bridge_group_binding binding;
-    cui_radio_group_item radios[64];
-    cui_choice_item tabs[64];
-    cui_menu_entry menu_entries[64];
-    cui_step steps[64];
-    cui_stepper_icon step_icons[64];
-    cui_disclosure_item disclosures[64];
-    bool opened[64];
-    cui_choice_item filtered[64];
+    cui_radio_group_item radios[BRIDGE_GROUP_MAX_ITEMS];
+    cui_choice_item tabs[BRIDGE_GROUP_MAX_ITEMS];
+    cui_menu_entry menu_entries[BRIDGE_GROUP_MAX_ITEMS];
+    cui_step steps[BRIDGE_GROUP_MAX_ITEMS];
+    cui_stepper_icon step_icons[BRIDGE_GROUP_MAX_ITEMS];
+    cui_disclosure_item disclosures[BRIDGE_GROUP_MAX_ITEMS];
+    bool opened[BRIDGE_GROUP_MAX_ITEMS];
+    cui_choice_item filtered[BRIDGE_GROUP_MAX_ITEMS];
+    cui_disclosure_trigger_style disclosure_styles[];
 } bridge_group_scratch;
 typedef struct {
     size_t requested;
@@ -4249,13 +4254,17 @@ static void bridge_render_input_group(cui_bridge_app *app, uint32_t slot,
                 bridge_click_simple(app, slots[i]);
 }
 static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_node_record *node) {
-    bridge_group_scratch *scratch = malloc(sizeof *scratch);
+    bool accordion = node->kind == CUI_BRIDGE_ACCORDION;
+    size_t style_bytes =
+        accordion ? BRIDGE_GROUP_MAX_ITEMS * sizeof(cui_disclosure_trigger_style) : 0;
+    bridge_group_scratch *scratch = malloc(sizeof *scratch + style_bytes);
     if (!scratch) {
         app->frame_error = CUI_BRIDGE_OUT_OF_MEMORY;
         return;
     }
     scratch->binding.app = app;
     size_t count = 0;
+    bool disclosure_style = false;
     for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {
         cui_bridge_node_record *item = &app->nodes[child];
         scratch->binding.slots[count] = child;
@@ -4281,6 +4290,12 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
         scratch->disclosures[count] =
             (cui_disclosure_item){item->id, cui_string(item->text), item->disabled};
         scratch->opened[count] = item->checked;
+        if (accordion) {
+            scratch->disclosure_styles[count] = item->disclosure_style
+                                                    ? *item->disclosure_style
+                                                    : (cui_disclosure_trigger_style){0};
+            disclosure_style |= item->disclosure_style != NULL;
+        }
         count++;
     }
     if (node->kind == CUI_BRIDGE_RADIO_GROUP) {
@@ -4476,10 +4491,33 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
             bridge_change(app, slot);
         }
     } else {
-        if (cui_accordion(app->ui, node->id, &app->theme, scratch->disclosures, count,
-                          scratch->opened,
-                          (cui_accordion_options){.multiple = true, .disabled = node->disabled},
-                          bridge_group_panel, &scratch->binding)) {
+        const cui_bridge_disclosure_config_v1 *config = node->disclosure_config;
+        uint32_t flags = config ? config->flags : 0;
+        cui_accordion_options options = {
+            .multiple = !(flags & CUI_BRIDGE_DISCLOSURE_SINGLE_V1),
+            .collapsible = (flags & CUI_BRIDGE_DISCLOSURE_ALLOW_COLLAPSE_V1) != 0,
+            .bordered = (flags & CUI_BRIDGE_DISCLOSURE_BORDERED_V1) != 0,
+            .disabled = node->disabled,
+        };
+        bool changed;
+        if (count && (config || disclosure_style)) {
+            cui_box card;
+            cui_disclosure_presentation paint = bridge_disclosure_presentation(config, &card);
+            if (disclosure_style) {
+                paint.trigger_styles = scratch->disclosure_styles;
+                paint.trigger_style_count = count;
+            }
+            changed =
+                cui_accordion_present(app->ui, node->id, &app->theme, scratch->disclosures, count,
+                                      scratch->opened, options, paint, bridge_group_panel,
+                                      &scratch->binding, (cui_disclosure_handler){0})
+                    .changed;
+        } else {
+            changed =
+                cui_accordion(app->ui, node->id, &app->theme, scratch->disclosures, count,
+                              scratch->opened, options, bridge_group_panel, &scratch->binding);
+        }
+        if (changed) {
             for (size_t i = 0; i < count; i++) {
                 cui_bridge_node_record *item = &app->nodes[scratch->binding.slots[i]];
                 if (item->checked != scratch->opened[i]) {
@@ -5677,8 +5715,27 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         cui_end_box(app->ui);
     } else if (node->kind == CUI_BRIDGE_COLLAPSIBLE) {
         bridge_panel_binding binding = {app, slot};
-        if (cui_collapsible(app->ui, node->id, &app->theme, cui_string(node->text), &node->checked,
-                            node->disabled, bridge_panel, &binding))
+        const cui_bridge_disclosure_config_v1 *config = node->disclosure_config;
+        cui_str title = cui_string(node->text);
+        bool changed;
+        if (config || node->disclosure_style) {
+            cui_box card;
+            cui_disclosure_presentation paint = bridge_disclosure_presentation(config, &card);
+            paint.trigger_styles = node->disclosure_style;
+            paint.trigger_style_count = node->disclosure_style ? 1 : 0;
+            cui_collapsible_options options = {
+                .disabled = node->disabled,
+                .borderless = config && (config->flags & CUI_BRIDGE_DISCLOSURE_BORDERLESS_V1),
+            };
+            changed = cui_collapsible_present(app->ui, node->id, &app->theme, title, &node->checked,
+                                              options, paint, bridge_panel, &binding,
+                                              (cui_disclosure_handler){0})
+                          .changed;
+        } else {
+            changed = cui_collapsible(app->ui, node->id, &app->theme, title, &node->checked,
+                                      node->disabled, bridge_panel, &binding);
+        }
+        if (changed)
             bridge_change(app, slot);
     } else if (node->kind == CUI_BRIDGE_ALERT) {
         cui_alert_options options = {.kind = CUI_ALERT_INFO,

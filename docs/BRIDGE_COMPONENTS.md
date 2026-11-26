@@ -19,11 +19,11 @@ event layout, and functions are unchanged. New kinds are appended.
 | Input | `cui_input_ex` | per-node edit model, text, change, disabled | 4096 UTF-8 bytes |
 | Textarea | `cui_textarea` | per-node multiline edit model, text, change, disabled | 4096 UTF-8 bytes, 512 layout lines |
 | NumberInput | `cui_number_input` | per-node numeric editor, value, range, step, change, disabled | Finite values; 127-byte draft |
-| Collapsible | `cui_collapsible` | open state, change, disabled | Child subtree is panel |
+| Collapsible | `cui_collapsible`, optional `cui_collapsible_present` | open state, change, disabled | Child subtree is panel. [Retained C presentation](#style-retained-accordion-and-collapsible-from-c). |
 | Alert | `cui_alert` | copied title/message | Static informational alert |
 | RadioGroup | `cui_radio_group_present_with_content` | selected Item, description, change, disabled, optional animated selection and decorative children | Up to 64 Items |
 | Tabs | `cui_tabs` | selected Item, change, disabled | Up to 64 Items; Item subtree is panel |
-| Accordion | `cui_accordion` | per-Item open state, change, disabled | Up to 64 Items; multiple expansion |
+| Accordion | `cui_accordion`, optional `cui_accordion_present` | per-Item open state, change, disabled | Up to 64 Items. [Retained C presentation and opening policy](#style-retained-accordion-and-collapsible-from-c). |
 | Item | Composite descriptor | label, disabled, optional panel children | Must belong to group |
 | Select | `cui_select` | selected Item, change, disabled | Up to 64 Items; viewport is app surface |
 | ComboBox | `cui_combobox` | query edit model, selected Item, change, disabled | Up to 64 Items, 4096 UTF-8 query bytes |
@@ -523,6 +523,84 @@ Run each example from the repository root. Use the setup commands under
 [Animate retained Radio selection from C](#animate-retained-radio-selection-from-c)
 to build the matching provider. Omit the font argument to run headlessly.
 The TypeScript example uses Node's TypeScript execution support.
+
+### Style retained Accordion and Collapsible from C
+
+Create an Accordion with direct Item children and place each panel's content
+under its Item. A Collapsible owns its panel children directly. Set the
+initial expansion of each Item or Collapsible with `cui_bridge_set_checked`.
+
+```c
+#include <cui/cui_bridge.h>
+
+cui_bridge_status style_disclosure(cui_bridge_app *app, cui_bridge_node accordion,
+                                  cui_bridge_node item) {
+    const cui_bridge_disclosure_config_v1 card = {
+        .struct_size = sizeof card,
+        .schema_version = 1,
+        .flags = CUI_BRIDGE_DISCLOSURE_JOINED_V1 | CUI_BRIDGE_DISCLOSURE_BORDERED_V1 |
+                 CUI_BRIDGE_DISCLOSURE_SINGLE_V1 | CUI_BRIDGE_DISCLOSURE_ALLOW_COLLAPSE_V1,
+        .design_size = CUI_BRIDGE_SIZE_LG,
+        .width = -1,
+        .collapsed_icon = "plus",
+        .expanded_icon = "minus",
+    };
+    const cui_bridge_disclosure_trigger_style_v1 style = {
+        .struct_size = sizeof style,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_DISCLOSURE_HOVER_V1 | CUI_BRIDGE_DISCLOSURE_CURSOR_V1,
+        .hover_rgba = 0x4879e02bu,
+        .cursor = CUI_BRIDGE_DISCLOSURE_CURSOR_POINTER,
+    };
+    cui_bridge_status status = cui_bridge_disclosure_configure_v1(app, accordion, &card);
+    return status == CUI_BRIDGE_OK
+        ? cui_bridge_disclosure_set_trigger_style_v1(app, item, &style) : status;
+}
+```
+
+Widths are `-1` to fill, `0` to fit, or positive logical pixels. The
+`CUI_BRIDGE_SIZE_*` scale sets trigger and icon dimensions, and each empty
+icon name uses the default chevron. Supply a name or path from the
+provider's embedded catalog. Each wire field has room for 63 bytes and one
+NUL. The `CUSTOM_CARD` flag accepts the outer background, border, radius,
+padding and gap together, and `CLIP_CARD` clips its children. For a
+standalone Collapsible, use `BORDERLESS` to remove its default trigger outline.
+
+Set hover, press, expanded, disabled and focus colors or the cursor on any
+direct Accordion Item or on a Collapsible. A named field may explicitly use
+zero, including a transparent color. Style and configuration are copied
+and can be cleared independently by passing NULL to the corresponding
+setter. Invalid records leave installed values unchanged.
+
+Accordion's default policy permits multiple open Items. An open Item can
+close on activation with `ALLOW_COLLAPSE`. With `SINGLE`, opening an Item
+closes its siblings. Explicit `set_checked` writes stay silent, even with
+`SINGLE`. Configuration and paint also leave the event queue unchanged.
+After stepping, use `cui_bridge_poll_event_ex` for queued CHANGE records.
+Accordion emits one record per Item whose final expansion differs from
+its previous value, in child order. Collapsible keeps its existing
+frame-level change record. The records carry the resulting `checked`
+value. Panel children follow expansion and share normal retained lifetimes.
+
+Build and run the [workspace preferences example](../bindings/bridge/examples/disclosure_preferences.c)
+from the repository root. Its headless mode activates Notifications, closes
+the Account panel and updates a status label.
+
+```sh
+cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
+cmake --build build --target bridge_disclosure_preferences_example
+./build/bridge_disclosure_preferences_example
+```
+
+For a native window, use a native-capable build with `CUI_BUILD_NATIVE=ON`
+and pass a font file as the first argument. [Native prerequisites](NATIVE_APP_STARTER.md)
+
+When dynamically loading bridge providers, look up the two additive
+`cui_bridge_disclosure_*_v1` setters before offering their controls.
+Providers without them retain their ordinary Accordion and Collapsible APIs.
+Python, JS/TS, Go and Rust builders currently have the ordinary controls.
+Custom headers, measured reveal and synchronous observers are available
+through the immediate C presenters. [Immediate C guide](DISCLOSURE.md)
 
 ### Configure a retained Rating from C
 

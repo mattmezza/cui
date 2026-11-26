@@ -109,9 +109,9 @@ The checkbox updates the application's bool. Controlled Switch/Toggle `on_change
 
 **Interaction:** Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.
 
-**Usage:** Submit stable item IDs and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width and SVG indicators. Set joined for one outer card, and use trigger_styles for per-item feedback. Keep motion alive through end_frame.
+**Usage:** Submit stable item IDs and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width and SVG indicators. Set joined for one outer card, and use trigger_styles for per-item feedback. Keep motion alive through end_frame. The retained C bridge copies presentation and keeps queued change records.
 
-API: `cui_accordion`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md).
+API: `cui_accordion`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md); [retained C](BRIDGE_COMPONENTS.md#style-retained-accordion-and-collapsible-from-c).
 
 Additional event includes: `cui/cui_disclosure_events.h`.
 
@@ -250,9 +250,9 @@ API: `cui_sdl3_clipboard_interface`. [Public header](../include/cui/cui_sdl3.h);
 
 **Interaction:** Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.
 
-**Usage:** Submit a stable ID and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width, SVG indicators and optional trigger feedback. Keep motion alive through end_frame.
+**Usage:** Submit a stable ID and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width, SVG indicators and optional trigger feedback. Keep motion alive through end_frame. The retained C bridge copies presentation and keeps queued change records.
 
-API: `cui_collapsible`, `cui_collapsible_ex`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md).
+API: `cui_collapsible`, `cui_collapsible_ex`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md); [retained C](BRIDGE_COMPONENTS.md#style-retained-accordion-and-collapsible-from-c).
 
 Additional event includes: `cui/cui_disclosure_events.h`.
 

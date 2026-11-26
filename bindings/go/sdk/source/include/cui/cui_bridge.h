@@ -1066,6 +1066,77 @@ typedef struct {
 CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_set_paint_v1(cui_bridge_app *, cui_bridge_node,
                                                                uint32_t layer,
                                                                const cui_bridge_radio_paint_v1 *);
+/* Optional retained Accordion and Collapsible presentation. */
+enum {
+    CUI_BRIDGE_DISCLOSURE_JOINED_V1 = 1u << 0,
+    CUI_BRIDGE_DISCLOSURE_BORDERED_V1 = 1u << 1,
+    CUI_BRIDGE_DISCLOSURE_SINGLE_V1 = 1u << 2,
+    CUI_BRIDGE_DISCLOSURE_ALLOW_COLLAPSE_V1 = 1u << 3,
+    CUI_BRIDGE_DISCLOSURE_CUSTOM_CARD_V1 = 1u << 4,
+    CUI_BRIDGE_DISCLOSURE_CLIP_CARD_V1 = 1u << 5,
+    CUI_BRIDGE_DISCLOSURE_BORDERLESS_V1 = 1u << 6
+};
+typedef struct {
+    uint32_t struct_size, schema_version, flags, design_size;
+    float width, card_radius, card_border_width, card_padding, card_gap;
+    uint32_t card_background_rgba, card_border_rgba;
+    char collapsed_icon[64], expanded_icon[64];
+} cui_bridge_disclosure_config_v1;
+/* Copies the configuration on Accordion or Collapsible. NULL restores legacy
+ * policy and clears display options. Independent trigger styles remain.
+ * Exact size and schema 1. Design size uses CUI_BRIDGE_SIZE_*.
+ * Width is -1 to fill, 0 to fit, or a positive logical width up to 4096. Icon
+ * arrays must contain a NUL and name an embedded catalog icon or path. Empty
+ * names use chevrons. BORDERED adds the theme outline to Accordion. JOINED puts
+ * its sections inside one card. SINGLE closes siblings on opening an Item.
+ * ALLOW_COLLAPSE lets an expanded Item close on activation. These four flags
+ * apply only to Accordion. BORDERLESS removes the Collapsible trigger border.
+ * CUSTOM_CARD replaces the outer card paint, padding and gap. Card dimensions
+ * are 0–4096 logical pixels and colors are 0xRRGGBBAA. CLIP_CARD is valid with
+ * CUSTOM_CARD. Inactive card fields are ignored. Configuration is silent.
+ * Changes are accepted between steps on the owner thread. Errors preserve the
+ * previous configuration and state. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_disclosure_configure_v1(
+    cui_bridge_app *, cui_bridge_node, const cui_bridge_disclosure_config_v1 *);
+enum {
+    CUI_BRIDGE_DISCLOSURE_HOVER_V1 = 1u << 0,
+    CUI_BRIDGE_DISCLOSURE_PRESSED_V1 = 1u << 1,
+    CUI_BRIDGE_DISCLOSURE_EXPANDED_V1 = 1u << 2,
+    CUI_BRIDGE_DISCLOSURE_DISABLED_V1 = 1u << 3,
+    CUI_BRIDGE_DISCLOSURE_FOCUS_V1 = 1u << 4,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_V1 = 1u << 5
+};
+typedef enum {
+    CUI_BRIDGE_DISCLOSURE_CURSOR_DEFAULT = 0,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_POINTER,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_TEXT,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_RESIZE_HORIZONTAL,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_RESIZE_VERTICAL,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_MOVE,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_NOT_ALLOWED,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_CROSSHAIR,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_GRAB,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_GRABBING,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_ZOOM_IN,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_ZOOM_OUT,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_WAIT,
+    CUI_BRIDGE_DISCLOSURE_CURSOR_HELP
+} cui_bridge_disclosure_cursor;
+typedef struct {
+    uint32_t struct_size, schema_version, fields, reserved;
+    uint32_t hover_rgba, pressed_rgba, expanded_rgba, disabled_rgba, focus_rgba, cursor;
+} cui_bridge_disclosure_trigger_style_v1;
+/* Copies optional trigger style on Collapsible or a direct Accordion Item.
+ * NULL or zero fields clears it. Exact size, schema 1, reserved 0. Fields select
+ * present colors (0xRRGGBBAA, including zero) and a supported cursor value.
+ * Inactive fields are ignored. Applies to the owning trigger, even without a
+ * separate display configuration. Uses disabled, pressed, hovered, expanded
+ * precedence and an independent focus outline. Cursor applies while enabled.
+ * Styles are independent of configuration and of expansion state. Call between
+ * steps on the owner thread. The setter emits no events and errors preserve the
+ * previous style. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_disclosure_set_trigger_style_v1(
+    cui_bridge_app *, cui_bridge_node, const cui_bridge_disclosure_trigger_style_v1 *);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *, cui_bridge_node,
                                                          uint32_t disabled);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_value(cui_bridge_app *, cui_bridge_node,

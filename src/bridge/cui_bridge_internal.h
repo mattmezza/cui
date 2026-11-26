@@ -127,6 +127,7 @@ typedef struct {
     uint32_t message_count;
     cui_carousel_state *carousel_state;
     cui_carousel_geometry *carousel_geometry;
+    cui_carousel_fit *carousel_fit;
     float carousel_basis;
     uint32_t carousel_axis, carousel_controls, carousel_slot_role;
     uint32_t carousel_arrow_size, carousel_marker_size;

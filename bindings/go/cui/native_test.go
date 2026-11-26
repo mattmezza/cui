@@ -1400,6 +1400,59 @@ func TestCarouselControlSizes(t *testing.T) {
 	assertSizes(32, 24)
 }
 
+func TestCarouselFit(t *testing.T) {
+	a := app(t)
+	legacy := os.Getenv("CUI_TEST_LEGACY_CAROUSEL_FIT") == "1"
+	supported, err := a.SupportsCarouselFit()
+	check(t, err)
+	if supported == legacy {
+		t.Fatalf("Carousel fit support = %t, legacy test = %t", supported, legacy)
+	}
+	slide := Item("build", "Build").CarouselBasis(.5).CarouselFit(true)
+	other := Item("release", "Release")
+	rail := Carousel("rail").VisualSize(400, 150).Children(slide, other)
+	root := Column("root").Children(rail)
+	if legacy {
+		if err := a.Mount(root); err != ErrCarouselFitUnavailable {
+			t.Fatalf("expected unmounted compatibility error, got %v", err)
+		}
+		check(t, slide.CarouselFit(false).CarouselBasis(.5).Err())
+	}
+	check(t, a.Mount(root))
+	settle := func() Rect {
+		t.Helper()
+		check(t, a.Step(.016))
+		check(t, a.Step(.016))
+		bounds, err := a.Bounds(slide)
+		check(t, err)
+		return bounds
+	}
+	first := settle()
+	if legacy {
+		check(t, slide.CarouselFit(false).Err())
+		if first.Width != 208 || settle().Width != first.Width {
+			t.Fatalf("disabled fit must preserve previous fractional size: %+v", first)
+		}
+		if err := slide.CarouselFit(true).Err(); err != ErrCarouselFitUnavailable {
+			t.Fatalf("expected mounted compatibility error, got %v", err)
+		}
+		return
+	}
+	check(t, slide.SetText("Prepare the nightly build"))
+	if grown := settle(); first.Width >= 100 || grown.Width <= first.Width+40 {
+		t.Fatalf("expected measured growth, got %.2f to %.2f", first.Width, grown.Width)
+	}
+	check(t, slide.CarouselBasis(0).Err())
+	if full := settle(); full.Width != 416 {
+		t.Fatalf("zero basis should switch to the viewport: %+v", full)
+	}
+	check(t, slide.CarouselFit(true).Err())
+	check(t, rail.CarouselAxis(CarouselVertical).Err())
+	if vertical := settle(); vertical.Height <= 16 || vertical.Height >= 100 {
+		t.Fatalf("vertical fit should measure text's height: %+v", vertical)
+	}
+}
+
 func TestCarouselSlots(t *testing.T) {
 	a := app(t)
 	supported, err := a.SupportsCarouselSlots()

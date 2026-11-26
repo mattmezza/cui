@@ -706,6 +706,7 @@ static cui_bridge_status go_attachment_preview(cui_bridge_app *a, cui_bridge_nod
 }
 
 static cui_bridge_status (*carousel_set_basis)(cui_bridge_app *, cui_bridge_node, float);
+static cui_bridge_status (*carousel_set_fit)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static cui_bridge_status (*carousel_set_axis)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static cui_bridge_status (*carousel_set_looping)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static cui_bridge_status (*carousel_set_controls)(cui_bridge_app *, cui_bridge_node, uint32_t);
@@ -717,6 +718,8 @@ static void go_carousel_initialize(void) {
  if (bridge_lib) {
   go_load_optional_symbol(&carousel_set_basis, sizeof carousel_set_basis,
                           "cui_bridge_set_carousel_slide_basis_v1");
+  go_load_optional_symbol(&carousel_set_fit, sizeof carousel_set_fit,
+                          "cui_bridge_set_carousel_slide_fit_v1");
   go_load_optional_symbol(&carousel_set_axis, sizeof carousel_set_axis,
                           "cui_bridge_set_carousel_axis_v1");
   go_load_optional_symbol(&carousel_set_looping, sizeof carousel_set_looping,
@@ -731,6 +734,7 @@ static void go_carousel_initialize(void) {
 #if defined(CUI_GO_STATIC)
  else {
   carousel_set_basis = cui_bridge_set_carousel_slide_basis_v1;
+  carousel_set_fit = cui_bridge_set_carousel_slide_fit_v1;
   carousel_set_axis = cui_bridge_set_carousel_axis_v1;
   carousel_set_looping = cui_bridge_set_carousel_looping_v1;
   carousel_set_controls = cui_bridge_set_carousel_controls_v1;
@@ -742,6 +746,10 @@ static void go_carousel_initialize(void) {
 static int go_carousel_basis_supported(void) { return carousel_set_basis != NULL; }
 static cui_bridge_status go_carousel_set_basis(cui_bridge_app *a, cui_bridge_node slide, float basis) {
  return carousel_set_basis(a, slide, basis);
+}
+static int go_carousel_fit_supported(void) { return carousel_set_fit != NULL; }
+static cui_bridge_status go_carousel_set_fit(cui_bridge_app *a, cui_bridge_node slide, uint32_t enabled) {
+ return carousel_set_fit(a, slide, enabled);
 }
 static int go_carousel_axis_supported(void) { return carousel_set_axis != NULL; }
 static cui_bridge_status go_carousel_set_axis(cui_bridge_app *a, cui_bridge_node carousel, uint32_t axis) {
@@ -954,6 +962,7 @@ type Node struct {
 	carouselSlot                         CarouselSlotRole
 	attachmentSlotWidth                  float32
 	carouselBasis                        float32
+	carouselFit                          bool
 	carouselAxis                         CarouselAxis
 	carouselLooping                      bool
 	carouselControls                     C.uint32_t
@@ -2113,6 +2122,14 @@ func (a *App) Mount(root *Node) error {
 				return ErrCarouselBasisUnavailable
 			}
 		}
+		if n.carouselFit {
+			if parent == nil || parent.kind != int(C.CUI_BRIDGE_CAROUSEL) {
+				return errors.New("CarouselFit requires a direct Carousel Item")
+			}
+			if C.go_carousel_fit_supported() == 0 {
+				return ErrCarouselFitUnavailable
+			}
+		}
 		if content && !radioContentKind(n.kind) {
 			return errors.New("Control decorations require passive content")
 		}
@@ -2591,6 +2608,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.carouselBasis > 0 {
 			if err := result(C.go_carousel_set_basis(a.ptr, h, C.float(n.carouselBasis))); err != nil {
+				return err
+			}
+		}
+		if n.carouselFit {
+			if err := result(C.go_carousel_set_fit(a.ptr, h, 1)); err != nil {
 				return err
 			}
 		}
@@ -4330,7 +4352,8 @@ func (a *App) SupportsCarouselBasis() (bool, error) {
 }
 
 // CarouselBasis sets the fraction of the viewport occupied by this Carousel
-// Item. Zero resets it to the full viewport. Layout changes emit no selection events.
+// Item and clears content sizing. Zero resets it to the full viewport. Layout
+// changes emit no selection events.
 func (n *Node) CarouselBasis(fraction float32) *Node {
 	if n.err != nil {
 		return n
@@ -4339,7 +4362,7 @@ func (n *Node) CarouselBasis(fraction float32) *Node {
 		n.err = errors.New("CarouselBasis requires a live Item and a finite fraction in [0,1]")
 		return n
 	}
-	if n.app != nil && (fraction > 0 || n.carouselBasis > 0) {
+	if n.app != nil && (fraction > 0 || n.carouselBasis > 0 || n.carouselFit) {
 		supported, err := n.app.SupportsCarouselBasis()
 		if err != nil {
 			n.err = err
@@ -4353,6 +4376,53 @@ func (n *Node) CarouselBasis(fraction float32) *Node {
 		}
 	}
 	n.carouselBasis = fraction
+	n.carouselFit = false
+	return n
+}
+
+// ErrCarouselFitUnavailable means the loaded bridge lacks content-sized slides.
+var ErrCarouselFitUnavailable = errors.New("Carousel fit requires cui_bridge_set_carousel_slide_fit_v1")
+
+// SupportsCarouselFit reports whether the loaded bridge supports content-sized slides.
+func (a *App) SupportsCarouselFit() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_carousel_fit_supported() != 0, nil
+}
+
+// CarouselFit measures the in-flow content of this direct Carousel Item.
+// Enabling it replaces any previous basis. Disabling it restores the ordinary
+// size if the Item was fitted. Layout changes emit no selection events.
+func (n *Node) CarouselFit(enabled bool) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != int(C.CUI_BRIDGE_ITEM) || n.removed {
+		n.err = errors.New("CarouselFit requires a live Item")
+		return n
+	}
+	if n.app != nil {
+		supported, err := n.app.SupportsCarouselFit()
+		if err != nil {
+			n.err = err
+		} else if !supported && enabled {
+			n.err = ErrCarouselFitUnavailable
+		} else if supported {
+			var value C.uint32_t
+			if enabled {
+				value = 1
+			}
+			n.err = result(C.go_carousel_set_fit(n.app.ptr, n.handle, value))
+		}
+		if n.err != nil {
+			return n
+		}
+	}
+	n.carouselFit = enabled
+	if enabled {
+		n.carouselBasis = 0
+	}
 	return n
 }
 

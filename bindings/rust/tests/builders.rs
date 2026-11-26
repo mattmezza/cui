@@ -1124,6 +1124,47 @@ fn carousel_control_sizes() {
 }
 
 #[test]
+fn carousel_fit() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let legacy = std::env::var("CUI_TEST_LEGACY_CAROUSEL_FIT").as_deref() == Ok("1");
+    assert_eq!(app.supports_carousel_fit(), !legacy);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let rail = app
+        .build_child(root, Kind::Carousel, "rail").unwrap()
+        .visual_size(400., 150.).unwrap().finish();
+    let builder = app.build_child(rail, Kind::Item, "slide").unwrap()
+        .text("Build").unwrap().carousel_basis(0.5).unwrap();
+    let slide = if legacy {
+        builder.carousel_fit(false).unwrap().finish()
+    } else {
+        builder.carousel_fit(true).unwrap().finish()
+    };
+    app.child(rail, Kind::Item, "next").unwrap();
+    let settle = |app: &mut App| {
+        app.step(0.016).unwrap();
+        app.step(0.016).unwrap();
+        app.bounds(slide).unwrap()
+    };
+    let first = settle(&mut app);
+    if legacy {
+        assert_eq!(first.width, 208.);
+        assert_eq!(app.carousel_fit(slide, true).err(), Some(Error::CAROUSEL_FIT_UNAVAILABLE));
+        assert_eq!(settle(&mut app).width, first.width);
+        return;
+    }
+    app.text(slide, "Prepare the nightly build").unwrap();
+    assert!(first.width < 100. && settle(&mut app).width > first.width + 40.);
+    app.carousel_basis(slide, 0.).unwrap();
+    assert_eq!(settle(&mut app).width, 416.);
+    app.carousel_fit(slide, true).unwrap();
+    app.carousel_axis(rail, CarouselAxis::Vertical).unwrap();
+    let vertical = settle(&mut app);
+    assert!(vertical.height > 16. && vertical.height < 100.);
+    assert_eq!(app.dispatch().unwrap(), 0);
+}
+
+#[test]
 fn carousel_slots() {
     let _guard = NATIVE.lock().unwrap();
     let mut app = App::headless(640., 480.).unwrap();

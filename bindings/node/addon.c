@@ -1693,6 +1693,16 @@ static napi_value set_carousel_axis(napi_env env, napi_callback_info info) {
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 
+static napi_value supports_carousel_fit(napi_env env, napi_callback_info info) {
+    (void)info;
+    return supports_bridge_flag(env, "cui_bridge_set_carousel_slide_fit_v1");
+}
+static napi_value set_carousel_fit(napi_env env, napi_callback_info info) {
+    return set_bridge_flag(env, info, "cui_bridge_set_carousel_slide_fit_v1",
+                           "enabled must be a boolean",
+                           "Carousel fit requires cui_bridge_set_carousel_slide_fit_v1");
+}
+
 typedef cui_bridge_status (*carousel_basis_fn)(cui_bridge_app *, cui_bridge_node, float);
 static carousel_basis_fn carousel_basis_symbol(void) {
     carousel_basis_fn set = NULL;
@@ -2895,6 +2905,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("supportsCarouselLooping", supports_carousel_looping, 0);
     EXPORT("setCarouselLooping", set_carousel_looping, 0);
     EXPORT("setCarouselAxis", set_carousel_axis, 0);
+    EXPORT("supportsCarouselFit", supports_carousel_fit, 0);
+    EXPORT("setCarouselFit", set_carousel_fit, 0);
     EXPORT("supportsCarouselBasis", supports_carousel_basis, 0);
     EXPORT("setCarouselBasis", set_carousel_basis, 0);
     EXPORT("supportsRadioMotion", supports_radio_motion, 0);

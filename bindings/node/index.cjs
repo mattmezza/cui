@@ -104,6 +104,10 @@ function preflightNodeOptions(app, node, insideDecoration = false, insideAttachm
   if (node.carouselControlSizesValue.some(Boolean) && !app.supports_carousel_control_sizes()) throw new Error('Carousel control sizes unavailable');
   if (node.carouselControlsValue && !app.supports_carousel_controls()) throw new Error('Carousel controls unavailable');
   if (node.carouselLoopingValue && !app.supports_carousel_looping()) throw new Error('Carousel looping unavailable');
+  if (node.carouselFitValue) {
+    if (node.parent?.kind !== 65) throw new TypeError('carousel_fit requires a direct Carousel Item');
+    if (!app.supports_carousel_fit()) throw new Error('Carousel fit unavailable');
+  }
   if (node.carouselBasisValue) {
     if (node.parent?.kind !== 65) throw new TypeError('carousel_basis requires a direct Carousel Item');
     if (!app.supports_carousel_basis()) throw new Error('Carousel basis unavailable');
@@ -212,6 +216,7 @@ class Node {
     this.carouselControlSizesValue = [0, 0];
     this.carouselControlsValue = 0;
     this.carouselLoopingValue = false;
+    this.carouselFitValue = false;
     this.carouselBasisValue = 0;
     this.radioMotionValue = false;
     this.radioTabIndexValue = null;
@@ -484,17 +489,30 @@ class Node {
     this.carouselLoopingValue = enabled;
     return this;
   }
+  carousel_fit(enabled = true) {
+    if (this.kind !== 20) throw new TypeError('carousel_fit requires an Item');
+    if (typeof enabled !== 'boolean') throw new TypeError('enabled must be a boolean');
+    if (this.owner) {
+      this.owner._alive();
+      if (this.owner.supports_carousel_fit()) native.setCarouselFit(this.owner.handle, this[NODE], enabled);
+      else if (enabled) throw new Error('Carousel fit unavailable');
+    }
+    this.carouselFitValue = enabled;
+    if (enabled) this.carouselBasisValue = 0;
+    return this;
+  }
   carousel_basis(fraction) {
     if (this.kind !== 20) throw new TypeError('carousel_basis requires an Item');
     if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1)
       throw new TypeError('fraction must be finite and in [0, 1]');
     if (this.owner) {
       this.owner._alive();
-      if (fraction || this.carouselBasisValue) {
+      if (fraction || this.carouselBasisValue || this.carouselFitValue) {
         if (!this.owner.supports_carousel_basis()) throw new Error('Carousel basis unavailable');
         native.setCarouselBasis(this.owner.handle, this[NODE], fraction);
       }
     }
+    this.carouselFitValue = false;
     this.carouselBasisValue = fraction;
     return this;
   }
@@ -713,6 +731,7 @@ class Node {
     if (!(item instanceof Node) || item.kind !== 20 || item.owner || item.parent ||
         item.childrenValue.length || this.childrenValue.length >= 64)
       throw new TypeError('unattached leaf Item required; capacity is 64');
+    if (item.carouselFitValue) throw new TypeError('carousel_fit requires a direct Carousel Item');
     if (item.carouselBasisValue) throw new TypeError('carousel_basis requires a direct Carousel Item');
     if (item.radioContentValue || item.radioTooltipValue || item.radioMotionValue ||
         item.radioTabIndexValue !== null || item.radioPaintValues)
@@ -938,6 +957,7 @@ class App {
       if (node.carouselControlSizesValue.some(Boolean)) native.setCarouselControlSizes(this.handle, node[NODE], ...node.carouselControlSizesValue);
       if (node.carouselControlsValue) native.setCarouselControls(this.handle, node[NODE], node.carouselControlsValue);
       if (node.carouselLoopingValue) native.setCarouselLooping(this.handle, node[NODE], true);
+      if (node.carouselFitValue) native.setCarouselFit(this.handle, node[NODE], true);
       if (node.carouselBasisValue) native.setCarouselBasis(this.handle, node[NODE], node.carouselBasisValue);
       if (node.radioMotionValue) native.setRadioMotion(this.handle, node[NODE], true);
       if (node.radioTabIndexValue !== null)
@@ -1163,6 +1183,11 @@ class App {
     this._alive();
     return typeof native.supportsCarouselLooping === 'function' &&
       typeof native.setCarouselLooping === 'function' && native.supportsCarouselLooping();
+  }
+  supports_carousel_fit() {
+    this._alive();
+    return typeof native.supportsCarouselFit === 'function' &&
+      typeof native.setCarouselFit === 'function' && native.supportsCarouselFit();
   }
   supports_carousel_basis() {
     this._alive();

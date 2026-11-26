@@ -338,3 +338,56 @@ console.log('PASS native Dock split layout, activation snapshots and metadata fr
    assert.deepEqual(rail.carouselControlSizesValue, [0,0]);
  } finally { legacy.dispose(); }
 }
+
+{
+  for (const value of [0, 1, null, 'true'])
+    assert.throws(() => c.item('bad').carousel_fit(value));
+  assert.throws(() => c.label('bad').carousel_fit(), /Item/);
+  const invalid = new c.App();
+  try {
+    const slide = c.item('bad').carousel_fit();
+    assert.throws(() => invalid.mount(c.column().children(slide)), /direct Carousel/);
+    assert.ok(!slide.owner);
+  } finally { invalid.dispose(); }
+
+  const app = new c.App({width: 640});
+  const slide = c.item('fit', 'Short').carousel_basis(.5).carousel_fit();
+  try {
+    assert.equal(app.supports_carousel_fit(), true);
+    const rail = c.carousel('fit-slides').visual_size(400, 100).children(slide);
+    app.mount(c.column().children(rail)).step();
+    app.step();
+    const initialWidth = slide.bounds().width;
+    slide.label('A considerably longer slide label');
+    app.step();
+    assert.equal(slide.bounds().width, initialWidth);
+    app.step();
+    assert.ok(slide.bounds().width > initialWidth);
+
+    slide.carousel_basis(.5);
+    app.step();
+    const fractionalWidth = slide.bounds().width;
+    slide.carousel_fit(false);
+    app.step();
+    assert.equal(slide.bounds().width, fractionalWidth);
+    slide.carousel_fit().carousel_basis(0);
+    app.step();
+    assert.ok(slide.bounds().width > fractionalWidth);
+    slide.carousel_fit();
+    app.step();
+    slide.carousel_fit(false);
+    app.step();
+    assert.ok(slide.bounds().width > fractionalWidth);
+  } finally { app.dispose(); }
+  assert.throws(() => slide.carousel_fit(false), /disposed/);
+
+  const legacy = new c.App();
+  try {
+    legacy.supports_carousel_fit = () => false;
+    const slide = c.item('legacy-slide').carousel_fit().carousel_fit(false);
+    legacy.mount(c.column().children(c.carousel('legacy-fit').children(slide)));
+    slide.carousel_fit(false);
+    assert.throws(() => slide.carousel_fit(), /unavailable/);
+    assert.equal(slide.carouselFitValue, false);
+  } finally { legacy.dispose(); }
+}

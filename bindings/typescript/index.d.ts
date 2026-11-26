@@ -45,6 +45,7 @@ export class App {
   supports_carousel_looping(): boolean;
   supports_carousel_controls(): boolean;
   supports_carousel_control_sizes(): boolean;
+  supports_carousel_fit(): boolean;
   supports_carousel_basis(): boolean;
   /** Whether this app's native bridge can animate retained Radio selection. */
   supports_radio_motion(): boolean;
@@ -114,6 +115,7 @@ export interface Disclosure extends Label, Composite, DisclosureTriggerStyled {o
 export interface Group extends Composite {select(item: Item): this; selected(): Item | undefined; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Item extends Disclosure, RadioTooltip, RadioPaintStyled {
   /** Direct Carousel Item viewport fraction in [0, 1]; zero resets. */
+  carousel_fit(enabled?: boolean): this;
   carousel_basis(fraction: number): this;
   /** Enable or hide passive children of a direct RadioGroup Item. */
   decorate_content(enabled?: boolean): this;

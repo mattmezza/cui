@@ -1261,12 +1261,22 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_visual_size(cui_bridge_app *, cu
                                                             float width, float height);
 /* Optional Carousel operation. Item must be a direct child of a Carousel.
  * Basis is a finite fraction in [0,1]. Zero restores the full-viewport extent.
+ * Setting any valid basis clears content sizing on that Item.
  * With any positive basis, an unset or zero Carousel visual width grows to the
  * layout allocation. An explicit positive width still fixes the viewport.
  * This changes layout only and never queues a selection event. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_slide_basis_v1(cui_bridge_app *,
                                                                         cui_bridge_node item,
                                                                         float basis);
+/* Optional retained content sizing for a direct Carousel Item. Set enabled
+ * to 1 to replace its basis with the measured in-flow content extent, or 0
+ * to disable content sizing. Disabling an already non-fit Item preserves its
+ * basis. The bridge owns measurement storage. An auto-width Carousel with a
+ * fitted Item grows to the layout allocation. A measured extent is applied
+ * on a follow-up frame. Selection is preserved and no event is queued. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_slide_fit_v1(cui_bridge_app *,
+                                                                      cui_bridge_node item,
+                                                                      uint32_t enabled);
 enum { CUI_BRIDGE_CAROUSEL_HORIZONTAL, CUI_BRIDGE_CAROUSEL_VERTICAL };
 /* Optional Carousel axis operation. Horizontal is the default. An axis change
  * takes effect on the next submission, cancels active Carousel gestures and

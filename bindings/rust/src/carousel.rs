@@ -68,6 +68,37 @@ fn resolve() -> Option<SetBasis> {
     None
 }
 
+fn fit_setter() -> Option<SetOption> {
+    static SETTER: OnceLock<Option<SetOption>> = OnceLock::new();
+    *SETTER.get_or_init(resolve_fit)
+}
+
+#[cfg(cui_bridge_static)]
+fn resolve_fit() -> Option<SetOption> {
+    extern "C" {
+        fn cui_bridge_set_carousel_slide_fit_v1(
+            app: *mut c_void,
+            item: RawNode,
+            enabled: u32,
+        ) -> u32;
+    }
+    Some(cui_bridge_set_carousel_slide_fit_v1)
+}
+
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn resolve_fit() -> Option<SetOption> {
+    unsafe {
+        let symbol =
+            crate::notification_symbol_v1(c"cui_bridge_set_carousel_slide_fit_v1".as_ptr());
+        (!symbol.is_null()).then(|| std::mem::transmute::<*mut c_void, SetOption>(symbol))
+    }
+}
+
+#[cfg(not(any(cui_bridge_static, unix, windows)))]
+fn resolve_fit() -> Option<SetOption> {
+    None
+}
+
 fn axis_setter() -> Option<SetOption> {
     static SETTER: OnceLock<Option<SetOption>> = OnceLock::new();
     *SETTER.get_or_init(resolve_axis)
@@ -221,6 +252,8 @@ fn resolve_slot_factory() -> Option<CreateSlot> {
 impl Error {
     /// The loaded bridge lacks the optional Carousel basis setter.
     pub const CAROUSEL_BASIS_UNAVAILABLE: Self = Self(9);
+    /// The loaded bridge lacks the optional Carousel content sizing setter.
+    pub const CAROUSEL_FIT_UNAVAILABLE: Self = Self(9);
     /// The loaded bridge lacks the optional Carousel axis setter.
     pub const CAROUSEL_AXIS_UNAVAILABLE: Self = Self(9);
     /// The loaded bridge lacks the optional Carousel looping setter.
@@ -331,12 +364,28 @@ impl App {
         setter().is_some()
     }
 
-    /// Set a direct Carousel Item's viewport fraction in [0, 1].
-    /// Zero restores the full viewport. This queues no selection notification.
+    /// Set a direct Carousel Item's viewport fraction in [0, 1] and clear
+    /// content sizing. Zero restores the full viewport. This queues no selection notification.
     pub fn carousel_basis(&mut self, item: Node, basis: f32) -> Result<&mut Self> {
         let item = self.valid(item)?;
         let set = setter().ok_or(Error::CAROUSEL_BASIS_UNAVAILABLE)?;
         check(unsafe { set(self.raw, item, basis) })?;
+        Ok(self)
+    }
+    /// Whether the loaded bridge supports content-sized Carousel slides.
+    pub fn supports_carousel_fit(&self) -> bool {
+        fit_setter().is_some()
+    }
+
+    /// Size a direct Carousel Item to its in-flow content. Enabling this
+    /// replaces its basis. Disabling it leaves any ordinary basis alone.
+    pub fn carousel_fit(&mut self, item: Node, enabled: bool) -> Result<&mut Self> {
+        let item = self.valid(item)?;
+        if let Some(set) = fit_setter() {
+            check(unsafe { set(self.raw, item, u32::from(enabled)) })?;
+        } else if enabled {
+            return Err(Error::CAROUSEL_FIT_UNAVAILABLE);
+        }
         Ok(self)
     }
 }
@@ -368,6 +417,12 @@ impl Builder<'_> {
     ) -> Result<Self> {
         self.app
             .carousel_control_sizes(self.node, arrows, pagination)?;
+        Ok(self)
+    }
+
+    /// Size the Item being built to its in-flow content.
+    pub fn carousel_fit(self, enabled: bool) -> Result<Self> {
+        self.app.carousel_fit(self.node, enabled)?;
         Ok(self)
     }
 

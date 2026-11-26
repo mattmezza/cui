@@ -319,6 +319,10 @@ class _API:
         if hasattr(lib, "cui_bridge_set_carousel_axis_v1"):
             self.set_carousel_axis = bind("set_carousel_axis_v1", C.c_int,
                                           C.c_void_p, _Handle, C.c_uint32)
+        self.set_carousel_fit = None
+        if hasattr(lib, "cui_bridge_set_carousel_slide_fit_v1"):
+            self.set_carousel_fit = bind("set_carousel_slide_fit_v1", C.c_int,
+                                         C.c_void_p, _Handle, C.c_uint32)
         self.set_carousel_basis = None
         if hasattr(lib, "cui_bridge_set_carousel_slide_basis_v1"):
             self.set_carousel_basis = bind("set_carousel_slide_basis_v1", C.c_int,
@@ -567,6 +571,7 @@ class Widget:
         self._carousel_control_sizes = (0, 0)
         self._carousel_controls = 0
         self._carousel_looping = False
+        self._carousel_fit = False
         self._carousel_basis = 0.0
         self._visual: tuple[float, float] | None = None
         self._total = 5 if kind == "rating" else 6 if kind == "otp_input" else 10
@@ -1111,6 +1116,24 @@ class Widget:
         self._carousel_looping = enabled
         return self
 
+    def carousel_fit(self, enabled: bool = True) -> "Widget":
+        """Fit a direct Carousel Item to its retained content."""
+        if self.kind != "item":
+            raise ValueError("carousel_fit requires an Item")
+        if not isinstance(enabled, bool):
+            raise TypeError("enabled must be a boolean")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is not None:
+            if self._app.supports_carousel_fit():
+                self._change("set_carousel_fit", int(enabled))
+            elif enabled:
+                raise RuntimeError("Carousel fit requires cui_bridge_set_carousel_slide_fit_v1")
+        self._carousel_fit = enabled
+        if enabled:
+            self._carousel_basis = 0.0
+        return self
+
     def carousel_basis(self, fraction: float) -> "Widget":
         """Size a direct Carousel Item relative to the inner viewport; zero resets."""
         if self.kind != "item":
@@ -1121,10 +1144,11 @@ class Widget:
             raise ValueError("fraction must be finite and in [0, 1]")
         if self._disposed:
             raise RuntimeError("Widget belongs to a disposed App")
-        if self._app is not None and (fraction or self._carousel_basis):
+        if self._app is not None and (fraction or self._carousel_basis or self._carousel_fit):
             if not self._app.supports_carousel_basis():
                 raise RuntimeError("Carousel basis requires cui_bridge_set_carousel_slide_basis_v1")
             self._change("set_carousel_basis", fraction)
+        self._carousel_fit = False
         self._carousel_basis = float(fraction)
         return self
 
@@ -1609,6 +1633,8 @@ class Widget:
         if (not isinstance(item, Widget) or item.kind != "item" or item._app is not None or
                 item._disposed or item._children or len(self._children) >= 64):
             raise ValueError("unattached leaf Item required; capacity is 64")
+        if item._carousel_fit:
+            raise ValueError("carousel_fit requires a direct Carousel Item")
         if item._carousel_basis:
             raise ValueError("carousel_basis requires a direct Carousel Item")
         if (item._radio_content or item._radio_tooltip or item._radio_motion or
@@ -2144,6 +2170,10 @@ class App:
         self._ensure_open()
         return self._api.set_carousel_looping is not None
 
+    def supports_carousel_fit(self) -> bool:
+        self._ensure_open()
+        return self._api.set_carousel_fit is not None
+
     def supports_carousel_basis(self) -> bool:
         self._ensure_open()
         return self._api.set_carousel_basis is not None
@@ -2299,6 +2329,11 @@ class App:
                 raise RuntimeError("Carousel controls requires cui_bridge_set_carousel_controls_v1")
             if node._carousel_looping and not self.supports_carousel_looping():
                 raise RuntimeError("Carousel looping requires cui_bridge_set_carousel_looping_v1")
+            if node._carousel_fit:
+                if parent is None or parent.kind != "carousel":
+                    raise ValueError("carousel_fit requires a direct Carousel Item")
+                if not self.supports_carousel_fit():
+                    raise RuntimeError("Carousel fit requires cui_bridge_set_carousel_slide_fit_v1")
             if node._carousel_basis:
                 if parent is None or parent.kind != "carousel":
                     raise ValueError("carousel_basis requires a direct Carousel Item")
@@ -2397,6 +2432,8 @@ class App:
                     node._change("set_carousel_controls", node._carousel_controls)
                 if node._carousel_looping:
                     node._change("set_carousel_looping", 1)
+                if node._carousel_fit:
+                    node._change("set_carousel_fit", 1)
                 if node._carousel_basis:
                     node._change("set_carousel_basis", node._carousel_basis)
                 if node._radio_motion:

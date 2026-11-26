@@ -248,6 +248,58 @@ class Models(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "looping"):
                 rail.carousel_looping()
 
+    def test_carousel_fit(self):
+        for value in (0, 1, None, "true"):
+            with self.assertRaises(TypeError):
+                c.item("bad").carousel_fit(value)
+        with self.assertRaises(ValueError):
+            c.label("bad").carousel_fit()
+        with c.App() as app:
+            invalid = c.item("bad").carousel_fit()
+            with self.assertRaises(ValueError):
+                app.mount(c.column().children(invalid))
+            self.assertIsNone(invalid._handle)
+
+        with c.App(width=640) as app:
+            self.assertTrue(app.supports_carousel_fit())
+            slide = c.item("fit", "Short").carousel_basis(.5).carousel_fit()
+            carousel = c.carousel("slides").visual_size(400, 100).children(slide)
+            app.mount(c.column().children(carousel))
+            app.step()
+            app.step()
+            initial_width = app.bounds(slide)[2]
+            slide.label("A considerably longer slide label")
+            app.step()
+            self.assertEqual(app.bounds(slide)[2], initial_width)
+            app.step()
+            self.assertGreater(app.bounds(slide)[2], initial_width)
+
+            slide.carousel_basis(.5)
+            app.step()
+            fractional_width = app.bounds(slide)[2]
+            slide.carousel_fit(False)
+            app.step()
+            self.assertEqual(app.bounds(slide)[2], fractional_width)
+            slide.carousel_fit().carousel_basis(0)
+            app.step()
+            self.assertGreater(app.bounds(slide)[2], fractional_width)
+            slide.carousel_fit()
+            app.step()
+            slide.carousel_fit(False)
+            app.step()
+            self.assertGreater(app.bounds(slide)[2], fractional_width)
+        with self.assertRaises(RuntimeError):
+            slide.carousel_fit(False)
+
+        with c.App() as app, patch.object(app._api, "set_carousel_fit", None):
+            self.assertFalse(app.supports_carousel_fit())
+            slide = c.item("legacy-slide").carousel_fit().carousel_fit(False)
+            app.mount(c.column().children(c.carousel("legacy").children(slide)))
+            slide.carousel_fit(False)
+            with self.assertRaises(RuntimeError):
+                slide.carousel_fit()
+            self.assertFalse(slide._carousel_fit)
+
     def test_carousel_basis(self):
         for value in (-.1, 1.1, float("nan"), float("inf")):
             with self.assertRaises(ValueError): c.item("bad").carousel_basis(value)

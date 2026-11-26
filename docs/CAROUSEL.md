@@ -130,8 +130,7 @@ at least one in-flow child or padding to give it a natural extent. A child
 that only fills its parent supplies no preferred size.
 
 Select **Fit to content** in the live gallery to try the same C behavior on
-either axis and copy a full example. Retained C and the language builders
-currently offer viewport-relative slide sizing.
+either axis and copy a full C example.
 
 ### Retained slides
 
@@ -196,6 +195,72 @@ Rust takes `carousel_controls(CarouselControls { arrows: true, pagination: true 
 on the builder or the corresponding App method. Probe
 `supports_carousel_controls()` (Go `SupportsCarouselControls()`) when using
 older bridge libraries and omit the option if the provider lacks it.
+
+### Size retained slides to their content
+
+Call `cui_bridge_set_carousel_slide_fit_v1(app, item, 1)` on a direct
+Carousel Item to size it to its in-flow content on the active axis. The
+bridge owns that Item's measurement storage. A fitted slide uses the
+Carousel's available width when the Carousel has no explicit visual width.
+It preserves selection and sends no selection notification when the
+measured size changes. Headless apps should step again after a layout
+or content change to apply the new measurement.
+
+Enabling fit replaces a previous fraction. A subsequent `carousel_basis`
+call replaces fit, including a zero fraction, which restores the full
+viewport extent. Disabling fit restores a fitted Item's ordinary size.
+Disabling fit on an Item with a fraction preserves that fraction.
+
+Probe the optional API before enabling the mode if you load a shared
+bridge from an earlier release:
+
+| Language | Enable on a direct Item | Capability |
+| --- | --- | --- |
+| Python | `slide.carousel_fit()` | `app.supports_carousel_fit()` |
+| JavaScript and TypeScript | `slide.carousel_fit()` | `app.supports_carousel_fit()` |
+| Go | `slide.CarouselFit(true)` | `app.SupportsCarouselFit()` |
+| Rust | `builder.carousel_fit(true)?` or `app.carousel_fit(slide, true)?` | `app.supports_carousel_fit()` |
+
+With an older bridge or Node addon, enabling fit reports that the feature
+is unavailable. Passing false is safe as a fallback. Keep ordinary or
+fractional sizes on those providers.
+
+This complete Python example mounts a horizontal Carousel and updates a
+slide's contents. It runs headlessly by default.
+
+```python
+import cui_bridge as cui
+
+with cui.App(width=640, height=320) as app:
+    stage = cui.item("build", "Build")
+    detail = cui.label("status", "Ready")
+    stage.children(detail)
+    release = cui.item("release", "Release")
+    if app.supports_carousel_fit():
+        stage.carousel_fit()
+        release.carousel_fit()
+    elif app.supports_carousel_basis():
+        stage.carousel_basis(0.5)
+        release.carousel_basis(0.5)
+
+    rail = cui.carousel("workflow").visual_size(360, 120).children(stage, release)
+    if app.supports_carousel_controls():
+        rail.carousel_controls()
+    app.mount(cui.column("root").children(rail))
+    app.step()
+    app.step()
+    before = app.bounds(stage)[2]
+
+    detail.label("Build artifacts are ready for download")
+    app.step()
+    app.step()
+    after = app.bounds(stage)[2]
+    print(f"Build slide width: {before:g} → {after:g}")
+    if app.supports_carousel_fit():
+        assert after > before
+    else:
+        assert after == before
+```
 
 ### Size arrows and markers
 

@@ -165,3 +165,8 @@ const sizedCarousel: c.Carousel = c.carousel().carousel_control_sizes().carousel
 c.carousel().carousel_control_sizes({arrows: "invalid"});
 // @ts-expect-error only Carousel supports control sizes
 c.item().carousel_control_sizes();
+
+const fittedSlide: c.Item = c.item("fitted").carousel_fit().carousel_fit(false);
+const hasCarouselFit: boolean = app.supports_carousel_fit();
+// @ts-expect-error fit requires a boolean
+fittedSlide.carousel_fit(1);

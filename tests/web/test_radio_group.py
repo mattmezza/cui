@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 import tempfile
 import threading
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 from test_touch_components import Audit
 
 
@@ -162,6 +162,65 @@ def check_tooltip(browser, url):
         page.close()
 
 
+def check_tab_order(browser, url):
+    page = browser.new_page(viewport={'width': 1280, 'height': 900})
+    try:
+        page.goto(url + '/#Radio')
+        page.wait_for_function('window.cuiGallery?.renderedComponent === "Radio"')
+        controls = page.locator('#accessible')
+        reset = controls.get_by_role('button', name='Reset selection')
+        option = page.locator('#radio-tab-order')
+        assert reset.count() == 0
+        option.check()
+        reset.wait_for(state='attached')
+        canvas = page.locator('#preview')
+
+        def wait_for_node(name, fields):
+            try:
+                page.wait_for_function("""({name, fields}) => {
+                    const e = cuiGallery.exports, text = new TextDecoder();
+                    for (let i = 0; i < e.gallery_semantic_count(); ++i) {
+                        const label = text.decode(new Uint8Array(e.memory.buffer,
+                            e.gallery_semantic_name(i), e.gallery_semantic_length(i)));
+                        if (label === name)
+                            return fields.every(([field, value]) =>
+                                e.gallery_semantic(i, field) === value);
+                    }
+                    return false;
+                }""", arg={'name': name, 'fields': list(fields.items())}, timeout=3000)
+            except PlaywrightTimeoutError as error:
+                raise AssertionError(f'{name} never reported semantic fields {fields}') from error
+
+        canvas.focus()
+        page.keyboard.press('Tab')
+        wait_for_node('Standard', {6: 1, 7: 1, 9: -2, 36: 1, 37: 0})
+        wait_for_node('Priority', {6: 0, 7: 0, 9: -2, 36: 1, 37: 1})
+        page.keyboard.press('ArrowDown')
+        wait_for_node('Priority', {6: 1, 7: 1, 9: -2, 36: 1, 37: 0})
+        wait_for_node('Standard', {6: 0, 7: 0, 37: 1})
+        page.keyboard.press('Tab')
+        wait_for_node('Reset selection', {7: 1, 9: 0, 37: 0})
+        page.keyboard.press('Shift+Tab')
+        wait_for_node('Priority', {7: 1})
+        page.keyboard.press('Tab')
+        wait_for_node('Reset selection', {7: 1})
+        page.keyboard.press('Enter')
+        wait_for_node('Standard', {6: 1, 7: 0, 37: 0})
+        assert page.evaluate('cuiGallery.exports.gallery_radio_stat(0)') == 1
+
+        page.locator('#choice-skip-tab').check()
+        wait_for_node('Standard', {9: -2, 36: 1, 37: 1})
+        canvas.focus()
+        page.keyboard.press('Tab')
+        wait_for_node('Reset selection', {7: 1})
+        option.uncheck()
+        reset.wait_for(state='detached')
+        page.locator('#choice-skip-tab').uncheck()
+        wait_for_node('Standard', {9: 0, 36: 0, 37: 0})
+    finally:
+        page.close()
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--directory',type=Path,default=Path('build/web'))
@@ -272,6 +331,8 @@ def main():
                    lambda: check_animated_marks(browser, f'http://127.0.0.1:{server.server_port}'))
             a.case('Radio', 'delayed hover and keyboard hints preserve descriptions and selection',
                    lambda: check_tooltip(browser, f'http://127.0.0.1:{server.server_port}'))
+            a.case('Radio', 'signed tab order follows the roving option and respects Skip Tab',
+                   lambda: check_tab_order(browser, f'http://127.0.0.1:{server.server_port}'))
             args.report.parent.mkdir(parents=True,exist_ok=True)
             args.report.write_text(json.dumps(a.results,indent=2)+'\n')
             failures=[r for r in a.results if r['status']!='verified']

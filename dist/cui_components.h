@@ -417,11 +417,15 @@ typedef struct {
 /* A zero indicator is anonymous. NULL motion preserves immediate marks. The
  * options and shared-integer mutation behavior match cui_radio_ex. NULL tooltip
  * follows the ordinary radio. An invalid tooltip ID, text or state rejects the
- * submission before changing the value. */
+ * submission before changing the value. Opt into signed tab order here.
+ * A lower index comes first, including negative indices. Equal indices
+ * follow submission order. Radio options.skip_tab controls eligibility. */
 typedef struct {
     cui_radio_motion *motion;
     cui_selection_indicator_parts parts;
     const cui_radio_tooltip *tooltip;
+    bool custom_tab_index;
+    int tab_index;
 } cui_radio_presentation;
 bool cui_radio_present(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                        cui_radio_options, cui_radio_presentation);
@@ -2992,8 +2996,8 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
 
 static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_theme *t,
                                         cui_str name, int *value, int option,
-                                        cui_radio_options options, cui_id indicator,
-                                        cui_radio_motion *motion, const cui_radio_tooltip *hint) {
+                                        cui_radio_options options,
+                                        cui_radio_presentation presentation) {
     cui_design_metrics design;
     if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
         return false;
@@ -3002,6 +3006,8 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
     cui_set_semantic_details(
         ui, id, (cui_semantic_details){.required = options.required, .invalid = options.invalid});
     cui_set_tab_stop(ui, id, !options.skip_tab);
+    if (presentation.custom_tab_index)
+        cui_set_tab_index(ui, id, presentation.tab_index);
     float density = t->font_size / 16;
     float size = (options.size == CUI_CONTROL_XSMALL  ? 12
                   : options.size == CUI_CONTROL_SMALL ? 14
@@ -3018,6 +3024,7 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
     }
     bool selected = *value == option;
     float opacity = selected ? 1 : 0;
+    cui_radio_motion *motion = presentation.motion;
     if (motion) {
         if (motion->mark.id != id)
             *motion = (cui_radio_motion){.mark = {.id = id}};
@@ -3056,7 +3063,7 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
         cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
         cui_end_box(ui);
     }
-    cui_begin_box(ui, indicator,
+    cui_begin_box(ui, presentation.parts.indicator,
                   (cui_box){.width = size,
                             .height = size,
                             .radius = size / 2,
@@ -3080,20 +3087,21 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
         cui_end_box(ui);
     }
     cui_end_box(ui);
-    cui_radio_tooltip_show(ui, t, id, options.disabled, hint);
+    cui_radio_tooltip_show(ui, t, id, options.disabled, presentation.tooltip);
     return changed;
 }
 bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                   int option, cui_radio_options options) {
-    return cui_components_radio_render(ui, id, t, name, value, option, options, 0, NULL, NULL);
+    return cui_components_radio_render(ui, id, t, name, value, option, options,
+                                       (cui_radio_presentation){0});
 }
 bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                              int *value, int option, cui_radio_options options,
                              cui_selection_indicator_parts parts) {
     if (!cui_components_indicator_parts_valid(ui, id, parts))
         return false;
-    return cui_components_radio_render(ui, id, t, name, value, option, options, parts.indicator,
-                                       NULL, NULL);
+    return cui_components_radio_render(ui, id, t, name, value, option, options,
+                                       (cui_radio_presentation){.parts = parts});
 }
 bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                        int option, cui_radio_options options, cui_radio_presentation presentation) {
@@ -3108,9 +3116,7 @@ bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str n
                                                     .id = id});
         return false;
     }
-    return cui_components_radio_render(ui, id, t, name, value, option, options,
-                                       presentation.parts.indicator, presentation.motion,
-                                       presentation.tooltip);
+    return cui_components_radio_render(ui, id, t, name, value, option, options, presentation);
 }
 bool cui_radio_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                           int option, bool disabled, cui_selection_indicator_parts parts) {

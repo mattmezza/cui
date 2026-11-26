@@ -416,11 +416,15 @@ typedef struct {
 /* A zero indicator is anonymous. NULL motion preserves immediate marks. The
  * options and shared-integer mutation behavior match cui_radio_ex. NULL tooltip
  * follows the ordinary radio. An invalid tooltip ID, text or state rejects the
- * submission before changing the value. */
+ * submission before changing the value. Opt into signed tab order here.
+ * A lower index comes first, including negative indices. Equal indices
+ * follow submission order. Radio options.skip_tab controls eligibility. */
 typedef struct {
     cui_radio_motion *motion;
     cui_selection_indicator_parts parts;
     const cui_radio_tooltip *tooltip;
+    bool custom_tab_index;
+    int tab_index;
 } cui_radio_presentation;
 bool cui_radio_present(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                        cui_radio_options, cui_radio_presentation);

@@ -22,6 +22,8 @@
   tooltips in immediate C, the retained C bridge, Python, JavaScript and
   TypeScript, Go and Rust. The WASM gallery and delivery forms show a hint on
   Priority.
+- Immediate C Radio and RadioGroup accept signed keyboard tab ordering.
+  RadioGroup remains one Tab stop. The WASM gallery demonstrates the option.
 
 ## 0.1.0-alpha.7
 

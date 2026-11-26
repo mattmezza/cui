@@ -1259,6 +1259,7 @@ static void gallery_checkbox_detail(cui_context *ui, void *user) {
 static int design_radius = -1;
 static float design_spacing = -1;
 static int control_size, choice_required, choice_invalid, choice_skip_tab;
+static bool radio_custom_order;
 static int gallery_xsmall_second_size(void) {
     return control_size == 1 ? 2 : control_size == 2 ? 3 : control_size == 3 ? 1 : 0;
 }
@@ -4845,6 +4846,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             {cui_id_from(ui, "radio-c"), cui_string("Express unavailable"), true}};
         if (!radio_selected)
             radio_selected = items[0].id;
+        if (radio_custom_order && cui_button(ui, cui_id_from(ui, "radio-reset"), &t,
+                                             cui_string("Reset selection"), disabled))
+            radio_selected = items[0].id;
         cui_radio_group_options radio_options =
             (cui_radio_group_options){.name = cui_string("Delivery options"),
                                       .vertical = true,
@@ -4861,7 +4865,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_radio_group_presentation presentation = {.motion = &radio_group_motion,
                                                      .parts =
                                                          control_surface_shadows ? parts : NULL,
-                                                     .part_count = control_surface_shadows ? 3 : 0};
+                                                     .part_count = control_surface_shadows ? 3 : 0,
+                                                     .custom_tab_index = radio_custom_order,
+                                                     .tab_index = -2};
         const cui_radio_tooltip priority_hint = {.id = cui_id_from(ui, "priority-delivery-hint"),
                                                  .state = &radio_priority_hint_state,
                                                  .text = cui_string("Track your package online"),
@@ -8160,7 +8166,7 @@ void gallery_design_options(int size, int radius, float spacing) {
 }
 void gallery_control_options(int size, int required, int invalid, int skip_tab, int label_left,
                              int custom_color, int variant, int segmented, int multiple,
-                             int shadows) {
+                             int shadows, int radio_tab_order) {
     control_size =
         size >= CUI_CONTROL_MEDIUM && size <= CUI_CONTROL_XSMALL ? size : CUI_CONTROL_MEDIUM;
     control_surface_shadows = shadows != 0;
@@ -8168,6 +8174,7 @@ void gallery_control_options(int size, int required, int invalid, int skip_tab, 
     choice_required = required;
     choice_invalid = invalid;
     choice_skip_tab = skip_tab;
+    radio_custom_order = radio_tab_order != 0;
     switch_label_left = label_left;
     switch_custom_color = custom_color;
     toggle_variant = variant;

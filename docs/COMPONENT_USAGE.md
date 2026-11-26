@@ -457,7 +457,7 @@ API: `cui_progress_defaults`, `cui_progress`, `cui_progress_ex`, `cui_progress_c
 
 **State:** Keep one selected ID and cui_radio_group_state per group. Standalone radios share one integer. For animated marks, keep zero-initialized cui_radio_group_motion per group or cui_radio_motion per standalone option. For a tooltip, keep one zero-initialized cui_radio_tooltip_state per option in immediate C. The retained C bridge owns its option tooltip state and copies the hint.
 
-**Interaction:** cui_radio_group resolves controlled callback requests before painting and provides arrow/Home/End navigation with one Tab stop; standalone functions return true when selection changes.
+**Interaction:** cui_radio_group resolves controlled callback requests before painting and provides arrow/Home/End navigation with one Tab stop; standalone functions return true when selection changes. Signed tab ordering is optional on the immediate C standalone and group presentations and keeps the group as one stop.
 
 **Usage:** Submit stable unique item IDs. Use cui_radio_group_present or cui_radio_present with motion storage, and schedule its next frame on the host clock. Use cui_radio_group_present_with_content to add descriptions and decorative label content to grouped options. Attach optional tooltips to the standalone presentation or the group item content descriptor. In retained C, use cui_bridge_radio_set_tooltip_v1 with a Radio or direct RadioGroup Item.
 

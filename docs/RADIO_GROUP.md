@@ -70,6 +70,30 @@ boxes with the same IDs. Do not register another interactive radio with the same
 ID after calling the base API. Standalone Radio accepts decorative composition
 through `cui_radio_options.content`. The full styling audit remains open.
 
+## Set keyboard tab order
+
+Set `.custom_tab_index = true` and a signed `.tab_index` on the immediate C
+presentation. Lower indices come first. Controls at the same index follow
+submission order, and ordinary stops use index zero. One group option at a time
+remains in the Tab sequence. Arrow keys, Home and End still follow item order.
+Disabled options and `skip_tab` remain ineligible.
+
+```c
+cui_radio_group_present(ui, group_id, theme, items, item_count,
+    &selected_id, &navigation, (cui_radio_group_options){.vertical = true},
+    (cui_radio_group_presentation){.custom_tab_index = true, .tab_index = -2},
+    (cui_selection_handler){0});
+```
+
+Pass the same presentation to `cui_radio_group_present_with_content` when
+options include descriptions or tooltips. For standalone Radio, set the fields
+on `cui_radio_presentation` in `cui_radio_present`. Its existing
+`cui_radio_options.tab_index` alias remains Checkbox-only.
+
+Try **Custom tab order** in the WASM Radio demo. Tab visits the delivery
+options before the reset button, even though the button appears first.
+The retained bridge and language builders do not expose custom Radio ordering.
+
 ## Add descriptions and custom content
 
 `cui_radio_group_present_with_content` accepts one optional descriptor per

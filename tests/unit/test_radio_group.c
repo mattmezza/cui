@@ -62,10 +62,11 @@ static cui_radio_group_event_result motion_frame(cui_radio_group_motion *motion,
                                                  cui_radio_group_options options,
                                                  const cui_selection_indicator_parts *parts) {
     assert(cui_begin_frame(ui, 2000, 1000, .016f));
-    cui_radio_group_event_result result =
-        cui_radio_group_present(ui, 10, &theme, list, count, &selected, &state, options,
-                                (cui_radio_group_presentation){motion, parts, parts ? count : 0},
-                                (cui_selection_handler){0});
+    cui_radio_group_event_result result = cui_radio_group_present(
+        ui, 10, &theme, list, count, &selected, &state, options,
+        (cui_radio_group_presentation){
+            .motion = motion, .parts = parts, .part_count = parts ? count : 0},
+        (cui_selection_handler){0});
     drawing = cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
     return result;
@@ -312,6 +313,105 @@ static void test_radio_group_tooltip(void) {
                !hint_state.hover.pending);
     assert(!cui_needs_redraw(ui));
 }
+static const cui_semantic *tab_semantic(cui_id id) {
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].id == id)
+            return &semantics[i];
+    assert(!"missing tab order semantic");
+    return NULL;
+}
+
+static cui_radio_group_result tab_order_frame(cui_radio_presentation standalone,
+                                              cui_radio_options standalone_options,
+                                              cui_radio_group_presentation presentation,
+                                              cui_radio_group_options options) {
+    int other = 0;
+    assert(cui_begin_frame(ui, 500, 300, .016f));
+    cui_radio_present(ui, 201, &theme, cui_string("Account default"), &other, 1, standalone_options,
+                      standalone);
+    cui_radio_ex(ui, 202, &theme, cui_string("Legacy option"), &other, 2,
+                 (cui_radio_options){.tab_index = -99});
+    cui_radio_group_event_result result =
+        cui_radio_group_present(ui, 10, &theme, items, 3, &selected, &state, options, presentation,
+                                (cui_selection_handler){0});
+    cui_end_frame(ui);
+    assert(result.legacy.valid && cui_last_error(ui) == CUI_OK);
+    return result.legacy;
+}
+
+static void test_tab_order(void) {
+    cui_radio_presentation standalone = {.custom_tab_index = true, .tab_index = 3};
+    cui_radio_options standalone_options = {0};
+    cui_radio_group_presentation presentation = {.custom_tab_index = true, .tab_index = -2};
+    cui_radio_group_options options = {
+        .vertical = true, .on_change = change, .change_user = &selected};
+    selected = 11;
+    state = (cui_radio_group_state){0};
+    calls = 0;
+    accept = false;
+    cui_focus(ui, 0);
+    assert(tab_order_frame(standalone, standalone_options, presentation, options).tab_stop == 11);
+    assert(!tab_semantic(202)->tab_ordered && tab_semantic(202)->tab_index == 0);
+    assert(!tab_semantic(11)->tab_stop_disabled && tab_semantic(11)->tab_ordered &&
+           tab_semantic(11)->tab_index == -2);
+    assert(tab_semantic(12)->tab_stop_disabled && tab_semantic(12)->tab_index == -2);
+    key(CUI_KEY_TAB);
+    tab_order_frame(standalone, standalone_options, presentation, options);
+    assert(cui_focused(ui) == 11 && calls == 0);
+    key(CUI_KEY_DOWN);
+    cui_radio_group_result result =
+        tab_order_frame(standalone, standalone_options, presentation, options);
+    assert(result.tab_stop == 12 && result.requested && !result.changed && selected == 11);
+    assert(calls == 1 && cui_focused(ui) == 12 && tab_semantic(11)->tab_stop_disabled);
+    assert(!tab_semantic(12)->tab_stop_disabled && tab_semantic(12)->tab_index == -2);
+    key(CUI_KEY_TAB);
+    tab_order_frame(standalone, standalone_options, presentation, options);
+    assert(cui_focused(ui) == 202);
+    assert(cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_TAB, .modifiers = CUI_MOD_SHIFT}));
+    tab_order_frame(standalone, standalone_options, presentation, options);
+    assert(cui_focused(ui) == 11 && calls == 1);
+
+    options.skip_tab = true;
+    assert(!tab_order_frame(standalone, standalone_options, presentation, options).tab_stop);
+    assert(tab_semantic(11)->tab_stop_disabled && tab_semantic(11)->tab_index == -2);
+    key(CUI_KEY_TAB);
+    tab_order_frame(standalone, standalone_options, presentation, options);
+    assert(cui_focused(ui) == 202);
+    key(CUI_KEY_TAB);
+    tab_order_frame(standalone, standalone_options, presentation, options);
+    assert(cui_focused(ui) == 201);
+
+    standalone.tab_index = -4;
+    options.skip_tab = false;
+    cui_focus(ui, 0);
+    tab_order_frame(standalone, standalone_options, presentation, options);
+    key(CUI_KEY_TAB);
+    tab_order_frame(standalone, standalone_options, presentation, options);
+    assert(cui_focused(ui) == 201 && tab_semantic(201)->tab_index == -4);
+    standalone_options.skip_tab = true;
+    options.disabled = true;
+    cui_focus(ui, 0);
+    assert(!tab_order_frame(standalone, standalone_options, presentation, options).tab_stop);
+    key(CUI_KEY_TAB);
+    tab_order_frame(standalone, standalone_options, presentation, options);
+    assert(cui_focused(ui) == 202 && tab_semantic(201)->tab_stop_disabled);
+
+    standalone.custom_tab_index = false;
+    standalone_options.skip_tab = false;
+    presentation.tab_index = 0;
+    options.disabled = false;
+    cui_focus(ui, 0);
+    tab_order_frame(standalone, standalone_options, presentation, options);
+    key(CUI_KEY_TAB);
+    tab_order_frame(standalone, standalone_options, presentation, options);
+    assert(cui_focused(ui) == 201); /* Equal indices follow submission order. */
+    assert(calls == 1);
+}
+
 int main(void) {
     ui = cui_create((cui_config){.width = 2000, .height = 1000});
     assert(ui);
@@ -451,6 +551,7 @@ int main(void) {
     test_motion();
     test_rich_content();
     test_radio_group_tooltip();
+    test_tab_order();
     cui_destroy(ui);
     return 0;
 }

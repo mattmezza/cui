@@ -86,10 +86,16 @@ typedef struct {
     cui_radio_group_motion *motion;
     const cui_selection_indicator_parts *parts;
     size_t part_count;
+    bool custom_tab_index;
+    int tab_index;
 } cui_radio_group_presentation;
 /* Optional parts follow the copied/validated with_parts contract. With no parts,
  * part_count must be zero. NULL motion preserves immediate decoration. Selection,
- * callbacks, observers and semantics remain synchronous and final this frame. */
+ * callbacks, observers and semantics remain synchronous and final this frame.
+ * Opt into signed tab order for the group with custom_tab_index. Its single
+ * Tab stop keeps this position as focus moves among options. Lower indices
+ * come first, equal indices follow submission order, and skip_tab remains
+ * independent. Arrow, Home and End order still follows the items array. */
 cui_radio_group_event_result
 cui_radio_group_present(cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *,
                         size_t, cui_id *, cui_radio_group_state *, cui_radio_group_options,

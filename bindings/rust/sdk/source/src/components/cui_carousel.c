@@ -336,7 +336,7 @@ static bool cui_carousel_root_disabled(cui_context *ui, cui_id root) {
 }
 static bool cui_carousel_button(cui_context *ui, cui_id id, const cui_theme *theme,
                                 cui_carousel_state *s, cui_id root, size_t index, bool next,
-                                bool pagination, cui_carousel_control_options o) {
+                                bool pagination, bool in_flow, cui_carousel_control_options o) {
     if (!ui || !id || !theme || !s || !isfinite(o.custom_size) || o.custom_size < 0 ||
         o.size < CUI_CAROUSEL_CONTROL_DEFAULT || o.size > CUI_CAROUSEL_CONTROL_CUSTOM ||
         (o.size == CUI_CAROUSEL_CONTROL_CUSTOM && o.custom_size <= 0) ||
@@ -392,7 +392,7 @@ static bool cui_carousel_button(cui_context *ui, cui_id id, const cui_theme *the
         box.border = theme->focus;
         box.border_width = 1;
     }
-    if (pagination)
+    if (in_flow)
         cui_begin_box(ui, id, box);
     else {
         float width = s->frame_width, height = s->frame_height;
@@ -451,12 +451,17 @@ static bool cui_carousel_button(cui_context *ui, cui_id id, const cui_theme *the
 }
 bool cui_carousel_control(cui_context *ui, cui_id id, const cui_theme *theme, cui_carousel_state *s,
                           cui_id root, bool next, cui_carousel_control_options o) {
-    return cui_carousel_button(ui, id, theme, s, root, 0, next, false, o);
+    return cui_carousel_button(ui, id, theme, s, root, 0, next, false, false, o);
+}
+bool cui_carousel_control_inline(cui_context *ui, cui_id id, const cui_theme *theme,
+                                 cui_carousel_state *s, cui_id root, bool next,
+                                 cui_carousel_control_options o) {
+    return cui_carousel_button(ui, id, theme, s, root, 0, next, false, true, o);
 }
 bool cui_carousel_pagination_item(cui_context *ui, cui_id id, const cui_theme *theme,
                                   cui_carousel_state *s, cui_id root, size_t index,
                                   cui_carousel_control_options o) {
-    return cui_carousel_button(ui, id, theme, s, root, index, false, true, o);
+    return cui_carousel_button(ui, id, theme, s, root, index, false, true, true, o);
 }
 
 bool cui_carousel_pagination_begin(cui_context *ui, cui_id id, cui_str label,

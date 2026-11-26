@@ -149,3 +149,12 @@ c.item("bad-loop-item").carousel_looping();
 c.carousel("bad-axis").carousel_axis("diagonal");
 // @ts-expect-error Carousel axis is not an Item operation
 c.item("bad-axis-item").carousel_axis("vertical");
+
+const controlledCarousel: c.Carousel = c.carousel("controls").carousel_controls().carousel_controls({arrows: false}).carousel_controls({pagination: false}).carousel_controls({arrows: false, pagination: false});
+const hasCarouselControls: boolean = app.supports_carousel_controls();
+const carouselControlBounds: c.Bounds = controlledCarousel.numeric_part_bounds(2);
+void hasCarouselControls; void carouselControlBounds;
+// @ts-expect-error Carousel controls options are boolean.
+c.carousel().carousel_controls({arrows: 1});
+// @ts-expect-error Controls are exclusive to Carousel.
+c.item().carousel_controls();

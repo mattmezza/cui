@@ -1225,10 +1225,13 @@ static void gallery_carousel_page_content(cui_context *context, const cui_theme 
 static void gallery_carousel_controls(cui_context *context, const cui_theme *theme,
                                       cui_carousel_state *state, cui_id root, void *user) {
     (void)user;
-    cui_carousel_control(context, cui_id_from(context, "carousel-prev"), theme, state, root, false,
-                         (cui_carousel_control_options){0});
-    cui_carousel_control(context, cui_id_from(context, "carousel-next"), theme, state, root, true,
-                         (cui_carousel_control_options){0});
+    cui_begin_box(context, 0,
+                  (cui_box){.width = -1, .row = true, .gap = 8, .align_x = CUI_ALIGN_CENTER});
+    cui_carousel_control_inline(context, cui_id_from(context, "carousel-prev"), theme, state, root,
+                                false, (cui_carousel_control_options){0});
+    cui_carousel_control_inline(context, cui_id_from(context, "carousel-next"), theme, state, root,
+                                true, (cui_carousel_control_options){0});
+    cui_end_box(context);
 }
 static void gallery_carousel_pagination(cui_context *context, const cui_theme *theme,
                                         cui_carousel_state *state, cui_id root, void *user) {

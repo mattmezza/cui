@@ -5796,7 +5796,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes, fractional sizing and geometry-supported wrapping. Custom retained controls, intrinsic sizing from arbitrary slide content, the first growing-width estimate and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
+        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes, fractional sizing, geometry-supported wrapping, and built-in navigation arrows and slide markers. Custom retained control content, intrinsic sizing from arbitrary slide content, the first growing-width estimate and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5846,6 +5846,22 @@
             "tests/unit/test_carousel.c",
             "tests/web/test_touch_page_navigation.py"
           ]
+        },
+        {
+          "name": "retained inline navigation and responsive slide markers",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_carousel.c",
+            "bindings/bridge/tests/test_bridge_components.c",
+            "bindings/python/test_model_components.py",
+            "bindings/node/test/models.test.cjs",
+            "bindings/typescript/components.typecheck.ts",
+            "bindings/go/cui/native_test.go",
+            "bindings/rust/tests/builders.rs",
+            "tests/web/test_touch_page_navigation.py",
+            "tests/web/test_snippets.py"
+          ],
+          "scope": "Independent opt-in control groups, copied Item selection, disabled boundaries, retained marker wrapping and omitted-control input cleanup. The gallery demonstrates inline placement with touch and copyable C usage."
         },
         {
           "name": "themed SVG controls, accessible item positions and inherited disabled state",

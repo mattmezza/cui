@@ -282,7 +282,9 @@ layout, probe `supports_carousel_axis` (`SupportsCarouselAxis` in Go) before
 configuring the Carousel. Vertical fractions use the viewport height. Probe
 `supports_carousel_looping` (`SupportsCarouselLooping` in Go) before enabling
 retained edge wrapping with `carousel_looping` (`CarouselLooping` in Go).
-Read `docs/CAROUSEL.md` for layout and examples.
+Check `supports_carousel_controls` (`SupportsCarouselControls` in Go) for
+opt-in arrows and slide markers. The controls share the ordinary Carousel
+selection event. Read `docs/CAROUSEL.md` for layout and examples.
 For a Command palette inside a dialog, set `cui_command_options.width = -1` to fit
 the body. Rows and hit targets fill the current allocation. Width-dependent
 custom row heights settle on a follow-up frame. See `docs/COMMAND.md`.

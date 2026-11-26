@@ -3023,6 +3023,19 @@ cui_bridge_status cui_bridge_set_carousel_looping_v1(cui_bridge_app *app, cui_br
     node->carousel_looping = looping != 0;
     return CUI_BRIDGE_OK;
 }
+cui_bridge_status cui_bridge_set_carousel_controls_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                      uint32_t mask) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_CAROUSEL)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (mask & ~(uint32_t)(CUI_BRIDGE_CAROUSEL_ARROWS_V1 | CUI_BRIDGE_CAROUSEL_PAGINATION_V1))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->carousel_controls = mask;
+    return CUI_BRIDGE_OK;
+}
 cui_bridge_status cui_bridge_set_scroll_extent(cui_bridge_app *app, cui_bridge_node handle,
                                                float width, float height) {
     cui_bridge_node_record *node;
@@ -5095,6 +5108,62 @@ static void bridge_carousel_change(size_t index, void *user) {
     binding->app->nodes[binding->slot].value = binding->slots[index];
     bridge_change(binding->app, binding->slot);
 }
+/* Bridge node IDs are monotonic. Each control occupies its own tag and
+ * page markers use the slide identity, even when their visual row changes. */
+enum {
+    BRIDGE_CAROUSEL_PREVIOUS,
+    BRIDGE_CAROUSEL_NEXT,
+    BRIDGE_CAROUSEL_MARKER,
+    BRIDGE_CAROUSEL_PAGE_GROUP
+};
+static cui_id bridge_carousel_part_id(cui_id id, unsigned part) {
+    return id | (UINT64_C(1) << (59u - part));
+}
+static void bridge_carousel_arrows(cui_context *ui, const cui_theme *theme,
+                                   cui_carousel_state *state, cui_id root, void *user) {
+    (void)user;
+    float size = fminf(32, state->frame_width);
+    cui_begin_box(
+        ui, 0,
+        (cui_box){
+            .width = -1, .row = state->frame_width >= 72, .gap = 8, .align_x = CUI_ALIGN_CENTER});
+    cui_carousel_control_options options = {.size = CUI_CAROUSEL_CONTROL_CUSTOM,
+                                            .custom_size = size};
+    cui_carousel_control_inline(ui, bridge_carousel_part_id(root, BRIDGE_CAROUSEL_PREVIOUS), theme,
+                                state, root, false, options);
+    cui_carousel_control_inline(ui, bridge_carousel_part_id(root, BRIDGE_CAROUSEL_NEXT), theme,
+                                state, root, true, options);
+    cui_end_box(ui);
+}
+static void bridge_carousel_pagination(cui_context *ui, const cui_theme *theme,
+                                       cui_carousel_state *state, cui_id root, void *user) {
+    (void)user;
+    if (!state->count)
+        return;
+    float size = fminf(24, state->frame_width);
+    size_t columns = (size_t)fmaxf(1, floorf((state->frame_width + 4) / (size + 4)));
+    cui_box layout = {.width = -1, .gap = 4, .align_x = CUI_ALIGN_CENTER};
+    if (!cui_carousel_pagination_begin(
+            ui, bridge_carousel_part_id(root, BRIDGE_CAROUSEL_PAGE_GROUP), (cui_str){0}, &layout))
+        return;
+    for (size_t first = 0; first < state->count; first += columns) {
+        size_t end = first + columns < state->count ? first + columns : state->count;
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = -1, .row = true, .gap = 4, .align_x = CUI_ALIGN_CENTER});
+        for (size_t i = first; i < end; ++i) {
+            char label[40];
+            snprintf(label, sizeof label, "Go to slide %zu", i + 1);
+            cui_carousel_pagination_item(
+                ui, bridge_carousel_part_id(state->items[i].id, BRIDGE_CAROUSEL_MARKER), theme,
+                state, root, i,
+                (cui_carousel_control_options){.size = CUI_CAROUSEL_CONTROL_CUSTOM,
+                                               .custom_size = size,
+                                               .label = cui_string(label)});
+        }
+        cui_end_box(ui);
+    }
+    cui_carousel_pagination_end(ui);
+}
 static void bridge_render_carousel(cui_bridge_app *app, uint32_t slot,
                                    cui_bridge_node_record *node) {
     if (!node->carousel_state) {
@@ -5152,6 +5221,10 @@ static void bridge_render_carousel(cui_bridge_app *app, uint32_t slot,
     options.now_seconds = app->now_seconds;
     options.disabled = node->disabled;
     options.label = cui_string(node->text);
+    if (node->carousel_controls & CUI_BRIDGE_CAROUSEL_ARROWS_V1)
+        options.controls = bridge_carousel_arrows;
+    if (node->carousel_controls & CUI_BRIDGE_CAROUSEL_PAGINATION_V1)
+        options.pagination = bridge_carousel_pagination;
     if (!cui_carousel_with_basis(app->ui, node->id, &app->theme, node->carousel_state,
                                  binding->items, count, options, has_basis ? binding->basis : NULL))
         app->frame_error = CUI_BRIDGE_CORE_ERROR;
@@ -6678,6 +6751,15 @@ cui_bridge_status cui_bridge_dropdown_part_bounds(cui_bridge_app *app, cui_bridg
     *out_bounds = (cui_bridge_rect){rect.x, rect.y, rect.w, rect.h};
     return CUI_BRIDGE_OK;
 }
+static cui_id bridge_carousel_numeric_part(cui_bridge_app *app, const cui_bridge_node_record *node,
+                                           uint32_t part) {
+    if (part == 1 || part == 2)
+        return bridge_carousel_part_id(node->id, part - 1);
+    uint32_t slide = node->first_child;
+    for (uint32_t index = 3; slide && index < part; ++index)
+        slide = app->nodes[slide].next_sibling;
+    return slide ? bridge_carousel_part_id(app->nodes[slide].id, BRIDGE_CAROUSEL_MARKER) : 0;
+}
 cui_bridge_status cui_bridge_numeric_part_bounds(cui_bridge_app *app, cui_bridge_node handle,
                                                  uint32_t part, cui_bridge_rect *out_bounds) {
     cui_bridge_node_record *node;
@@ -6685,11 +6767,13 @@ cui_bridge_status cui_bridge_numeric_part_bounds(cui_bridge_app *app, cui_bridge
     if (status != CUI_BRIDGE_OK)
         return status;
     if (node->kind != CUI_BRIDGE_PAGINATION && node->kind != CUI_BRIDGE_RATING &&
-        node->kind != CUI_BRIDGE_STEPPER)
+        node->kind != CUI_BRIDGE_STEPPER && node->kind != CUI_BRIDGE_CAROUSEL)
         return CUI_BRIDGE_INVALID_STATE;
     if (!part || part > 100 || !out_bounds)
         return CUI_BRIDGE_INVALID_ARGUMENT;
-    cui_rect rect = cui_bounds(app->ui, cui_numeric_part_id(node->id, part));
+    cui_id id = node->kind == CUI_BRIDGE_CAROUSEL ? bridge_carousel_numeric_part(app, node, part)
+                                                  : cui_numeric_part_id(node->id, part);
+    cui_rect rect = cui_bounds(app->ui, id);
     if (!isfinite(rect.x) || !isfinite(rect.y) || rect.w <= 0 || rect.h <= 0)
         return CUI_BRIDGE_INVALID_STATE;
     *out_bounds = (cui_bridge_rect){rect.x, rect.y, rect.w, rect.h};

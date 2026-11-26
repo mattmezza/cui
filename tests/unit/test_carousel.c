@@ -253,6 +253,15 @@ static void controls(cui_context *ui, const cui_theme *theme, cui_carousel_state
     cui_carousel_control(ui, 2000, theme, s, root, false, options);
     cui_carousel_control(ui, 2001, theme, s, root, true, options);
 }
+static void inline_controls(cui_context *ui, const cui_theme *theme, cui_carousel_state *s,
+                            cui_id root, void *user) {
+    (void)user;
+    cui_begin_box(ui, 0,
+                  (cui_box){.width = -1, .row = true, .gap = 8, .align_x = CUI_ALIGN_CENTER});
+    cui_carousel_control_inline(ui, 2000, theme, s, root, false, (cui_carousel_control_options){0});
+    cui_carousel_control_inline(ui, 2001, theme, s, root, true, (cui_carousel_control_options){0});
+    cui_end_box(ui);
+}
 static void pagination(cui_context *ui, const cui_theme *theme, cui_carousel_state *s, cui_id root,
                        void *user) {
     (void)user;
@@ -357,7 +366,7 @@ static void test_item_basis(void) {
     assert(changes == 1);
     cui_destroy(ui);
 }
-static void test_disabled_controls(void) {
+static void test_disabled_controls(bool inline_placement) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     cui_theme theme = cui_theme_light();
     cui_carousel_state state;
@@ -367,9 +376,18 @@ static void test_disabled_controls(void) {
     options.width = 200;
     options.height = 80;
     options.reduced_motion = true;
-    options.controls = controls;
+    options.controls = inline_placement ? inline_controls : controls;
     options.pagination = pagination;
     frame(ui, &theme, &state, options);
+    cui_rect first_next = find(ui, 2001)->bounds;
+    cui_rect viewport = state.frame_bounds;
+    if (inline_placement) {
+        assert(first_next.x >= viewport.x &&
+               first_next.x + first_next.w <= viewport.x + viewport.w);
+        assert(first_next.y >= viewport.y + viewport.h);
+    } else {
+        assert(first_next.x >= viewport.x + viewport.w);
+    }
 
     /* The first disabled frame can receive activations routed by the last frame. */
     cui_focus(ui, 2001);
@@ -1006,7 +1024,8 @@ int main(void) {
     test_widget();
     test_controls();
     test_item_basis();
-    test_disabled_controls();
+    test_disabled_controls(false);
+    test_disabled_controls(true);
     test_controls_during_motion();
     test_parent_handoff();
     test_disjoint_bursts();

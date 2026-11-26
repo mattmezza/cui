@@ -144,6 +144,44 @@ class Models(unittest.TestCase):
                 with self.assertRaises(RuntimeError): carousel.carousel_axis("vertical")
                 self.assertEqual(carousel._carousel_axis,"horizontal")
 
+    def test_carousel_controls(self):
+        with self.assertRaises(TypeError): c.carousel("bad").carousel_controls(arrows=1)
+        with self.assertRaises(ValueError): c.item("bad").carousel_controls()
+        with c.App(width=640) as app:
+            self.assertTrue(app.supports_carousel_controls())
+            events = []
+            slides = [c.item(str(i), str(i)) for i in range(3)]
+            rail = c.carousel("controls").carousel_controls().children(*slides).on_change(events.append)
+            app.mount(c.column().children(rail)); app.step()
+            self.assertIs(rail.selected(), slides[0])
+            self.press(app, app.numeric_part_bounds(rail, 2)); app.dispatch()
+            self.assertIs(rail.selected(), slides[1])
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[-1].selected_handle, (slides[1]._handle.slot, slides[1]._handle.generation))
+            self.press(app, app.numeric_part_bounds(rail, 5)); app.dispatch()
+            self.assertIs(rail.selected(), slides[2])
+            self.assertEqual(len(events), 2)
+            self.assertEqual(events[-1].selected_handle, (slides[2]._handle.slot, slides[2]._handle.generation))
+            for arrows, pagination, absent, present in [(False, True, 2, 3), (True, False, 3, 2)]:
+                rail.carousel_controls(arrows=arrows, pagination=pagination); app.step()
+                self.assertEqual(app.dispatch(), 0)
+                self.assertIs(rail.selected(), slides[2])
+                with self.assertRaises(c.BridgeError): app.numeric_part_bounds(rail, absent)
+                self.assertGreater(app.numeric_part_bounds(rail, present)[2], 0)
+            rail.carousel_controls(arrows=False, pagination=False); app.step()
+            with self.assertRaises(c.BridgeError): app.numeric_part_bounds(rail, 2)
+            self.assertEqual(app.dispatch(), 0)
+        with c.App() as app, patch.object(app._api, "set_carousel_controls", None):
+            self.assertFalse(app.supports_carousel_controls())
+            rail = c.carousel("legacy").carousel_controls().children(c.item("first"))
+            root = c.column().children(rail)
+            with self.assertRaisesRegex(RuntimeError, "controls"): app.mount(root)
+            rail.carousel_controls(arrows=False, pagination=False)
+            app.mount(root); app.step()
+            rail.carousel_controls(arrows=False, pagination=False)
+            with self.assertRaisesRegex(RuntimeError, "controls"): rail.carousel_controls()
+            self.assertEqual(rail._carousel_controls, 0)
+
     def test_carousel_looping(self):
         with self.assertRaises(TypeError):
             c.carousel("invalid").carousel_looping(1)

@@ -140,6 +140,32 @@ Python, JavaScript and TypeScript expose `carousel_looping()` and accept
 `supports_carousel_looping()` (Go `SupportsCarouselLooping()`) before setting the
 option when loading an older bridge. Omitting it keeps bounded navigation.
 
+Enable built-in arrows and slide markers independently with
+`cui_bridge_set_carousel_controls_v1`. Pass `CUI_BRIDGE_CAROUSEL_ARROWS_V1`,
+`CUI_BRIDGE_CAROUSEL_PAGINATION_V1`, their bitwise OR, or zero to hide both.
+Both groups are off until enabled. They appear below the viewport, so the full
+Carousel can be taller than its `visual_size` height. Markers wrap to fit the
+viewport width. The arrows follow the current axis and disable at finite ends.
+All buttons inherit the Carousel's disabled state. They use the same selected
+Item change event as wheel, drag, and keyboard navigation. Configuration itself
+is silent and preserves selection.
+
+Use `carousel_controls()` in Python, JavaScript, and TypeScript to show both
+groups. Python accepts keyword arguments such as `carousel_controls(pagination=False)`.
+JavaScript and TypeScript take an options object such as
+`carousel_controls({pagination: false})`. Go takes
+`CarouselControls(cui.CarouselControls{Arrows: true, Pagination: true})`.
+Rust takes `carousel_controls(CarouselControls { arrows: true, pagination: true })?`
+on the builder or the corresponding App method. Probe
+`supports_carousel_controls()` (Go `SupportsCarouselControls()`) when using
+older bridge libraries and omit the option if the provider lacks it.
+
+For host-driven input and tests, the existing numeric part bounds API reports
+positions from the latest completed frame. Parts 1 and 2 are Previous and Next.
+Part `3 + i` is the marker for zero-based slide index `i`. Disabled controls
+still have bounds. Omitted controls return an invalid-state error. Bounds use
+the current retained slide order, so refresh them after edits and a completed frame.
+
 This Python example mounts a Carousel with two visible slides and a third to
 scroll to. It enables vertical layout and wrapping when the loaded bridge
 supports each option.
@@ -167,8 +193,20 @@ with cui.App(width=640, height=360) as app:
     looping = app.supports_carousel_looping()
     if looping:
         rail.carousel_looping()
+    controls = app.supports_carousel_controls()
+    if controls:
+        rail.carousel_controls()
     app.mount(cui.column("root").children(rail))
     app.step()
+    if controls:
+        # In a native window, click the arrows or slide markers directly.
+        next_x, next_y, width, height = app.numeric_part_bounds(rail, 2)
+        app.queue_pointer("down", next_x + width / 2, next_y + height / 2)
+        app.queue_pointer("up", next_x + width / 2, next_y + height / 2)
+        app.step()
+        assert rail.selected() is slides[1]
+        rail.select(slides[0])
+        app.step()
     x, y, _, _ = app.bounds(rail)
     dx, dy = (0, -1) if vertical else (-1, 0)
     app.queue_scroll(x + 30, y + 30, dx, dy)
@@ -181,7 +219,10 @@ with cui.App(width=640, height=360) as app:
         assert rail.selected() is slides[-1]
 ```
 
-Retained Carousel uses default spacing. For custom controls, use the immediate C API.
+Retained Carousel uses default spacing. Use the immediate C API for custom
+control content and presentation. Use `cui_carousel_control_inline` to place an
+axis-aware navigation button in ordinary flow, or `cui_carousel_control` to
+position it at the sides of the slide viewport.
 
 ## Input ownership
 

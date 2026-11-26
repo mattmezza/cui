@@ -161,6 +161,12 @@ def run_cases(a):
     def disabled_carousel():
         next_slide = a.target('Next slide', 1)
         last_slide = a.target('Go to slide 4', 1)
+        root = a.target('Workflow carousel')
+        assert root['f'][1] <= next_slide['f'][1]
+        assert next_slide['f'][1] + next_slide['f'][3] <= root['f'][1] + root['f'][3] + .1
+        assert next_slide['f'][2] >= root['f'][2] + 200
+        assert last_slide['f'][2] >= next_slide['f'][2] + next_slide['f'][4]
+        assert 'cui_carousel_control_inline' in a.page.locator('#snippet').inner_text()
         before = carousel_state()
         a.configure('disabled', True)
         try:

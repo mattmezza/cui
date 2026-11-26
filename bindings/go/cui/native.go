@@ -708,6 +708,7 @@ static cui_bridge_status go_attachment_preview(cui_bridge_app *a, cui_bridge_nod
 static cui_bridge_status (*carousel_set_basis)(cui_bridge_app *, cui_bridge_node, float);
 static cui_bridge_status (*carousel_set_axis)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static cui_bridge_status (*carousel_set_looping)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static cui_bridge_status (*carousel_set_controls)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static void go_carousel_initialize(void) {
  if (bridge_lib) {
   go_load_optional_symbol(&carousel_set_basis, sizeof carousel_set_basis,
@@ -716,12 +717,15 @@ static void go_carousel_initialize(void) {
                           "cui_bridge_set_carousel_axis_v1");
   go_load_optional_symbol(&carousel_set_looping, sizeof carousel_set_looping,
                           "cui_bridge_set_carousel_looping_v1");
+  go_load_optional_symbol(&carousel_set_controls, sizeof carousel_set_controls,
+                          "cui_bridge_set_carousel_controls_v1");
  }
 #if defined(CUI_GO_STATIC)
  else {
   carousel_set_basis = cui_bridge_set_carousel_slide_basis_v1;
   carousel_set_axis = cui_bridge_set_carousel_axis_v1;
   carousel_set_looping = cui_bridge_set_carousel_looping_v1;
+  carousel_set_controls = cui_bridge_set_carousel_controls_v1;
  }
 #endif
 }
@@ -737,6 +741,11 @@ static cui_bridge_status go_carousel_set_axis(cui_bridge_app *a, cui_bridge_node
 static int go_carousel_looping_supported(void) { return carousel_set_looping != NULL; }
 static cui_bridge_status go_carousel_set_looping(cui_bridge_app *a, cui_bridge_node carousel, uint32_t enabled) {
  return carousel_set_looping(a, carousel, enabled);
+}
+
+static int go_carousel_controls_supported(void) { return carousel_set_controls != NULL; }
+static cui_bridge_status go_carousel_set_controls(cui_bridge_app *a, cui_bridge_node carousel, uint32_t mask) {
+ return carousel_set_controls(a, carousel, mask);
 }
 
 static int bridge_open(const char *path) {
@@ -926,6 +935,7 @@ type Node struct {
 	carouselBasis                        float32
 	carouselAxis                         CarouselAxis
 	carouselLooping                      bool
+	carouselControls                     C.uint32_t
 	imagePixels                          []byte
 	imageWidth, imageHeight, imageStride uint32
 	timeValue                            Time
@@ -2064,6 +2074,9 @@ func (a *App) Mount(root *Node) error {
 		if n.carouselLooping && C.go_carousel_looping_supported() == 0 {
 			return ErrCarouselLoopingUnavailable
 		}
+		if n.carouselControls != 0 && C.go_carousel_controls_supported() == 0 {
+			return ErrCarouselControlsUnavailable
+		}
 		if n.carouselBasis > 0 {
 			if parent == nil || parent.kind != int(C.CUI_BRIDGE_CAROUSEL) {
 				return errors.New("CarouselBasis requires a direct Carousel Item")
@@ -2551,6 +2564,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.carouselLooping {
 			if err := result(C.go_carousel_set_looping(a.ptr, h, 1)); err != nil {
+				return err
+			}
+		}
+		if n.carouselControls != 0 {
+			if err := result(C.go_carousel_set_controls(a.ptr, h, n.carouselControls)); err != nil {
 				return err
 			}
 		}
@@ -4076,6 +4094,56 @@ func (n *Node) CarouselLooping(enabled bool) *Node {
 		}
 	}
 	n.carouselLooping = enabled
+	return n
+}
+
+// CarouselControls selects which navigation controls appear below a Carousel.
+type CarouselControls struct {
+	Arrows     bool
+	Pagination bool
+}
+
+// ErrCarouselControlsUnavailable means the loaded bridge lacks retained controls.
+var ErrCarouselControlsUnavailable = errors.New("Carousel controls require cui_bridge_set_carousel_controls_v1")
+
+// SupportsCarouselControls reports whether the loaded bridge supports retained navigation controls.
+func (a *App) SupportsCarouselControls() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_carousel_controls_supported() != 0, nil
+}
+
+// CarouselControls configures the built-in arrows and slide markers.
+func (n *Node) CarouselControls(options CarouselControls) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != int(C.CUI_BRIDGE_CAROUSEL) || n.removed {
+		n.err = errors.New("CarouselControls requires a live Carousel")
+		return n
+	}
+	var mask C.uint32_t
+	if options.Arrows {
+		mask |= C.CUI_BRIDGE_CAROUSEL_ARROWS_V1
+	}
+	if options.Pagination {
+		mask |= C.CUI_BRIDGE_CAROUSEL_PAGINATION_V1
+	}
+	if n.app != nil && mask != n.carouselControls {
+		supported, err := n.app.SupportsCarouselControls()
+		if err != nil {
+			n.err = err
+		} else if !supported {
+			n.err = ErrCarouselControlsUnavailable
+		} else {
+			n.err = result(C.go_carousel_set_controls(n.app.ptr, n.handle, mask))
+		}
+		if n.err != nil {
+			return n
+		}
+	}
+	n.carouselControls = mask
 	return n
 }
 

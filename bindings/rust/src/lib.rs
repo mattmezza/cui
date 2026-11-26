@@ -6,7 +6,7 @@ pub use attachment::{
     AttachmentTextWeight, AttachmentTypography,
 };
 mod carousel;
-pub use carousel::CarouselAxis;
+pub use carousel::{CarouselAxis, CarouselControls};
 mod disclosure;
 pub use disclosure::{
     DisclosureAlignment, DisclosureCard, DisclosureConfig, DisclosureCursor, DisclosureDivider,

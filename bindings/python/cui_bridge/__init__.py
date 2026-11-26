@@ -299,6 +299,10 @@ class _API:
         self.get_selected = bind("get_selected", C.c_int, C.c_void_p, _Handle, C.POINTER(_Handle))
         self.get_open = bind("get_open", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_uint32))
         self.set_anchor = bind("set_anchor", C.c_int, C.c_void_p, _Handle, _Handle)
+        self.set_carousel_controls = None
+        if hasattr(lib, "cui_bridge_set_carousel_controls_v1"):
+            self.set_carousel_controls = bind("set_carousel_controls_v1", C.c_int,
+                                              C.c_void_p, _Handle, C.c_uint32)
         self.set_carousel_looping = None
         if hasattr(lib, "cui_bridge_set_carousel_looping_v1"):
             self.set_carousel_looping = bind("set_carousel_looping_v1", C.c_int,
@@ -552,6 +556,7 @@ class Widget:
         self._anchor: Widget | None = None
         self._extent: tuple[float, float] | None = None
         self._carousel_axis = "horizontal"
+        self._carousel_controls = 0
         self._carousel_looping = False
         self._carousel_basis = 0.0
         self._visual: tuple[float, float] | None = None
@@ -1039,6 +1044,22 @@ class Widget:
                 raise RuntimeError("Carousel axis requires cui_bridge_set_carousel_axis_v1")
             self._change("set_carousel_axis", int(axis == "vertical"))
         self._carousel_axis = axis
+        return self
+
+    def carousel_controls(self, *, arrows: bool = True, pagination: bool = True) -> "Widget":
+        """Enable retained navigation arrows and slide markers independently."""
+        if self.kind != "carousel":
+            raise ValueError("carousel_controls requires a Carousel")
+        if not isinstance(arrows, bool) or not isinstance(pagination, bool):
+            raise TypeError("arrows and pagination must be booleans")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        mask = int(arrows) | (int(pagination) << 1)
+        if self._app is not None and mask != self._carousel_controls:
+            if not self._app.supports_carousel_controls():
+                raise RuntimeError("Carousel controls requires cui_bridge_set_carousel_controls_v1")
+            self._change("set_carousel_controls", mask)
+        self._carousel_controls = mask
         return self
 
     def carousel_looping(self, enabled: bool = True) -> "Widget":
@@ -2062,6 +2083,10 @@ class App:
         self._ensure_open()
         return self._api.set_carousel_axis is not None
 
+    def supports_carousel_controls(self) -> bool:
+        """Whether the bridge supports retained Carousel navigation controls."""
+        return self._api.set_carousel_controls is not None
+
     def supports_carousel_looping(self) -> bool:
         self._ensure_open()
         return self._api.set_carousel_looping is not None
@@ -2206,6 +2231,8 @@ class App:
                 self._require_stepper_fill()
             if node._carousel_axis == "vertical" and not self.supports_carousel_axis():
                 raise RuntimeError("Carousel axis requires cui_bridge_set_carousel_axis_v1")
+            if node._carousel_controls and not self.supports_carousel_controls():
+                raise RuntimeError("Carousel controls requires cui_bridge_set_carousel_controls_v1")
             if node._carousel_looping and not self.supports_carousel_looping():
                 raise RuntimeError("Carousel looping requires cui_bridge_set_carousel_looping_v1")
             if node._carousel_basis:
@@ -2295,6 +2322,8 @@ class App:
                     node._change("set_checked", int(node._checked))
                 if node._carousel_axis == "vertical":
                     node._change("set_carousel_axis", 1)
+                if node._carousel_controls:
+                    node._change("set_carousel_controls", node._carousel_controls)
                 if node._carousel_looping:
                     node._change("set_carousel_looping", 1)
                 if node._carousel_basis:

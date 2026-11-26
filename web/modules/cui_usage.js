@@ -263,20 +263,72 @@ cui_virtual_widget_result draw_virtual_inbox(cui_context *ui, cui_id id, const c
 export function carouselBasisUsage(visible, vertical = false, looping = false) {
     const basis = visible === 2 ? '.5f' : visible === 3 ? '1.f / 3' : null;
     const frame = basis
-        ? `const float basis[] = {${[basis, basis, basis, basis].join(', ')}};
-cui_carousel_with_basis(ui, id, &theme, &state, slides, 4, options, basis);`
-        : `cui_carousel(ui, id, &theme, &state, slides, 4, options);`;
-    const axis = vertical ? '\ncui_carousel_set_axis(&state, CUI_ORIENTATION_VERTICAL);' : '';
-    const loop = looping ? '\ncui_carousel_set_looping(&state, true);' : '';
-    return `/* Initialize retained state and geometry storage once. */
-cui_carousel_state_init(&state, geometry, 4, 4);${axis}${loop}
+        ? `const float basis[] = {${Array(4).fill(basis).join(', ')}};
+    bool drawn = cui_carousel_with_basis(ui, id, theme, &rail->state, slides, 4, options, basis);`
+        : 'bool drawn = cui_carousel(ui, id, theme, &rail->state, slides, 4, options);';
+    const axis = vertical ? '\n    cui_carousel_set_axis(&rail->state, CUI_ORIENTATION_VERTICAL);' : '';
+    const loop = looping ? '\n    cui_carousel_set_looping(&rail->state, true);' : '';
+    return `#include <cui/cui_carousel.h>
 
-/* Submit each frame with four stable slide IDs and render callbacks. */
-cui_carousel_options options = cui_carousel_default();
-options.now_seconds = now_seconds; /* Monotonic host frame clock. */
-options.controls = draw_controls;
-options.pagination = draw_pages;
-${frame}`;
+typedef struct {
+    cui_carousel_state state;
+    cui_carousel_geometry geometry[4];
+} workflow_rail;
+
+/* Keep rail at a stable address across frames. Call once. */
+bool workflow_init(workflow_rail *rail) {
+    if (!cui_carousel_state_init(&rail->state, rail->geometry, 4, 4))
+        return false;${axis}${loop}
+    return true;
+}
+
+static const char *const stages[] = {"Build", "Preview", "Test", "Ship"};
+static void workflow_slide(cui_context *ui, const cui_theme *theme, size_t index, void *user) {
+    (void)user;
+    cui_text(ui, cui_string(stages[index]), theme->font_size, theme->text);
+}
+
+static void workflow_arrows(cui_context *ui, const cui_theme *theme,
+    cui_carousel_state *state, cui_id root, void *user) {
+    (void)user;
+    cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true, .gap = 8, .align_x = CUI_ALIGN_CENTER});
+    cui_carousel_control_inline(ui, cui_id_from(ui, "prev"), theme, state, root,
+        false, (cui_carousel_control_options){0});
+    cui_carousel_control_inline(ui, cui_id_from(ui, "next"), theme, state, root,
+        true, (cui_carousel_control_options){0});
+    cui_end_box(ui);
+}
+
+static void workflow_pages(cui_context *ui, const cui_theme *theme,
+    cui_carousel_state *state, cui_id root, void *user) {
+    (void)user;
+    if (!cui_carousel_pagination_begin(ui, cui_id_from(ui, "pages"), cui_string("Stages"), NULL))
+        return;
+    for (size_t i = 0; i < state->count; ++i)
+        cui_carousel_pagination_item(ui, cui_id_from(ui, stages[i]), theme, state, root, i,
+            (cui_carousel_control_options){.label = cui_string(stages[i])});
+    cui_carousel_pagination_end(ui);
+}
+
+/* Submit between begin_frame and end_frame. Give each instance a stable key. */
+bool workflow_draw(cui_context *ui, const char *key, const cui_theme *theme,
+    workflow_rail *rail, double now_seconds) {
+    if (!cui_push_id(ui, key))
+        return false;
+    cui_id id = cui_id_from(ui, "carousel");
+    cui_carousel_item slides[4];
+    const char *const keys[] = {"build-slide", "preview-slide", "test-slide", "ship-slide"};
+    for (size_t i = 0; i < 4; ++i)
+        slides[i] = (cui_carousel_item){.id = cui_id_from(ui, keys[i]), .label = cui_string(stages[i]),
+                                       .render = workflow_slide};
+    cui_carousel_options options = cui_carousel_default();
+    options.now_seconds = now_seconds;
+    options.controls = workflow_arrows;
+    options.pagination = workflow_pages;
+    ${frame}
+    cui_pop_id(ui);
+    return drawn;
+}`;
 }
 
 export function selectedUsage(name, mode, size = 3, disabled = false) {

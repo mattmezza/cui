@@ -1305,6 +1305,61 @@ func TestCarouselLooping(t *testing.T) {
 	}
 }
 
+func TestCarouselControls(t *testing.T) {
+	a := app(t)
+	options := CarouselControls{Arrows: true, Pagination: true}
+	supported, err := a.SupportsCarouselControls()
+	check(t, err)
+	legacy := os.Getenv("CUI_TEST_LEGACY_CAROUSEL_CONTROLS") == "1"
+	if supported == legacy {
+		t.Fatalf("Carousel controls capability = %t, legacy test = %t", supported, legacy)
+	}
+	first, second, third := Item("first", "First"), Item("second", "Second"), Item("third", "Third")
+	rail := Carousel("controls").VisualSize(240, 180).CarouselControls(options).Children(first, second, third)
+	root := Column("root").Children(rail)
+	var selected *Node
+	rail.OnChange(func(event Event) { selected = event.Selected })
+	if legacy {
+		if err := a.Mount(root); err != ErrCarouselControlsUnavailable {
+			t.Fatalf("expected unavailable before mounting, got %v", err)
+		}
+		check(t, rail.CarouselControls(CarouselControls{}).Err())
+	}
+	check(t, a.Mount(root))
+	check(t, a.Step(.016))
+	if legacy {
+		if _, err = a.NumericPartBounds(rail, 2); err == nil {
+			t.Fatal("legacy Carousel unexpectedly has a next arrow")
+		}
+		return
+	}
+	for index, part := range []uint32{2, 5} {
+		rect, err := a.NumericPartBounds(rail, part)
+		check(t, err)
+		x, y := rect.X+rect.Width/2, rect.Y+rect.Height/2
+		check(t, a.QueuePointer(PointerDown, x, y))
+		check(t, a.QueuePointer(PointerUp, x, y))
+		check(t, a.Step(.016))
+		count, err := a.Dispatch()
+		check(t, err)
+		if count != 1 || selected != []*Node{second, third}[index] {
+			t.Fatalf("part %d did not emit exactly one selection for its slide", part)
+		}
+	}
+	check(t, rail.CarouselControls(CarouselControls{Arrows: true}).Err())
+	check(t, a.Step(.016))
+	if _, err = a.NumericPartBounds(rail, 5); err == nil {
+		t.Fatal("pagination marker remained after it was removed")
+	}
+	count, err := a.Dispatch()
+	check(t, err)
+	current, err := a.Selected(rail)
+	check(t, err)
+	if count != 0 || current != third {
+		t.Fatal("control configuration changed selection or emitted an event")
+	}
+}
+
 func TestResizable(t *testing.T) {
 	a := app(t)
 	first := Item("first", "First panel").PanelSize(240)

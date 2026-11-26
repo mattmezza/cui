@@ -28,9 +28,9 @@ const {stories, snippets} = context.data;
 const inline = {
     Accordion: [false, true].map(interactive => disclosureHeadingUsage(true, interactive)),
     Collapsible: [false, true].map(interactive => disclosureHeadingUsage(false, interactive)),
-    Carousel: [carouselBasisUsage(2), carouselBasisUsage(3, true, true)],
 };
 const standalone = {
+    Carousel: [snippets.Carousel, carouselBasisUsage(2), carouselBasisUsage(3, true, true)],
     Attachment: [readFileSync(join(process.argv[2], '..', 'attachment_slots_example.h'), 'utf8')],
     VirtualList: [virtualInboxUsage],
     Radio: [radioStyledUsage, radioControlledUsage],
@@ -44,6 +44,7 @@ const standalone = {
 };
 delete snippets.TimeField; // Compile complete sources as separate translation units.
 delete snippets.Rating;
+delete snippets.Carousel;
 delete snippets.Pagination;
 process.stdout.write(JSON.stringify({stories, snippets, standalone, inline}));
 '''
@@ -161,7 +162,6 @@ def main():
         'TitleBar': 'cui_title_bar_state state = {0}; cui_chrome_item items[1] = {0}; size_t count = 1; cui_title_bar_options options = {0};',
         'Sidebar': 'cui_sidebar_state state = {0}; cui_sidebar_entry entries[1] = {0}; size_t count = 1; cui_sidebar_options options = {0};',
         'Settings': 'cui_settings_state state = {0}; cui_settings_page_state page_workspace[2] = {0}; cui_edit *search = 0; cui_setting_page pages[2] = {0};',
-        'Carousel': 'cui_carousel_state state = {0}; cui_carousel_geometry geometry[4] = {0}; cui_carousel_item slides[4] = {0}; void (*draw_controls)(cui_context *, const cui_theme *, cui_carousel_state *, cui_id, void *) = 0; void (*draw_pages)(cui_context *, const cui_theme *, cui_carousel_state *, cui_id, void *) = 0;',
         'Command': 'cui_command_state state = {0}; cui_command_row rows[32] = {0}; cui_edit *query = 0; cui_command_entry entries[1] = {0}; size_t count = 1; cui_command_options options = {0};',
         'Questionnaire': 'cui_questionnaire_state state = {0}; cui_questionnaire_options options = {0}; cui_id root_id = 0, progress_id = 0, item_id = 0, heading_id = 0, group_id = 0, choice_id = 0; size_t item = 0, choice = 0; cui_questionnaire_choice_render_fn draw_choice_content = 0;',
         'Speech': 'cui_speech_state state = {0}; cui_speech_workspace workspace = {0}; cui_speech_recognizer recognizer = {0}; cui_speech_input input = {0}; cui_speech_event_fn on_event = 0; cui_speech_button_options options = {0}; cui_speech_waveform_options waveform = {0}; cui_id waveform_id = 0; double now = 0;',

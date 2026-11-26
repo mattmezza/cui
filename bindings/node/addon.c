@@ -1559,6 +1559,27 @@ static napi_value set_bridge_flag(napi_env env, napi_callback_info info, const c
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 
+static napi_value supports_carousel_controls(napi_env env, napi_callback_info info) {
+    (void)info;
+    return supports_bridge_flag(env, "cui_bridge_set_carousel_controls_v1");
+}
+static napi_value set_carousel_controls(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *node;
+    uint32_t mask;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &mask))
+        return NULL;
+    if (mask > 3)
+        return fail(env, "invalid Carousel controls mask");
+    bridge_flag_fn set = bridge_flag_symbol("cui_bridge_set_carousel_controls_v1");
+    if (!set)
+        return fail(env, "Carousel controls requires cui_bridge_set_carousel_controls_v1");
+    cui_bridge_status code = set(app->bridge, node->node, mask);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 static napi_value supports_carousel_looping(napi_env env, napi_callback_info info) {
     (void)info;
     return supports_bridge_flag(env, "cui_bridge_set_carousel_looping_v1");
@@ -2792,6 +2813,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("supportsRadioPaint", supports_radio_paint, 0);
     EXPORT("setRadioPaint", set_radio_paint, 0);
     EXPORT("supportsCarouselAxis", supports_carousel_axis, 0);
+    EXPORT("supportsCarouselControls", supports_carousel_controls, 0);
+    EXPORT("setCarouselControls", set_carousel_controls, 0);
     EXPORT("supportsCarouselLooping", supports_carousel_looping, 0);
     EXPORT("setCarouselLooping", set_carousel_looping, 0);
     EXPORT("setCarouselAxis", set_carousel_axis, 0);

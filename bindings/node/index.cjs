@@ -100,6 +100,7 @@ function requestsRadioMotion(node) {
 const stepperFillUnavailable = 'Stepper Fill requires cui_bridge_set_stepper_fill';
 function preflightNodeOptions(app, node, insideDecoration = false, insideAttachmentSlot = false) {
   if (node.carouselAxisValue === 'vertical' && !app.supports_carousel_axis()) throw new Error('Carousel axis unavailable');
+  if (node.carouselControlsValue && !app.supports_carousel_controls()) throw new Error('Carousel controls unavailable');
   if (node.carouselLoopingValue && !app.supports_carousel_looping()) throw new Error('Carousel looping unavailable');
   if (node.carouselBasisValue) {
     if (node.parent?.kind !== 65) throw new TypeError('carousel_basis requires a direct Carousel Item');
@@ -196,6 +197,7 @@ class Node {
     this.extentValue=null; this.anchorValue=null; this.visualValue=null; this.closeValue=null; this.totalValue=kind===43?5:kind===59?6:10; this.attachmentValue=0; this.imageValue=null;this.chartDataValue=[];this.chartKindValue=0;this.plotPointsValue=[];this.matrixValue=null;this.selectionModeValue=0;this.textFormatValue=0;this.panelValue=null; this.timeValue=[0,0,0];this.dateValue=[2026,1,1];this.colorValue=0x000000ff; this.statusValue=null; this.openValue = false;this.openSet=false;this.checkedSet=false; this.detailValue = ""; this.selectedValue = null; this.checkedValue = false; this.numericValue = kind===42?1:0; this.rangeValue = kind===42?[1,10,1]:kind===43?[0,5,1]:[0,1,.01]; this.changeValue = undefined;
     this.radioPaintValues = null;
     this.carouselAxisValue = 'horizontal';
+    this.carouselControlsValue = 0;
     this.carouselLoopingValue = false;
     this.carouselBasisValue = 0;
     this.radioMotionValue = false;
@@ -413,6 +415,21 @@ class Node {
       }
     }
     this.carouselAxisValue = axis;
+    return this;
+  }
+  carousel_controls({arrows = true, pagination = true} = {}) {
+    if (this.kind !== 65) throw new TypeError('carousel_controls requires a Carousel');
+    if (typeof arrows !== 'boolean' || typeof pagination !== 'boolean')
+      throw new TypeError('arrows and pagination must be booleans');
+    const mask = Number(arrows) | (Number(pagination) << 1);
+    if (this.owner) {
+      this.owner._alive();
+      if (mask !== this.carouselControlsValue) {
+        if (!this.owner.supports_carousel_controls()) throw new Error('Carousel controls unavailable');
+        native.setCarouselControls(this.owner.handle, this[NODE], mask);
+      }
+    }
+    this.carouselControlsValue = mask;
     return this;
   }
   carousel_looping(enabled = true) {
@@ -869,6 +886,7 @@ class App {
           native.setRadioPaint(this.handle, node[NODE], layer, paint);
       }
       if (node.carouselAxisValue === 'vertical') native.setCarouselAxis(this.handle, node[NODE], 1);
+      if (node.carouselControlsValue) native.setCarouselControls(this.handle, node[NODE], node.carouselControlsValue);
       if (node.carouselLoopingValue) native.setCarouselLooping(this.handle, node[NODE], true);
       if (node.carouselBasisValue) native.setCarouselBasis(this.handle, node[NODE], node.carouselBasisValue);
       if (node.radioMotionValue) native.setRadioMotion(this.handle, node[NODE], true);
@@ -1080,6 +1098,11 @@ class App {
     this._alive();
     return typeof native.supportsCarouselAxis === 'function' &&
       typeof native.setCarouselAxis === 'function' && native.supportsCarouselAxis();
+  }
+  supports_carousel_controls() {
+    this._alive();
+    return typeof native.supportsCarouselControls === 'function' &&
+      typeof native.setCarouselControls === 'function' && native.supportsCarouselControls();
   }
   supports_carousel_looping() {
     this._alive();

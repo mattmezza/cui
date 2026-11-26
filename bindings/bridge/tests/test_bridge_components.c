@@ -951,6 +951,132 @@ static void test_carousel_looping(void) {
     }
 }
 
+static void carousel_control_pointer(cui_bridge_app *app, cui_bridge_rect bounds, uint32_t action) {
+    assert(cui_bridge_queue_pointer(app, action, bounds.x + bounds.width / 2,
+                                    bounds.y + bounds.height / 2) == CUI_BRIDGE_OK);
+}
+static void carousel_control_expect(cui_bridge_app *app, cui_bridge_node carousel,
+                                    cui_bridge_node expected, bool changed) {
+    cui_bridge_node selected;
+    cui_bridge_event_ex event;
+    char payload[1];
+    uint32_t needed;
+    assert(cui_bridge_get_selected(app, carousel, &selected) == CUI_BRIDGE_OK);
+    if (selected.slot != expected.slot || selected.generation != expected.generation)
+        fprintf(stderr, "Expected Carousel item %u, got %u (change expected: %d)\n", expected.slot,
+                selected.slot, changed);
+    assert(selected.slot == expected.slot && selected.generation == expected.generation);
+    if (changed) {
+        assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+               CUI_BRIDGE_OK);
+        assert(event.type == CUI_BRIDGE_EVENT_CHANGE && event.node.slot == carousel.slot &&
+               event.node.generation == carousel.generation &&
+               event.selected.slot == expected.slot &&
+               event.selected.generation == expected.generation);
+    }
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_EMPTY);
+}
+static void test_carousel_controls(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_NONE,
+                                  .width = 640,
+                                  .height = 480};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root, rail, slides[4];
+    assert(cui_bridge_node_create(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root", &root) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_CAROUSEL, "rail", &rail) == CUI_BRIDGE_OK);
+    for (unsigned i = 0; i < 4; ++i) {
+        char key[16];
+        snprintf(key, sizeof key, "control-%u", i);
+        assert(cui_bridge_node_create(app, rail, CUI_BRIDGE_ITEM, key, &slides[i]) ==
+               CUI_BRIDGE_OK);
+    }
+    assert(cui_bridge_set_visual_size(app, rail, 84, 90) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_carousel_axis_v1(app, rail, CUI_BRIDGE_CAROUSEL_VERTICAL) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_carousel_controls_v1(NULL, rail, 1) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_carousel_controls_v1(app, root, 1) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_carousel_controls_v1(app, rail, 4) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect next, previous, first, last, frame;
+    assert(cui_bridge_numeric_part_bounds(app, rail, 2, &next) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 3, &first) == CUI_BRIDGE_INVALID_STATE);
+    uint32_t both = CUI_BRIDGE_CAROUSEL_ARROWS_V1 | CUI_BRIDGE_CAROUSEL_PAGINATION_V1;
+    assert(cui_bridge_set_carousel_controls_v1(app, rail, both) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_carousel_controls_v1(app, rail, UINT32_MAX) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_bounds(app, rail, &frame) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 1, &previous) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 2, &next) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 3, &first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 6, &last) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 7, &frame) == CUI_BRIDGE_INVALID_STATE);
+    assert(previous.x >= frame.x && next.x + next.width <= frame.x + frame.width);
+    assert(next.y >= frame.y + 90 && first.y >= next.y + next.height && first.y < last.y);
+    assert(last.x >= frame.x && last.x + last.width <= frame.x + frame.width);
+    carousel_control_expect(app, rail, slides[0], false);
+
+    /* Tab reaches the first enabled arrow and Enter takes the same selection route. */
+    for (unsigned i = 0; i < 2; ++i) {
+        assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, CUI_BRIDGE_KEY_TAB, 0, 0) ==
+               CUI_BRIDGE_OK);
+        assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    }
+    assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, CUI_BRIDGE_KEY_ENTER, 0, 0) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    carousel_control_expect(app, rail, slides[1], true);
+    assert(cui_bridge_set_selected(app, rail, slides[0]) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    carousel_control_pointer(app, previous, CUI_BRIDGE_POINTER_DOWN);
+    carousel_control_pointer(app, previous, CUI_BRIDGE_POINTER_UP);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    carousel_control_expect(app, rail, slides[0], false);
+    carousel_control_pointer(app, last, CUI_BRIDGE_POINTER_DOWN);
+    carousel_control_pointer(app, last, CUI_BRIDGE_POINTER_UP);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    carousel_control_expect(app, rail, slides[3], true);
+
+    /* Removing an active arrow leaves the late release silent. */
+    assert(cui_bridge_set_carousel_looping_v1(app, rail, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    carousel_control_pointer(app, next, CUI_BRIDGE_POINTER_DOWN);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_carousel_controls_v1(app, rail, CUI_BRIDGE_CAROUSEL_PAGINATION_V1) ==
+           CUI_BRIDGE_OK);
+    carousel_control_pointer(app, next, CUI_BRIDGE_POINTER_UP);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 2, &next) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 3, &first) == CUI_BRIDGE_OK);
+    carousel_control_expect(app, rail, slides[3], false);
+
+    assert(cui_bridge_set_disabled(app, rail, 1) == CUI_BRIDGE_OK);
+    carousel_control_pointer(app, first, CUI_BRIDGE_POINTER_DOWN);
+    carousel_control_pointer(app, first, CUI_BRIDGE_POINTER_UP);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    carousel_control_expect(app, rail, slides[3], false);
+
+    assert(cui_bridge_set_disabled(app, rail, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_carousel_controls_v1(app, rail, CUI_BRIDGE_CAROUSEL_ARROWS_V1) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 3, &first) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 2, &next) == CUI_BRIDGE_OK);
+    carousel_control_pointer(app, next, CUI_BRIDGE_POINTER_DOWN);
+    carousel_control_pointer(app, next, CUI_BRIDGE_POINTER_UP);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    carousel_control_expect(app, rail, slides[0], true);
+    assert(cui_bridge_node_remove(app, rail) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_carousel_controls_v1(app, rail, both) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+}
+
 static void test_carousel_slide_basis(void) {
     cui_bridge_options o = {.struct_size = sizeof o,
                             .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -2589,6 +2715,7 @@ int main(void) {
     test_carousel_slide_basis();
     test_carousel_axis();
     test_carousel_looping();
+    test_carousel_controls();
     test_resizable();
     test_text_view();
     test_editor();

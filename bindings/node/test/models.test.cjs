@@ -268,3 +268,41 @@ console.log('PASS native Dock split layout, activation snapshots and metadata fr
  assert.throws(()=>horizontal.carousel_axis('vertical'),/unavailable/);
  assert.equal(horizontal.carouselAxisValue,'horizontal');legacy.dispose();
 }
+
+{
+ assert.throws(() => c.carousel().carousel_controls({arrows: 1}), /boolean/);
+ assert.throws(() => c.item().carousel_controls(), /Carousel/);
+ const app = new c.App({width: 640}), events = [];
+ try {
+   assert.equal(app.supports_carousel_controls(), true);
+   const slides = [0, 1, 2].map(i => c.item(String(i), String(i)));
+   const rail = c.carousel('controls').carousel_controls().children(...slides).on_change(e => events.push(e));
+   app.mount(c.column().children(rail)).step();
+   assert.equal(rail.selected(), slides[0]);
+   press(app, rail.numeric_part_bounds(2));
+   assert.equal(rail.selected(), slides[1]); assert.equal(events.length, 1);
+   assert.equal(app.nodes.get(`${events[0].selectedHandle.slot}:${events[0].selectedHandle.generation}`), slides[1]);
+   press(app, rail.numeric_part_bounds(5));
+   assert.equal(rail.selected(), slides[2]); assert.equal(events.length, 2);
+   assert.equal(app.nodes.get(`${events[1].selectedHandle.slot}:${events[1].selectedHandle.generation}`), slides[2]);
+   for (const [options, absent, present] of [[{arrows:false}, 2, 3], [{pagination:false}, 3, 2]]) {
+     rail.carousel_controls(options); app.step();
+     assert.equal(events.length, 2); assert.equal(rail.selected(), slides[2]);
+     assert.throws(() => rail.numeric_part_bounds(absent));
+     assert.ok(rail.numeric_part_bounds(present).width > 0);
+   }
+   rail.carousel_controls({arrows:false, pagination:false}); app.step();
+   assert.throws(() => rail.numeric_part_bounds(2)); assert.equal(events.length, 2);
+ } finally { app.dispose(); }
+ const legacy = new c.App();
+ try {
+   legacy.supports_carousel_controls = () => false;
+   const rail = c.carousel('legacy').carousel_controls().children(c.item('first'));
+   const root = c.column().children(rail);
+   assert.throws(() => legacy.mount(root), /unavailable/);
+   rail.carousel_controls({arrows:false, pagination:false}); legacy.mount(root).step();
+   rail.carousel_controls({arrows:false, pagination:false});
+   assert.throws(() => rail.carousel_controls(), /unavailable/);
+   assert.equal(rail.carouselControlsValue, 0);
+ } finally { legacy.dispose(); }
+}

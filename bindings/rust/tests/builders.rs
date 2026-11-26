@@ -1037,6 +1037,58 @@ fn carousel_looping() {
 }
 
 #[test]
+fn carousel_controls() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let options = CarouselControls {
+        arrows: true,
+        pagination: true,
+    };
+    let legacy = std::env::var("CUI_TEST_LEGACY_CAROUSEL_CONTROLS").as_deref() == Ok("1");
+    assert_eq!(app.supports_carousel_controls(), !legacy);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let builder = app.build_child(root, Kind::Carousel, "controls").unwrap();
+    let rail = if legacy {
+        builder.finish()
+    } else {
+        builder.carousel_controls(options).unwrap().finish()
+    };
+    if legacy {
+        assert_eq!(
+            app.carousel_controls(rail, options).err(),
+            Some(Error::CAROUSEL_CONTROLS_UNAVAILABLE)
+        );
+    }
+    app.child(rail, Kind::Item, "first").unwrap();
+    let second = app.child(rail, Kind::Item, "second").unwrap();
+    let third = app.child(rail, Kind::Item, "third").unwrap();
+    let selection = Rc::new(Cell::new(None));
+    let observer = selection.clone();
+    app.on_change_event(rail, move |event| observer.set(event.selected))
+        .unwrap();
+    app.step(0.016).unwrap();
+    if legacy {
+        assert!(app.numeric_part_bounds(rail, 2).is_err());
+        return;
+    }
+    for (part, expected) in [(2, second), (5, third)] {
+        let bounds = app.numeric_part_bounds(rail, part).unwrap();
+        let x = bounds.x + bounds.width / 2.;
+        let y = bounds.y + bounds.height / 2.;
+        app.pointer(Phase::Down, x, y).unwrap();
+        app.pointer(Phase::Up, x, y).unwrap();
+        app.step(0.016).unwrap();
+        assert_eq!(app.dispatch().unwrap(), 1);
+        assert_eq!(selection.get(), Some(expected));
+    }
+    app.carousel_controls(rail, CarouselControls::default()).unwrap();
+    app.step(0.016).unwrap();
+    assert!(app.numeric_part_bounds(rail, 2).is_err());
+    assert_eq!(app.dispatch().unwrap(), 0);
+    assert_eq!(app.selected(rail).unwrap(), Some(third));
+}
+
+#[test]
 fn resizable_panel_drag() {
     let _guard = NATIVE.lock().unwrap();
     let mut app = App::headless(500., 300.).unwrap();

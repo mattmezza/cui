@@ -12,6 +12,13 @@ pub enum CarouselAxis {
     Vertical = 1,
 }
 
+/// Opt-in navigation controls rendered below a retained Carousel.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CarouselControls {
+    pub arrows: bool,
+    pub pagination: bool,
+}
+
 fn setter() -> Option<SetBasis> {
     static SETTER: OnceLock<Option<SetBasis>> = OnceLock::new();
     *SETTER.get_or_init(resolve)
@@ -99,6 +106,36 @@ fn resolve_looping() -> Option<SetOption> {
     None
 }
 
+fn controls_setter() -> Option<SetOption> {
+    static SETTER: OnceLock<Option<SetOption>> = OnceLock::new();
+    *SETTER.get_or_init(resolve_controls)
+}
+
+#[cfg(cui_bridge_static)]
+fn resolve_controls() -> Option<SetOption> {
+    extern "C" {
+        fn cui_bridge_set_carousel_controls_v1(
+            app: *mut c_void,
+            carousel: RawNode,
+            mask: u32,
+        ) -> u32;
+    }
+    Some(cui_bridge_set_carousel_controls_v1)
+}
+
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn resolve_controls() -> Option<SetOption> {
+    unsafe {
+        let symbol = crate::notification_symbol_v1(c"cui_bridge_set_carousel_controls_v1".as_ptr());
+        (!symbol.is_null()).then(|| std::mem::transmute::<*mut c_void, SetOption>(symbol))
+    }
+}
+
+#[cfg(not(any(cui_bridge_static, unix, windows)))]
+fn resolve_controls() -> Option<SetOption> {
+    None
+}
+
 impl Error {
     /// The loaded bridge lacks the optional Carousel basis setter.
     pub const CAROUSEL_BASIS_UNAVAILABLE: Self = Self(9);
@@ -106,6 +143,8 @@ impl Error {
     pub const CAROUSEL_AXIS_UNAVAILABLE: Self = Self(9);
     /// The loaded bridge lacks the optional Carousel looping setter.
     pub const CAROUSEL_LOOPING_UNAVAILABLE: Self = Self(9);
+    /// The loaded bridge lacks the optional Carousel controls setter.
+    pub const CAROUSEL_CONTROLS_UNAVAILABLE: Self = Self(9);
 }
 
 impl App {
@@ -135,6 +174,24 @@ impl App {
         Ok(self)
     }
 
+    /// Whether the loaded bridge supports retained Carousel arrows and slide markers.
+    pub fn supports_carousel_controls(&self) -> bool {
+        controls_setter().is_some()
+    }
+
+    /// Configure the built-in controls without changing the selected slide.
+    pub fn carousel_controls(
+        &mut self,
+        carousel: Node,
+        options: CarouselControls,
+    ) -> Result<&mut Self> {
+        let carousel = self.valid(carousel)?;
+        let set = controls_setter().ok_or(Error::CAROUSEL_CONTROLS_UNAVAILABLE)?;
+        let mask = u32::from(options.arrows) | (u32::from(options.pagination) << 1);
+        check(unsafe { set(self.raw, carousel, mask) })?;
+        Ok(self)
+    }
+
     /// Whether the loaded bridge supports fractional slide sizing.
     pub fn supports_carousel_basis(&self) -> bool {
         setter().is_some()
@@ -160,6 +217,12 @@ impl Builder<'_> {
     /// Enable edge wrapping on the Carousel being built.
     pub fn carousel_looping(self, enabled: bool) -> Result<Self> {
         self.app.carousel_looping(self.node, enabled)?;
+        Ok(self)
+    }
+
+    /// Configure the built-in controls on the Carousel being built.
+    pub fn carousel_controls(self, options: CarouselControls) -> Result<Self> {
+        self.app.carousel_controls(self.node, options)?;
         Ok(self)
     }
 

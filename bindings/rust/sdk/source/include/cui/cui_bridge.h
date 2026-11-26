@@ -1282,6 +1282,14 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_axis_v1(cui_bridge_app 
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_looping_v1(cui_bridge_app *,
                                                                     cui_bridge_node carousel,
                                                                     uint32_t looping);
+enum { CUI_BRIDGE_CAROUSEL_ARROWS_V1 = 1u << 0, CUI_BRIDGE_CAROUSEL_PAGINATION_V1 = 1u << 1 };
+/* Combine the requested control groups. Zero (the default) omits both.
+ * Controls are rendered below the viewport and inherit Carousel disabled
+ * state. Updates take effect on the next submission without changing
+ * selection or emitting an event. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_controls_v1(cui_bridge_app *,
+                                                                     cui_bridge_node carousel,
+                                                                     uint32_t mask);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_total(cui_bridge_app *, cui_bridge_node,
                                                       uint32_t total);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_step_status(cui_bridge_app *, cui_bridge_node item,
@@ -1502,6 +1510,9 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_node_bounds(cui_bridge_app *app, cui
 CUI_BRIDGE_API cui_bridge_status cui_bridge_dropdown_part_bounds(cui_bridge_app *, cui_bridge_node,
                                                                  uint32_t menu_part,
                                                                  cui_bridge_rect *out_bounds);
+/* Carousel parts are Previous (1), Next (2), and the marker for zero-based
+ * slide index i (3+i). Bounds are available from the most recent layout.
+ * Disabled controls still have bounds. Absent controls return INVALID_STATE. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_numeric_part_bounds(cui_bridge_app *, cui_bridge_node,
                                                                 uint32_t part,
                                                                 cui_bridge_rect *out_bounds);

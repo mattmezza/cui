@@ -125,6 +125,10 @@ typedef struct {
 } cui_carousel_control_options;
 bool cui_carousel_control(cui_context *, cui_id, const cui_theme *, cui_carousel_state *,
                           cui_id root, bool next, cui_carousel_control_options);
+/* Same activation, styling and axis-aware icon as cui_carousel_control.
+ * Place this version in ordinary layout flow inside the Carousel root. */
+bool cui_carousel_control_inline(cui_context *, cui_id, const cui_theme *, cui_carousel_state *,
+                                 cui_id root, bool next, cui_carousel_control_options);
 /* Pair end only when begin succeeds. Default centered row with 8px gap. */
 bool cui_carousel_pagination_begin(cui_context *, cui_id, cui_str label, const cui_box *custom_box);
 void cui_carousel_pagination_end(cui_context *);

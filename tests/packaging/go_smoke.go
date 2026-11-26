@@ -28,6 +28,15 @@ func main() {
 	if supported, err := app.SupportsVirtualListRows(); err != nil || !supported {
 		panic(fmt.Sprintf("installed bridge lacks VirtualList live rows: %v", err))
 	}
+	if supported, err := app.SupportsDisclosurePresentation(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks disclosure presentation: %v", err))
+	}
+	if supported, err := app.SupportsDisclosureHeading(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks disclosure headings: %v", err))
+	}
+	if supported, err := app.SupportsDisclosureDivider(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks disclosure dividers: %v", err))
+	}
 	clicks := 0
 	button := cui.Button("save").Text("Save ✓").OnClick(func(cui.Event) { clicks++ })
 	if err := app.Mount(cui.Row("root").Children(button)); err != nil {

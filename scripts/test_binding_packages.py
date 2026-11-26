@@ -179,7 +179,7 @@ def main():
                      clean / "appointments.py")
         subprocess.run([str(python), "appointments.py"], cwd=clean, env=env, check=True)
         for example in ("pagination", "radio_delivery", "rating_options",
-                        "stepper_visual", "virtual_list_inbox"):
+                        "stepper_visual", "virtual_list_inbox", "workspace_preferences"):
             filename = f"{example}.py"
             shutil.copy2(ROOT / "bindings/python/examples" / filename, clean / filename)
             subprocess.run([str(python), filename], cwd=clean, env=env, check=True)
@@ -189,7 +189,7 @@ def main():
         shutil.copy2(ROOT / "tests/packaging/node_smoke.cjs", clean / "node_smoke.cjs")
         subprocess.run(["node", "node_smoke.cjs"], cwd=clean, env=env, check=True)
         for example in ("time-field-localized", "pagination-options", "radio-delivery",
-                        "rating-options", "stepper_visual", "virtual-list-inbox"):
+                        "rating-options", "stepper_visual", "virtual-list-inbox", "workspace-preferences"):
             filename = f"{example}.cjs"
             code = (ROOT / "bindings/node/examples" / filename).read_text(encoding="utf-8")
             code = code.replace("require('../index.cjs')", "require('@cui/native')")
@@ -199,7 +199,7 @@ def main():
         subprocess.run(["npm", "install", "--save-dev", "--no-audit", "--no-fund", "--ignore-scripts", "typescript@5.8.3"], cwd=clean, env=env, check=True)
         shutil.copy2(ROOT / "tests/packaging/typescript_smoke.cts", clean / "typescript_smoke.cts")
         typed_examples = ("time_field_localized", "pagination_options", "radio_delivery",
-                          "rating_options", "stepper_visual", "virtual_list_inbox")
+                          "rating_options", "stepper_visual", "virtual_list_inbox", "workspace_preferences")
         for example in typed_examples:
             code = (ROOT / "bindings/typescript/examples" / f"{example}.ts").read_text(encoding="utf-8")
             code = code.replace("'../../node/index.cjs'", "'@cui/native'")

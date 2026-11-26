@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.10
+
+- Accordion and Collapsible offer responsive widths, shared size presets and
+  customizable SVG indicators. Accordion can join items into one group, with
+  configurable dividers. Per-trigger appearance includes paint, focus and cursor.
+- Headings support shared and per-item typography and sizing, with distinct
+  expanded and disabled styles. Long titles reflow as the panel narrows.
+  Accessibility activation goes to the targeted trigger.
+- Retained C, Python, JavaScript, TypeScript, Go and Rust expose the disclosure
+  options and preserve queued change events. The runnable workspace preferences
+  examples exercise the styling and update a status label from a change handler.
+
 ## 0.1.0-alpha.9
 
 - Standalone Radio shares RadioGroup's configurable indicator layers across

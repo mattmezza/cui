@@ -9,6 +9,9 @@ fn main() -> Result<()> {
     assert!(app.supports_rating_options(), "installed bridge lacks Rating options");
     assert!(app.supports_stepper_fill(), "installed bridge lacks Stepper Fill");
     assert!(app.supports_virtual_list_rows(), "installed bridge lacks VirtualList live rows");
+    assert!(app.supports_disclosure_presentation(), "installed bridge lacks disclosure presentation");
+    assert!(app.supports_disclosure_heading(), "installed bridge lacks disclosure headings");
+    assert!(app.supports_disclosure_divider(), "installed bridge lacks disclosure dividers");
     let root = app.build_root(Kind::Row,"root")?.finish();
     let clicked = Rc::new(Cell::new(0));
     let callback = clicked.clone();

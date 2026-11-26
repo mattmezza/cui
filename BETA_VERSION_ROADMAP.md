@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.9**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.9) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
 | Public website | Interactive WASM gallery and docs at alpha.9. The Pages deployment from `3d1cd970` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45824241556) |
-| Latest slice | Radio paint, responsive Stepper Fill, configurable Rating and retained VirtualList live rows ship across C and the five bindings. |
+| Latest slice | Accordion and Collapsible styling, responsive geometry and per-trigger accessibility are in alpha.10 qualification. Alpha.9 ships Radio paint, Stepper Fill, Rating options and retained VirtualList live rows. |
 | Packages | Alpha.9 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green

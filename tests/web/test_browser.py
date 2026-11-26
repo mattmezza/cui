@@ -14,6 +14,27 @@ import threading
 from playwright.sync_api import sync_playwright
 
 
+def verify_disclosure_accessibility(page, component):
+    page.evaluate('name=>location.hash=name', component)
+    page.wait_for_function('name=>window.cuiGallery?.renderedComponent===name', arg=component)
+    names = ['Show details']
+    if component == 'Accordion':
+        page.locator('#disclosure-mode').select_option('0')
+        page.locator('#disclosure-multiple').check()
+        names = ['Getting started', 'Configuration']
+    current = page.evaluate('''names=>{
+        const rows=names.map(name=>
+            document.querySelector(`#accessible button[aria-label="${name}"]`));
+        const expected=rows.map(row=>[row.id,String(row.getAttribute('aria-expanded')==='false')]);
+        const before=[2,3].map(field=>cuiGallery.exports.gallery_pointer_stats(field));
+        for(const row of rows)row.click();
+        return {expected,before};
+    }''', names)
+    page.wait_for_function('''expected=>expected.every(([id,value])=>
+        document.getElementById(id)?.getAttribute('aria-expanded')===value)''', arg=current['expected'])
+    assert page.evaluate('[2,3].map(f=>cuiGallery.exports.gallery_pointer_stats(f))') == current['before']
+
+
 def verify_pagination_tooltips(page):
     """Real mouse movement and Escape exercise the C tooltip in WASM."""
     semantic_bounds = """({name, role}) => {
@@ -479,7 +500,6 @@ def verify_sidebar_scrolling(browser, url):
 
 
 def main():
-    subprocess.run([sys.executable, str(Path(__file__).with_name('test_snippets.py'))], check=True)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=Path('build/web'))
     parser.add_argument('--chromium', help='Optional installed Chromium executable')
@@ -487,7 +507,11 @@ def main():
     parser.add_argument('--sidebar-only', action='store_true', help='Run focused Sidebar scrolling checks only')
     parser.add_argument('--notification-only', action='store_true', help='Run focused Notification checks only')
     parser.add_argument('--pagination-only', action='store_true', help='Run focused Pagination checks only')
+    parser.add_argument('--disclosure-only', action='store_true',
+                        help='Run the focused disclosure accessibility checks only')
     args = parser.parse_args()
+    if not args.disclosure_only:
+        subprocess.run([sys.executable, str(Path(__file__).with_name('test_snippets.py'))], check=True)
     root = args.directory.resolve()
     # Mount as /cui/ to exercise the same URL shape as GitHub project Pages.
     class Handler(SimpleHTTPRequestHandler):
@@ -506,6 +530,14 @@ def main():
             if args.chromium:
                 options['executable_path'] = args.chromium
             browser = p.chromium.launch(**options)
+            if args.disclosure_only:
+                page = browser.new_page()
+                page.goto(f'http://127.0.0.1:{server.server_port}/cui/#Accordion')
+                verify_disclosure_accessibility(page, 'Accordion')
+                verify_disclosure_accessibility(page, 'Collapsible')
+                print('Accordion and Collapsible semantic activation passed without pointer input.')
+                browser.close()
+                return
             if args.attachment_only:
                 verify_attachment_metadata(browser, f'http://127.0.0.1:{server.server_port}/cui/')
                 browser.close()
@@ -2176,6 +2208,8 @@ def main():
             page.wait_for_function('document.querySelector(`#accessible button[aria-label="Getting started"]`)?.getAttribute("aria-expanded")==="true"&&document.querySelector(`#accessible button[aria-label="Configuration"]`)?.getAttribute("aria-expanded")==="true"')
             assert page.locator('#accessible [role=group][aria-label="Getting started"]').count() == 1
             assert page.locator('#accessible [role=group][aria-label="Configuration"]').count() == 1
+            verify_disclosure_accessibility(page, 'Accordion')
+            verify_disclosure_accessibility(page, 'Collapsible')
             control_change('theme', '0')
             page.evaluate('location.hash="Tag"')
             page.wait_for_function('cuiGallery.renderedComponent==="Tag"')

@@ -251,9 +251,11 @@ cui_accordion_common(cui_context *ui, cui_id target, const cui_disclosure_item *
     }
     size_t event_count = 0;
     const cui_event *events = cui_frame_events(ui, &event_count);
+    cui_id routed_focus = cui_focused(ui);
     size_t cursor = count;
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
-        if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_TAB)
+        const cui_event *event = &events[e];
+        if (event->type == CUI_EVENT_KEY_DOWN && event->key == CUI_KEY_TAB)
             cursor = count;
         size_t from = count;
         cui_id routed_target = cui_event_target(ui, e);
@@ -262,17 +264,26 @@ cui_accordion_common(cui_context *ui, cui_id target, const cui_disclosure_item *
                 from = i;
         if (from == count || items[from].disabled)
             continue;
-        if (cursor == count)
+        bool accessibility = event->type == CUI_EVENT_ACCESSIBILITY_ACTION;
+        bool direct = accessibility && event->accessibility_action == CUI_ACCESSIBILITY_ACTIVATE;
+        cui_id activation = cui_event_activation(ui, e);
+        if (accessibility && event->accessibility_action == CUI_ACCESSIBILITY_FOCUS) {
             cursor = from;
-        if (cui_event_activation(ui, e) && (events[e].type != CUI_EVENT_KEY_UP ||
-                                            items[cursor].id == cui_event_activation(ui, e))) {
-            if (events[e].type == CUI_EVENT_POINTER_UP)
-                cursor = from;
-            if (!open[cursor] || options.collapsible) {
+            /* Core routed the whole batch before local arrow navigation ran.
+             * Restore its explicit focus if an earlier arrow replaced it. */
+            if (routed_focus == routed_target)
+                cui_focus(ui, routed_target);
+        } else if (!direct &&
+                   (cursor == count || (event->type == CUI_EVENT_POINTER_UP && activation))) {
+            cursor = from;
+        }
+        if (activation && (event->type != CUI_EVENT_KEY_UP || items[cursor].id == activation)) {
+            size_t item = direct ? from : cursor;
+            if (!open[item] || options.collapsible) {
                 cui_component_event_metadata evidence;
                 bool notify =
                     handler.on_change && cui_disclosure_evidence(ui, target, e, &evidence);
-                bool next_open = !open[cursor];
+                bool next_open = !open[item];
                 if (next_open && !options.multiple)
                     for (size_t j = 0; j < count; j++) {
                         bool previous = open[j];
@@ -281,17 +292,17 @@ cui_accordion_common(cui_context *ui, cui_id target, const cui_disclosure_item *
                             cui_disclosure_notify(&result, handler, evidence, items[j].id, j,
                                                   previous, false);
                     }
-                bool previous = open[cursor];
-                open[cursor] = next_open;
+                bool previous = open[item];
+                open[item] = next_open;
                 result.changed = true;
                 if (notify && previous != next_open)
-                    cui_disclosure_notify(&result, handler, evidence, items[cursor].id, cursor,
+                    cui_disclosure_notify(&result, handler, evidence, items[item].id, item,
                                           previous, next_open);
             }
         }
-        if (events[e].type != CUI_EVENT_KEY_DOWN)
+        if (event->type != CUI_EVENT_KEY_DOWN)
             continue;
-        cui_key key = events[e].key;
+        cui_key key = event->key;
         int direction = key == CUI_KEY_DOWN || key == CUI_KEY_HOME ? 1 : -1;
         if (key != CUI_KEY_UP && key != CUI_KEY_DOWN && key != CUI_KEY_HOME && key != CUI_KEY_END)
             continue;

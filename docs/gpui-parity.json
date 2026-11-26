@@ -12,7 +12,8 @@
       "tests": [
         "tests/unit/test_disclosure.c",
         "tests/unit/test_disclosure_events.c",
-        "tests/web/test_touch_components.py"
+        "tests/web/test_touch_components.py",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
@@ -69,6 +70,14 @@
           "evidence": [
             "tests/unit/test_disclosure.c",
             "tests/web/test_touch_components.py"
+          ]
+        },
+        {
+          "name": "ordered direct accessibility activation and mixed keyboard focus",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure_events.c",
+            "tests/web/test_browser.py"
           ]
         }
       ],

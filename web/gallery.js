@@ -1304,7 +1304,9 @@ function syncSemantics(){
   if(!el){el=document.createElement(interactiveRoles.includes(f(0))&&!['treeitem','columnheader'].includes(role)?'button':'div');el.id=id;if(el.tagName==='BUTTON'){el.type='button';el.tabIndex=-1;}semanticNodes.set(id,el);}
   if(role==='text')el.removeAttribute('role');else el.setAttribute('role',role);
   const name=stringAt(wasm.gallery_semantic_name(i),wasm.gallery_semantic_length(i));
+  const controls=wasm.gallery_semantic_controls(i);
   const accountTrigger=selected.name==='Popover'&&role==='button'&&name==='Open account card';
+  const disclosureTrigger=role==='button'&&controls!==0n&&['Accordion','Collapsible'].includes(selected.name);
   if(role==='text')el.textContent=name;
   el.setAttribute('aria-label',name);
   const orderedFocus=f(0)===timeInputRole||role==='spinbutton';
@@ -1325,7 +1327,10 @@ function syncSemantics(){
   if(role==='columnheader'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);requestFrame();};}
   if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=e=>{
    e.stopPropagation();
-   if(accountTrigger&&$('popover-trigger').value==='1'){if(wasm.gallery_accessibility_activate(i))requestFrame();return;}
+   if(disclosureTrigger||(accountTrigger&&$('popover-trigger').value==='1')){
+    if(wasm.gallery_accessibility_activate(i))requestFrame();
+    return;
+   }
    wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);
    wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);requestFrame();
   };}
@@ -1354,8 +1359,8 @@ function syncSemantics(){
   }else if(role==='slider'&&selected.name==='VideoPlayer'&&name==='Volume')el.setAttribute('aria-valuetext',description);
   else el.removeAttribute('aria-valuetext');
   if(accountTrigger)el.setAttribute('aria-haspopup','dialog');else el.removeAttribute('aria-haspopup');
-  if(accountTrigger||selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
-  entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${wasm.gallery_semantic_controls(i)}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
+  if(accountTrigger||disclosureTrigger||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
+  entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${controls}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
  }
  // A wrapped toolbar can move the canvas when a popup closes on pointer down.
  // Keep the input coordinates stable until the captured gesture ends.

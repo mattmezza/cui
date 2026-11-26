@@ -165,6 +165,48 @@ static void test_base_routing(void) {
     assert(result.change_count == 0 && o.count == 4);
     cui_destroy(ui);
 }
+static void accordion_accessibility(cui_context *ui, cui_id id, cui_accessibility_action action) {
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
+                                           .accessibility_target = id,
+                                           .accessibility_action = action}));
+}
+static void test_accordion_accessibility_batch(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 128, .max_commands = 256});
+    assert(ui);
+    bool open[3] = {0};
+    /* The first three observer slots are reserved for the ordered-write fixture. */
+    accordion_observer o = {.ui = ui, .open = open, .count = 3};
+    base_scene(ui, open, &o, false, false);
+    accordion_accessibility(ui, 20, CUI_ACCESSIBILITY_ACTIVATE);
+    accordion_accessibility(ui, 40, CUI_ACCESSIBILITY_ACTIVATE);
+    cui_disclosure_event_result result = base_scene(ui, open, &o, false, false);
+    assert(result.changed && result.change_count == 2 && open[0] && open[2]);
+    for (size_t i = 0; i < 2; ++i) {
+        const cui_disclosure_change *change = &o.changes[3 + i];
+        assert(change->item == group[2 * i].id && change->expanded);
+        assert(change->event.source == CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY);
+        assert(change->event.event_index == i && change->event.activation.target == change->item);
+    }
+
+    /* A direct accessibility activation does not steal the keyboard cursor. */
+    cui_focus(ui, 20);
+    accordion_accessibility(ui, 40, CUI_ACCESSIBILITY_ACTIVATE);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    result = base_scene(ui, open, &o, false, false);
+    assert(result.change_count == 2 && !open[0] && !open[2]);
+    assert(o.changes[5].item == 40 && o.changes[6].item == 20);
+    assert(o.changes[6].event.source == CUI_COMPONENT_EVENT_SOURCE_KEYBOARD);
+
+    /* An explicit accessibility focus action redirects later keyboard events. */
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_DOWN}));
+    accordion_accessibility(ui, 20, CUI_ACCESSIBILITY_FOCUS);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    result = base_scene(ui, open, &o, false, false);
+    assert(result.change_count == 1 && open[0] && !open[2]);
+    assert(o.changes[7].item == 20 && o.changes[7].event.event_index == 2);
+    assert(cui_focused(ui) == 20);
+    cui_destroy(ui);
+}
 static void test_accordion(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 128, .max_commands = 256});
     cui_context *old = cui_create((cui_config){.max_elements = 128, .max_commands = 256});
@@ -236,6 +278,7 @@ static void test_accordion(void) {
 int main(void) {
     test_accordion();
     test_base_routing();
+    test_accordion_accessibility_batch();
     cui_context *ui = cui_create((cui_config){.max_elements = 128, .max_commands = 256});
     cui_context *old = cui_create((cui_config){.max_elements = 128, .max_commands = 256});
     assert(ui && old);

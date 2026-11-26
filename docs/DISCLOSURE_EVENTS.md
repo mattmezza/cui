@@ -53,6 +53,11 @@ sees this intermediate array; there can temporarily be no open item or several
 remaining old items. No normalization occurs just because input starts multi-open.
 Multiple mode only changes the chosen slot. Noncollapsible open activation is silent.
 
+Explicit accessibility activation addresses its own trigger for each event in a
+batch and leaves the keyboard navigation cursor in place. An explicit focus action
+updates the cursor for subsequent keyboard events in the same batch. The WASM
+gallery's accessibility mirror uses semantic activation for disclosure triggers.
+
 The copied activation still identifies the originating trigger, even when keyboard
 navigation redirects the reducer cursor or single-open policy closes another item.
 `event.target` remains the compound. Notifications precede the existing final

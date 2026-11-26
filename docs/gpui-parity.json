@@ -2334,7 +2334,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. The optional C ellipsis menus expose up to 100 omitted pages per direction. Text and accessible names can be localized. Optional labeled chevrons omit separate First/Last controls. The retained C bridge copies the extended options and emits the existing scalar CHANGE event. Python, JS, TS, Go and Rust have tested opt-in V1 authoring. Python, Node, Go and Rust retain ordinary paging with the alpha.6 provider. Both chevron layouts show viewport-bounded localized pointer hover hints; the retained configuration wire is unchanged. Custom logical-pixel heights are tested in immediate C, retained C and the WASM gallery. Foreign custom-size builders and physical-host acceptance remain open."
+        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. The optional C ellipsis menus expose up to 100 omitted pages per direction. Text and accessible names can be localized. Optional labeled chevrons omit separate First/Last controls. The retained C bridge copies the extended options and emits the existing scalar CHANGE event. Python, JS, TS, Go and Rust have tested opt-in V1 authoring. Python, Node, Go and Rust retain ordinary paging with the alpha.6 provider. Both chevron layouts show viewport-bounded localized pointer hover hints; the retained configuration wire is unchanged. Custom logical-pixel heights are tested in immediate C, retained C, the WASM gallery and all five retained language builders. Missing or incomplete height symbols leave V1 navigation, named sizing and scalar events available. Physical-host acceptance remains open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2375,6 +2375,18 @@
             "tests/unit/test_numeric_selection_events.c",
             "tests/unit/test_bridge_pagination.c",
             "tests/web/test_browser.py"
+          ]
+        },
+        {
+          "name": "retained foreign custom heights and optional provider fallback",
+          "status": "tested",
+          "evidence": [
+            "bindings/python/test_pagination_options.py",
+            "bindings/node/test/pagination-options.test.cjs",
+            "bindings/node/test/pagination-options.types.ts",
+            "bindings/go/cui/pagination_test.go",
+            "bindings/rust/tests/pagination_options.rs",
+            "cmake/CUIPaginationBindingTests.cmake"
           ]
         },
         {

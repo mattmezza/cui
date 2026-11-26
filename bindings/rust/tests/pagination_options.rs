@@ -201,3 +201,88 @@ fn optional_provider_preserves_legacy() {
     assert_eq!(app.dispatch().unwrap(), 1);
     assert_eq!(&*changes.borrow(), &[2.]);
 }
+
+#[test]
+fn custom_size_geometry_and_activation() {
+    let _serial = UI.lock().unwrap();
+    let mut app = App::headless(440., 320.).unwrap();
+    assert!(app.supports_pagination_custom_size());
+    let mut other = App::headless(440., 320.).unwrap();
+    let other_root = other.root(Kind::Column, "other").unwrap();
+    let foreign = other
+        .child(other_root, Kind::Pagination, "foreign")
+        .unwrap();
+    assert!(app.set_pagination_custom_size(foreign, 52.5).is_err());
+    assert!(app.pagination_custom_size(foreign).is_err());
+    let root = app.root(Kind::Column, "root").unwrap();
+    let pager = PaginationOptions::default()
+        .design_size(DesignSize::Lg)
+        .custom_size(52.5)
+        .unwrap()
+        .mount(&mut app, root, "pages")
+        .unwrap();
+    app.total(pager, 20).unwrap();
+    let changes = Rc::new(RefCell::new(Vec::new()));
+    let captured = changes.clone();
+    app.on_change_event(pager, move |e| captured.borrow_mut().push(e.value))
+        .unwrap();
+    for bad in [-1., 0.5, 513., f32::NAN, f32::INFINITY] {
+        assert!(PaginationOptions::default().custom_size(bad).is_err());
+        assert_eq!(
+            app.set_pagination_custom_size(pager, bad).err(),
+            Some(Error(3))
+        );
+        assert_eq!(app.pagination_custom_size(pager).unwrap(), 52.5);
+    }
+    app.step(0.016).unwrap();
+    assert_eq!(app.numeric_part_bounds(pager, 3).unwrap().height, 52.5);
+    click(&mut app, pager, 3);
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(&*changes.borrow(), &[2.]);
+    assert_eq!(app.dispatch().unwrap(), 0);
+    app.set_pagination_custom_size(pager, 0.).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.numeric_part_bounds(pager, 3).unwrap().height, 40.);
+    app.remove(pager).unwrap();
+    assert!(app.set_pagination_custom_size(pager, 52.5).is_err());
+    assert!(app.pagination_custom_size(pager).is_err());
+}
+
+#[test]
+fn custom_size_optional_provider() {
+    let _serial = UI.lock().unwrap();
+    let unsupported = std::env::var("CUI_PAGINATION_CUSTOM_UNSUPPORTED").as_deref() == Ok("1");
+    let mut app = App::headless(440., 320.).unwrap();
+    assert_eq!(app.supports_pagination_custom_size(), !unsupported);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let options = PaginationOptions::default().custom_size(52.5).unwrap();
+    let pager = if unsupported {
+        assert_eq!(options.mount(&mut app, root, "pages").err(), Some(Error(9)));
+        options
+            .custom_size(0.)
+            .unwrap()
+            .mount(&mut app, root, "pages")
+            .unwrap()
+    } else {
+        options.mount(&mut app, root, "pages").unwrap()
+    };
+    app.total(pager, 20).unwrap();
+    if unsupported {
+        assert_eq!(
+            app.set_pagination_custom_size(pager, 0.).err(),
+            Some(Error(9))
+        );
+        assert_eq!(app.pagination_custom_size(pager), Err(Error(9)));
+    } else {
+        assert_eq!(app.pagination_custom_size(pager).unwrap(), 52.5);
+    }
+    let changes = Rc::new(RefCell::new(Vec::new()));
+    let captured = changes.clone();
+    app.on_change_event(pager, move |e| captured.borrow_mut().push(e.value))
+        .unwrap();
+    app.step(0.016).unwrap();
+    click(&mut app, pager, 3);
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(&*changes.borrow(), &[2.]);
+    assert_eq!(app.dispatch().unwrap(), 0);
+}

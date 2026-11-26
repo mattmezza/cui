@@ -74,6 +74,12 @@ def bind_api(api, bind):
         "configure_v1": (C.c_int, C.c_void_p, _Handle, C.POINTER(_Config)),
         "get_config_v1": (C.c_int, C.c_void_p, _Handle, C.POINTER(_Config)),
     }
+    api.pagination_custom_size = None
+    custom = {"set_custom_size": (C.c_int, C.c_void_p, _Handle, C.c_float),
+              "get_custom_size": (C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_float))}
+    if all(hasattr(api.lib, "cui_bridge_pagination_" + name) for name in custom):
+        api.pagination_custom_size = SimpleNamespace(
+            **{name: bind("pagination_" + name, *spec) for name, spec in custom.items()})
     api.pagination_options = None
     if all(hasattr(api.lib, "cui_bridge_pagination_" + name) for name in specs):
         api.pagination_options = SimpleNamespace(
@@ -85,6 +91,19 @@ def supported(app) -> bool:
     api = app._api.pagination_options
     return bool(api is not None and api.versions() & 1 and
                 api.config_size_v1() == C.sizeof(_Config) == 916)
+
+
+def custom_supported(app) -> bool:
+    app._ensure_open()
+    return app._api.pagination_custom_size is not None
+
+
+def require_custom_api(app):
+    if current_thread() is not app._creation_thread:
+        raise RuntimeError("Pagination custom size requires the app's owner thread")
+    if not custom_supported(app):
+        raise RuntimeError("Pagination custom size requires a complete, compatible bridge symbol group")
+    return app._api.pagination_custom_size
 
 
 def require_api(app):
@@ -126,6 +145,31 @@ class Pagination(Widget):
     def __init__(self, key: str, text: str = ""):
         super().__init__("pagination", key, text)
         self._pagination_config: PaginationConfig | None = None
+        self._pagination_custom_size = 0.0
+
+    def custom_size(self, value: float) -> Pagination:
+        """Set a logical pixel height, or zero to restore the named design size."""
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if type(value) not in (int, float) or not (value == 0 or 1 <= value <= 512):
+            raise ValueError("custom_size must be zero or a number in [1, 512]")
+        value = C.c_float(value).value
+        if self._app is not None:
+            app = self._app
+            app._api.check(require_custom_api(app).set_custom_size(app._ptr, self._handle, value))
+        self._pagination_custom_size = value
+        return self
+
+    def get_custom_size(self) -> float:
+        """Return the custom logical pixel height; zero means named design size."""
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is None:
+            return self._pagination_custom_size
+        app = self._app
+        value = C.c_float()
+        app._api.check(require_custom_api(app).get_custom_size(app._ptr, self._handle, C.byref(value)))
+        return value.value
 
     def configure(self, config: PaginationConfig | None) -> Pagination:
         """Copy presentation options. Pass None to clear them."""
@@ -167,10 +211,14 @@ class Pagination(Widget):
         return self
 
     def _preflight_pagination(self, app) -> None:
+        if self._pagination_custom_size:
+            require_custom_api(app)
         if self._pagination_config is not None or self._design_size is not None:
             require_api(app)
 
     def _mount_pagination(self) -> None:
+        if self._pagination_custom_size:
+            self.custom_size(self._pagination_custom_size)
         if self._pagination_config is not None:
             self.configure(self._pagination_config)
 

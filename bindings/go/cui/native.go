@@ -555,6 +555,7 @@ type Node struct {
 	timeLocalized                        *TimeFieldConfig
 	skeletonConfig                       *SkeletonConfig
 	paginationConfig                     *PaginationConfig
+	paginationCustomSize                 float32
 	iconConfig                           *IconConfig
 	badgeConfig                          *BadgeConfig
 	timeChange                           func(TimeFieldChange)
@@ -1744,6 +1745,9 @@ func (a *App) Mount(root *Node) error {
 			}
 		}
 		usesResponsiveSkeleton = usesResponsiveSkeleton || n.skeletonConfig != nil
+		if n.paginationCustomSize != 0 && C.go_pagination_custom_supported() == 0 {
+			return ErrPaginationCustomSizeUnavailable
+		}
 		if n.kind == 42 && (n.paginationConfig != nil || n.hasDesignSize) && C.go_pagination_supported() == 0 {
 			return ErrPaginationOptionsUnavailable
 		}
@@ -1818,6 +1822,11 @@ func (a *App) Mount(root *Node) error {
 		a.nodes[keyID(h)] = n
 		if n.skeletonConfig != nil {
 			if e := n.configureMountedSkeleton(*n.skeletonConfig); e != nil {
+				return e
+			}
+		}
+		if n.paginationCustomSize != 0 {
+			if e := n.setMountedPaginationCustomSize(n.paginationCustomSize); e != nil {
 				return e
 			}
 		}
@@ -4620,4 +4629,43 @@ func (n *Node) PaginationConfig() (PaginationConfig, bool, error) {
 		return PaginationConfig{}, false, err
 	}
 	return config, true, nil
+}
+
+// SupportsPaginationCustomSize reports the independent custom-height capability.
+func (a *App) SupportsPaginationCustomSize() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_pagination_custom_supported() != 0, nil
+}
+func (n *Node) setMountedPaginationCustomSize(size float32) error {
+	supported, err := n.app.SupportsPaginationCustomSize()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrPaginationCustomSizeUnavailable
+	}
+	return result(C.go_pagination_set_custom_size(n.app.ptr, n.handle, C.float(size)))
+}
+
+// PaginationCustomSize returns zero when the named design size is active.
+// Explicit mounted reads require the independent custom-height capability.
+func (n *Node) PaginationCustomSize() (float32, error) {
+	if err := n.checkPagination(); err != nil {
+		return 0, err
+	}
+	if n.app == nil {
+		return n.paginationCustomSize, nil
+	}
+	supported, err := n.app.SupportsPaginationCustomSize()
+	if err != nil {
+		return 0, err
+	}
+	if !supported {
+		return 0, ErrPaginationCustomSizeUnavailable
+	}
+	var size C.float
+	err = result(C.go_pagination_get_custom_size(n.app.ptr, n.handle, &size))
+	return float32(size), err
 }

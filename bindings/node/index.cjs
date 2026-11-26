@@ -680,6 +680,7 @@ class App {
       typeof native.configureDataTableLoadMore === 'function' &&
       typeof native.pollDataTableLoadMore === 'function' && native.supportsDataTablePaging();
   }
+  supports_pagination_custom_size() { return paginationOptions.supportsCustom(this); }
   supports_pagination_options() { return paginationOptions.supports(this); }
   supports_skeleton_presentation() { return skeletons.supports(this); }
   supports_localized_time_field(){return localizedTimes.supports(this);}

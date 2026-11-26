@@ -93,3 +93,49 @@ static napi_value pagination_options(napi_env env, napi_callback_info info) {
     }
     return result;
 }
+
+/* Independent optional group: V1 presentation is not a prerequisite. */
+typedef struct {
+    cui_bridge_status (*set)(cui_bridge_app *, cui_bridge_node, float);
+    cui_bridge_status (*get)(cui_bridge_app *, cui_bridge_node, float *);
+} pagination_custom_api;
+static napi_value pagination_custom_size(napi_env env, napi_callback_info info) {
+    napi_value v[4];
+    js_app *app;
+    uint32_t op;
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app) || !uint_arg(env, v[1], &op))
+        return NULL;
+    if (op > 2)
+        return fail(env, "unknown Pagination custom size operation");
+    pagination_custom_api api;
+    bool supported =
+        optional_bridge_symbol(&api.set, sizeof api.set, "cui_bridge_pagination_set_custom_size") &&
+        optional_bridge_symbol(&api.get, sizeof api.get, "cui_bridge_pagination_get_custom_size");
+    if (op == 0) {
+        napi_value result;
+        return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
+    }
+    if (!supported)
+        return fail(env,
+                    "Pagination custom size requires a complete, compatible bridge symbol group");
+    js_node *node;
+    if (!args(env, info, op == 1 ? 4 : 3, v) || !node_arg(env, v[2], app, &node))
+        return NULL;
+    float value = 0;
+    if (op == 1) {
+        double number;
+        if (!number_arg(env, v[3], &number))
+            return NULL;
+        if (!(number == 0 || (number >= 1 && number <= 512)))
+            return fail(env, "Pagination custom size must be zero or in [1,512]");
+        value = (float)number;
+    }
+    cui_bridge_status code = op == 1 ? api.set(app->bridge, node->node, value)
+                                     : api.get(app->bridge, node->node, &value);
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
+    if (op == 1)
+        return undefined(env);
+    napi_value result;
+    return napi_create_double(env, value, &result) == napi_ok ? result : NULL;
+}

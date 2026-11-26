@@ -28,3 +28,10 @@ rating().configure(config);
 rating().get_config();
 // @ts-expect-error plain Label has no Pagination configuration
 label('status').configure(config);
+
+const customHeight: number = pages.custom_size(52.5).get_custom_size();
+new App().supports_pagination_custom_size();
+// @ts-expect-error custom height must be numeric
+pages.custom_size('52.5');
+// @ts-expect-error Rating has no custom Pagination height
+rating().custom_size(52.5);

@@ -128,6 +128,9 @@ export interface PaginationConfig {
   earlierPages?: string; laterPages?: string;
 }
 export interface Pagination extends PagedNumericControl, DesignSized {
+  /** Logical pixel height: zero restores the named design size; otherwise 1..512. */
+  custom_size(value: number): this;
+  get_custom_size(): number;
   configure(options: PaginationConfig | null): this;
   reset_config(): this;
   get_config(): Readonly<Required<PaginationConfig>> | undefined;
@@ -479,6 +482,7 @@ export const ResponsiveSkeleton: {new(key?: string, config?: SkeletonConfigInput
 export function responsive_skeleton(key?: string, config?: SkeletonConfigInput): ResponsiveSkeleton;
 export interface App {
   supports_skeleton_presentation(): boolean;
+  supports_pagination_custom_size(): boolean;
   supports_pagination_options(): boolean;
 }
 

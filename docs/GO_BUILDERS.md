@@ -145,12 +145,15 @@ pager := cui.ConfiguredPagination("results", cui.PaginationConfig{
     Chevrons: true, JumpMenu: true, VisiblePages: 5, AvailableWidth: 320,
     Group: "Pages de résultats", Previous: "Précédente", Next: "Suivante",
 }).Total(24).DesignSize(cui.Base)
+if err := pager.SetPaginationCustomSize(52.5); err != nil {
+    return err
+}
 pager.OnChange(func(event cui.Event) {
     showResults(int(event.Value))
 })
 ```
 
-Use `pager.ConfigurePagination(config)` on the app's owner thread to replace the options. `pager.PaginationConfig()` returns a copy and a presence flag. `pager.ResetPagination()` clears the options and preserves the current page, total and design size. The app dispatches callbacks after stepping the bridge.
+Use `pager.ConfigurePagination(config)` on the app's owner thread to replace the options. `pager.PaginationConfig()` returns a copy and a presence flag. `pager.ResetPagination()` clears the options and preserves the page, total and size. `pager.SetPaginationCustomSize(height)` accepts fractional logical pixels from 1 through 512. Read the override with `pager.PaginationCustomSize()` and set zero to restore the named size. Check `app.SupportsPaginationCustomSize()` before opting in with a dynamic provider. The app dispatches callbacks after stepping the bridge.
 
 Run the [document results example](../bindings/go/examples/pagination_options/main.go) with Go and CGO. The default Linux build uses the bundled bridge sources.
 

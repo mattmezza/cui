@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 'use strict';
+const CUSTOM = Symbol('Pagination custom size');
 const CONFIG = Symbol('Pagination configuration');
 const labels = ['group', 'first', 'previous', 'next', 'last', 'earlierPages', 'laterPages'];
 const booleans = ['counter', 'iconOnly', 'chevrons', 'jumpMenu'];
@@ -30,6 +31,16 @@ function configValue(options) {
   return Object.freeze(config);
 }
 module.exports = function paginationModule(native, Node, NODE) {
+  function supportsCustom(app) {
+    app._alive();
+    return typeof native.paginationCustomSize === 'function' && native.paginationCustomSize(app.handle, 0) === true;
+  }
+  function customCall(app, op, node, ...args) {
+    app._alive();
+    if (typeof native.paginationCustomSize !== 'function')
+      throw new Error('Pagination custom size requires a complete, compatible bridge symbol group');
+    return native.paginationCustomSize(app.handle, op, node[NODE], ...args);
+  }
   function supports(app) {
     app._alive();
     return typeof native.paginationOptions === 'function' && native.paginationOptions(app.handle, 0) === true;
@@ -47,6 +58,19 @@ module.exports = function paginationModule(native, Node, NODE) {
   function paginationNode(node) {
     if (node.kind !== 42) throw new TypeError('Pagination configuration requires Pagination');
   }
+  Node.prototype.custom_size = function(value) {
+    paginationNode(this);
+    if (typeof value !== 'number' || !Number.isFinite(value) || !(value === 0 || value >= 1 && value <= 512))
+      throw new RangeError('custom_size must be zero or a number in [1,512]');
+    value = Math.fround(value);
+    if (this.owner) customCall(this.owner, 1, this, value);
+    this[CUSTOM] = value;
+    return this;
+  };
+  Node.prototype.get_custom_size = function() {
+    paginationNode(this);
+    return this.owner ? customCall(this.owner, 2, this) : this[CUSTOM] ?? 0;
+  };
   Node.prototype.configure = function(options) {
     paginationNode(this);
     if (options === null) return this.reset_config();
@@ -77,11 +101,14 @@ module.exports = function paginationModule(native, Node, NODE) {
       const node = pending.pop();
       if (node.kind === 42 && (node[CONFIG] !== undefined || node.designSizeValue !== undefined) && !supports(app))
         throw new Error('Pagination V1 requires a complete, compatible bridge symbol group');
+      if (node.kind === 42 && node[CUSTOM] && !supportsCustom(app))
+        throw new Error('Pagination custom size requires a complete, compatible bridge symbol group');
       pending.push(...node.childrenValue);
     }
   }
   function mount(app, node) {
+    if (node[CUSTOM]) customCall(app, 1, node, node[CUSTOM]);
     if (node[CONFIG] !== undefined) configure(app, node, node[CONFIG]);
   }
-  return {supports, preflight, mount};
+  return {supports, supportsCustom, preflight, mount};
 };

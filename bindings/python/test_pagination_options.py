@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-from cui_bridge import App, BridgeError, PaginationConfig, column, pagination
+from cui_bridge import App, BridgeError, PaginationConfig, column, pagination, rating
 from cui_bridge.pagination_options import bind_api
 
 
@@ -120,12 +120,104 @@ class PaginationTests(unittest.TestCase):
         self.assertIsNone(api.pagination_options)
         bind.assert_not_called()
 
+    def check_custom_unavailable(self, app):
+        self.assertFalse(app.supports_pagination_custom_size())
+        pager = pagination("custom").custom_size(52.5)
+        tree = column().children(pager)
+        with self.assertRaisesRegex(RuntimeError, "compatible bridge symbol group"):
+            app.mount(tree)
+        self.assertIsNone(tree._handle)
+        self.assertIsNone(pager._handle)
+        pager.custom_size(0)
+        app.mount(tree)
+        app.step()
+        for action in (lambda: pager.custom_size(52.5), lambda: pager.custom_size(0), pager.get_custom_size):
+            with self.assertRaisesRegex(RuntimeError, "compatible bridge symbol group"):
+                action()
+        self.assertEqual(pager._pagination_custom_size, 0)
+        if app.supports_pagination_options():
+            pager.design_size("lg").configure(PaginationConfig(counter=True))
+            app.step()
+            self.assertEqual(app.numeric_part_bounds(pager, 3)[3], 40)
+            pager.design_size("inherit").configure(None)
+
+    def test_custom_size(self):
+        if os.environ.get("CUI_PAGINATION_CUSTOM_UNSUPPORTED") == "1":
+            with App() as app:
+                self.check_custom_unavailable(app)
+            return
+        changes = []
+        pager = pagination("custom").design_size("lg").custom_size(52.5)
+        pager.total(20).value(10).on_change(changes.append)
+        self.assertEqual(pager.get_custom_size(), 52.5)
+        with App() as app:
+            self.assertTrue(app.supports_pagination_custom_size())
+            app.mount(column().children(pager))
+            app.step()
+            self.assertEqual(pager.get_custom_size(), 52.5)
+            self.assertEqual(app.numeric_part_bounds(pager, 3)[3], 52.5)
+            click(app, pager, 3)
+            self.assertEqual(app.dispatch(), 1)
+            self.assertEqual([event.value for event in changes], [11])
+            self.assertEqual(app.dispatch(), 0)
+            with patch.object(app._api.pagination_custom_size, "set_custom_size", return_value=6):
+                with self.assertRaises(BridgeError):
+                    pager.custom_size(60)
+            self.assertEqual(pager._pagination_custom_size, 52.5)
+            self.assertEqual(pager.get_custom_size(), 52.5)
+            pager.design_size("sm")
+            app.step()
+            self.assertEqual(app.numeric_part_bounds(pager, 3)[3], 52.5)
+            pager.custom_size(0)
+            app.step()
+            self.assertEqual(app.numeric_part_bounds(pager, 3)[3], 24)
+            self.assertEqual(pager.get_custom_size(), 0)
+        for action in (pager.get_custom_size, lambda: pager.custom_size(0)):
+            with self.assertRaises(RuntimeError):
+                action()
+
+    def test_custom_native_validation_and_stale_handles(self):
+        if os.environ.get("CUI_PAGINATION_CUSTOM_UNSUPPORTED") == "1":
+            self.skipTest("custom size symbols unavailable")
+        pager, other = pagination("custom"), rating("other")
+        with App() as app:
+            app.mount(column().children(pager, other))
+            api = app._api.pagination_custom_size
+            app._api.check(api.set_custom_size(app._ptr, pager._handle, 52.5))
+            for value in (-1, .5, 513, float("nan"), float("inf")):
+                with self.assertRaises(BridgeError):
+                    app._api.check(api.set_custom_size(app._ptr, pager._handle, value))
+            self.assertEqual(pager.get_custom_size(), 52.5)
+            with self.assertRaises(BridgeError):
+                app._api.check(api.set_custom_size(app._ptr, other._handle, 52.5))
+            app._api.check(app._api.node_remove(app._ptr, pager._handle))
+            with self.assertRaises(BridgeError):
+                pager.get_custom_size()
+            with self.assertRaises(BridgeError):
+                pager.custom_size(0)
+            self.assertEqual(pager._pagination_custom_size, 0)
+
+    def test_custom_validation_and_partial_discovery(self):
+        pager = pagination("custom").custom_size(52.5)
+        for value in (float("nan"), float("inf"), -1, .5, 512.001, True, "52.5", None):
+            with self.subTest(value=value), self.assertRaises((ValueError, TypeError)):
+                pager.custom_size(value)
+            self.assertEqual(pager.get_custom_size(), 52.5)
+        for missing in ("set", "get"):
+            symbols = {"cui_bridge_pagination_" + name + "_custom_size": Mock()
+                       for name in ("set", "get") if name != missing}
+            api = SimpleNamespace(lib=SimpleNamespace(**symbols))
+            bind_api(api, Mock())
+            self.assertIsNone(api.pagination_custom_size)
+
     def test_published_legacy_bridge(self):
         library = os.environ.get("CUI_PAGINATION_LEGACY_LIBRARY")
         if not library:
             self.skipTest("published legacy library was not supplied")
         with App(library=library) as app:
             self.check_unavailable(app)
+        with App(library=library) as app:
+            self.check_custom_unavailable(app)
 
 
 if __name__ == "__main__":

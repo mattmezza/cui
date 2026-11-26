@@ -87,3 +87,25 @@ func (c PaginationConfig) validate() error {
 	}
 	return nil
 }
+
+// ErrPaginationCustomSizeUnavailable indicates missing custom-height exports.
+var ErrPaginationCustomSizeUnavailable = errors.New("Pagination custom size is unavailable")
+
+// SetPaginationCustomSize selects a logical-pixel height, zero to restore the
+// named design size, or a finite value from 1 through 512. Rejected updates
+// preserve the previous height. Detached zero needs no optional capability.
+func (n *Node) SetPaginationCustomSize(size float32) error {
+	if err := n.checkPagination(); err != nil {
+		return err
+	}
+	if size != 0 && !(size >= 1 && size <= 512) {
+		return errors.New("invalid Pagination custom size")
+	}
+	if n.app != nil {
+		if err := n.setMountedPaginationCustomSize(size); err != nil {
+			return err
+		}
+	}
+	n.paginationCustomSize = size
+	return nil
+}

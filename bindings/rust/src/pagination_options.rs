@@ -183,13 +183,70 @@ fn resolve() -> Option<Api> {
     None
 }
 
+type SetCustom = unsafe extern "C" fn(*mut c_void, RawNode, f32) -> u32;
+type GetCustom = unsafe extern "C" fn(*mut c_void, RawNode, *mut f32) -> u32;
+struct CustomApi {
+    set: SetCustom,
+    get: GetCustom,
+}
+fn custom_api() -> Option<&'static CustomApi> {
+    static API: OnceLock<Option<CustomApi>> = OnceLock::new();
+    API.get_or_init(resolve_custom).as_ref()
+}
+#[cfg(cui_bridge_static)]
+fn resolve_custom() -> Option<CustomApi> {
+    extern "C" {
+        fn cui_bridge_pagination_set_custom_size(a: *mut c_void, n: RawNode, size: f32) -> u32;
+        fn cui_bridge_pagination_get_custom_size(a: *mut c_void, n: RawNode, size: *mut f32)
+            -> u32;
+    }
+    Some(CustomApi {
+        set: cui_bridge_pagination_set_custom_size,
+        get: cui_bridge_pagination_get_custom_size,
+    })
+}
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn resolve_custom() -> Option<CustomApi> {
+    let set = unsafe {
+        super::notification_symbol_v1(b"cui_bridge_pagination_set_custom_size\0".as_ptr().cast())
+    };
+    let get = unsafe {
+        super::notification_symbol_v1(b"cui_bridge_pagination_get_custom_size\0".as_ptr().cast())
+    };
+    if set.is_null() || get.is_null() {
+        return None;
+    }
+    Some(CustomApi {
+        set: unsafe { std::mem::transmute::<*mut c_void, SetCustom>(set) },
+        get: unsafe { std::mem::transmute::<*mut c_void, GetCustom>(get) },
+    })
+}
+#[cfg(not(any(cui_bridge_static, unix, windows)))]
+fn resolve_custom() -> Option<CustomApi> {
+    None
+}
+fn validate_custom(size: f32) -> Result<()> {
+    if size == 0. || (1.0..=512.0).contains(&size) {
+        Ok(())
+    } else {
+        Err(Error(3))
+    }
+}
+
 /// Detached presentation builder. Mount preflights optional capabilities before creation.
 #[derive(Clone, Debug, Default)]
 pub struct PaginationOptions {
     config: Option<PaginationConfig>,
     design_size: Option<DesignSize>,
+    custom_size: f32,
 }
 impl PaginationOptions {
+    /// Set a logical-pixel height: zero restores named sizing; otherwise 1–512.
+    pub fn custom_size(mut self, size: f32) -> Result<Self> {
+        validate_custom(size)?;
+        self.custom_size = size;
+        Ok(self)
+    }
     /// Store a validated, owned configuration.
     pub fn configure(mut self, config: PaginationConfig) -> Result<Self> {
         config.validate()?;
@@ -213,8 +270,14 @@ impl PaginationOptions {
         if self.config.is_some() || self.design_size.is_some() {
             api().ok_or(Error(9))?;
         }
+        if self.custom_size != 0. {
+            custom_api().ok_or(Error(9))?;
+        }
         let node = app.child(parent, Kind::Pagination, key)?;
         let result = (|| {
+            if self.custom_size != 0. {
+                app.set_pagination_custom_size(node, self.custom_size)?;
+            }
             if let Some(config) = &self.config {
                 app.configure_pagination(node, config)?;
             }
@@ -231,6 +294,27 @@ impl PaginationOptions {
     }
 }
 impl App {
+    /// Independent of Pagination V1 presentation support.
+    pub fn supports_pagination_custom_size(&self) -> bool {
+        custom_api().is_some()
+    }
+    /// Zero restores named sizing; otherwise use a finite height from 1 to 512.
+    pub fn set_pagination_custom_size(&mut self, node: Node, size: f32) -> Result<&mut Self> {
+        validate_custom(size)?;
+        let node = self.valid(node)?;
+        let api = custom_api().ok_or(Error(9))?;
+        check(unsafe { (api.set)(self.raw, node, size) })?;
+        Ok(self)
+    }
+    /// Read the height override; zero means named sizing. Requires capability.
+    pub fn pagination_custom_size(&self, node: Node) -> Result<f32> {
+        let node = self.valid(node)?;
+        let api = custom_api().ok_or(Error(9))?;
+        let mut size = 0.;
+        check(unsafe { (api.get)(self.raw, node, &mut size) })?;
+        Ok(size)
+    }
+
     /// Report whether the active bridge provides the complete Pagination V1 API.
     pub fn supports_pagination_options(&self) -> bool {
         api().is_some()
@@ -270,6 +354,12 @@ impl App {
     }
 }
 impl Builder<'_> {
+    /// Set the height on an existing child; detached options preflight creation.
+    pub fn pagination_custom_size(self, size: f32) -> Result<Self> {
+        self.app.set_pagination_custom_size(self.node, size)?;
+        Ok(self)
+    }
+
     /// Configure an already created child. Use PaginationOptions to preflight
     /// provider compatibility before creating the child.
     pub fn pagination_options(self, config: &PaginationConfig) -> Result<Self> {

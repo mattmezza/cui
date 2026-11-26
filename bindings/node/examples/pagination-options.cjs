@@ -5,7 +5,7 @@ const {App, column, label, pagination} = require('../index.cjs');
 // Runs headlessly by default. Supply a font path for an interactive native window.
 const fontPath = process.argv[2];
 const status = label('Page 10 of 20');
-const pages = pagination('results').total(20).value(10).design_size('lg').configure({
+const pages = pagination('results').total(20).value(10).design_size('lg').custom_size(52.5).configure({
   counter: true, chevrons: true, availableWidth: 420,
   group: 'Search results pages', previous: 'Previous page', next: 'Next page',
 }).on_change(event => status.label(`Page ${event.value} of 20`));

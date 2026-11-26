@@ -97,11 +97,11 @@ pager = pagination("results-pages").configure(PaginationConfig(
     chevrons=True, jump_menu=True, visible_pages=5, available_width=320,
     group="Pages de résultats", previous="Précédente", next="Suivante",
     earlier_pages="Pages précédentes", later_pages="Pages suivantes",
-)).design_size("base")
+)).design_size("base").custom_size(52.5)
 pager.total(24).on_change(lambda event: print(f"Loading page {int(event.value)}"))
 ```
 
-Supply the current container's inner logical width to wrap between whole controls, or use zero for one row. Copy a revised width into the mounted pager with `configure` on the owner thread. `get_config()` returns the current options, and `configure(None)` clears them. The design size is independent and can be reset with `design_size("inherit")`. Opening, scrolling and dismissing a jump menu leave the selected page unchanged. Callbacks run through normal bridge dispatch after a committed page change.
+Supply the current container's inner logical width to wrap between whole controls, or use zero for one row. Copy a revised width into the mounted pager with `configure` on the owner thread. `get_config()` returns the current options, and `configure(None)` clears them. The design size is independent and can be reset with `design_size("inherit")`. Use `custom_size(52.5)` for an exact logical-pixel height and `get_custom_size()` to read it. Heights from 1 through 512 accept fractions. Set zero to return to the named scale. If the provider can vary, check `app.supports_pagination_custom_size()` before opting in. Opening, scrolling and dismissing a jump menu leave the selected page unchanged. Callbacks run through normal bridge dispatch after a committed page change.
 
 The [runnable results example](../bindings/python/examples/pagination.py) updates real result labels after a page change. Run it from the repository root with the Python binding and matching bridge available:
 
@@ -306,14 +306,14 @@ Use `pagination(key)` with the options object below. TypeScript exports `Paginat
 ```js
 const {pagination} = require('@cui/native');
 
-const pager = pagination('results').total(24).design_size('base').configure({
+const pager = pagination('results').total(24).design_size('base').custom_size(52.5).configure({
   chevrons: true, jumpMenu: true, visiblePages: 5, availableWidth: 320,
   group: 'Pages de résultats', previous: 'Précédente', next: 'Suivante',
   earlierPages: 'Pages précédentes', laterPages: 'Pages suivantes',
 }).on_change(event => console.log(`Loading page ${event.value}`));
 ```
 
-The bridge copies the strings. Provide a logical inner width for wrapping, or use zero for one row. A mounted pager can be reconfigured on its owner thread. Call `configure(null)` or `reset_config()` to clear presentation options. Use `design_size('inherit')` to reset the separate size. A page-change callback fires when navigation commits, including when a jump menu selects a page.
+The bridge copies the strings. Provide a logical inner width for wrapping, or use zero for one row. A mounted pager can be reconfigured on its owner thread. Call `configure(null)` or `reset_config()` to clear presentation options. Use `design_size('inherit')` to reset the separate named size. `custom_size(52.5)` sets the control height in logical pixels and accepts values from 1 through 512. Read it with `get_custom_size()` and pass zero to restore the named size. Check `app.supports_pagination_custom_size()` independently of V1 options for a varying provider. A page-change callback fires when navigation commits, including when a jump menu selects a page.
 
 Run either checked-in example from the repository root with `CUI_NODE_ADDON` pointing to the built addon:
 

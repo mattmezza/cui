@@ -2175,6 +2175,10 @@ class App:
         from .slider_model import dispatch
         return dispatch(self)
 
+    def supports_pagination_custom_size(self) -> bool:
+        from .pagination_options import custom_supported
+        return custom_supported(self)
+
     def supports_pagination_options(self) -> bool:
         from .pagination_options import supported
         return supported(self)

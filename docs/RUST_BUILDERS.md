@@ -112,11 +112,12 @@ let pager = PaginationOptions::default()
         ..Default::default()
     })?
     .design_size(DesignSize::Base)
+    .custom_size(52.5)?
     .mount(&mut app, root, "results")?;
 app.total(pager, 24)?;
 ```
 
-Use `app.configure_pagination(pager, &config)` to update a mounted pager as its inner width changes. `app.pagination_config(pager)` returns an owned snapshot. `app.reset_pagination(pager)` clears the override and preserves the current page, total and design size. Use `on_change_event` to capture the committed page, then update your app after dispatch. The [document results example](../bindings/rust/examples/pagination_options.rs) applies the page update to three document labels.
+Use `app.configure_pagination(pager, &config)` to update a mounted pager as its inner width changes. `app.pagination_config(pager)` returns an owned snapshot. `app.reset_pagination(pager)` clears navigation options and preserves the page, total and size. Use `app.set_pagination_custom_size(pager, height)` and `app.pagination_custom_size(pager)` on a mounted node. Heights from 1 through 512 accept fractional logical pixels. Set zero to return to the named size. Check `app.supports_pagination_custom_size()` independently of navigation options for a varying provider. Use `on_change_event` to capture the committed page, then update your app after dispatch. The [document results example](../bindings/rust/examples/pagination_options.rs) applies the page update to three document labels.
 
 ```sh
 cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --example pagination_options

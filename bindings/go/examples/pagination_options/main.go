@@ -34,6 +34,7 @@ func main() {
 	}).Total(pageCount).DesignSize(cui.Base).OnChange(func(event cui.Event) {
 		renderResults(int(event.Value))
 	})
+	must(pager.SetPaginationCustomSize(52.5))
 	content := append([]*cui.Node{cui.Label("Documents"), summary}, results...)
 	must(app.Mount(cui.Column("results").GapUnits(2).Children(append(content, pager)...)))
 	if *font != "" {
@@ -44,6 +45,9 @@ func main() {
 	must(app.Step(.016))
 	next, err := app.NumericPartBounds(pager, 3)
 	must(err)
+	if next.Height != 52.5 {
+		panic("unexpected custom height")
+	}
 	x, y := next.X+next.Width/2, next.Y+next.Height/2
 	must(app.QueuePointer(cui.PointerDown, x, y))
 	must(app.QueuePointer(cui.PointerUp, x, y))

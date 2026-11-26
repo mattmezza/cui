@@ -24,7 +24,7 @@ def main():
     pager = pagination("results-pages").configure(PaginationConfig(
         chevrons=True, jump_menu=True, visible_pages=5, available_width=320,
         group="Results pages",
-    )).design_size("base")
+    )).design_size("base").custom_size(52.5)
     pager.total(24).on_change(lambda event: render_results(int(event.value)))
 
     with App(backend="sdl" if args.font else "none", font_path=args.font,

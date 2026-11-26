@@ -60,10 +60,50 @@ cui_pagination_provider_fixture(cui_pagination_bad_version cui_bridge CUI_TEST_P
 foreach(mode bad_size bad_version)
  set(fixture $<TARGET_FILE:cui_pagination_${mode}>)
  cui_go_pagination_test(${mode} ${fixture} 1
-  test -tags cui_dynamic ./cui -count=1 -run "^TestPaginationOptionalProvider$")
+  test -tags cui_dynamic ./cui -count=1 -run "^TestPagination(OptionalProvider|CustomSizeOptionalProvider)$")
  cui_rust_pagination_test(${mode} "${_cui_rust_pagination_dynamic}" 1
   ${_cui_rust_pagination_current} LD_PRELOAD=${fixture}
-  ${_cui_rust_pagination_test} -- --exact optional_provider_preserves_legacy)
+  ${_cui_rust_pagination_test} -- optional_provider --test-threads=1)
+endforeach()
+
+# Exercise the optional height symbols independently of a working V1 wire ABI.
+# Compile the same portable bridge once, hiding one or both symbols at link time.
+add_library(cui_pagination_custom_provider_objects OBJECT
+ "${CUI_BRIDGE_ROOT}/src/bridge/cui_bridge.c")
+set_target_properties(cui_pagination_custom_provider_objects PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_definitions(cui_pagination_custom_provider_objects PRIVATE CUI_BRIDGE_BUILD=1)
+target_include_directories(cui_pagination_custom_provider_objects PRIVATE
+ "${CUI_BRIDGE_ROOT}/include" "${CUI_BRIDGE_ROOT}/src/bridge")
+target_link_libraries(cui_pagination_custom_provider_objects PRIVATE cui)
+cui_warnings(cui_pagination_custom_provider_objects)
+
+foreach(mode named_only custom_set_only)
+ set(provider cui_pagination_${mode})
+ set(directory "${CMAKE_CURRENT_BINARY_DIR}/pagination-providers/${mode}")
+ set(map "${directory}/exports.map")
+ set(hidden "cui_bridge_pagination_get_custom_size;")
+ if(mode STREQUAL "named_only")
+  string(APPEND hidden " cui_bridge_pagination_set_custom_size;")
+ endif()
+ file(GENERATE OUTPUT "${map}" CONTENT "{ local: ${hidden} };\n")
+ add_library(${provider} SHARED)
+ target_link_libraries(${provider} PRIVATE cui_pagination_custom_provider_objects cui)
+ target_link_options(${provider} PRIVATE "LINKER:--version-script,${map}")
+ set_target_properties(${provider} PROPERTIES
+  OUTPUT_NAME cui_bridge LIBRARY_OUTPUT_DIRECTORY "${directory}" LINK_DEPENDS "${map}")
+
+ cui_go_pagination_test(${mode} $<TARGET_FILE:${provider}> 0
+  test -tags cui_dynamic ./cui -count=1 -run "^TestPagination")
+ cui_rust_pagination_test(${mode} "${_cui_rust_pagination_dynamic}" 0
+  ${_cui_rust_pagination_current} LD_LIBRARY_PATH=${directory}
+  ${_cui_rust_pagination_test} -- --skip custom_size_geometry_and_activation --test-threads=1)
+ set_tests_properties(bridge_go_pagination_${mode} bridge_rust_pagination_${mode} PROPERTIES
+  ENVIRONMENT "CUI_PAGINATION_CUSTOM_UNSUPPORTED=1")
+
+ add_test(NAME bridge_python_pagination_${mode} COMMAND ${CMAKE_COMMAND} -E env
+  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python
+  CUI_BRIDGE_LIBRARY=$<TARGET_FILE:${provider}> CUI_PAGINATION_CUSTOM_UNSUPPORTED=1
+  ${Python3_EXECUTABLE} "${CUI_BRIDGE_ROOT}/bindings/python/test_pagination_options.py")
 endforeach()
 
 if(CUI_PAGINATION_LEGACY_LIBRARY)
@@ -78,12 +118,14 @@ if(CUI_PAGINATION_LEGACY_LIBRARY)
  set_target_properties(cui_pagination_partial_provider PROPERTIES BUILD_RPATH "${provider_dir}")
 
  cui_go_pagination_test(legacy "${CUI_PAGINATION_LEGACY_LIBRARY}" 1
-  test -tags cui_dynamic ./cui -count=1 -run "^TestPaginationOptionalProvider$")
+  test -tags cui_dynamic ./cui -count=1 -run "^TestPagination(OptionalProvider|CustomSizeOptionalProvider)$")
  cui_go_pagination_test(partial $<TARGET_FILE:cui_pagination_partial_provider> 1
   test -tags cui_dynamic ./cui -count=1 -run "^TestPaginationOptionalProvider$")
  cui_rust_pagination_test(legacy "${_cui_rust_pagination_dynamic}" 1
   ${_cui_rust_pagination_current} LD_LIBRARY_PATH=${provider_dir}
-  ${_cui_rust_pagination_test} -- --exact optional_provider_preserves_legacy)
+  ${_cui_rust_pagination_test} -- optional_provider --test-threads=1)
+ set_tests_properties(bridge_go_pagination_legacy bridge_rust_pagination_legacy PROPERTIES
+  ENVIRONMENT "CUI_PAGINATION_CUSTOM_UNSUPPORTED=1")
  cui_rust_pagination_test(partial "${_cui_rust_pagination_dynamic}" 1
   ${_cui_rust_pagination_current} LD_LIBRARY_PATH=${provider_dir}
   LD_PRELOAD=$<TARGET_FILE:cui_pagination_partial_provider>

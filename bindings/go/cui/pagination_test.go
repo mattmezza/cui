@@ -193,3 +193,101 @@ func TestPaginationOptionalProvider(t *testing.T) {
 		t.Fatalf("ordinary callback or page changed: %+v, %g", changes, value)
 	}
 }
+
+func TestPaginationCustomSize(t *testing.T) {
+	if os.Getenv("CUI_PAGINATION_CUSTOM_UNSUPPORTED") == "1" {
+		t.Skip("fixture lacks the custom height exports")
+	}
+	a := app(t)
+	pager := Pagination("pages").Total(20).DesignSize(LG)
+	check(t, pager.SetPaginationCustomSize(52.5))
+	got, err := pager.PaginationCustomSize()
+	check(t, err)
+	if got != 52.5 {
+		t.Fatal(got)
+	}
+	if Rating("rating").SetPaginationCustomSize(52.5) == nil {
+		t.Fatal("accepted wrong kind")
+	}
+	changes := 0
+	pager.OnChange(func(Event) { changes++ })
+	check(t, a.Mount(Column("root").Children(pager)))
+	for _, bad := range []float32{-1, .5, 513, float32(math.NaN()), float32(math.Inf(1))} {
+		if pager.SetPaginationCustomSize(bad) == nil {
+			t.Fatal("accepted invalid height")
+		}
+		got, err := pager.PaginationCustomSize()
+		check(t, err)
+		if got != 52.5 {
+			t.Fatal("invalid update changed height")
+		}
+	}
+	check(t, a.Step(.016))
+	b, err := a.NumericPartBounds(pager, 3)
+	check(t, err)
+	if b.Height != 52.5 {
+		t.Fatalf("height = %g", b.Height)
+	}
+	clickPaginationPart(t, a, pager, 3)
+	count, err := a.Dispatch()
+	check(t, err)
+	if count != 1 || changes != 1 {
+		t.Fatal("activation count")
+	}
+	count, err = a.Dispatch()
+	check(t, err)
+	if count != 0 || changes != 1 {
+		t.Fatal("activation replayed")
+	}
+	check(t, pager.SetPaginationCustomSize(0))
+	check(t, a.Step(.016))
+	b, err = a.NumericPartBounds(pager, 3)
+	check(t, err)
+	if b.Height != 40 {
+		t.Fatalf("named height = %g", b.Height)
+	}
+	check(t, pager.Remove())
+	if pager.SetPaginationCustomSize(52.5) == nil {
+		t.Fatal("accepted stale node")
+	}
+}
+
+func TestPaginationCustomSizeOptionalProvider(t *testing.T) {
+	a := app(t)
+	unsupported := os.Getenv("CUI_PAGINATION_CUSTOM_UNSUPPORTED") == "1"
+	supported, err := a.SupportsPaginationCustomSize()
+	check(t, err)
+	if supported == unsupported {
+		t.Fatalf("custom capability = %t", supported)
+	}
+	pager := Pagination("pages").Total(20)
+	check(t, pager.SetPaginationCustomSize(52.5))
+	if unsupported {
+		if err := a.Mount(Column("root").Children(pager)); !errors.Is(err, ErrPaginationCustomSizeUnavailable) || a.root != nil || pager.app != nil {
+			t.Fatalf("preflight: %v", err)
+		}
+		check(t, pager.SetPaginationCustomSize(0))
+	}
+	check(t, a.Mount(Column("root").Children(pager)))
+	if unsupported {
+		if !errors.Is(pager.SetPaginationCustomSize(0), ErrPaginationCustomSizeUnavailable) {
+			t.Fatal("mounted reset must require capability")
+		}
+		if _, err := pager.PaginationCustomSize(); !errors.Is(err, ErrPaginationCustomSizeUnavailable) {
+			t.Fatal("mounted read must require capability")
+		}
+	} else {
+		got, err := pager.PaginationCustomSize()
+		check(t, err)
+		if got != 52.5 {
+			t.Fatal(got)
+		}
+	}
+	check(t, a.Step(.016))
+	clickPaginationPart(t, a, pager, 3)
+	count, err := a.Dispatch()
+	check(t, err)
+	if count != 1 {
+		t.Fatal(count)
+	}
+}

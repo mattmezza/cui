@@ -45,6 +45,7 @@ fn main() -> Result<()> {
             ..Default::default()
         })?
         .design_size(DesignSize::Base)
+        .custom_size(52.5)?
         .mount(&mut app, root, "pages")?;
     app.total(pager, PAGE_COUNT)?;
 
@@ -64,7 +65,8 @@ fn main() -> Result<()> {
 
     app.step(0.016)?;
     let next = app.numeric_part_bounds(pager, 3)?;
-    assert!(next.width > 0. && next.height > 0.);
+    assert!(next.width > 0.);
+    assert_eq!(next.height, 52.5);
     for phase in [Phase::Down, Phase::Up] {
         app.pointer(phase, next.x + next.width / 2., next.y + next.height / 2.)?;
     }

@@ -121,3 +121,69 @@ test('invalid options fail before mutating retained configuration', () => {
   assert.throws(() => rating().configure({}), /requires Pagination/);
   assert.equal(pagination().configure({next: 'é'.repeat(63)}).get_config().next.length, 63);
 });
+
+const customUnsupported = process.env.CUI_PAGINATION_CUSTOM_UNSUPPORTED === '1';
+test('custom height validates detached values atomically', () => {
+  const pages = pagination().custom_size(52.5);
+  for (const value of [NaN, Infinity, -1, .5, 512.001, true, '52.5', null, undefined]) {
+    assert.throws(() => pages.custom_size(value));
+    assert.equal(pages.get_custom_size(), 52.5);
+  }
+  assert.equal(pages.custom_size(0).get_custom_size(), 0);
+  assert.throws(() => rating().custom_size(52.5), /requires Pagination/);
+});
+test('custom height feature and legacy mounting are independent', () => withApp(app => {
+  assert.equal(app.supports_pagination_custom_size(), !customUnsupported);
+  if (customUnsupported) {
+    assert.throws(() => app.mount(column().children(pagination().custom_size(52.5))), /compatible bridge/);
+    assert.equal(app.nodes.size, 0);
+    const pages = pagination().custom_size(52.5).custom_size(0);
+    app.mount(column().children(pages)).step();
+    assert.throws(() => pages.custom_size(52.5), /compatible bridge/);
+    assert.throws(() => pages.custom_size(0), /compatible bridge/);
+    assert.throws(() => pages.get_custom_size(), /compatible bridge/);
+    if (!unsupported) {
+      pages.design_size('lg').configure({counter: true});
+      app.step();
+      assert.equal(pages.numeric_part_bounds(3).height, 40);
+      pages.design_size('inherit').reset_config();
+    }
+    return;
+  }
+  const changes = [], pages = pagination().total(20).value(10)
+    .custom_size(52.5).on_change(event => changes.push(event.value));
+  const ordinary = pagination('ordinary');
+  app.mount(column().children(pages, ordinary)).step();
+  assert.equal(pages.get_custom_size(), 52.5);
+  assert.equal(pages.numeric_part_bounds(3).height, 52.5);
+  press(app, pages.numeric_part_bounds(3));
+  assert.deepEqual(changes, [11]);
+  app.step();
+  assert.deepEqual(changes, [11]);
+  assert.throws(() => pages.custom_size(513));
+  assert.equal(pages.get_custom_size(), 52.5);
+  if (!unsupported) pages.design_size('sm');
+  app.step();
+  assert.equal(pages.numeric_part_bounds(3).height, 52.5);
+  pages.custom_size(0);
+  app.step();
+  assert.equal(pages.get_custom_size(), 0);
+  assert.equal(pages.numeric_part_bounds(3).height,
+    unsupported ? ordinary.numeric_part_bounds(3).height : 24);
+  app.dispose();
+  assert.throws(() => pages.get_custom_size(), /disposed/);
+  assert.throws(() => pages.custom_size(0), /disposed/);
+}));
+if (!customUnsupported) test('direct custom height rejects stale handles, foreign owners and wrong kinds', () => withApp(app => {
+  const root = native.makeNode(app.handle, null, 2, 'root');
+  const pages = native.makeNode(app.handle, root, 42, 'pages');
+  const other = native.makeNode(app.handle, root, 43, 'rating');
+  native.paginationCustomSize(app.handle, 1, pages, 52.5);
+  for (const value of [-1, .5, 512.001, NaN, Infinity])
+    assert.throws(() => native.paginationCustomSize(app.handle, 1, pages, value));
+  assert.equal(native.paginationCustomSize(app.handle, 2, pages), 52.5);
+  assert.throws(() => native.paginationCustomSize(app.handle, 2, other), /invalid/i);
+  withApp(second => assert.throws(() => native.paginationCustomSize(second.handle, 2, pages), /another app/));
+  native.removeNode(app.handle, pages);
+  assert.throws(() => native.paginationCustomSize(app.handle, 2, pages), /stale handle/);
+}));

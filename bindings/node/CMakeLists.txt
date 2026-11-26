@@ -486,9 +486,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> LD_PRELOAD=$<TARGET_FILE:cui_node_pagination_bad_size>
   CUI_PAGINATION_UNSUPPORTED=1 ${NODE_EXECUTABLE} --test
   ${CMAKE_CURRENT_SOURCE_DIR}/test/pagination-options.test.cjs)
- foreach(provider legacy partial)
+ foreach(provider legacy partial named_only custom_set_only)
   string(TOUPPER "${provider}" kind)
   set(provider_var CUI_NODE_PAGINATION_${kind}_LIBRARY)
+  set(expect_unsupported CUI_PAGINATION_CUSTOM_UNSUPPORTED=1)
+  if(provider STREQUAL "legacy" OR provider STREQUAL "partial")
+   list(APPEND expect_unsupported CUI_PAGINATION_UNSUPPORTED=1)
+  endif()
   set(${provider_var} "" CACHE FILEPATH "Existing ${provider} bridge for Pagination compatibility")
   if(${provider_var})
    if(NOT EXISTS "${${provider_var}}")
@@ -501,7 +505,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
    target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Werror)
    set_target_properties(${target} PROPERTIES PREFIX "" SUFFIX ".node")
    add_test(NAME node_pagination_${provider} COMMAND ${CMAKE_COMMAND} -E env
-    CUI_NODE_ADDON=$<TARGET_FILE:${target}> CUI_PAGINATION_UNSUPPORTED=1 ${NODE_EXECUTABLE} --test
+    CUI_NODE_ADDON=$<TARGET_FILE:${target}> ${expect_unsupported} ${NODE_EXECUTABLE} --test
     ${CMAKE_CURRENT_SOURCE_DIR}/test/pagination-options.test.cjs)
   endif()
  endforeach()

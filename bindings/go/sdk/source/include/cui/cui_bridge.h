@@ -236,6 +236,7 @@ CUI_BRIDGE_API uint32_t cui_bridge_pagination_versions(void);
 CUI_BRIDGE_API uint32_t cui_bridge_pagination_config_size_v1(void);
 /* Owner thread, outside step. Copies V1 or clears the override with NULL.
  * ICON_ONLY takes priority. CHEVRONS shows labeled arrows without First/Last.
+ * Both arrow layouts show localized pointer hover labels inside the host viewport.
  * JUMP_MENU applies in numbered mode and uses the current host viewport.
  * The shared design-size setter, owner page, total and CHANGE event are independent. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_pagination_configure_v1(

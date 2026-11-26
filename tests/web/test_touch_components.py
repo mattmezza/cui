@@ -452,6 +452,8 @@ def run_cases(a):
             assert 'CUI_PAGINATION_NAV_CHEVRONS' in snippet and '.labels = &labels' in snippet
             a.tap(next_page)
             assert a.target('Pages de résultats', 9)['f'][8] == 2
+            a.page.wait_for_timeout(480)
+            assert not any(s['name'] == 'Suivante' and s['f'][0] == 7 for s in a.snapshot())
             a.tap(a.target('Pages suivantes', 1))
             assert a.target('Pages suivantes', 15)['f'][17] == 1
             a.page.locator('canvas').press('Escape')

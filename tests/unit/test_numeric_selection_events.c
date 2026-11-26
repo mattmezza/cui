@@ -189,9 +189,11 @@ static void pagination_action(fixture *f, cui_id target) {
                                               .accessibility_target = target,
                                               .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
 }
-static cui_numeric_selection_event_result
-ellipsis_frame(fixture *f, size_t total, cui_pagination_options options, bool passive, bool omit) {
-    assert(cui_begin_frame(f->ui, 400, 420, .016f));
+static cui_numeric_selection_event_result ellipsis_frame_with_delta(fixture *f, size_t total,
+                                                                    cui_pagination_options options,
+                                                                    bool passive, bool omit,
+                                                                    float dt) {
+    assert(cui_begin_frame(f->ui, 400, 420, dt));
     cui_theme theme = cui_theme_light();
     cui_numeric_selection_event_result result = {0};
     if (!omit) {
@@ -204,6 +206,106 @@ ellipsis_frame(fixture *f, size_t total, cui_pagination_options options, bool pa
     assert(cui_last_error(f->ui) == CUI_OK);
     return result;
 }
+static cui_numeric_selection_event_result
+ellipsis_frame(fixture *f, size_t total, cui_pagination_options options, bool passive, bool omit) {
+    return ellipsis_frame_with_delta(f, total, options, passive, omit, .016f);
+}
+static void pagination_pointer(fixture *f, unsigned part, cui_event_type type,
+                               cui_pointer_type pointer) {
+    cui_rect bounds = cui_bounds(f->ui, cui_numeric_part_id(2, part));
+    assert(bounds.w > 0 && bounds.h > 0);
+    assert(cui_queue_event(f->ui, (cui_event){.type = type,
+                                              .pointer_type = pointer,
+                                              .pointer_id = 1,
+                                              .x = bounds.x + bounds.w / 2,
+                                              .y = bounds.y + bounds.h / 2}));
+}
+
+static void pagination_tooltip_idle(fixture *f, cui_pagination_options options) {
+    for (unsigned i = 0; i < 32; ++i)
+        assert(!ellipsis_frame(f, 20, options, false, false).control);
+}
+
+static void pagination_arrow_tooltips(void) {
+    fixture f = make();
+    f.value = 3;
+    char next[] = "Suivante";
+    const cui_pagination_labels labels = {
+        .previous = CUI_STR("Précédente"),
+        .next = {next, sizeof(next) - 1},
+    };
+    cui_pagination_options options = {.design_size = CUI_DESIGN_BASE,
+                                      .icon_only = true,
+                                      .tooltip_viewport = {0, 0, 105, 110},
+                                      .labels = &labels};
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    cui_rect anchor = cui_bounds(f.ui, cui_numeric_part_id(2, 3));
+    cui_focus(f.ui, cui_numeric_part_id(2, 3));
+    pagination_tooltip_idle(&f, options);
+    assert(!pagination_node(&f, CUI_ROLE_LABEL, next)); /* Focus alone does not open it. */
+
+    pagination_pointer(&f, 3, CUI_EVENT_POINTER_MOVE, CUI_POINTER_MOUSE);
+    /* The first frame after idle may report a long delta from before entry. */
+    assert(!ellipsis_frame_with_delta(&f, 20, options, false, false, 2.f).control);
+    assert(!pagination_node(&f, CUI_ROLE_LABEL, next));
+    pagination_tooltip_idle(&f, options);
+    const cui_semantic *hint = pagination_node(&f, CUI_ROLE_LABEL, next);
+    assert(hint && hint->details.parent == cui_numeric_part_id(2, 3));
+    cui_rect popup = cui_bounds(f.ui, hint->id);
+    assert(popup.x >= 0 && popup.y >= 0 && popup.x + popup.w <= 105 && popup.y + popup.h <= 110);
+    cui_rect after = cui_bounds(f.ui, cui_numeric_part_id(2, 3));
+    assert(anchor.x == after.x && anchor.y == after.y && anchor.w == after.w &&
+           anchor.h == after.h);
+    assert(!cui_needs_redraw(f.ui)); /* Open tooltip needs no ticking. */
+    bool drawn = false;
+    for (size_t i = 0; i < f.draw.count; ++i) {
+        const cui_draw_command *command = &f.draw.commands[i];
+        drawn |= command->type == CUI_DRAW_TEXT && command->text.length == strlen(next) &&
+                 !memcmp(command->text.data, next, command->text.length);
+    }
+    assert(drawn && f.value == 3 && !f.calls);
+    next[0] = 'X';
+    assert(pagination_node(&f, CUI_ROLE_LABEL, "Suivante")); /* Frame-owned copy. */
+    next[0] = 'S';
+
+    pagination_key(&f, CUI_KEY_ESCAPE);
+    pagination_tooltip_idle(&f, options);
+    assert(!pagination_node(&f, CUI_ROLE_LABEL, next));
+    pagination_pointer(&f, 3, CUI_EVENT_POINTER_MOVE, CUI_POINTER_MOUSE);
+    pagination_tooltip_idle(&f, options);
+    assert(pagination_node(&f, CUI_ROLE_LABEL, next));
+    pagination_pointer(&f, 3, CUI_EVENT_POINTER_DOWN, CUI_POINTER_TOUCH);
+    pagination_pointer(&f, 3, CUI_EVENT_POINTER_UP, CUI_POINTER_TOUCH);
+    assert(ellipsis_frame(&f, 20, options, false, false).change_count == 1);
+    pagination_tooltip_idle(&f, options);
+    assert(!pagination_node(&f, CUI_ROLE_LABEL, next) && f.value == 4 && f.calls == 1);
+
+    pagination_pointer(&f, 2, CUI_EVENT_POINTER_MOVE, CUI_POINTER_MOUSE);
+    pagination_tooltip_idle(&f, options);
+    assert(!pagination_node(&f, CUI_ROLE_LABEL, next));
+    assert(pagination_node(&f, CUI_ROLE_LABEL, "Précédente"));
+    assert(!ellipsis_frame(&f, 20, options, false, true).control);
+    pagination_tooltip_idle(&f, options);
+    assert(!pagination_node(&f, CUI_ROLE_LABEL, "Précédente")); /* Omission drops pending state. */
+
+    options.icon_only = false;
+    options.navigation = CUI_PAGINATION_NAV_CHEVRONS;
+    options.tooltip_viewport = (cui_rect){0, 0, 400, 420};
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    pagination_pointer(&f, 3, CUI_EVENT_POINTER_MOVE, CUI_POINTER_PEN);
+    pagination_tooltip_idle(&f, options);
+    assert(pagination_node(&f, CUI_ROLE_LABEL, next)); /* Works with visible captions too. */
+    options.disabled = true;
+    pagination_tooltip_idle(&f, options);
+    assert(!pagination_node(&f, CUI_ROLE_LABEL, next));
+    options.disabled = false;
+    options.tooltip_viewport.w = NAN;
+    pagination_pointer(&f, 3, CUI_EVENT_POINTER_MOVE, CUI_POINTER_MOUSE);
+    pagination_tooltip_idle(&f, options);
+    assert(!pagination_node(&f, CUI_ROLE_LABEL, next) && f.calls == 1);
+    cui_destroy(f.ui);
+}
+
 static void pagination_localized_navigation(void) {
     fixture f = make();
     f.value = 3;
@@ -747,6 +849,7 @@ int main(void) {
     sized_pagination();
     pagination_modes();
     pagination_localized_navigation();
+    pagination_arrow_tooltips();
     pagination_ellipsis_menu();
     for (unsigned styled = 0; styled < 2; ++styled) {
         pagination(styled != 0);

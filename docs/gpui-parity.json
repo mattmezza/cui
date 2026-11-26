@@ -2334,7 +2334,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. The optional C ellipsis menus expose up to 100 omitted pages per direction. Text and accessible names can be localized. Optional labeled chevrons omit separate First/Last controls. The retained C bridge copies the extended options and emits the existing scalar CHANGE event. Python, JS, TS, Go and Rust have tested opt-in V1 authoring. Python, Node, Go and Rust retain ordinary paging with the alpha.6 provider. Custom numeric sizing, arrow-only hover tooltips and physical-host acceptance remain open."
+        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. The optional C ellipsis menus expose up to 100 omitted pages per direction. Text and accessible names can be localized. Optional labeled chevrons omit separate First/Last controls. The retained C bridge copies the extended options and emits the existing scalar CHANGE event. Python, JS, TS, Go and Rust have tested opt-in V1 authoring. Python, Node, Go and Rust retain ordinary paging with the alpha.6 provider. Both chevron layouts show viewport-bounded localized pointer hover hints; the retained configuration wire is unchanged. Custom numeric sizing and physical-host acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2390,6 +2390,16 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_numeric_selection_events.c",
+            "tests/web/test_touch_components.py"
+          ]
+        },
+        {
+          "name": "localized delayed chevron hover labels",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric_selection_events.c",
+            "tests/unit/test_bridge_pagination.c",
+            "tests/web/test_browser.py",
             "tests/web/test_touch_components.py"
           ]
         },

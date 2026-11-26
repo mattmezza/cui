@@ -102,9 +102,12 @@ typedef struct {
      * Empty fields use English defaults. Keep the struct and text valid and
      * unchanged through submission, including callbacks. Nothing is retained. */
     const cui_pagination_labels *labels;
+    /* Styled chevrons only. Positive logical viewport dimensions enable the
+     * localized hover labels after pointer motion. Independent of jump menus. */
+    cui_rect tooltip_viewport;
 } cui_pagination_options;
 /* Same owner and result as cui_base_pagination. Uses navigation and labels for
- * button availability and semantics. Styled metrics and menus are ignored. */
+ * button availability and semantics. Styled metrics, menus and tooltips are ignored. */
 bool cui_base_pagination_ex(cui_context *, cui_id, size_t *, size_t total, cui_pagination_options);
 /* Same owner and result as cui_pagination. Invalid size or width does not submit. */
 bool cui_pagination_ex(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page,
@@ -888,6 +891,7 @@ cui_base_pagination_observe_internal(cui_context *, cui_id, size_t *, size_t tot
 
 
 
+
 #include <math.h>
 #include <stdio.h>
 static void cui_numeric_paint_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str text,
@@ -1305,6 +1309,81 @@ static void cui_pagination_paint_menu(cui_context *ui, cui_id id, const cui_them
                                 .size = CUI_MENU_SMALL,
                                 .max_height = 240});
 }
+typedef struct {
+    cui_id trigger;
+    cui_hover_state hover;
+} cui_pagination_tooltip_state;
+
+static bool cui_pagination_tooltip_input(cui_context *ui, cui_id trigger, bool *moved) {
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = count; i > 0; --i) {
+        const cui_event *event = &events[i - 1];
+        switch (event->type) {
+        case CUI_EVENT_POINTER_MOVE:
+            *moved = (event->pointer_type == CUI_POINTER_MOUSE ||
+                      event->pointer_type == CUI_POINTER_PEN) &&
+                     cui_event_hovered(ui, i - 1, trigger);
+            return *moved;
+        case CUI_EVENT_POINTER_DOWN:
+        case CUI_EVENT_POINTER_UP:
+        case CUI_EVENT_POINTER_LEAVE:
+        case CUI_EVENT_CANCEL:
+        case CUI_EVENT_SCROLL:
+        case CUI_EVENT_GESTURE:
+        case CUI_EVENT_KEY_DOWN:
+        case CUI_EVENT_ACCESSIBILITY_ACTION:
+            return false;
+        default:
+            break;
+        }
+    }
+    return true;
+}
+
+static void cui_pagination_paint_tooltip(cui_context *ui, cui_id id, const cui_theme *theme,
+                                         size_t page, size_t total, cui_rect viewport,
+                                         const cui_pagination_labels *labels) {
+    if (!isfinite(viewport.x) || !isfinite(viewport.y) || !isfinite(viewport.w) ||
+        !isfinite(viewport.h) || viewport.w <= 0 || viewport.h <= 0 ||
+        !cui_frame_input_snapshot_ready(ui))
+        return;
+    cui_id previous = cui_numeric_part_id(id, 2), next = cui_numeric_part_id(id, 3);
+    bool previous_hovered = page > 1 && cui_hovered(ui, previous);
+    bool next_hovered = page < total && cui_hovered(ui, next);
+    if (!previous_hovered && !next_hovered)
+        return;
+    cui_id trigger = previous_hovered ? previous : next;
+    bool moved = false;
+    if (cui_pressed(ui, trigger) || !cui_pagination_tooltip_input(ui, trigger, &moved))
+        return;
+
+    const cui_id resource = UINT64_C(0x697b02c76a514cf1);
+    cui_pagination_tooltip_state *state = cui_resource_find(ui, id, resource);
+    if (!state && moved)
+        state = cui_resource_get(ui, id, resource, sizeof(*state), NULL, NULL);
+    if (!state)
+        return;
+    bool entered = state->trigger != trigger;
+    if (entered) {
+        if (!moved) {
+            *state = (cui_pagination_tooltip_state){0};
+            return;
+        }
+        *state = (cui_pagination_tooltip_state){.trigger = trigger};
+    }
+    cui_str text = previous_hovered ? labels->previous : labels->next;
+    float width = cui_measure_text(ui, text, theme->font_size).width + 2 * theme->padding;
+    cui_tooltip(ui, cui_numeric_part_id(id, previous_hovered ? 7 : 8), theme, &state->hover, text,
+                (cui_hover_options){.trigger = trigger,
+                                    .viewport = viewport,
+                                    .side = CUI_POPUP_BELOW,
+                                    .width = width,
+                                    .gap = theme->gap,
+                                    .dt = entered ? 0 : cui_frame_delta(ui),
+                                    .open_delay = .4f});
+}
+
 static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t, size_t *page,
                                   size_t total, cui_pagination_options options, bool legacy,
                                   const cui_pagination_event_handler *handler,
@@ -1405,6 +1484,8 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
         cui_end_box(ui);
     cui_end_box(ui);
     cui_pagination_paint_menu(ui, id, t, menu, viewport, &labels);
+    if (chevrons && !disabled && (!menu || !menu->menu.overlay.open))
+        cui_pagination_paint_tooltip(ui, id, t, *page, total, options.tooltip_viewport, &labels);
     return changed;
 }
 bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page, size_t total,

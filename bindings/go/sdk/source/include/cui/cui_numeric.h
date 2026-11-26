@@ -101,9 +101,12 @@ typedef struct {
      * Empty fields use English defaults. Keep the struct and text valid and
      * unchanged through submission, including callbacks. Nothing is retained. */
     const cui_pagination_labels *labels;
+    /* Styled chevrons only. Positive logical viewport dimensions enable the
+     * localized hover labels after pointer motion. Independent of jump menus. */
+    cui_rect tooltip_viewport;
 } cui_pagination_options;
 /* Same owner and result as cui_base_pagination. Uses navigation and labels for
- * button availability and semantics. Styled metrics and menus are ignored. */
+ * button availability and semantics. Styled metrics, menus and tooltips are ignored. */
 bool cui_base_pagination_ex(cui_context *, cui_id, size_t *, size_t total, cui_pagination_options);
 /* Same owner and result as cui_pagination. Invalid size or width does not submit. */
 bool cui_pagination_ex(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page,

@@ -727,7 +727,7 @@
       "state_types": [],
       "state_ownership": "Caller retains size_t page.",
       "interaction": "Returns the page-change result and optionally notifies a synchronous aggregate observer.",
-      "usage": "Use cui_pagination_ex with cui_pagination_options for shared sizes, responsive rows, a numbered window with optional jump menus, localized navigation labels and labeled or icon-only chevrons.",
+      "usage": "Use cui_pagination_ex with cui_pagination_options for shared sizes, responsive rows, a numbered window with optional jump menus, localized labels and hover hints for chevrons.",
       "docs": [
         "docs/NUMERIC.md",
         "docs/NUMERIC_SELECTION_EVENTS.md",

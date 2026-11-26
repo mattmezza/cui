@@ -136,6 +136,8 @@ static bool bridge_pagination_draw(cui_bridge_app *app, const cui_bridge_node_re
         options.icon_only = (flags & CUI_BRIDGE_PAGINATION_ICON_ONLY) != 0;
         if (flags & CUI_BRIDGE_PAGINATION_CHEVRONS)
             options.navigation = CUI_PAGINATION_NAV_CHEVRONS;
+        if (flags & (CUI_BRIDGE_PAGINATION_ICON_ONLY | CUI_BRIDGE_PAGINATION_CHEVRONS))
+            options.tooltip_viewport = (cui_rect){0, 0, app->width, app->height};
         if ((flags & CUI_BRIDGE_PAGINATION_JUMP_MENU) && app->width > 0 && app->height > 8)
             options.ellipsis_viewport = (cui_rect){0, 0, app->width, app->height};
         options.visible_pages = config->visible_pages;

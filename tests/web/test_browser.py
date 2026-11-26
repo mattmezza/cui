@@ -14,6 +14,40 @@ import threading
 from playwright.sync_api import sync_playwright
 
 
+def verify_pagination_tooltips(page):
+    """Real mouse movement and Escape exercise the C tooltip in WASM."""
+    semantic_bounds = """({name, role}) => {
+        const e = cuiGallery.exports, decode = new TextDecoder();
+        for (let i = 0; i < e.gallery_semantic_count(); i++) {
+            if (e.gallery_semantic(i, 0) !== role) continue;
+            const label = decode.decode(new Uint8Array(e.memory.buffer,
+                e.gallery_semantic_name(i), e.gallery_semantic_length(i)));
+            if (label === name) return [1,2,3,4].map(f => e.gallery_semantic(i, f));
+        }
+        return null;
+    }"""
+    page.evaluate('location.hash = "Pagination"')
+    page.wait_for_function('cuiGallery.renderedComponent === "Pagination"')
+    page.locator('#pagination-mode').select_option('2')
+    page.locator('#pagination-language').select_option('fr')
+    canvas = page.locator('canvas')
+    canvas.scroll_into_view_if_needed()
+    arrow = {'name': 'Suivante', 'role': 1}
+    hint = {'name': 'Suivante', 'role': 7}
+    x, y, width, height = page.wait_for_function(semantic_bounds, arg=arrow).json_value()
+    assert not page.evaluate(semantic_bounds, hint)
+    box = canvas.bounding_box()
+    page.mouse.move(box['x'] + x + width / 2, box['y'] + y + height / 2)
+    tooltip = page.wait_for_function(semantic_bounds, arg=hint).json_value()
+    assert tooltip[2] > width and sum(tooltip[::2]) <= box['width']
+    assert sum(tooltip[1::2]) <= box['height']
+    assert page.evaluate(semantic_bounds, arrow) == [x, y, width, height]
+    assert '.tooltip_viewport = viewport' in page.locator('#snippet').text_content()
+    canvas.focus()
+    page.keyboard.press('Escape')
+    page.wait_for_function(f'(hint) => !({semantic_bounds})(hint)', arg=hint)
+
+
 def main():
     subprocess.run([sys.executable, str(Path(__file__).with_name('test_snippets.py'))], check=True)
     parser = argparse.ArgumentParser(description=__doc__)
@@ -3025,6 +3059,7 @@ def main():
             page.evaluate('location.hash="%"')
             page.wait_for_timeout(60)
             assert page.locator('#name').inner_text() == 'Button'
+            verify_pagination_tooltips(page)
             assert not errors, errors
             # Direct project-Pages URLs must initialize CUI, survive reloads and
             # expose accurate share metadata without relying on fragment rendering.

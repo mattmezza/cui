@@ -67,6 +67,8 @@ Opening, scrolling and dismissing the menu leave the page unchanged. Select a ro
 
 Pass a `cui_pagination_labels` through `.labels` to name the group, navigation buttons and ellipsis menus in your application's language. Each empty field falls back to its English default. Supply single-line UTF-8 spans and keep both the descriptor and spans valid and unchanged through the call, including its synchronous callback. CUI copies the submitted text and accessible names into the frame. No application strings are held by persistent menu state. Icons keep these accessible names even when no caption is visible. The Base API uses the same labels for group and button semantics in custom layouts. Numbered pages keep their decimal labels.
 
+Set `.tooltip_viewport` to the current absolute logical viewport to show those same labels on hover in either chevron layout. A mouse or pen must move over an enabled arrow. The hint opens after 400 ms and dismisses on leave, a click, a tap, a scroll or keyboard input. It leaves the pager geometry, focus order and page unchanged. The hint uses one context-owned record for the hovered pager and copies its text into the frame. Omission clears the hover state. A zero viewport leaves tooltips off, independently of whether jump menus are on. The retained bridge supplies its viewport for both chevron layouts without adding a wire field.
+
 ```c
 static const cui_pagination_labels french_pages = {
     .group = CUI_STR("Pages de résultats"),
@@ -82,6 +84,7 @@ cui_pagination_options options = {
     .available_width = content_width,
     .visible_pages = 5,
     .ellipsis_viewport = viewport,
+    .tooltip_viewport = viewport,
     .navigation = CUI_PAGINATION_NAV_CHEVRONS,
     .labels = &french_pages,
 };

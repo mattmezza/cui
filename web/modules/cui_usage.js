@@ -6,9 +6,11 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
 
 export function paginationUsage(size, disabled = false, mode = 0, visiblePages = 5, french = false) {
  const numbered = mode === 1 || mode === 3;
+ const arrows = mode === 2 || mode === 3;
  const layout = mode === 2 ? '.icon_only = true' :
                 numbered ? `.visible_pages = ${visiblePages}, .ellipsis_viewport = viewport` : '.compact = true';
  const navigation = mode === 3 ? ',\n                                 .navigation = CUI_PAGINATION_NAV_CHEVRONS' : '';
+ const tooltip = arrows ? ',\n                                 .tooltip_viewport = viewport' : '';
  const labels = french ? `static const cui_pagination_labels labels = {
     .group = CUI_STR("Pages de résultats"),
     .first = CUI_STR("Première"), .previous = CUI_STR("Précédente"),
@@ -21,11 +23,11 @@ export function paginationUsage(size, disabled = false, mode = 0, visiblePages =
 
 ${labels}/* The application retains page and supplies the layout's current content width. */
 bool draw_results_pages(cui_context *ui, cui_id id, const cui_theme *theme,
-                        size_t *page, size_t total_pages, float content_width${numbered ? ', cui_rect viewport' : ''}) {
+                        size_t *page, size_t total_pages, float content_width${numbered || arrows ? ', cui_rect viewport' : ''}) {
     return cui_pagination_ex(ui, id, theme, page, total_pages,
         (cui_pagination_options){${layout}, .disabled = ${disabled},
                                  .design_size = ${sizes[size] || 'CUI_DESIGN_BASE'},
-                                 .available_width = content_width${navigation}${french ? ',\n                                 .labels = &labels' : ''}});
+                                 .available_width = content_width${navigation}${tooltip}${french ? ',\n                                 .labels = &labels' : ''}});
 }`;
 }
 

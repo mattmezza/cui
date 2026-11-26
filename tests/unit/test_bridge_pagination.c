@@ -143,11 +143,19 @@ int main(void) {
     assert(semantic(app, CUI_ROLE_BUTTON, "Précédente"));
     assert(!semantic(app, CUI_ROLE_BUTTON, "First") && !semantic(app, CUI_ROLE_BUTTON, "Last"));
 
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_MOVE, next.x + next.width / 2,
+                                    next.y + next.height / 2) == CUI_BRIDGE_OK);
+    for (unsigned i = 0; i < 32; ++i)
+        step(app);
+    assert(semantic(app, CUI_ROLE_LABEL, "Suivante"));
+    page_is(app, pager, 11, false);
+
     press_semantic(app, CUI_ROLE_BUTTON, "Pages suivantes");
     step(app);
     page_is(app, pager, 11, false);
     const cui_semantic *menu = semantic(app, CUI_ROLE_MENU, "Pages suivantes");
     assert(menu && menu->details.scrollable);
+    assert(!semantic(app, CUI_ROLE_LABEL, "Suivante"));
     cui_rect popup = cui_bounds(app->ui, menu->id);
     assert(popup.w > 0 && popup.h > 0 && popup.h <= 240 && popup.x + popup.w <= app->width);
     press_semantic(app, CUI_ROLE_MENUITEM, "13");

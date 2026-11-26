@@ -6762,6 +6762,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                               .visible_pages = pagination_visible_pages,
                               .icon_only = pagination_mode == 2,
                               .ellipsis_viewport = {0, 0, width, height},
+                              .tooltip_viewport = {0, 0, width, height},
                               .navigation = pagination_mode == 3 ? CUI_PAGINATION_NAV_CHEVRONS
                                                                  : CUI_PAGINATION_NAV_DEFAULT,
                               .labels = pagination_french ? &pagination_labels_fr : NULL});

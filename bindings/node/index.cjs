@@ -489,6 +489,16 @@ class Node {
     this.carouselLoopingValue = enabled;
     return this;
   }
+  _carousel_navigation(operation, next) {
+    if (this.kind !== 65) throw new TypeError('Carousel navigation requires a Carousel');
+    if (typeof next !== 'boolean') throw new TypeError('next must be a boolean');
+    if (!this.owner) throw new Error('Carousel navigation requires a mounted node');
+    this.owner._alive();
+    if (!this.owner.supports_carousel_navigation()) throw new Error('Carousel navigation unavailable');
+    return this.owner.nodes.get(keyFor(native[operation](this.owner.handle, this[NODE], next)));
+  }
+  carousel_adjacent(next = true) { return this._carousel_navigation('carouselAdjacent', next); }
+  carousel_step(next = true) { return this._carousel_navigation('carouselStep', next); }
   carousel_fit(enabled = true) {
     if (this.kind !== 20) throw new TypeError('carousel_fit requires an Item');
     if (typeof enabled !== 'boolean') throw new TypeError('enabled must be a boolean');
@@ -1183,6 +1193,12 @@ class App {
     this._alive();
     return typeof native.supportsCarouselLooping === 'function' &&
       typeof native.setCarouselLooping === 'function' && native.supportsCarouselLooping();
+  }
+  supports_carousel_navigation() {
+    this._alive();
+    return typeof native.supportsCarouselNavigation === 'function' &&
+      typeof native.carouselAdjacent === 'function' && typeof native.carouselStep === 'function' &&
+      native.supportsCarouselNavigation();
   }
   supports_carousel_fit() {
     this._alive();

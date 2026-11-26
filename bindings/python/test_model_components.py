@@ -633,4 +633,57 @@ class Models(unittest.TestCase):
             field=c.input('foreign','value'); foreign.mount(c.column().children(field)); foreign.step()
             with self.assertRaises(ValueError):settings.settings_field_bounds(field)
 
+    def test_carousel_navigation(self):
+        with self.assertRaises(RuntimeError):
+            c.carousel("unmounted").carousel_adjacent()
+        with self.assertRaises(ValueError):
+            c.item("wrong").carousel_step()
+        with self.assertRaises(TypeError):
+            c.carousel("bad").carousel_step(1)
+        with c.App(width=640) as app:
+            events = []
+            first = c.item("first", "First")
+            second = c.item("second", "Second")
+            rail = c.carousel("navigation").visual_size(400, 100).children(first, second)
+            rail.on_change(events.append)
+            def advance(event):
+                self.assertIs(rail.carousel_step(), second)
+                self.assertEqual(events, [])  # Step never invokes the Carousel callback.
+
+            action = c.button("next").label("Next").on_click(advance)
+            app.mount(c.column().children(rail, action))
+            self.assertTrue(app.supports_carousel_navigation())
+            self.assertIsNone(rail.carousel_adjacent())
+            self.assertIsNone(rail.carousel_step())
+            app.step()
+            self.assertIsNone(rail.carousel_adjacent(False))
+            self.assertIs(rail.carousel_adjacent(), second)
+            self.assertIs(rail.selected(), first)
+            self.assertEqual(events, [])
+
+            self.assertIs(rail.carousel_step(), second)
+            self.assertEqual(events, [])
+            app.dispatch()
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[0].selected_handle, (second._handle.slot, second._handle.generation))
+            self.assertIsNone(rail.carousel_step())
+            self.assertIs(rail.carousel_step(False), first)
+            app.dispatch()
+            events.clear()
+
+            self.press(app, app.bounds(action))
+            app.dispatch()
+            self.assertIs(rail.selected(), second)
+            self.assertEqual(len(events), 1)
+            self.assertEqual(app.dispatch(), 0)
+            rail.disabled()
+            self.assertIsNone(rail.carousel_adjacent(False))
+            self.assertIsNone(rail.carousel_step(False))
+            with patch.object(app._api, "carousel_step", None):
+                self.assertFalse(app.supports_carousel_navigation())
+                with self.assertRaises(RuntimeError):
+                    rail.carousel_step()
+        with self.assertRaises(RuntimeError):
+            rail.carousel_step()
+
 if __name__=='__main__':unittest.main()

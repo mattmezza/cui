@@ -5796,7 +5796,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes, fractional sizing, geometry-supported wrapping, and named sizes and passive content for navigation arrows and slide markers. Immediate C, retained C, Python, JavaScript, TypeScript, Go, Rust and the gallery support measured in-flow content sizing with bounded workspace and a follow-up frame. Exact first-frame sizing, custom retained placement and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
+        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes, fractional sizing, geometry-supported wrapping, and named sizes and passive content for navigation arrows and slide markers. Immediate C, retained C, Python, JavaScript, TypeScript, Go, Rust and the gallery support measured in-flow content sizing with bounded workspace and a follow-up frame. Retained apps can place ordinary navigation buttons freely and use the Carousel's snap rules and selection events. Exact first-frame sizing, custom placement of the built-in retained controls and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5923,6 +5923,20 @@
             "docs/CAROUSEL.md"
           ],
           "scope": "Retained C and all five builders support direct Item fit, child growth, silent sizing-mode replacement and preflight/capability checks. The bridge owns one measurement per fitted Item and releases it when fit is replaced or the Item is removed."
+        },
+        {
+          "name": "freely placed application navigation controls and retained split-frame dragging",
+          "status": "tested",
+          "evidence": [
+            "bindings/bridge/tests/test_bridge_components.c",
+            "bindings/python/test_model_components.py",
+            "bindings/node/test/models.test.cjs",
+            "bindings/typescript/components.typecheck.ts",
+            "bindings/go/cui/native_test.go",
+            "bindings/rust/tests/builders.rs",
+            "docs/CAROUSEL.md"
+          ],
+          "scope": "Retained C and all five builders share layout-derived adjacent and step operations. Custom applications can place ordinary buttons outside the viewport and preserve boundary states and copied change events. Native tests exercise duplicate snaps, multi-frame drag, looping, stale geometry after removal and queue-capacity atomicity."
         },
         {
           "name": "exact cold layout and remaining host integration parity",

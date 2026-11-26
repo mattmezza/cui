@@ -297,7 +297,12 @@ fit measurements. Use `cui_bridge_set_carousel_slide_fit_v1` or
 `carousel_fit` (`CarouselFit` in Go) on a direct Item. Probe
 `supports_carousel_fit` (`SupportsCarouselFit` in Go) with an older
 provider. A valid fraction replaces fit, and enabling fit replaces a
-fraction. Read `docs/CAROUSEL.md` for layout and examples.
+fraction. For freely placed retained navigation buttons, use
+`cui_bridge_carousel_adjacent_v1` to check availability and
+`cui_bridge_carousel_step_v1` to select and enqueue one copied change.
+Probe `supports_carousel_navigation` (`SupportsCarouselNavigation` in Go)
+before using the wrapper methods. Query after layout. Read
+`docs/CAROUSEL.md` for layout and examples.
 For a Command palette inside a dialog, set `cui_command_options.width = -1` to fit
 the body. Rows and hit targets fill the current allocation. Width-dependent
 custom row heights settle on a follow-up frame. See `docs/COMMAND.md`.

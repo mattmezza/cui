@@ -1354,6 +1354,142 @@ static void test_carousel_content_sizing(void) {
     assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
     cui_bridge_destroy(app);
 }
+static void test_carousel_custom_navigation(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_NONE,
+                                  .max_events = 1,
+                                  .width = 640,
+                                  .height = 480};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, holder, rail, slides[4];
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLLAPSIBLE, "holder", &holder) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_checked(app, holder, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, holder, CUI_BRIDGE_CAROUSEL, "rail", &rail) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, rail, 200, 100) == CUI_BRIDGE_OK);
+    for (unsigned i = 0; i < 4; ++i) {
+        char key[16];
+        snprintf(key, sizeof key, "slide-%u", i);
+        assert(cui_bridge_node_create(app, rail, CUI_BRIDGE_ITEM, key, &slides[i]) ==
+               CUI_BRIDGE_OK);
+        assert(cui_bridge_set_carousel_slide_basis_v1(app, slides[i], .5f) == CUI_BRIDGE_OK);
+    }
+    cui_bridge_node adjacent = root;
+    assert(cui_bridge_carousel_adjacent_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(!adjacent.slot && !adjacent.generation);
+    assert(cui_bridge_carousel_step_v1(app, root, 1, &adjacent) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_carousel_step_v1(app, rail, 2, &adjacent) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_carousel_adjacent_v1(app, rail, 0, NULL) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_carousel_adjacent_v1(app, rail, 0, &adjacent) == CUI_BRIDGE_OK);
+    assert(!adjacent.slot);
+    assert(cui_bridge_carousel_adjacent_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(adjacent.slot == slides[1].slot && adjacent.generation == slides[1].generation);
+    cui_bridge_event_ex event;
+    char payload[8];
+    uint32_t needed;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_carousel_step_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(adjacent.slot == slides[1].slot);
+    adjacent = root;
+    assert(cui_bridge_carousel_step_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_CAPACITY);
+    assert(adjacent.slot == root.slot && adjacent.generation == root.generation);
+    assert(cui_bridge_get_selected(app, rail, &adjacent) == CUI_BRIDGE_OK);
+    assert(adjacent.slot == slides[1].slot);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.type == CUI_BRIDGE_EVENT_CHANGE && event.node.slot == rail.slot &&
+           event.selected.slot == slides[1].slot &&
+           event.selected.generation == slides[1].generation && event.frame_sequence > 0);
+    uint64_t layout_frame = event.frame_sequence;
+    assert(cui_bridge_carousel_step_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(adjacent.slot == slides[2].slot);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.selected.slot == slides[2].slot && event.frame_sequence == layout_frame);
+    assert(cui_bridge_carousel_step_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(!adjacent.slot); /* The last two slides share a snap. */
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_EMPTY);
+
+    assert(cui_bridge_set_selected(app, rail, slides[3]) == CUI_BRIDGE_OK);
+    assert(cui_bridge_carousel_adjacent_v1(app, rail, 0, &adjacent) == CUI_BRIDGE_OK);
+    assert(adjacent.slot == slides[1].slot); /* Respects pending silent selection. */
+    assert(cui_bridge_set_disabled(app, rail, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_carousel_step_v1(app, rail, 0, &adjacent) == CUI_BRIDGE_OK);
+    assert(!adjacent.slot);
+    assert(cui_bridge_set_disabled(app, rail, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_carousel_looping_v1(app, rail, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_carousel_adjacent_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(!adjacent.slot); /* A policy change needs a fresh layout. */
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_carousel_step_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(adjacent.slot == slides[0].slot);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.selected.slot == slides[0].slot);
+    assert(cui_bridge_node_remove(app, slides[1]) == CUI_BRIDGE_OK);
+    assert(cui_bridge_carousel_adjacent_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(!adjacent.slot); /* Old slide mapping is stale. */
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_carousel_adjacent_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(adjacent.slot == slides[2].slot);
+    assert(cui_bridge_set_checked(app, holder, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_carousel_step_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(!adjacent.slot); /* Omitted in the most recent layout. */
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_set_checked(app, holder, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_carousel_adjacent_v1(app, rail, 1, &adjacent) == CUI_BRIDGE_OK);
+    assert(adjacent.slot == slides[2].slot);
+    cui_bridge_destroy(app);
+}
+static void test_retained_carousel_drag(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_NONE,
+                                  .width = 640,
+                                  .height = 480};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, rail, first, second;
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_CAROUSEL, "rail", &rail) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, rail, 200, 100) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, rail, CUI_BRIDGE_ITEM, "first", &first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, rail, CUI_BRIDGE_ITEM, "second", &second) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect bounds;
+    assert(cui_bridge_node_bounds(app, rail, &bounds) == CUI_BRIDGE_OK);
+    float x = bounds.x, y = bounds.y + 30;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x + 165, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_MOVE, x + 25, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x + 25, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_node selected;
+    assert(cui_bridge_get_selected(app, rail, &selected) == CUI_BRIDGE_OK);
+    assert(selected.slot == second.slot);
+    cui_bridge_event_ex event;
+    char payload[8];
+    uint32_t needed;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.type == CUI_BRIDGE_EVENT_CHANGE && event.selected.slot == second.slot);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_EMPTY);
+    cui_bridge_destroy(app);
+}
 static void test_resizable(void) {
     cui_bridge_options o = {.struct_size = sizeof o,
                             .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -2918,6 +3054,8 @@ int main(void) {
     test_carousel();
     test_carousel_slide_basis();
     test_carousel_content_sizing();
+    test_carousel_custom_navigation();
+    test_retained_carousel_drag();
     test_carousel_axis();
     test_carousel_looping();
     test_carousel_controls();

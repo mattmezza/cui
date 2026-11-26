@@ -4127,7 +4127,7 @@ static void bridge_click(void *user, const cui_button_click_event *event) {
     bridge_enqueue_click(binding->app, binding->slot, event->frame_sequence,
                          (cui_bridge_event_payload){.payload_kind = CUI_BRIDGE_PAYLOAD_NONE});
 }
-static void bridge_change(cui_bridge_app *app, uint32_t slot) {
+static void bridge_change_at(cui_bridge_app *app, uint32_t slot, uint64_t frame) {
     if (app->event_count == app->max_events) {
         app->frame_error = CUI_BRIDGE_CAPACITY;
         return;
@@ -4276,8 +4276,11 @@ static void bridge_change(cui_bridge_app *app, uint32_t slot) {
     app->event_payloads[tail] = payload;
     app->events[tail] = (cui_bridge_event){.type = CUI_BRIDGE_EVENT_CHANGE,
                                            .node = {slot, app->nodes[slot].generation},
-                                           .frame_sequence = cui_frame_sequence(app->ui)};
+                                           .frame_sequence = frame};
     app->event_count++;
+}
+static void bridge_change(cui_bridge_app *app, uint32_t slot) {
+    bridge_change_at(app, slot, cui_frame_sequence(app->ui));
 }
 static void bridge_data_table_change(cui_bridge_app *app, uint32_t slot, const char *reason) {
     if (app->event_count == app->max_events) {
@@ -5353,7 +5356,7 @@ static void bridge_render_carousel(cui_bridge_app *app, uint32_t slot,
             selected = count;
         count++;
     }
-    if (selected != SIZE_MAX)
+    if (selected != SIZE_MAX && selected != node->carousel_state->selected)
         cui_carousel_set_selected(node->carousel_state, selected);
     node->carousel_state->on_change = bridge_carousel_change;
     node->carousel_state->change_user = binding;
@@ -5376,8 +5379,10 @@ static void bridge_render_carousel(cui_bridge_app *app, uint32_t slot,
     }
     cui_carousel_layout layout = {.basis = has_basis ? binding->basis : NULL,
                                   .fit = has_fit ? binding->fit : NULL};
-    if (!cui_carousel_with_layout(app->ui, node->id, &app->theme, node->carousel_state,
-                                  binding->items, count, options, layout))
+    if (cui_carousel_with_layout(app->ui, node->id, &app->theme, node->carousel_state,
+                                 binding->items, count, options, layout))
+        node->carousel_layout_frame = app->last_core_frame;
+    else
         app->frame_error = CUI_BRIDGE_CORE_ERROR;
     if (node->carousel_state->selected < count)
         node->value = binding->slots[node->carousel_state->selected];
@@ -5386,6 +5391,80 @@ static void bridge_render_carousel(cui_bridge_app *app, uint32_t slot,
     node->carousel_state->on_change = NULL;
     node->carousel_state->change_user = NULL;
     free(binding);
+}
+static bool bridge_carousel_layout_available(cui_bridge_app *app,
+                                             const cui_bridge_node_record *node) {
+    const cui_carousel_state *state = node->carousel_state;
+    if (!state || !state->geometry_ready || node->disabled ||
+        node->carousel_layout_frame != app->last_core_frame || cui_last_error(app->ui) != CUI_OK ||
+        state->looping != node->carousel_looping ||
+        (state->axis == CUI_ORIENTATION_VERTICAL) !=
+            (node->carousel_axis == CUI_BRIDGE_CAROUSEL_VERTICAL))
+        return false;
+    size_t count = 0;
+    const cui_semantic *semantics = cui_semantics(app->ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (semantics[i].id == node->id)
+            return !semantics[i].disabled;
+    return false;
+}
+static cui_bridge_status bridge_carousel_navigate(cui_bridge_app *app, cui_bridge_node carousel,
+                                                  uint32_t next, cui_bridge_node *out_item,
+                                                  bool commit) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, carousel, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!out_item || next > 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (node->kind != CUI_BRIDGE_CAROUSEL)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (!bridge_carousel_layout_available(app, node)) {
+        *out_item = (cui_bridge_node){0};
+        return CUI_BRIDGE_OK;
+    }
+    cui_carousel_state view = *node->carousel_state;
+    view.selected = CUI_CAROUSEL_NO_SELECTION;
+    uint32_t slots[64];
+    size_t count = 0;
+    for (uint32_t child = bridge_carousel_slide_at_or_after(app, node->first_child); child;
+         child = bridge_carousel_slide_at_or_after(app, app->nodes[child].next_sibling)) {
+        if (count >= view.count || view.items[count].id != app->nodes[child].id) {
+            *out_item = (cui_bridge_node){0};
+            return CUI_BRIDGE_OK;
+        }
+        if (child == (uint32_t)node->value)
+            view.selected = count;
+        slots[count++] = child;
+    }
+    size_t destination =
+        count == view.count ? cui_carousel_navigation(&view, next != 0) : CUI_CAROUSEL_NO_SELECTION;
+    if (destination == CUI_CAROUSEL_NO_SELECTION) {
+        *out_item = (cui_bridge_node){0};
+        return CUI_BRIDGE_OK;
+    }
+    uint32_t slot = slots[destination];
+    if (commit) {
+        if (app->event_count == app->max_events)
+            return CUI_BRIDGE_CAPACITY;
+        cui_carousel_state *state = node->carousel_state;
+        if (state->selected != view.selected)
+            cui_carousel_set_selected(state, view.selected);
+        cui_carousel_select(state, destination);
+        node->value = slot;
+        bridge_change_at(app, carousel.slot, node->carousel_layout_frame);
+        cui_invalidate(app->ui);
+    }
+    *out_item = (cui_bridge_node){slot, app->nodes[slot].generation};
+    return CUI_BRIDGE_OK;
+}
+cui_bridge_status cui_bridge_carousel_adjacent_v1(cui_bridge_app *app, cui_bridge_node carousel,
+                                                  uint32_t next, cui_bridge_node *out_item) {
+    return bridge_carousel_navigate(app, carousel, next, out_item, false);
+}
+cui_bridge_status cui_bridge_carousel_step_v1(cui_bridge_app *app, cui_bridge_node carousel,
+                                              uint32_t next, cui_bridge_node *out_item) {
+    return bridge_carousel_navigate(app, carousel, next, out_item, true);
 }
 static void bridge_resizable_panel_content(cui_context *ui, void *user) {
     bridge_panel_binding *binding = user;

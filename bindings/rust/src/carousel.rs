@@ -4,6 +4,52 @@ use std::{
     sync::OnceLock,
 };
 
+type Navigate = unsafe extern "C" fn(*mut c_void, RawNode, u32, *mut RawNode) -> u32;
+
+fn navigation() -> Option<(Navigate, Navigate)> {
+    static SYMBOLS: OnceLock<Option<(Navigate, Navigate)>> = OnceLock::new();
+    *SYMBOLS.get_or_init(resolve_navigation)
+}
+
+#[cfg(cui_bridge_static)]
+fn resolve_navigation() -> Option<(Navigate, Navigate)> {
+    extern "C" {
+        fn cui_bridge_carousel_adjacent_v1(
+            app: *mut c_void,
+            carousel: RawNode,
+            next: u32,
+            out: *mut RawNode,
+        ) -> u32;
+        fn cui_bridge_carousel_step_v1(
+            app: *mut c_void,
+            carousel: RawNode,
+            next: u32,
+            out: *mut RawNode,
+        ) -> u32;
+    }
+    Some((cui_bridge_carousel_adjacent_v1, cui_bridge_carousel_step_v1))
+}
+
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn resolve_navigation() -> Option<(Navigate, Navigate)> {
+    unsafe {
+        let adjacent = crate::notification_symbol_v1(c"cui_bridge_carousel_adjacent_v1".as_ptr());
+        let step = crate::notification_symbol_v1(c"cui_bridge_carousel_step_v1".as_ptr());
+        if adjacent.is_null() || step.is_null() {
+            return None;
+        }
+        Some((
+            std::mem::transmute::<*mut c_void, Navigate>(adjacent),
+            std::mem::transmute::<*mut c_void, Navigate>(step),
+        ))
+    }
+}
+
+#[cfg(not(any(cui_bridge_static, unix, windows)))]
+fn resolve_navigation() -> Option<(Navigate, Navigate)> {
+    None
+}
+
 type SetBasis = unsafe extern "C" fn(*mut c_void, RawNode, f32) -> u32;
 type SetOption = unsafe extern "C" fn(*mut c_void, RawNode, u32) -> u32;
 type SetControlSizes = unsafe extern "C" fn(*mut c_void, RawNode, u32, u32) -> u32;
@@ -250,6 +296,8 @@ fn resolve_slot_factory() -> Option<CreateSlot> {
 }
 
 impl Error {
+    /// The loaded bridge lacks the optional Carousel navigation operations.
+    pub const CAROUSEL_NAVIGATION_UNAVAILABLE: Self = Self(9);
     /// The loaded bridge lacks the optional Carousel basis setter.
     pub const CAROUSEL_BASIS_UNAVAILABLE: Self = Self(9);
     /// The loaded bridge lacks the optional Carousel content sizing setter.
@@ -267,6 +315,33 @@ impl Error {
 }
 
 impl App {
+    /// Whether the loaded bridge supports application-owned Carousel navigation.
+    pub fn supports_carousel_navigation(&self) -> bool {
+        navigation().is_some()
+    }
+
+    /// Look up a neighboring snap target from the last laid out Carousel.
+    pub fn carousel_adjacent(&self, carousel: Node, next: bool) -> Result<Option<Node>> {
+        self.carousel_navigate(carousel, next, false)
+    }
+
+    /// Select a reachable slide and queue one ordinary Carousel change.
+    pub fn carousel_step(&mut self, carousel: Node, next: bool) -> Result<Option<Node>> {
+        self.carousel_navigate(carousel, next, true)
+    }
+
+    fn carousel_navigate(&self, carousel: Node, next: bool, commit: bool) -> Result<Option<Node>> {
+        let carousel = self.valid(carousel)?;
+        let (adjacent, step) = navigation().ok_or(Error::CAROUSEL_NAVIGATION_UNAVAILABLE)?;
+        let navigate = if commit { step } else { adjacent };
+        let mut item = RawNode::default();
+        check(unsafe { navigate(self.raw, carousel, u32::from(next), &mut item) })?;
+        Ok((item.slot != 0).then_some(Node {
+            raw: item,
+            app_id: self.id,
+        }))
+    }
+
     /// Whether the loaded bridge supports vertical layout for retained Carousels.
     pub fn supports_carousel_axis(&self) -> bool {
         axis_setter().is_some()

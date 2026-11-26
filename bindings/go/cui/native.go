@@ -705,6 +705,9 @@ static cui_bridge_status go_attachment_preview(cui_bridge_app *a, cui_bridge_nod
  return attachment_preview(a, n, pixels, w, h, stride, length);
 }
 
+typedef cui_bridge_status (*carousel_navigate_fn)(cui_bridge_app *, cui_bridge_node,
+                                                   uint32_t, cui_bridge_node *);
+static carousel_navigate_fn carousel_adjacent, carousel_step;
 static cui_bridge_status (*carousel_set_basis)(cui_bridge_app *, cui_bridge_node, float);
 static cui_bridge_status (*carousel_set_fit)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static cui_bridge_status (*carousel_set_axis)(cui_bridge_app *, cui_bridge_node, uint32_t);
@@ -716,6 +719,10 @@ static cui_bridge_status (*carousel_create_slot)(cui_bridge_app *, cui_bridge_no
                                                  const char *, cui_bridge_node *);
 static void go_carousel_initialize(void) {
  if (bridge_lib) {
+  go_load_optional_symbol(&carousel_adjacent, sizeof carousel_adjacent,
+                          "cui_bridge_carousel_adjacent_v1");
+  go_load_optional_symbol(&carousel_step, sizeof carousel_step,
+                          "cui_bridge_carousel_step_v1");
   go_load_optional_symbol(&carousel_set_basis, sizeof carousel_set_basis,
                           "cui_bridge_set_carousel_slide_basis_v1");
   go_load_optional_symbol(&carousel_set_fit, sizeof carousel_set_fit,
@@ -733,6 +740,8 @@ static void go_carousel_initialize(void) {
  }
 #if defined(CUI_GO_STATIC)
  else {
+  carousel_adjacent = cui_bridge_carousel_adjacent_v1;
+  carousel_step = cui_bridge_carousel_step_v1;
   carousel_set_basis = cui_bridge_set_carousel_slide_basis_v1;
   carousel_set_fit = cui_bridge_set_carousel_slide_fit_v1;
   carousel_set_axis = cui_bridge_set_carousel_axis_v1;
@@ -742,6 +751,11 @@ static void go_carousel_initialize(void) {
   carousel_create_slot = cui_bridge_carousel_slot_create_v1;
  }
 #endif
+}
+static int go_carousel_navigation_supported(void) { return carousel_adjacent && carousel_step; }
+static cui_bridge_status go_carousel_navigate(cui_bridge_app *a, cui_bridge_node carousel,
+                                               uint32_t next, int commit, cui_bridge_node *out) {
+ return (commit ? carousel_step : carousel_adjacent)(a, carousel, next, out);
 }
 static int go_carousel_basis_supported(void) { return carousel_set_basis != NULL; }
 static cui_bridge_status go_carousel_set_basis(cui_bridge_app *a, cui_bridge_node slide, float basis) {
@@ -4378,6 +4392,48 @@ func (n *Node) CarouselBasis(fraction float32) *Node {
 	n.carouselBasis = fraction
 	n.carouselFit = false
 	return n
+}
+
+// ErrCarouselNavigationUnavailable means the loaded bridge lacks custom Carousel navigation.
+var ErrCarouselNavigationUnavailable = errors.New("Carousel navigation requires the optional adjacent and step operations")
+
+// SupportsCarouselNavigation reports if the loaded bridge offers both operations.
+func (a *App) SupportsCarouselNavigation() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_carousel_navigation_supported() != 0, nil
+}
+
+// CarouselAdjacent reads the destination in the last laid out Carousel.
+// next=false moves toward the previous snap. Nil means no destination.
+func (a *App) CarouselAdjacent(carousel *Node, next bool) (*Node, error) {
+	return a.carouselNavigate(carousel, next, false)
+}
+
+// CarouselStep selects a reachable slide and queues one ordinary Carousel change.
+// It returns nil at a boundary or when the Carousel has no usable layout.
+func (a *App) CarouselStep(carousel *Node, next bool) (*Node, error) {
+	return a.carouselNavigate(carousel, next, true)
+}
+
+func (a *App) carouselNavigate(carousel *Node, next, commit bool) (*Node, error) {
+	supported, err := a.SupportsCarouselNavigation()
+	if err != nil {
+		return nil, err
+	}
+	if carousel == nil || carousel.app != a || carousel.removed || carousel.kind != int(C.CUI_BRIDGE_CAROUSEL) {
+		return nil, errors.New("Carousel navigation requires a live Carousel in this App")
+	}
+	if !supported {
+		return nil, ErrCarouselNavigationUnavailable
+	}
+	var item C.cui_bridge_node
+	if err := result(C.go_carousel_navigate(a.ptr, carousel.handle, C.uint32_t(btoi(next)),
+		C.int(btoi(commit)), &item)); err != nil {
+		return nil, err
+	}
+	return a.nodes[keyID(item)], nil
 }
 
 // ErrCarouselFitUnavailable means the loaded bridge lacks content-sized slides.

@@ -1277,6 +1277,24 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_slide_basis_v1(cui_brid
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_slide_fit_v1(cui_bridge_app *,
                                                                       cui_bridge_node item,
                                                                       uint32_t enabled);
+/* Navigate from application-owned controls using the Carousel's last laid out
+ * snap geometry (0 previous, 1 next). Both calls return OK and a zero handle
+ * for an unavailable direction, disabled/omitted Carousel, or until it has
+ * rendered its current slide order, axis and looping policy. In-flow size
+ * changes take effect after the corresponding layout has been submitted.
+ * A pending programmatic selection uses the same geometry on this path.
+ * Adjacent is read-only. Step updates selection and queues one existing
+ * Carousel change with a copied Item handle and the geometry frame sequence.
+ * No callback runs inside these calls. On error, including a full event queue,
+ * Step leaves selection, event queue and the output unchanged. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_carousel_adjacent_v1(cui_bridge_app *,
+                                                                 cui_bridge_node carousel,
+                                                                 uint32_t next,
+                                                                 cui_bridge_node *out_item);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_carousel_step_v1(cui_bridge_app *,
+                                                             cui_bridge_node carousel,
+                                                             uint32_t next,
+                                                             cui_bridge_node *out_item);
 enum { CUI_BRIDGE_CAROUSEL_HORIZONTAL, CUI_BRIDGE_CAROUSEL_VERTICAL };
 /* Optional Carousel axis operation. Horizontal is the default. An axis change
  * takes effect on the next submission, cancels active Carousel gestures and

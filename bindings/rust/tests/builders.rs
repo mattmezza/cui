@@ -1124,6 +1124,44 @@ fn carousel_control_sizes() {
 }
 
 #[test]
+fn carousel_navigation() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let legacy = std::env::var("CUI_TEST_LEGACY_CAROUSEL_NAVIGATION").as_deref() == Ok("1");
+    assert_eq!(app.supports_carousel_navigation(), !legacy);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let rail = app.child(root, Kind::Carousel, "rail").unwrap();
+    let first = app.child(rail, Kind::Item, "first").unwrap();
+    let second = app.child(rail, Kind::Item, "second").unwrap();
+    if legacy {
+        assert_eq!(
+            app.carousel_adjacent(rail, true).err(),
+            Some(Error::CAROUSEL_NAVIGATION_UNAVAILABLE)
+        );
+        assert_eq!(
+            app.carousel_step(rail, true).err(),
+            Some(Error::CAROUSEL_NAVIGATION_UNAVAILABLE)
+        );
+        return;
+    }
+    let changes = Rc::new(Cell::new(None));
+    let observed = changes.clone();
+    app.on_change_event(rail, move |event| observed.set(event.selected)).unwrap();
+    assert_eq!(app.carousel_adjacent(rail, true).unwrap(), None);
+    app.step(0.016).unwrap();
+    assert_eq!(app.carousel_adjacent(rail, false).unwrap(), None);
+    assert_eq!(app.carousel_adjacent(rail, true).unwrap(), Some(second));
+    assert_eq!(app.selected(rail).unwrap(), Some(first));
+    assert_eq!(app.dispatch().unwrap(), 0);
+    assert_eq!(app.carousel_step(rail, true).unwrap(), Some(second));
+    assert_eq!(changes.get(), None);
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(changes.get(), Some(second));
+    assert_eq!(app.carousel_step(rail, true).unwrap(), None);
+    assert_eq!(app.dispatch().unwrap(), 0);
+}
+
+#[test]
 fn carousel_fit() {
     let _guard = NATIVE.lock().unwrap();
     let mut app = App::headless(640., 480.).unwrap();

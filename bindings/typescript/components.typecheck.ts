@@ -170,3 +170,14 @@ const fittedSlide: c.Item = c.item("fitted").carousel_fit().carousel_fit(false);
 const hasCarouselFit: boolean = app.supports_carousel_fit();
 // @ts-expect-error fit requires a boolean
 fittedSlide.carousel_fit(1);
+
+const navigationRail = c.carousel('navigation');
+if (app.supports_carousel_navigation()) {
+  const adjacentSlide: c.Item | undefined = navigationRail.carousel_adjacent();
+  const previousSlide: c.Item | undefined = navigationRail.carousel_step(false);
+  console.log(adjacentSlide, previousSlide);
+}
+// @ts-expect-error Carousel direction requires a boolean.
+navigationRail.carousel_step(1);
+// @ts-expect-error Navigation belongs to Carousel.
+c.button('navigation-button').carousel_adjacent();

@@ -128,6 +128,7 @@ typedef struct {
     cui_carousel_state *carousel_state;
     cui_carousel_geometry *carousel_geometry;
     cui_carousel_fit *carousel_fit;
+    uint64_t carousel_layout_frame;
     float carousel_basis;
     uint32_t carousel_axis, carousel_controls, carousel_slot_role;
     uint32_t carousel_arrow_size, carousel_marker_size;

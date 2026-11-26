@@ -301,6 +301,13 @@ class _API:
         self.set_open = bind("set_open", C.c_int, C.c_void_p, _Handle, C.c_uint32)
         self.set_selected = bind("set_selected", C.c_int, C.c_void_p, _Handle, _Handle)
         self.get_selected = bind("get_selected", C.c_int, C.c_void_p, _Handle, C.POINTER(_Handle))
+        self.carousel_adjacent = self.carousel_step = None
+        if all(hasattr(lib, "cui_bridge_" + name + "_v1") for name in
+               ("carousel_adjacent", "carousel_step")):
+            self.carousel_adjacent = bind("carousel_adjacent_v1", C.c_int, C.c_void_p,
+                                           _Handle, C.c_uint32, C.POINTER(_Handle))
+            self.carousel_step = bind("carousel_step_v1", C.c_int, C.c_void_p,
+                                       _Handle, C.c_uint32, C.POINTER(_Handle))
         self.get_open = bind("get_open", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_uint32))
         self.set_anchor = bind("set_anchor", C.c_int, C.c_void_p, _Handle, _Handle)
         self.set_carousel_control_sizes = None
@@ -1015,6 +1022,27 @@ class Widget:
             self._change("set_selected", item._handle)
         self._selected = item
         return self
+
+    def _carousel_navigation(self, operation: str, next: bool) -> "Widget | None":
+        if self.kind != "carousel":
+            raise ValueError("Carousel navigation requires a Carousel")
+        if type(next) is not bool:
+            raise TypeError("next must be a bool")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is None:
+            raise RuntimeError("Carousel navigation requires a mounted Widget")
+        if not self._app.supports_carousel_navigation():
+            raise RuntimeError("Carousel navigation unavailable")
+        handle = _Handle()
+        self._change(operation, int(next), C.byref(handle))
+        return self._app._by_handle.get((handle.slot, handle.generation))
+
+    def carousel_adjacent(self, next: bool = True) -> "Widget | None":
+        return self._carousel_navigation("carousel_adjacent", next)
+
+    def carousel_step(self, next: bool = True) -> "Widget | None":
+        return self._carousel_navigation("carousel_step", next)
 
     def selected(self) -> "Widget | None":
         if self.kind not in _SELECTED | {"command"}:
@@ -2169,6 +2197,10 @@ class App:
     def supports_carousel_looping(self) -> bool:
         self._ensure_open()
         return self._api.set_carousel_looping is not None
+
+    def supports_carousel_navigation(self) -> bool:
+        self._ensure_open()
+        return self._api.carousel_adjacent is not None and self._api.carousel_step is not None
 
     def supports_carousel_fit(self) -> bool:
         self._ensure_open()

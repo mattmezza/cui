@@ -391,3 +391,46 @@ console.log('PASS native Dock split layout, activation snapshots and metadata fr
     assert.equal(slide.carouselFitValue, false);
   } finally { legacy.dispose(); }
 }
+
+{
+  assert.throws(() => c.carousel('unmounted').carousel_adjacent(), /mounted/);
+  assert.throws(() => c.item('wrong').carousel_step(), /Carousel/);
+  assert.throws(() => c.carousel('bad').carousel_step(1), /boolean/);
+
+  const app = new c.App({width: 640});
+  const first = c.item('first', 'First');
+  const second = c.item('second', 'Second');
+  const events = [];
+  const rail = c.carousel('navigation').visual_size(400, 100).children(first, second)
+    .on_change(event => events.push(event));
+  try {
+    app.mount(c.column().children(rail));
+    assert.equal(app.supports_carousel_navigation(), true);
+    assert.equal(rail.carousel_adjacent(), undefined);
+    assert.equal(rail.carousel_step(), undefined);
+    app.step();
+    assert.equal(rail.carousel_adjacent(false), undefined);
+    assert.equal(rail.carousel_adjacent(), second);
+    assert.equal(rail.selected(), first);
+    assert.equal(events.length, 0);
+
+    assert.equal(rail.carousel_step(), second);
+    assert.equal(events.length, 0);
+    app.step();
+    assert.equal(events.length, 1);
+    assert.equal(events[0].node, rail);
+    assert.ok(events[0].frame > 0);
+    assert.equal(rail.selected(), second);
+    assert.equal(rail.carousel_step(), undefined);
+    assert.equal(rail.carousel_step(false), first);
+    app.step();
+    assert.equal(events.length, 2);
+
+    rail.disabled();
+    assert.equal(rail.carousel_adjacent(), undefined);
+    assert.equal(rail.carousel_step(), undefined);
+    app.supports_carousel_navigation = () => false;
+    assert.throws(() => rail.carousel_step(), /unavailable/);
+  } finally { app.dispose(); }
+  assert.throws(() => rail.carousel_step(), /disposed/);
+}

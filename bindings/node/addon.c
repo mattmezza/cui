@@ -573,6 +573,51 @@ static napi_value get_selected(napi_env env, napi_callback_info info) {
         return NULL;
     return result;
 }
+typedef cui_bridge_status (*carousel_navigation_fn)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                                                    cui_bridge_node *);
+static int carousel_navigation_symbols(carousel_navigation_fn *out, int step) {
+    carousel_navigation_fn adjacent = NULL, advance = NULL;
+    int supported =
+        optional_bridge_symbol(&adjacent, sizeof adjacent, "cui_bridge_carousel_adjacent_v1") &&
+        optional_bridge_symbol(&advance, sizeof advance, "cui_bridge_carousel_step_v1");
+    *out = step ? advance : adjacent;
+    return supported;
+}
+static napi_value supports_carousel_navigation(napi_env env, napi_callback_info info) {
+    napi_value result;
+    carousel_navigation_fn navigate = NULL;
+    (void)info;
+    if (napi_get_boolean(env, carousel_navigation_symbols(&navigate, 0), &result) != napi_ok)
+        return NULL;
+    return result;
+}
+static napi_value carousel_navigation(napi_env env, napi_callback_info info) {
+    napi_value v[3], result, x;
+    bool next;
+    void *data;
+    size_t count = 3;
+    carousel_navigation_fn navigate = NULL;
+    js_app *app;
+    js_node *node;
+    cui_bridge_node selected = {0};
+    if (napi_get_cb_info(env, info, &count, v, NULL, &data) != napi_ok || count < 3 ||
+        !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
+        return NULL;
+    if (napi_get_value_bool(env, v[2], &next) != napi_ok)
+        return fail(env, "next must be a boolean");
+    if (!carousel_navigation_symbols(&navigate, (uintptr_t)data != 0))
+        return fail(env, "Carousel navigation unavailable");
+    cui_bridge_status code = navigate(app->bridge, node->node, next ? 1u : 0u, &selected);
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
+    if (napi_create_object(env, &result) != napi_ok ||
+        napi_create_uint32(env, selected.slot, &x) != napi_ok ||
+        napi_set_named_property(env, result, "slot", x) != napi_ok ||
+        napi_create_uint32(env, selected.generation, &x) != napi_ok ||
+        napi_set_named_property(env, result, "generation", x) != napi_ok)
+        return NULL;
+    return result;
+}
 static napi_value dropdown_bounds(napi_env env, napi_callback_info info) {
     napi_value v[3], result, x;
     js_app *app;
@@ -2894,6 +2939,9 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setOpen", set_num, 8);
     EXPORT("setSelected", set_selected, 0);
     EXPORT("getSelected", get_selected, 0);
+    EXPORT("supportsCarouselNavigation", supports_carousel_navigation, 0);
+    EXPORT("carouselAdjacent", carousel_navigation, 0);
+    EXPORT("carouselStep", carousel_navigation, 1);
     EXPORT("setChecked", set_num, 6);
     EXPORT("supportsRadioPaint", supports_radio_paint, 0);
     EXPORT("setRadioPaint", set_radio_paint, 0);

@@ -1400,6 +1400,66 @@ func TestCarouselControlSizes(t *testing.T) {
 	assertSizes(32, 24)
 }
 
+func TestCarouselNavigation(t *testing.T) {
+	a := app(t)
+	legacy := os.Getenv("CUI_TEST_LEGACY_CAROUSEL_NAVIGATION") == "1"
+	supported, err := a.SupportsCarouselNavigation()
+	check(t, err)
+	if supported == legacy {
+		t.Fatalf("Carousel navigation capability = %t, legacy test = %t", supported, legacy)
+	}
+	first, second := Item("build", "Build"), Item("release", "Release")
+	rail := Carousel("rail").Children(first, second)
+	var changes []Event
+	rail.OnChange(func(event Event) { changes = append(changes, event) })
+	check(t, a.Mount(Column("root").Children(rail)))
+	if legacy {
+		if _, err := a.CarouselAdjacent(rail, true); err != ErrCarouselNavigationUnavailable {
+			t.Fatalf("adjacent must report compatibility error: %v", err)
+		}
+		if _, err := a.CarouselStep(rail, true); err != ErrCarouselNavigationUnavailable {
+			t.Fatalf("step must report compatibility error: %v", err)
+		}
+		return
+	}
+	beforeLayout, err := a.CarouselAdjacent(rail, true)
+	check(t, err)
+	if beforeLayout != nil {
+		t.Fatal("unexpected navigation before layout")
+	}
+	check(t, a.Step(.016))
+	destination, err := a.CarouselAdjacent(rail, true)
+	check(t, err)
+	if destination != second {
+		t.Fatal("query missed next slide")
+	}
+	selected, err := a.Selected(rail)
+	check(t, err)
+	if selected != first || len(changes) != 0 {
+		t.Fatal("query changed selection")
+	}
+	destination, err = a.CarouselStep(rail, true)
+	check(t, err)
+	if destination != second || len(changes) != 0 {
+		t.Fatal("step did not commit exactly as a queued change")
+	}
+	_, err = a.Dispatch()
+	check(t, err)
+	if len(changes) != 1 || changes[0].Node != rail || changes[0].Selected != second || changes[0].Frame == 0 {
+		t.Fatalf("expected one Carousel change carrying the next slide: %+v", changes)
+	}
+	boundary, err := a.CarouselStep(rail, true)
+	check(t, err)
+	if boundary != nil {
+		t.Fatal("expected boundary")
+	}
+	_, err = a.Dispatch()
+	check(t, err)
+	if len(changes) != 1 {
+		t.Fatal("boundary emitted a change")
+	}
+}
+
 func TestCarouselFit(t *testing.T) {
 	a := app(t)
 	legacy := os.Getenv("CUI_TEST_LEGACY_CAROUSEL_FIT") == "1"

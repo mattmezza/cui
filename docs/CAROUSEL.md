@@ -310,6 +310,81 @@ Probe `supports_carousel_slots()` (Go `SupportsCarouselSlots()`) when loading
 an older provider. Ordinary arrows and markers can still be enabled if
 their capability is available.
 
+### Place your own navigation buttons
+
+Omit the built-in arrows when your app owns its navigation controls.
+Place ordinary Buttons anywhere in your layout. Read the next reachable
+slide with `cui_bridge_carousel_adjacent_v1`. In the button handler use
+`cui_bridge_carousel_step_v1` to select that slide and queue the ordinary
+Carousel change. Both operations take 0 for Previous or 1 for Next. The
+returned Item is zero when navigation in that direction is unavailable.
+
+These operations use the last laid out snaps. They honor disabled state,
+skip duplicate snaps, and use the effective looping policy. The current
+slide order, axis, and looping policy must have been submitted. When
+a slide size changes, the new snaps are available after the corresponding
+layout. A successful Step uses the existing copied change event, with the
+selected Item and the layout's frame sequence. A query leaves selection and
+the queue unchanged. A full queue rejects Step without changing selection.
+Use `cui_bridge_set_selected` for a silent programmatic selection.
+
+| Language | Find the neighboring Item | Select it and queue the change |
+| --- | --- | --- |
+| Python, JavaScript and TypeScript | `rail.carousel_adjacent(next)` | `rail.carousel_step(next)` |
+| Go | `app.CarouselAdjacent(rail, next)` | `app.CarouselStep(rail, next)` |
+| Rust | `app.carousel_adjacent(rail, next)?` | `app.carousel_step(rail, next)?` |
+
+Use `supports_carousel_navigation` (`SupportsCarouselNavigation` in Go)
+before using these methods with an older library or Node addon. A caller
+can use the built-in arrows when those are available. The Python example
+places its own buttons above the slides and refreshes their disabled
+states after the initial layout and when the selection changes.
+
+```python
+import cui_bridge as cui
+
+with cui.App(width=640, height=320) as app:
+    build = cui.item("build", "Build")
+    release = cui.item("release", "Release")
+    rail = cui.carousel("workflow").visual_size(320, 120).children(build, release)
+    root = cui.column("root")
+    if app.supports_carousel_navigation():
+        back = cui.button("back").label("Previous").disabled()
+        forward = cui.button("forward").label("Next").disabled()
+        back.on_click(lambda event: rail.carousel_step(False))
+        forward.on_click(lambda event: rail.carousel_step(True))
+
+        def refresh_controls():
+            back.disabled(rail.carousel_adjacent(False) is None)
+            forward.disabled(rail.carousel_adjacent(True) is None)
+
+        rail.on_change(lambda event: refresh_controls())
+        root.children(cui.row("toolbar").children(back, forward), rail)
+        app.mount(root)
+        app.step()
+        refresh_controls()
+        app.step()
+
+        # Simulate a user clicking Next in this headless example.
+        x, y, width, height = app.bounds(forward)
+        app.queue_pointer("down", x + width / 2, y + height / 2)
+        app.queue_pointer("up", x + width / 2, y + height / 2)
+        app.step()
+        app.dispatch()
+        assert rail.selected() is release
+    else:
+        if app.supports_carousel_controls():
+            rail.carousel_controls()
+        app.mount(root.children(rail))
+        app.step()
+        assert rail.selected() is build
+```
+
+Step queues the change for the binding's normal dispatch. Python's
+dispatcher can deliver it after the button handler returns. Refresh
+external controls after changing the axis, looping policy, slide order
+or available size as well as after selection changes.
+
 ### Bounds and runnable example
 
 For host-driven input and tests, the existing numeric part bounds API reports

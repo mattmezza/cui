@@ -366,7 +366,7 @@ static struct {
 } table_paging;
 static int table_paging_supported;
 
-static void go_data_table_load_symbol(void *destination, size_t size, const char *name) {
+static void go_load_optional_symbol(void *destination, size_t size, const char *name) {
 #if defined(_WIN32)
  FARPROC symbol = GetProcAddress((HMODULE)bridge_lib, name);
 #else
@@ -375,6 +375,8 @@ static void go_data_table_load_symbol(void *destination, size_t size, const char
  if (symbol && sizeof symbol == size)
   memcpy(destination, &symbol, size);
 }
+
+#include "pagination_ffi.h"
 
 static void go_data_table_initialize(void) {
  if (!bridge_lib) {
@@ -387,16 +389,16 @@ static void go_data_table_initialize(void) {
   table_paging.poll = cui_bridge_data_table_poll_load_more_v1;
 #endif
  } else {
-  go_data_table_load_symbol(&table_keyed, sizeof table_keyed, "cui_bridge_data_table_set_keyed");
-  go_data_table_load_symbol(&table_capacity.maximum, sizeof table_capacity.maximum,
+  go_load_optional_symbol(&table_keyed, sizeof table_keyed, "cui_bridge_data_table_set_keyed");
+  go_load_optional_symbol(&table_capacity.maximum, sizeof table_capacity.maximum,
                             "cui_bridge_data_table_max_row_capacity_v1");
-  go_data_table_load_symbol(&table_capacity.set, sizeof table_capacity.set,
+  go_load_optional_symbol(&table_capacity.set, sizeof table_capacity.set,
                             "cui_bridge_data_table_set_keyed_capacity_v1");
-  go_data_table_load_symbol(&table_paging.size, sizeof table_paging.size,
+  go_load_optional_symbol(&table_paging.size, sizeof table_paging.size,
                             "cui_bridge_data_table_load_more_size_v1");
-  go_data_table_load_symbol(&table_paging.configure, sizeof table_paging.configure,
+  go_load_optional_symbol(&table_paging.configure, sizeof table_paging.configure,
                             "cui_bridge_data_table_configure_load_more_v1");
-  go_data_table_load_symbol(&table_paging.poll, sizeof table_paging.poll,
+  go_load_optional_symbol(&table_paging.poll, sizeof table_paging.poll,
                             "cui_bridge_data_table_poll_load_more_v1");
  }
  table_paging_supported = table_paging.size && table_paging.configure && table_paging.poll &&
@@ -451,6 +453,7 @@ static int bridge_open(const char *path) {
 #undef STATIC_LOAD
  go_data_table_initialize();
  go_skeleton_initialize();
+ go_pagination_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -479,6 +482,7 @@ static int bridge_open(const char *path) {
  bridge_lib = lib;
  go_data_table_initialize();
  go_skeleton_initialize();
+ go_pagination_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -512,6 +516,7 @@ static int bridge_same_thread(bridge_thread_token t) {
 import "C"
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
@@ -549,6 +554,7 @@ type Options struct {
 type Node struct {
 	timeLocalized                        *TimeFieldConfig
 	skeletonConfig                       *SkeletonConfig
+	paginationConfig                     *PaginationConfig
 	iconConfig                           *IconConfig
 	badgeConfig                          *BadgeConfig
 	timeChange                           func(TimeFieldChange)
@@ -645,7 +651,7 @@ type Event struct {
 	CloseResult    int
 }
 
-// DesignSize uses the shared scale currently supported by Button, Avatar and Stepper.
+// DesignSize is the shared scale for Button, Avatar, Pagination and Stepper.
 type DesignSize = Size
 
 type Size int
@@ -1219,7 +1225,7 @@ func (a *App) Close() error {
 	C.go_destroy(a.ptr)
 	for _, n := range a.nodes {
 		n.timeChange = nil
-		n.iconConfig, n.badgeConfig = nil, nil
+		n.iconConfig, n.badgeConfig, n.paginationConfig = nil, nil, nil
 		if n.slider != nil {
 			n.slider.callback = nil
 		}
@@ -1456,7 +1462,7 @@ func (n *Node) StepperVisual(enabled, vertical bool, density StepperDensity) *No
 	return n
 }
 
-// DesignSize applies the shared scale to Button, Avatar and Stepper.
+// DesignSize applies the shared scale to Button, Avatar, Pagination and Stepper.
 func (n *Node) DesignSize(v DesignSize) *Node {
 	if n.kind == 4 {
 		return n.Size(v)
@@ -1464,13 +1470,17 @@ func (n *Node) DesignSize(v DesignSize) *Node {
 	if n.err != nil {
 		return n
 	}
-	if (n.kind != 30 && n.kind != 44) || v < Inherit || v > Size9XL {
-		n.err = errors.New("design size requires Button, Avatar or Stepper and a supported size")
+	if (n.kind != 30 && n.kind != 42 && n.kind != 44) || v < Inherit || v > Size9XL {
+		n.err = errors.New("design size requires Button, Avatar, Pagination or Stepper and a supported size")
 		return n
 	}
 	if n.app != nil {
 		if e := n.app.check(); e != nil {
 			n.err = e
+			return n
+		}
+		if n.kind == 42 && C.go_pagination_supported() == 0 {
+			n.err = ErrPaginationOptionsUnavailable
 			return n
 		}
 		if e := result(C.go_set_design_size(n.app.ptr, n.handle, C.cui_bridge_button_size(v))); e != nil {
@@ -1734,6 +1744,9 @@ func (a *App) Mount(root *Node) error {
 			}
 		}
 		usesResponsiveSkeleton = usesResponsiveSkeleton || n.skeletonConfig != nil
+		if n.kind == 42 && (n.paginationConfig != nil || n.hasDesignSize) && C.go_pagination_supported() == 0 {
+			return ErrPaginationOptionsUnavailable
+		}
 		if n.key == "" {
 			n.key = fmt.Sprintf("go-%p", n)
 		}
@@ -1805,6 +1818,11 @@ func (a *App) Mount(root *Node) error {
 		a.nodes[keyID(h)] = n
 		if n.skeletonConfig != nil {
 			if e := n.configureMountedSkeleton(*n.skeletonConfig); e != nil {
+				return e
+			}
+		}
+		if n.paginationConfig != nil {
+			if e := n.setPaginationConfig(n.paginationConfig); e != nil {
 				return e
 			}
 		}
@@ -2533,7 +2551,7 @@ func (n *Node) Remove() error {
 		delete(x.app.nodes, keyID(x.handle))
 		x.removed = true
 		x.timeChange = nil
-		x.iconConfig, x.badgeConfig = nil, nil
+		x.iconConfig, x.badgeConfig, x.paginationConfig = nil, nil, nil
 		if x.slider != nil {
 			x.slider.callback = nil
 		}
@@ -4483,4 +4501,123 @@ func (n *Node) SkeletonPresentation() (SkeletonPresentation, bool, error) {
 		return SkeletonPresentation{}, false, errors.New("invalid copied Skeleton presentation")
 	}
 	return p, true, nil
+}
+
+// SupportsPaginationOptions reports whether the selected provider exposes all
+// of Pagination V1 with a compatible layout.
+func (a *App) SupportsPaginationOptions() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_pagination_supported() != 0, nil
+}
+
+func paginationWire() C.cui_bridge_pagination_config_v1 {
+	return C.cui_bridge_pagination_config_v1{
+		struct_size: C.sizeof_cui_bridge_pagination_config_v1, schema_version: C.CUI_BRIDGE_PAGINATION_V1,
+	}
+}
+
+func (n *Node) setPaginationConfig(config *PaginationConfig) error {
+	supported, err := n.app.SupportsPaginationOptions()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrPaginationOptionsUnavailable
+	}
+	if config == nil {
+		return result(C.go_pagination_configure(n.app.ptr, n.handle, nil))
+	}
+	wire := paginationWire()
+	if config.Counter {
+		wire.flags |= C.CUI_BRIDGE_PAGINATION_COUNTER
+	}
+	if config.IconOnly {
+		wire.flags |= C.CUI_BRIDGE_PAGINATION_ICON_ONLY
+	}
+	if config.Chevrons {
+		wire.flags |= C.CUI_BRIDGE_PAGINATION_CHEVRONS
+	}
+	if config.JumpMenu {
+		wire.flags |= C.CUI_BRIDGE_PAGINATION_JUMP_MENU
+	}
+	wire.visible_pages = C.uint32_t(config.VisiblePages)
+	wire.available_width = C.float(config.AvailableWidth)
+	for _, label := range []struct {
+		target *C.char
+		value  string
+	}{
+		{&wire.group[0], config.Group}, {&wire.first[0], config.First},
+		{&wire.previous[0], config.Previous}, {&wire.next[0], config.Next},
+		{&wire.last[0], config.Last}, {&wire.earlier_pages[0], config.EarlierPages},
+		{&wire.later_pages[0], config.LaterPages},
+	} {
+		copy(paginationLabelBytes(label.target), label.value)
+	}
+	return result(C.go_pagination_configure(n.app.ptr, n.handle, &wire))
+}
+
+func paginationLabelBytes(source *C.char) []byte {
+	return unsafe.Slice((*byte)(unsafe.Pointer(source)), C.CUI_BRIDGE_PAGINATION_LABEL_BYTES)
+}
+
+// PaginationConfig returns an owned copy and a boolean indicating whether an
+// override is set. An ordinary pager has no override on an earlier provider.
+func (n *Node) PaginationConfig() (PaginationConfig, bool, error) {
+	if err := n.checkPagination(); err != nil {
+		return PaginationConfig{}, false, err
+	}
+	if n.app == nil {
+		if n.paginationConfig == nil {
+			return PaginationConfig{}, false, nil
+		}
+		return *n.paginationConfig, true, nil
+	}
+	supported, err := n.app.SupportsPaginationOptions()
+	if err != nil || !supported {
+		return PaginationConfig{}, false, err
+	}
+	wire := paginationWire()
+	code := C.go_pagination_get_config(n.app.ptr, n.handle, &wire)
+	if code == C.CUI_BRIDGE_EMPTY {
+		return PaginationConfig{}, false, nil
+	}
+	if err := result(code); err != nil {
+		return PaginationConfig{}, false, err
+	}
+	const known = C.CUI_BRIDGE_PAGINATION_COUNTER | C.CUI_BRIDGE_PAGINATION_ICON_ONLY |
+		C.CUI_BRIDGE_PAGINATION_CHEVRONS | C.CUI_BRIDGE_PAGINATION_JUMP_MENU
+	if wire.struct_size != C.sizeof_cui_bridge_pagination_config_v1 ||
+		wire.schema_version != C.CUI_BRIDGE_PAGINATION_V1 || wire.flags&^known != 0 {
+		return PaginationConfig{}, false, errors.New("invalid copied Pagination options")
+	}
+	config := PaginationConfig{
+		Counter:        wire.flags&C.CUI_BRIDGE_PAGINATION_COUNTER != 0,
+		IconOnly:       wire.flags&C.CUI_BRIDGE_PAGINATION_ICON_ONLY != 0,
+		Chevrons:       wire.flags&C.CUI_BRIDGE_PAGINATION_CHEVRONS != 0,
+		JumpMenu:       wire.flags&C.CUI_BRIDGE_PAGINATION_JUMP_MENU != 0,
+		VisiblePages:   uint32(wire.visible_pages),
+		AvailableWidth: float32(wire.available_width),
+	}
+	for _, label := range []struct {
+		source *C.char
+		target *string
+	}{
+		{&wire.group[0], &config.Group}, {&wire.first[0], &config.First},
+		{&wire.previous[0], &config.Previous}, {&wire.next[0], &config.Next},
+		{&wire.last[0], &config.Last}, {&wire.earlier_pages[0], &config.EarlierPages},
+		{&wire.later_pages[0], &config.LaterPages},
+	} {
+		buf := paginationLabelBytes(label.source)
+		end := bytes.IndexByte(buf, 0)
+		if end < 0 {
+			return PaginationConfig{}, false, errors.New("invalid copied Pagination label")
+		}
+		*label.target = string(buf[:end])
+	}
+	if err := config.validate(); err != nil {
+		return PaginationConfig{}, false, err
+	}
+	return config, true, nil
 }

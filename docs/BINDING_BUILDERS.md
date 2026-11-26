@@ -324,6 +324,8 @@ node bindings/typescript/examples/pagination_options.ts
 
 Both examples exercise the result counter in headless mode. The JavaScript example accepts a font path as its first argument to open an SDL window. The TypeScript command uses Node's type-stripping support. [JavaScript source](../bindings/node/examples/pagination-options.cjs) · [TypeScript source](../bindings/typescript/examples/pagination_options.ts)
 
+For the same retained pager on other hosts, see the [Go results example](GO_BUILDERS.md#configure-pagination-from-go) and [Rust results example](RUST_BUILDERS.md#configure-pagination-from-rust).
+
 ## Keep a JavaScript or TypeScript DataTable's scroll position during updates
 
 Pass the row keys as the third argument to `table_data`.

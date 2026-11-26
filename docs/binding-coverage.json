@@ -320,7 +320,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The retained C V1 bridge, Python, JavaScript and TypeScript expose design and navigation options with the existing scalar event. Go and Rust builders use the numbered single-row layout. Immediate C offers synchronous typed aggregate observation."
+        "The retained C V1 bridge and all five language bindings expose design and navigation options. Retained bindings dispatch the scalar event after the frame. Synchronous typed aggregate observation is available in immediate C."
       ]
     },
     {

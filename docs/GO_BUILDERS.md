@@ -136,6 +136,31 @@ VirtualList accepts up to 64 keyed `Item` rows with fixed 32-pixel height and an
 
 The composed workspace example lives at `bindings/go/examples/workspace`. From `bindings/go`, run `CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --headless` to validate native hit targets, Account/Preferences tab navigation, name editing, notifications checkbox, an older birthday, save dialog, and status update without opening a window. To use the SDL UI, run `CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --font /absolute/path/to/font.ttf`. Automated SDL runs on Linux must use invisible Xvfb, for example `xvfb-run -a env -u WAYLAND_DISPLAY CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --font /absolute/path/to/font.ttf`; native mode remains open until the user closes its window.
 
+## Configure Pagination from Go
+
+`ConfiguredPagination` records copied layout options on a detached node. Set `AvailableWidth` to the current inner width in logical pixels to wrap, or use zero for a single row. Send committed pages to your results view through `OnChange`. For a dynamic provider, check `app.SupportsPaginationOptions()` before opting in. Ordinary `Pagination(key)` and its change callback also work with earlier providers.
+
+```go
+pager := cui.ConfiguredPagination("results", cui.PaginationConfig{
+    Chevrons: true, JumpMenu: true, VisiblePages: 5, AvailableWidth: 320,
+    Group: "Pages de résultats", Previous: "Précédente", Next: "Suivante",
+}).Total(24).DesignSize(cui.Base)
+pager.OnChange(func(event cui.Event) {
+    showResults(int(event.Value))
+})
+```
+
+Use `pager.ConfigurePagination(config)` on the app's owner thread to replace the options. `pager.PaginationConfig()` returns a copy and a presence flag. `pager.ResetPagination()` clears the options and preserves the current page, total and design size. The app dispatches callbacks after stepping the bridge.
+
+Run the [document results example](../bindings/go/examples/pagination_options/main.go) with Go and CGO. The default Linux build uses the bundled bridge sources.
+
+```sh
+cd bindings/go
+go run ./examples/pagination_options
+```
+
+To open the same example in an SDL window with a font, run `go run -tags cui_native ./examples/pagination_options -font /path/to/font.ttf`. The native build needs SDL3, FreeType and HarfBuzz.
+
 ## Keep the visible DataTable row during a Go update
 
 Use `TableDataKeyed` to build and `SetTableKeyed` to replace rows from the

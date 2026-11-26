@@ -93,6 +93,37 @@ Dock composes Item panels with optional child content; `dock_activate`, `dock_mo
 
 Settings composes Item pages, nested Item groups, and Switch/Checkbox/Input/NumberInput fields. `settings_query` filters pages (up to 256 bytes), `settings_page`/`settings_set_page` control navigation, `settings_field_bounds` locates visible fields, and `settings_reset_page` restores first-frame defaults with copied field events. The page/group schema freezes after the first frame; Input and NumberInput titles use `detail_text`. All fallible setters return the bridge status as `Error(code)`.
 
+## Configure Pagination from Rust
+
+Build a detached `PaginationOptions` when you want the bridge capability and record size checked before creating a retained child. Ordinary `Kind::Pagination` still works with earlier providers. `app.supports_pagination_options()` reports whether the extended API is available.
+
+```rust
+use cui_builders::{DesignSize, PaginationConfig, PaginationOptions};
+
+let pager = PaginationOptions::default()
+    .configure(PaginationConfig {
+        chevrons: true,
+        jump_menu: true,
+        visible_pages: 5,
+        available_width: 320.0,
+        group: "Pages de résultats".into(),
+        previous: "Précédente".into(),
+        next: "Suivante".into(),
+        ..Default::default()
+    })?
+    .design_size(DesignSize::Base)
+    .mount(&mut app, root, "results")?;
+app.total(pager, 24)?;
+```
+
+Use `app.configure_pagination(pager, &config)` to update a mounted pager as its inner width changes. `app.pagination_config(pager)` returns an owned snapshot. `app.reset_pagination(pager)` clears the override and preserves the current page, total and design size. Use `on_change_event` to capture the committed page, then update your app after dispatch. The [document results example](../bindings/rust/examples/pagination_options.rs) applies the page update to three document labels.
+
+```sh
+cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --example pagination_options
+```
+
+For the native UI, add `--features native` before `--example` and `-- /path/to/font.ttf` at the end. The native build needs SDL3, FreeType and HarfBuzz.
+
 ## Keep the visible DataTable row during a Rust update
 
 Use `Builder::data_table_keyed` on creation and `App::data_table_keyed` on

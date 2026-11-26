@@ -2334,7 +2334,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. The optional C ellipsis menus expose up to 100 omitted pages per direction. Text and accessible names can be localized. Optional labeled chevrons omit separate First/Last controls. The retained C bridge copies the extended options and emits the existing scalar CHANGE event. Python, JS and TS have tested opt-in V1 authoring. Python and Node retain ordinary paging with the alpha.6 provider. Go and Rust option wrappers and physical-host acceptance remain open."
+        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. The optional C ellipsis menus expose up to 100 omitted pages per direction. Text and accessible names can be localized. Optional labeled chevrons omit separate First/Last controls. The retained C bridge copies the extended options and emits the existing scalar CHANGE event. Python, JS, TS, Go and Rust have tested opt-in V1 authoring. Python, Node, Go and Rust retain ordinary paging with the alpha.6 provider. Custom numeric sizing, arrow-only hover tooltips and physical-host acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2416,6 +2416,17 @@
             "bindings/node/test/pagination-options.test.cjs",
             "bindings/node/test/pagination-options.types.ts",
             "bindings/typescript/examples/pagination_options.ts"
+          ]
+        },
+        {
+          "name": "retained Go and Rust configuration and callback",
+          "status": "tested",
+          "evidence": [
+            "bindings/go/cui/pagination_test.go",
+            "bindings/go/examples/pagination_options/main.go",
+            "bindings/rust/tests/pagination_options.rs",
+            "bindings/rust/examples/pagination_options.rs",
+            "cmake/CUIPaginationBindingTests.cmake"
           ]
         },
         {

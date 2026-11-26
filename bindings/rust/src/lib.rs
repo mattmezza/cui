@@ -1,5 +1,6 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
 mod icon_resources;
+mod pagination_options;
 mod shadows;
 mod skeleton_presentation;
 mod slider_model;
@@ -9,6 +10,7 @@ pub use icon_resources::{
     IconBoxStyle, IconCatalogEntry, IconConfig, IconConstraints, IconError, IconInfo, IconLimits,
     IconOptions, IconResource, IconResult, IconSize, IconSource, IconSourceKind, IconTransform,
 };
+pub use pagination_options::{PaginationConfig, PaginationOptions};
 pub use shadows::{BoxShadow, CornerRadii, ShadowKind, ShadowPreset, ShadowStyle};
 pub use skeleton_presentation::{SkeletonConfig, SkeletonPresentation, SkeletonWidth};
 pub use slider_model::{
@@ -1176,7 +1178,7 @@ pub enum Size {
     X8l = 13,
     X9l = 14,
 }
-/// Shared scale, currently supported only by Button and Avatar.
+/// Shared design scale; supported components include Button, Avatar and Pagination.
 pub type DesignSize = Size;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Rounding {

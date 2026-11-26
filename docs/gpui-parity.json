@@ -7384,7 +7384,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Styled visible-window rendering, both orientations, variable extents, scrollbars/keyboard and Auto/Infer sizing are headless tested. The retained C bridge adds optional anchor preservation on vertical updates with up to 64 explicitly sized rows. Intrinsic measurement is an immediate host callback. Row selection and controls remain application-owned. Foreign builders keep the uniform-row path."
+        "Styled visible-window rendering, both orientations, variable extents, scrollbars/keyboard and Auto/Infer sizing are headless tested. The retained C bridge and all five language builders add optional anchoring on vertical updates with up to 64 explicitly sized rows. Intrinsic measurement is an immediate host callback. Row selection and controls remain application-owned."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -7431,6 +7431,19 @@
             "include/cui/cui_bridge.h",
             "docs/VIRTUAL_LIST.md"
           ]
+        },
+        {
+          "name": "Retained live-row authoring across all five language bindings",
+          "status": "tested",
+          "evidence": [
+            "bindings/python/test_virtual_list_rows.py",
+            "bindings/node/test/virtual-list-rows.test.cjs",
+            "bindings/node/test/virtual-list-rows.types.ts",
+            "bindings/go/cui/virtual_list_test.go",
+            "bindings/rust/tests/virtual_list.rs",
+            "docs/VIRTUAL_LIST.md"
+          ],
+          "scope": "Headless row geometry, live membership and order, invalid input, the ordinary path on the released alpha.7 provider, and TypeScript declaration checks."
         },
         {
           "name": "1K/10K/100K benchmark",

@@ -568,3 +568,54 @@ if(CUI_NODE_TSC_EXECUTABLE)
   --tsc ${CUI_NODE_TSC_EXECUTABLE} --node ${NODE_EXECUTABLE}
   --output ${CMAKE_CURRENT_BINARY_DIR}/rating-types)
 endif()
+
+add_test(NAME node_virtual_list_rows COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/virtual-list-rows.test.cjs)
+add_test(NAME node_virtual_list_inbox COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/virtual-list-inbox.cjs)
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_virtual_list_types COMMAND "${CUI_NODE_TSC_EXECUTABLE}" --noEmit --strict
+  --target ES2022 --module NodeNext --moduleResolution NodeNext
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/virtual-list-rows.types.ts
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/virtual_list_inbox.ts)
+endif()
+if(CUI_NODE_VERSION VERSION_GREATER_EQUAL "22.18")
+ add_test(NAME node_virtual_list_types_example COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/virtual_list_inbox.ts)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ set(CUI_NODE_VIRTUAL_LEGACY_LIBRARY "" CACHE FILEPATH "Existing bridge without retained VirtualList rows")
+ if(CUI_NODE_VIRTUAL_LEGACY_LIBRARY)
+  if(NOT EXISTS "${CUI_NODE_VIRTUAL_LEGACY_LIBRARY}")
+   message(FATAL_ERROR "CUI_NODE_VIRTUAL_LEGACY_LIBRARY must name an existing bridge library")
+  endif()
+  add_library(cui_node_virtual_legacy MODULE addon.c)
+  target_include_directories(cui_node_virtual_legacy PRIVATE ${NODE_API_INCLUDE_DIR} ../../include)
+  target_link_libraries(cui_node_virtual_legacy PRIVATE "${CUI_NODE_VIRTUAL_LEGACY_LIBRARY}" m ${CMAKE_DL_LIBS})
+  target_compile_options(cui_node_virtual_legacy PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  set_target_properties(cui_node_virtual_legacy PROPERTIES PREFIX "" SUFFIX ".node")
+  add_test(NAME node_virtual_list_legacy COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_virtual_legacy> CUI_EXPECT_VIRTUAL_LEGACY=1
+   LD_PRELOAD=${CUI_NODE_VIRTUAL_LEGACY_LIBRARY} ${NODE_EXECUTABLE}
+   ${CMAKE_CURRENT_SOURCE_DIR}/test/virtual-list-rows.test.cjs)
+  add_test(NAME node_virtual_list_legacy_inbox COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_virtual_legacy>
+   LD_PRELOAD=${CUI_NODE_VIRTUAL_LEGACY_LIBRARY} ${NODE_EXECUTABLE}
+   ${CMAKE_CURRENT_SOURCE_DIR}/examples/virtual-list-inbox.cjs)
+  foreach(part rows anchor)
+   add_library(cui_node_virtual_${part}_only SHARED test/virtual-list-partial-provider.c)
+   target_include_directories(cui_node_virtual_${part}_only PRIVATE ../../include)
+   target_compile_options(cui_node_virtual_${part}_only PRIVATE -Wall -Wextra -Wpedantic -Werror)
+   if(part STREQUAL "anchor")
+    target_compile_definitions(cui_node_virtual_${part}_only PRIVATE CUI_TEST_VIRTUAL_ANCHOR_ONLY)
+   endif()
+   add_test(NAME node_virtual_list_${part}_only COMMAND ${CMAKE_COMMAND} -E env
+    CUI_NODE_ADDON=$<TARGET_FILE:cui_node_virtual_legacy> CUI_EXPECT_VIRTUAL_LEGACY=1
+    LD_PRELOAD=${CUI_NODE_VIRTUAL_LEGACY_LIBRARY}:$<TARGET_FILE:cui_node_virtual_${part}_only>
+    ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/virtual-list-rows.test.cjs)
+  endforeach()
+ endif()
+endif()

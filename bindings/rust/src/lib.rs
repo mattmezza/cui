@@ -9,6 +9,8 @@ mod skeleton_presentation;
 mod slider_model;
 mod stepper_fill;
 mod time_localized;
+mod virtual_list;
+pub use virtual_list::VirtualListRow;
 pub use icon_resources::{
     BadgeConfig, BadgeResult, BadgeSize, BadgeVariant, IconAlign, IconAvailability, IconBitmap,
     IconBoxStyle, IconCatalogEntry, IconConfig, IconConstraints, IconError, IconInfo, IconLimits,

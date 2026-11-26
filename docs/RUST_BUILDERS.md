@@ -77,7 +77,10 @@ Plot accepts up to 256 copied finite `PlotPoint { x, y }` values through `plot_p
 
 Command accepts up to 64 Item actions; each Item uses `text` as label and `detail_text` as one filter keyword. Command owns the query through `text`/`editable_text`; `command_item_bounds` locates a filtered action for pointer input. Native selection produces CHANGE events and confirmation produces an Item CLICK callback. There are no grouped or custom result rows.
 
-VirtualList accepts up to 64 keyed Item rows, renders a fixed 32-pixel vertical viewport with overscan, and exposes its scroll offset through `value`/`current_value`. `virtual_list_item_bounds` succeeds only for currently rendered rows. Native wheel and key scrolling emit offset CHANGE events; there is no unbounded data source callback.
+VirtualList accepts up to 64 keyed Item rows of 32 pixels by default, renders a vertical viewport with overscan, and exposes its scroll offset through `value`/`current_value`. `virtual_list_item_bounds` succeeds only for currently rendered rows. Native wheel and key scrolling emit offset CHANGE events. Enable
+`preserve_virtual_list_anchor` and send `VirtualListRow` values with
+`set_virtual_list_rows` to retain the first visible Item during edits.
+[Run the live inbox](VIRTUAL_LIST.md#live-updates-from-the-language-builders).
 
 Sidebar accepts Item navigation actions; `open` controls disclosure, `selected` reads the active Item, and native activation emits a selected CHANGE plus Item CLICK. DataTable also supports typed row, column, or cell `data_table_selection_mode`; cell selection snapshots preserve columns beyond the first in copied event JSON.
 

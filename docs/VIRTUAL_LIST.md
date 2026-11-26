@@ -152,10 +152,57 @@ To open an actual window, build with an SDL-enabled C bridge and pass the path
 to a TrueType font as the first argument. [C example](../bindings/bridge/examples/virtual_inbox.c) ·
 [Native bridge prerequisites](BINDING_BUILDERS.md)
 
-The retained bridge currently uses a vertical viewport with explicit row
-extents. Use the immediate API for horizontal lists or a host measurement
-callback. Python, JavaScript, TypeScript, Go and Rust keep their existing
-uniform-row retained builders.
+### Live updates from the language builders
+
+Run the projection between frames, including from an ordinary queued Button
+callback. Check the provider before enabling edit controls. The ordinary
+VirtualList still works with 32-pixel rows on earlier releases. The live API
+covers up to 64 rows in a vertical viewport. Use the immediate C API for
+horizontal lists or a host measurement callback.
+
+| Language | Probe | Set anchoring and order | Change membership after mount |
+| --- | --- | --- | --- |
+| Python | `app.supports_virtual_list_rows()` | `inbox.preserve_virtual_list_anchor()`, `inbox.set_virtual_list_rows([(item, extent), ...])` | `inbox.append_virtual_list_item(item)`, `inbox.remove_virtual_list_item(item)` |
+| JavaScript / TypeScript | `app.supportsVirtualListRows()` | `inbox.preserveVirtualListAnchor()`, `inbox.setVirtualListRows([{item, extent}, ...])` | `inbox.appendVirtualListItem(item)`, `inbox.removeVirtualListItem(item)` |
+| Go | `app.SupportsVirtualListRows()` | `inbox.PreserveVirtualListAnchor(true)`, `inbox.SetVirtualListRows(rows)` with `[]cui.VirtualListRow` | `inbox.AppendVirtualListItem(key, label)`, `item.Remove()` |
+| Rust | `app.supports_virtual_list_rows()` | `app.preserve_virtual_list_anchor(inbox, true)`, `app.set_virtual_list_rows(inbox, &rows)` with `VirtualListRow` values | `app.child(inbox, Kind::Item, key)`, `app.remove(item)` |
+
+Keep a row array in the application. To prepend, create an Item with a unique
+key, add that Item at index zero in your array and submit the full projection.
+Paths for app-owned Items with child controls still use the host's original
+tree construction. Live Python and JavaScript/TypeScript append helpers and
+Go's text helper append a leaf Item. An invalid projection leaves the last
+admitted order and heights intact. Membership edits are separate operations.
+After the next layout, query the current offset or row bounds using the same
+handles.
+
+These examples open the same kind of inbox and exercise prepend and resize
+through actual button callbacks. With no font they run a headless check. First
+build the [Python bridge and Node addon](BINDING_BUILDERS.md). For Go and Rust
+the commands use the bundled portable bridge. The TypeScript command requires
+Node with built-in type stripping. Paths below start at the checkout root.
+
+```sh
+PYTHONPATH=bindings/python CUI_BRIDGE_LIBRARY="$PWD/build/libcui_bridge.so" \
+  python bindings/python/examples/virtual_list_inbox.py
+CUI_NODE_ADDON="$PWD/build-node/cui.node" node bindings/node/examples/virtual-list-inbox.cjs
+CUI_NODE_ADDON="$PWD/build-node/cui.node" node bindings/typescript/examples/virtual_list_inbox.ts
+(cd bindings/go && go run ./examples/virtual_list_inbox)
+cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --example virtual_list_inbox
+```
+
+For a native window, use an SDL-enabled provider and supply a TrueType font.
+Pass `--font /absolute/path/to/font.ttf` in Python. JavaScript and TypeScript
+accept the path as their first argument. In Go, add `--font /absolute/path/to/font.ttf` and use
+`go run -tags cui_native` with [the native SDK prerequisites](GO_BUILDERS.md).
+In Rust, add `--features native` before `-- /absolute/path/to/font.ttf` with
+[the native SDK prerequisites](RUST_BUILDERS.md). An SDL-enabled shared bridge
+also works with either compiled binding. See the runnable examples for loop
+and callback ownership. [Python](../bindings/python/examples/virtual_list_inbox.py) ·
+[JavaScript](../bindings/node/examples/virtual-list-inbox.cjs) ·
+[TypeScript](../bindings/typescript/examples/virtual_list_inbox.ts) ·
+[Go](../bindings/go/examples/virtual_list_inbox/main.go) ·
+[Rust](../bindings/rust/examples/virtual_list_inbox.rs)
 
 Verified scope: both orientations, variable extents, keyed reorder identity,
 visible-window callback bounds, overscan, cross-axis scroll, precise wheel motion,

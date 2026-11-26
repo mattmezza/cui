@@ -44,6 +44,10 @@ class _Handle(C.Structure):
     _fields_ = [("slot", C.c_uint32), ("generation", C.c_uint32)]
 
 
+class _VirtualListRow(C.Structure):
+    _fields_ = [("item", _Handle), ("extent", C.c_float)]
+
+
 class _Rect(C.Structure):
     _fields_ = [("x", C.c_float), ("y", C.c_float),
                 ("width", C.c_float), ("height", C.c_float)]
@@ -187,6 +191,14 @@ class _API:
                                               C.c_uint32, C.POINTER(_DataTableLoadMoreV1))
         self.command_bounds = bind("command_item_bounds", C.c_int, C.c_void_p, _Handle, _Handle, C.POINTER(_Rect))
         self.virtual_bounds = bind("virtual_list_item_bounds", C.c_int, C.c_void_p, _Handle, _Handle, C.POINTER(_Rect))
+        self.virtual_rows = self.virtual_anchor = None
+        if all(hasattr(lib, "cui_bridge_" + name) for name in
+               ("virtual_list_set_rows_v1", "virtual_list_preserve_anchor_v1")):
+            self.virtual_rows = bind("virtual_list_set_rows_v1", C.c_int, C.c_void_p, _Handle,
+                                     C.c_uint32, C.POINTER(_VirtualListRow), C.c_uint32)
+            self.virtual_anchor = bind("virtual_list_preserve_anchor_v1", C.c_int,
+                                       C.c_void_p, _Handle, C.c_uint32)
+
         self.set_chart = bind("chart_set_data", C.c_int, C.c_void_p, _Handle, C.POINTER(_ChartDatum), C.c_uint32)
         self.set_chart_kind = bind("chart_set_kind", C.c_int, C.c_void_p, _Handle, C.c_uint32)
         self.get_chart = bind("chart_get_datum", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32), C.POINTER(C.c_double))
@@ -1336,6 +1348,104 @@ class Widget:
         if self.kind != "data_table" or self._app is None or isinstance(column,bool) or not isinstance(column,int) or not 0<=column<=0xffffffff: raise ValueError("invalid mounted table header")
         rect=_Rect();self._change("matrix_header_bounds",column,C.byref(rect));return rect.x,rect.y,rect.width,rect.height
 
+    def _live_virtual_list(self) -> App:
+        if self.kind != "virtual_list" or self._app is None or self._disposed:
+            raise ValueError("mounted VirtualList required")
+        self._app._ensure_open()
+        if not self._app.supports_virtual_list_rows():
+            raise RuntimeError("VirtualList live rows require both V1 bridge symbols")
+        return self._app
+
+    def preserve_virtual_list_anchor(self, enabled: bool = True) -> "Widget":
+        app = self._live_virtual_list()
+        if type(enabled) is not bool:
+            raise TypeError("enabled must be bool")
+        app._api.check(app._api.virtual_anchor(app._ptr, self._handle, int(enabled)))
+        return self
+
+    def set_virtual_list_rows(self, rows: Iterable[tuple[Widget, float]]) -> "Widget":
+        """Replace the complete order/extent projection; zero extent uses 32px."""
+        app = self._live_virtual_list()
+        rows = list(islice(rows, 65))
+        if len(rows) > 64 or len(rows) != len(self._children):
+            raise ValueError("projection must contain all children, at most 64")
+        seen = set()
+        wire = (_VirtualListRow * len(rows))()
+        ordered = []
+        for index, row in enumerate(rows):
+            if not isinstance(row, (tuple, list)) or len(row) != 2:
+                raise ValueError("rows require (Item, extent) pairs")
+            item, extent = row
+            if (not isinstance(item, Widget) or item.kind != "item" or
+                    item._app is not app or item._disposed or item not in self._children or
+                    id(item) in seen):
+                raise ValueError("rows require unique live direct Items")
+            if (isinstance(extent, bool) or not isinstance(extent, (int, float)) or
+                    not (extent == 0 or 1 <= extent <= 4096)):
+                raise ValueError("extent must be zero or finite in 1..4096")
+            seen.add(id(item))
+            ordered.append(item)
+            wire[index] = _VirtualListRow(item._handle, extent)
+        app._api.check(app._api.virtual_rows(app._ptr, self._handle, C.sizeof(_VirtualListRow),
+                                            wire, len(rows)))
+        self._children[:] = ordered
+        return self
+
+    def append_virtual_list_item(self, item: "Widget") -> "Widget":
+        """Mount one unattached leaf Item; submit a complete projection afterward."""
+        app = self._live_virtual_list()
+        if (not isinstance(item, Widget) or item.kind != "item" or item._app is not None or
+                item._disposed or item._children or len(self._children) >= 64):
+            raise ValueError("unattached leaf Item required; capacity is 64")
+        if (item._radio_content or item._radio_tooltip or item._radio_motion or
+                item._radio_tab_index is not None or item._radio_paints):
+            raise ValueError("RadioGroup Item options are unavailable here")
+        key = item.key
+        if key is None or any(node.key == key for node in app._by_handle.values()):
+            raise ValueError("live Items require a unique explicit key")
+        handle = _Handle()
+        app._api.check(app._api.node_create(app._ptr, self._handle, _KIND["item"], _utf8(key), C.byref(handle)))
+        item._app, item._handle = app, handle
+        try:
+            item._change("set_text", _utf8(item._text))
+            if item._detail: item._change("set_detail", _utf8(item._detail))
+            if item._disabled: item._change("set_disabled", 1)
+            if item._checked_set: item._change("set_checked", int(item._checked))
+            if item._open_set: item._change("set_open", int(item._open))
+            if item._visual is not None: item._change("set_visual", *item._visual)
+            if item._image is not None: item._change("set_image", *item._image)
+            if item._step_status is not None: item._change("set_step_status", item._step_status)
+            if item._panel_size is not None: item._change("set_value", item._panel_size)
+            if item._question_flags is not None: item._change("question_config", *map(int, item._question_flags))
+            for part, style in item._part_shadow_styles.items():
+                target = target_value(part)
+                wire = style._wire(app._api)
+                item._change("set_target_box_shadows_v1", 16, C.byref(target), 224, C.byref(wire))
+        except Exception:
+            app._api.node_remove(app._ptr, handle)
+            item._app = item._handle = None
+            raise
+        app._by_handle[(handle.slot, handle.generation)] = item
+        self._children.append(item)
+        return self
+
+    def remove_virtual_list_item(self, item: "Widget") -> "Widget":
+        app = self._live_virtual_list()
+        if (not isinstance(item, Widget) or item not in self._children or
+                item._app is not app or item._disposed):
+            raise ValueError("live direct Item required")
+        app._api.check(app._api.node_remove(app._ptr, item._handle))
+
+        def retire(node):
+            app._by_handle.pop((node._handle.slot, node._handle.generation), None)
+            node._disposed = True
+            for child in node._children:
+                retire(child)
+
+        retire(item)
+        self._children.remove(item)
+        return self
+
     def item_bounds(self, item: "Widget") -> tuple:
         if self.kind not in {"command","virtual_list"} or self._app is None or not isinstance(item,Widget) or item._app is not self._app or item not in self._children: raise ValueError("item_bounds requires mounted same-app child")
         rect=_Rect();self._change("command_bounds" if self.kind=="command" else "virtual_bounds",item._handle,C.byref(rect));return rect.x,rect.y,rect.width,rect.height
@@ -2390,6 +2500,10 @@ class App:
         if self._time_field_enabled and self._ptr:
             count += self.dispatch_time_changes()
         return count
+
+    def supports_virtual_list_rows(self) -> bool:
+        self._ensure_open()
+        return self._api.virtual_rows is not None and self._api.virtual_anchor is not None
 
     def supports_slider_model(self) -> bool:
         from .slider_model import supported

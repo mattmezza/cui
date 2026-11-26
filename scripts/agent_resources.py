@@ -66,6 +66,7 @@ def source_files(root):
                  'bindings/go/cui/icon_presentation.go', 'bindings/go/cui/badge_configured.go',
                  'bindings/rust/src/time_localized.rs', 'bindings/rust/src/skeleton_presentation.rs',
                  'bindings/rust/src/pagination_options.rs', 'bindings/rust/src/icon_resources/rating.rs',
+                 'bindings/rust/src/virtual_list.rs',
                  'bindings/rust/src/icon_resources.rs',
                  'bindings/rust/src/icon_resources/presentation.rs', 'bindings/rust/src/icon_resources/badge.rs',
                  'bindings/go/cui/part_shadows.go', 'bindings/go/cui/slider_model.go', 'bindings/rust/src/part_shadows.rs'))

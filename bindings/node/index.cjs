@@ -544,6 +544,85 @@ class Node {
   table_state() {if(this.kind!==71||!this.owner)throw new TypeError('mounted DataTable required');return native.getMatrixState(this.owner.handle,this[NODE]);}
   table_cell_bounds(row,column) {if(this.kind!==71||!this.owner||![row,column].every(v=>Number.isInteger(v)&&v>=0&&v<=0xffffffff))throw new TypeError('invalid mounted cell');return native.matrixCellBounds(this.owner.handle,this[NODE],row,column);}
   table_header_bounds(column) {if(this.kind!==71||!this.owner||!Number.isInteger(column)||column<0||column>0xffffffff)throw new TypeError('invalid mounted header');return native.matrixHeaderBounds(this.owner.handle,this[NODE],0,column);}
+  _liveVirtualList() {
+    if (this.kind !== 74 || !this.owner) throw new TypeError('mounted VirtualList required');
+    this.owner._alive();
+    if (!this.owner.supportsVirtualListRows())
+      throw new Error('VirtualList live rows require both V1 bridge symbols');
+    return this.owner;
+  }
+  preserveVirtualListAnchor(enabled = true) {
+    const app = this._liveVirtualList();
+    if (typeof enabled !== 'boolean') throw new TypeError('enabled must be boolean');
+    native.virtualRowsOptions(app.handle, 1, this[NODE], enabled ? 1 : 0);
+    return this;
+  }
+  setVirtualListRows(rows) {
+    const app = this._liveVirtualList();
+    if (!Array.isArray(rows) || rows.length > 64 || rows.length !== this.childrenValue.length)
+      throw new RangeError('projection requires all children, at most 64');
+    const seen = new Set(), ordered = [], wire = [];
+    for (const row of rows.slice(0, 65)) {
+      if (!row) throw new TypeError('row required');
+      // Capture user-controlled accessors once; commit exactly the validated snapshot.
+      const item = row.item, extent = row.extent;
+      if (!(item instanceof Node) || item.kind !== 20 || item.owner !== app ||
+          item.parent !== this || !this.childrenValue.includes(item) || seen.has(item))
+        throw new TypeError('unique live direct Items required');
+      if (typeof extent !== 'number' || !Number.isFinite(extent) ||
+          !(extent === 0 || (extent >= 1 && extent <= 4096)))
+        throw new RangeError('extent must be zero or finite in 1..4096');
+      seen.add(item);
+      ordered.push(item);
+      wire.push({item: item[NODE], extent});
+    }
+    native.virtualRowsOptions(app.handle, 2, this[NODE], wire);
+    this.childrenValue = ordered;
+    return this;
+  }
+  appendVirtualListItem(item) {
+    const app = this._liveVirtualList();
+    if (!(item instanceof Node) || item.kind !== 20 || item.owner || item.parent ||
+        item.childrenValue.length || this.childrenValue.length >= 64)
+      throw new TypeError('unattached leaf Item required; capacity is 64');
+    if (item.radioContentValue || item.radioTooltipValue || item.radioMotionValue ||
+        item.radioTabIndexValue !== null || item.radioPaintValues)
+      throw new TypeError('RadioGroup Item options unavailable here');
+    if ([...app.nodes.values()].some(node => node.keyValue === item.keyValue))
+      throw new Error('duplicate key');
+    item[NODE] = native.makeNode(app.handle, this[NODE], 20, item.keyValue);
+    try {
+      native.setText(app.handle, item[NODE], item.textValue);
+      if (item.detailValue) native.setDetail(app.handle, item[NODE], item.detailValue);
+      if (item.disabledValue) native.setDisabled(app.handle, item[NODE], 1);
+      if (item.checkedSet) native.setChecked(app.handle, item[NODE], item.checkedValue ? 1 : 0);
+      if (item.openSet) native.setOpen(app.handle, item[NODE], item.openValue ? 1 : 0);
+      if (item.visualValue) native.setVisualSize(app.handle, item[NODE], ...item.visualValue);
+      if (item.imageValue) native.setImage(app.handle, item[NODE], ...item.imageValue);
+      if (item.statusValue !== null) native.setStepStatus(app.handle, item[NODE], item.statusValue);
+      if (item.panelValue !== null) native.setValue(app.handle, item[NODE], item.panelValue);
+      if (item.questionFlags)
+        native.questionConfig(app.handle, item[NODE], ...item.questionFlags.map(value => value ? 1 : 0));
+      for (const [part, style] of item.partShadowStyles)
+        native.setPartShadows(app.handle, item[NODE], part, style.wire());
+    } catch (error) {
+      native.removeNode(app.handle, item[NODE]);
+      item[NODE] = null;
+      throw error;
+    }
+    item.owner = app;
+    item.parent = this;
+    app.nodes.set(keyFor(native.nodeId(item[NODE])), item);
+    this.childrenValue.push(item);
+    return this;
+  }
+  removeVirtualListItem(item) {
+    this._liveVirtualList();
+    if (!(item instanceof Node) || item.owner !== this.owner || item.parent !== this ||
+        !this.childrenValue.includes(item)) throw new TypeError('live direct Item required');
+    item.remove();
+    return this;
+  }
   item_bounds(item) {if(![73,74].includes(this.kind)||!this.owner||!(item instanceof Node)||item.owner!==this.owner||!this.childrenValue.includes(item))throw new TypeError('item_bounds requires mounted same-app child');return this.kind===73?native.commandBounds(this.owner.handle,this[NODE],item[NODE]):native.virtualBounds(this.owner.handle,this[NODE],item[NODE]);}
   scroll_to(offset) {if(![64,74].includes(this.kind) || !this.owner || !Number.isFinite(offset) || offset<0 || offset>1000000)throw new TypeError('message scroll_to requires a mounted component after first frame and valid offset');native.setValue(this.owner.handle,this[NODE],offset);return this;}
   panel_size(size) {if(this.kind!==20 || !Number.isFinite(size) || size<100 || size>4096)throw new TypeError('Resizable panel requires 100..4096 pixels');if(this.owner)native.setValue(this.owner.handle,this[NODE],size);this.panelValue=size;return this;}
@@ -656,6 +735,10 @@ class App {
       backend: options.backend === 'sdl' ? 1 : options.backend === undefined || options.backend === 'headless' ? 0 : NaN,
       maxNodes: options.maxNodes ?? 1024, maxEvents: options.maxEvents ?? 1024,
       title: options.title, fontPath: options.fontPath, initiallyHidden: options.initiallyHidden ? 1 : 0});
+  }
+  supportsVirtualListRows() {
+    this._alive();
+    return native.virtualRowsOptions(this.handle, 0);
   }
   _alive() { if (this.disposed) throw new Error('app is disposed'); }
   font_fallbacks(paths) {

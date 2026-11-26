@@ -101,6 +101,12 @@ add_test(NAME bridge_python_rating COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_rating_example COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/examples/rating_options.py)
+add_test(NAME bridge_python_virtual_list_rows COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_virtual_list_rows.py)
+add_test(NAME bridge_python_virtual_list_inbox COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/examples/virtual_list_inbox.py)
 set(CUI_PYTHON_SKELETON_LEGACY_LIBRARY "" CACHE FILEPATH "Optional published pre-presentation bridge")
 set(CUI_PYTHON_SKELETON_PARTIAL_LIBRARY "" CACHE FILEPATH "Optional bridge with incomplete Skeleton symbols")
 add_test(NAME bridge_python_skeleton COMMAND ${CMAKE_COMMAND} -E env
@@ -325,6 +331,7 @@ set(CUI_RUST_SKELETON_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-skeleton-target" CACH
 set(CUI_RUST_SKELETON_STATIC_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-skeleton-static-target" CACHE PATH "Reusable Cargo cache for bundled Skeleton checks")
 include("${CMAKE_CURRENT_LIST_DIR}/CUIPaginationBindingTests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/CUIRatingBindingTests.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/CUIVirtualListBindingTests.cmake")
 if(CUI_RUST_SKELETON_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR "Rust Skeleton provider tests currently support Linux only")

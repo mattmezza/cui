@@ -468,7 +468,10 @@ query. See the headless and native inbox in `docs/RUST_BUILDERS.md`.
 For variable-height VirtualList updates in C, capture an anchor before
 rebuilding keys or changing heights and restore it before the next draw.
 Retain the within-row offset for surviving keys. Clear it if a removed item's
-replacement should begin at the viewport edge. See `docs/VIRTUAL_LIST.md`.
+replacement should begin at the viewport edge. The retained C, Python, JS/TS,
+Go and Rust APIs copy a complete projection of up to 64 vertical Items. Probe
+live-row support before enabling anchoring. Explicit scroll wins. Earlier
+providers keep uniform rows. See the runnable inboxes in `docs/VIRTUAL_LIST.md`.
 For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots alive
 through frame completion and ensure the container fits the panels' combined
 min/max range. A pane at its constraint cannot move farther in that direction.

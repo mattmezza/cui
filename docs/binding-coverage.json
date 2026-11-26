@@ -934,7 +934,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Immediate C has the variable-extent anchor model. The retained C bridge offers batched order and extent updates with opt-in restoration. Python, JavaScript, TypeScript, Go and Rust retain uniform rows and numeric scrolling; the optional live-row APIs are pending."
+        "Python, JavaScript, TypeScript, Go and Rust support complete copied order and extent projections with optional anchoring, up to 64 existing direct Items in a vertical viewport. Earlier providers retain uniform rows. Horizontal, host measurement and larger model capacities remain in immediate C. Row focus, selection and navigation are app-owned."
       ]
     },
     {

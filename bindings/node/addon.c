@@ -2481,6 +2481,64 @@ static void wire_big_out(unsigned char *wire, const void *record, size_t at) {
 #include "rating_options_internal.h"
 // clang-format on
 
+/* Optional pair: ordinary VirtualList remains usable on earlier providers. */
+typedef cui_bridge_status (*virtual_rows_fn)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                                             const cui_bridge_virtual_list_row_v1 *, uint32_t);
+typedef cui_bridge_status (*virtual_anchor_fn)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static napi_value virtual_rows_options(napi_env env, napi_callback_info info) {
+    napi_value v[4], result;
+    js_app *app;
+    js_node *list;
+    uint32_t op;
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app) || !uint_arg(env, v[1], &op))
+        return NULL;
+    virtual_rows_fn rows = NULL;
+    virtual_anchor_fn anchor = NULL;
+    bool supported =
+        optional_bridge_symbol(&rows, sizeof rows, "cui_bridge_virtual_list_set_rows_v1") &&
+        optional_bridge_symbol(&anchor, sizeof anchor,
+                               "cui_bridge_virtual_list_preserve_anchor_v1");
+    if (op == 0) {
+        return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
+    }
+    if (!supported)
+        return fail(env, "VirtualList live rows require both V1 bridge symbols");
+    if (!args(env, info, 4, v) || !node_arg(env, v[2], app, &list))
+        return NULL;
+    cui_bridge_status code;
+    if (op == 1) {
+        uint32_t enabled;
+        if (!uint_arg(env, v[3], &enabled) || enabled > 1)
+            return fail(env, "invalid anchor flag");
+        code = anchor(app->bridge, list->node, enabled);
+    } else if (op == 2) {
+        bool array = false;
+        uint32_t count;
+        if (napi_is_array(env, v[3], &array) != napi_ok || !array ||
+            napi_get_array_length(env, v[3], &count) != napi_ok || count > 64)
+            return fail(env, "expected at most 64 rows");
+        cui_bridge_virtual_list_row_v1 wire[64];
+        for (uint32_t i = 0; i < count; ++i) {
+            napi_value row, item, extent;
+            js_node *node;
+            double height;
+            if (napi_get_element(env, v[3], i, &row) != napi_ok ||
+                napi_get_named_property(env, row, "item", &item) != napi_ok ||
+                !node_arg(env, item, app, &node) ||
+                napi_get_named_property(env, row, "extent", &extent) != napi_ok ||
+                napi_get_value_double(env, extent, &height) != napi_ok || !isfinite(height) ||
+                !(height == 0 || (height >= 1 && height <= 4096)))
+                return fail(env, "invalid VirtualList row");
+            wire[i] = (cui_bridge_virtual_list_row_v1){node->node, (float)height};
+        }
+        code = rows(app->bridge, list->node, sizeof wire[0], wire, count);
+    } else
+        return fail(env, "invalid VirtualList operation");
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
+    return napi_get_undefined(env, &result) == napi_ok ? result : NULL;
+}
+
 static napi_value init(napi_env env, napi_value exports) {
 #define EXPORT(name, fn, data)                                                                     \
     if (!export_fn(env, exports, name, fn, data))                                                  \
@@ -2621,6 +2679,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("skeletonPresentation", skeleton_presentation, 0);
     EXPORT("paginationOptions", pagination_options, 0);
     EXPORT("ratingOptions", rating_options, 0);
+    EXPORT("virtualRowsOptions", virtual_rows_options, 0);
     EXPORT("paginationCustomSize", pagination_custom_size, 0);
     EXPORT("iconResource", icon_resource, 0);
     EXPORT("iconNode", icon_node, 0);

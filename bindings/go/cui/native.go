@@ -555,6 +555,41 @@ static cui_bridge_status go_data_table_poll_load_more(cui_bridge_app *app,
                                : CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
 
+static struct {
+ cui_bridge_status (*set_rows)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                               const cui_bridge_virtual_list_row_v1 *, uint32_t);
+ cui_bridge_status (*preserve_anchor)(cui_bridge_app *, cui_bridge_node, uint32_t);
+} virtual_list_api;
+
+static void go_virtual_list_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&virtual_list_api.set_rows, sizeof virtual_list_api.set_rows,
+                          "cui_bridge_virtual_list_set_rows_v1");
+  go_load_optional_symbol(&virtual_list_api.preserve_anchor, sizeof virtual_list_api.preserve_anchor,
+                          "cui_bridge_virtual_list_preserve_anchor_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else {
+  virtual_list_api.set_rows = cui_bridge_virtual_list_set_rows_v1;
+  virtual_list_api.preserve_anchor = cui_bridge_virtual_list_preserve_anchor_v1;
+ }
+#endif
+}
+
+static int go_virtual_list_rows_supported(void) {
+ return virtual_list_api.set_rows && virtual_list_api.preserve_anchor;
+}
+
+static cui_bridge_status go_virtual_list_set_rows(cui_bridge_app *app, cui_bridge_node list,
+ const cui_bridge_virtual_list_row_v1 *rows, uint32_t count) {
+ return virtual_list_api.set_rows(app, list, sizeof *rows, rows, count);
+}
+
+static cui_bridge_status go_virtual_list_preserve_anchor(cui_bridge_app *app,
+ cui_bridge_node list, uint32_t enabled) {
+ return virtual_list_api.preserve_anchor(app, list, enabled);
+}
+
 static int bridge_open(const char *path) {
  if (bridge_initialized) return 0;
 #if defined(CUI_GO_STATIC)
@@ -572,6 +607,7 @@ static int bridge_open(const char *path) {
  go_radio_content_initialize();
  go_radio_tooltip_initialize();
  go_stepper_fill_initialize();
+ go_virtual_list_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -608,6 +644,7 @@ static int bridge_open(const char *path) {
  go_radio_content_initialize();
  go_radio_tooltip_initialize();
  go_stepper_fill_initialize();
+ go_virtual_list_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -649,6 +686,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/cgo"
+	"slices"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -3586,6 +3624,108 @@ func Plot(key string) *Node        { return &Node{kind: 72, key: key} }
 func Command(key string) *Node     { return &Node{kind: 73, key: key} }
 func VirtualList(key string) *Node { return &Node{kind: 74, key: key} }
 func Sidebar(key string) *Node     { return &Node{kind: 75, key: key} }
+
+// VirtualListRow places an existing direct Item in the next layout.
+type VirtualListRow struct {
+	Item *Node
+	// Extent is in logical pixels. Use zero for 32, or a value from 1 through 4096.
+	Extent float32
+}
+
+// ErrVirtualListRowsUnavailable means the loaded bridge does not export the live row API.
+var ErrVirtualListRowsUnavailable = errors.New("live VirtualList rows are unavailable in this bridge")
+
+// SupportsVirtualListRows reports whether the bridge supports projections and anchor preservation.
+func (a *App) SupportsVirtualListRows() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_virtual_list_rows_supported() != 0, nil
+}
+
+func (n *Node) mountedVirtualList() error {
+	if n == nil || n.app == nil || n.removed || n.kind != int(C.CUI_BRIDGE_VIRTUAL_LIST) {
+		return errors.New("mounted VirtualList required")
+	}
+	return n.app.check()
+}
+
+// AppendVirtualListItem attaches a text Item after the existing rows.
+// Call SetVirtualListRows to move it or assign a custom extent.
+func (n *Node) AppendVirtualListItem(key, label string) (*Node, error) {
+	if err := n.mountedVirtualList(); err != nil {
+		return nil, err
+	}
+	if err := valid(key); err != nil {
+		return nil, err
+	}
+	if err := valid(label); err != nil {
+		return nil, err
+	}
+	name := cs(key)
+	defer C.free(unsafe.Pointer(name))
+	a := n.app
+	var handle C.cui_bridge_node
+	if err := result(C.go_node_create(a.ptr, n.handle, C.CUI_BRIDGE_ITEM, name, &handle)); err != nil {
+		return nil, err
+	}
+	item := Item(key, label)
+	item.app, item.handle = a, handle
+	if err := item.setNativeText(label); err != nil {
+		_ = C.go_node_remove(a.ptr, handle)
+		return nil, err
+	}
+	a.nodes[keyID(handle)] = item
+	n.children = slices.DeleteFunc(n.children, func(child *Node) bool { return child.removed })
+	n.children = append(n.children, item)
+	return item, nil
+}
+
+// PreserveVirtualListAnchor opts into retaining the first visible Item and its
+// offset during row edits. An explicit scroll value before the next step wins.
+func (n *Node) PreserveVirtualListAnchor(enabled bool) error {
+	if err := n.mountedVirtualList(); err != nil {
+		return err
+	}
+	if C.go_virtual_list_rows_supported() == 0 {
+		return ErrVirtualListRowsUnavailable
+	}
+	return result(C.go_virtual_list_preserve_anchor(n.app.ptr, n.handle, C.uint32_t(btoi(enabled))))
+}
+
+// SetVirtualListRows copies a complete order and set of extents for the existing
+// direct Items. Include each live Item once. Errors preserve order and extents.
+// Change membership through AppendVirtualListItem and Item.Remove before calling this.
+func (n *Node) SetVirtualListRows(rows []VirtualListRow) error {
+	if err := n.mountedVirtualList(); err != nil {
+		return err
+	}
+	if C.go_virtual_list_rows_supported() == 0 {
+		return ErrVirtualListRowsUnavailable
+	}
+	var data [64]C.cui_bridge_virtual_list_row_v1
+	if len(rows) > len(data) {
+		return errors.New("VirtualList supports up to 64 direct Items")
+	}
+	children := make([]*Node, len(rows))
+	for i, row := range rows {
+		if row.Item == nil || row.Item.app != n.app || row.Item.removed ||
+			row.Item.kind != int(C.CUI_BRIDGE_ITEM) {
+			return errors.New("live same-app VirtualList Item required")
+		}
+		if row.Extent != 0 && !(row.Extent >= 1 && row.Extent <= 4096) {
+			return errors.New("invalid VirtualList Item extent")
+		}
+		data[i] = C.cui_bridge_virtual_list_row_v1{item: row.Item.handle, extent: C.float(row.Extent)}
+		children[i] = row.Item
+	}
+	if err := result(C.go_virtual_list_set_rows(n.app.ptr, n.handle, &data[0], C.uint32_t(len(rows)))); err != nil {
+		return err
+	}
+	n.children = children
+	return nil
+}
+
 func (a *App) VirtualListItemBounds(list, item *Node) (Rect, error) {
 	if e := a.check(); e != nil {
 		return Rect{}, e

@@ -112,6 +112,14 @@ PYTHONPATH=bindings/python CUI_BRIDGE_LIBRARY="$PWD/build/libcui_bridge.so" \
 
 Append `--font /absolute/path/to/font.ttf` to run the SDL window. Build the bridge with SDL support for that mode.
 
+## Keep an inbox in place while rows change
+
+The retained VirtualList in Python, JavaScript and TypeScript can opt into
+scroll anchoring across live row edits. Append a leaf Item and submit the
+full order and heights in one copied projection. Ordinary row scrolling
+still reports offset changes. The runnable inboxes show how Button callbacks
+prepend a message or change a row's height. [Live inbox guide](VIRTUAL_LIST.md#live-updates-from-the-language-builders)
+
 ## Keep a Python DataTable's scroll position during updates
 
 Use the keyword argument `row_keys` when mounting and updating a DataTable.

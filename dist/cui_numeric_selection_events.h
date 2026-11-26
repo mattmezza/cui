@@ -34,6 +34,11 @@ cui_numeric_selection_event_result cui_pagination_events(cui_context *, cui_id, 
                                                          size_t *, size_t total, bool compact,
                                                          bool disabled,
                                                          cui_pagination_event_handler);
+/* Same event contract with the navigation options from cui_base_pagination_ex. */
+cui_numeric_selection_event_result cui_base_pagination_events_ex(cui_context *, cui_id, size_t *,
+                                                                 size_t total,
+                                                                 cui_pagination_options,
+                                                                 cui_pagination_event_handler);
 /* Same event contract with the layout options from cui_pagination_ex. */
 cui_numeric_selection_event_result cui_pagination_events_ex(cui_context *, cui_id,
                                                             const cui_theme *, size_t *,
@@ -99,11 +104,19 @@ cui_numeric_selection_event_result cui_rating_events(cui_context *, cui_id, cons
 cui_numeric_selection_event_result
 cui_base_pagination_events(cui_context *ui, cui_id id, size_t *page, size_t total, bool compact,
                            bool disabled, cui_pagination_event_handler handler) {
+    return cui_base_pagination_events_ex(
+        ui, id, page, total, (cui_pagination_options){.compact = compact, .disabled = disabled},
+        handler);
+}
+cui_numeric_selection_event_result
+cui_base_pagination_events_ex(cui_context *ui, cui_id id, size_t *page, size_t total,
+                              cui_pagination_options options,
+                              cui_pagination_event_handler handler) {
     uint64_t frame = cui_frame_sequence(ui);
-    bool observe = handler.change && frame && id && page && !disabled;
+    bool observe = handler.change && frame && id && page && !options.disabled;
     size_t before = observe ? *page : 0;
     cui_numeric_selection_event_result result = {0};
-    result.control = cui_base_pagination(ui, id, page, total, compact, disabled);
+    result.control = cui_base_pagination_ex(ui, id, page, total, options);
     if (observe && cui_frame_sequence(ui) == frame && before != *page) {
         cui_pagination_change_event event = {0};
         (void)cui_component_event_init(&event.event, CUI_COMPONENT_EVENT_CHANGE, id,

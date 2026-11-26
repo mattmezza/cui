@@ -22,7 +22,11 @@ Remaining GPUI options include thousands-separator masks, custom pattern validat
 
 Pages are one-based, with zero representing an empty result. Current page clamps to `[1,total]` or zero when no pages exist. Buttons support First, Previous, Next and Last, and visible numbered pages. A compact mode shows the current/total count. Boundaries and the current page disable redundant activation.
 
-The allocation-free item model emits endpoints and a radius-bounded neighborhood, fills single omitted pages, and inserts ellipses for larger gaps. Radius is capped at three, with at most eleven items. Arithmetic remains bounded for `SIZE_MAX` totals. The styled control uses radius two. All page buttons use the ordinary pointer/keyboard button routing; selected semantic details reflect the controlled page. The original `cui_pagination` uses the theme's control sizing in a single row.
+The original `cui_pagination` uses the theme's sizes in a single row. Its allocation-free numbered model emits endpoints, a radius-two neighborhood and ellipses, filling single omitted pages. The reusable `cui_pagination_items` model supports radius zero through three and at most eleven items. All controls retain the application's `size_t page` and use the ordinary pointer, keyboard and accessibility button routing.
+
+Set `.visible_pages = 10` in `cui_pagination_options` to show ten numbered buttons, including the first and last pages. The contiguous middle window shifts near each end so it can use the whole budget. Positive budgets clamp to 5 through 32, and up to two extra ellipses label the gaps. Zero selects the existing radius-two window. Use `cui_pagination_visible_items` with `CUI_PAGINATION_MAX_ITEMS` caller slots when painting a custom view. The window arithmetic supports totals through `SIZE_MAX`.
+
+Set `.icon_only = true` to show just Previous and Next with SVG chevrons. Both buttons keep their accessible labels and boundary disabling. This takes priority over `.compact` and the numbered budget. The gallery offers **Page counter**, **Numbered pages** and **Arrows only**.
 
 Use `cui_pagination_ex` with `cui_pagination_options` for the shared XS through 9XL sizing and single-line labels. BASE and MD are equivalent. INHERIT uses theme metrics. A positive `available_width` wraps between whole items in navigation order. Supply the current container's inner width in logical pixels each frame. Zero keeps one row. An item wider than the available width keeps its natural width, so provide a sufficiently wide or horizontally scrollable parent for extreme sizes and long page counts. The counter aligns with the controls in its row.
 
@@ -38,7 +42,7 @@ bool draw_results_pages(cui_context *ui, cui_id id, const cui_theme *theme,
 }
 ```
 
-Use `cui_pagination_events_ex` for the same layout with the synchronous aggregate change observer. The C options leave the existing retained binding builders on their numbered single-row presentation. Configurable label slots, an icon-only compact presentation and arbitrary visible-page budgets remain open.
+Use `cui_pagination_events_ex` for the synchronous aggregate change observer and `cui_base_pagination_ex` for the matching Base behavior in custom layouts. Numbered actions use the window computed from the normalized entry page and the options supplied in that submission. The retained binding builders provide the numbered single-row presentation. Configurable labels, interactive ellipsis menus and foreign exposure of the C layout options remain open.
 
 ## Rating
 

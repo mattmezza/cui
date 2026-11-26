@@ -68,6 +68,12 @@ typedef struct {
 /* One-based pages. radius <= 3; max output count is 11. Out-of-range current is clamped. */
 size_t cui_pagination_items(size_t current, size_t total, unsigned radius,
                             cui_page_item output[11]);
+enum { CUI_PAGINATION_MAX_VISIBLE_PAGES = 32, CUI_PAGINATION_MAX_ITEMS = 34 };
+/* Positive visible_pages is clamped to 5..32 numbered buttons, including
+ * first/last. Up to two additional items mark omitted ranges. Zero uses the
+ * legacy radius-two model. Pass space for CUI_PAGINATION_MAX_ITEMS items. */
+size_t cui_pagination_visible_items(size_t current, size_t total, unsigned visible_pages,
+                                    cui_page_item output[CUI_PAGINATION_MAX_ITEMS]);
 bool cui_base_pagination(cui_context *, cui_id, size_t *, size_t total, bool compact,
                          bool disabled);
 bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page, size_t total,
@@ -78,7 +84,11 @@ typedef struct {
     /* Positive content width in logical pixels wraps whole items onto new rows.
      * Zero uses one row. An individual item keeps its natural width. */
     float available_width;
+    unsigned visible_pages; /* Numbered mode only. Zero uses the legacy window. */
+    bool icon_only;         /* Submit only Previous and Next. Overrides compact. */
 } cui_pagination_options;
+/* Same owner and result as cui_base_pagination. Ignores presentation metrics. */
+bool cui_base_pagination_ex(cui_context *, cui_id, size_t *, size_t total, cui_pagination_options);
 /* Same owner and result as cui_pagination. Invalid size or width does not submit. */
 bool cui_pagination_ex(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page,
                        size_t total, cui_pagination_options);
@@ -273,6 +283,41 @@ size_t cui_pagination_items(size_t current, size_t total, unsigned radius, cui_p
         out[n++] = (cui_page_item){.page = page};
         previous = page;
     }
+    return n;
+}
+
+size_t cui_pagination_visible_items(size_t current, size_t total, unsigned visible_pages,
+                                    cui_page_item out[CUI_PAGINATION_MAX_ITEMS]) {
+    if (!out || !total)
+        return 0;
+    if (!visible_pages)
+        return cui_pagination_items(current, total, 2, out);
+    if (visible_pages < 5)
+        visible_pages = 5;
+    if (visible_pages > CUI_PAGINATION_MAX_VISIBLE_PAGES)
+        visible_pages = CUI_PAGINATION_MAX_VISIBLE_PAGES;
+    if (total <= visible_pages) {
+        for (size_t i = 0; i < total; ++i)
+            out[i] = (cui_page_item){.page = i + 1};
+        return total;
+    }
+
+    /* Reserve the edges, then shift the step window inward near either end. */
+    size_t middle_count = visible_pages - 2;
+    size_t offset = (middle_count - 1) / 2;
+    size_t first = current > offset + 2 ? current - offset : 2;
+    if (first > total - middle_count)
+        first = total - middle_count;
+    size_t last = first + middle_count - 1;
+    size_t n = 0;
+    out[n++] = (cui_page_item){.page = 1};
+    if (first > 2)
+        out[n++] = (cui_page_item){.ellipsis = true};
+    for (size_t i = first; i <= last; ++i)
+        out[n++] = (cui_page_item){.page = i};
+    if (last < total - 1)
+        out[n++] = (cui_page_item){.ellipsis = true};
+    out[n++] = (cui_page_item){.page = total};
     return n;
 }
 
@@ -596,6 +641,11 @@ cui_number_result cui_base_number_input(cui_context *ui, cui_id id, cui_str name
 }
 bool cui_base_pagination(cui_context *ui, cui_id id, size_t *page, size_t total, bool compact,
                          bool disabled) {
+    return cui_base_pagination_ex(
+        ui, id, page, total, (cui_pagination_options){.compact = compact, .disabled = disabled});
+}
+bool cui_base_pagination_ex(cui_context *ui, cui_id id, size_t *page, size_t total,
+                            cui_pagination_options options) {
     if (!ui || !page)
         return false;
     size_t original = *page;
@@ -605,20 +655,24 @@ bool cui_base_pagination(cui_context *ui, cui_id id, size_t *page, size_t total,
         *page = 1;
     else if (*page > total)
         *page = total;
-    size_t previous = *page;
-    cui_page_item old_items[11];
-    size_t old_count = compact ? 0 : cui_pagination_items(previous, total, 2, old_items);
+    bool numbered = !options.compact && !options.icon_only;
+    bool disabled = options.disabled;
+    cui_page_item old_items[CUI_PAGINATION_MAX_ITEMS];
+    size_t old_count =
+        numbered ? cui_pagination_visible_items(*page, total, options.visible_pages, old_items) : 0;
     size_t n;
     cui_frame_events(ui, &n);
     for (size_t e = 0; e < n && !disabled; ++e) {
         cui_id activation = cui_event_activation(ui, e);
-        if (activation == cui_numeric_part_id(id, 1) && total)
+        if (!activation)
+            continue;
+        if (activation == cui_numeric_part_id(id, 1) && total && !options.icon_only)
             *page = 1;
         else if (activation == cui_numeric_part_id(id, 2) && *page > 1)
             --*page;
         else if (activation == cui_numeric_part_id(id, 3) && *page < total)
             ++*page;
-        else if (activation == cui_numeric_part_id(id, 4) && total)
+        else if (activation == cui_numeric_part_id(id, 4) && total && !options.icon_only)
             *page = total;
         else
             for (size_t i = 0; i < old_count; ++i)
@@ -629,20 +683,21 @@ bool cui_base_pagination(cui_context *ui, cui_id id, size_t *page, size_t total,
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Pagination"), disabled, false, (float)*page);
     cui_set_tab_stop(ui, id, false);
     const char *names[] = {"First", "Previous", "Next", "Last"};
-    for (unsigned i = 0; i < 4; ++i)
+    for (unsigned i = options.icon_only ? 1 : 0; i < (options.icon_only ? 3u : 4u); ++i)
         cui_interact(ui, cui_numeric_part_id(id, 1 + i), CUI_ROLE_BUTTON, cui_string(names[i]),
                      disabled || !total || (i < 2 ? *page <= 1 : *page >= total), false, 0);
-    cui_page_item items[11];
-    size_t count = compact ? 0 : cui_pagination_items(*page, total, 2, items);
+    size_t count =
+        numbered ? cui_pagination_visible_items(*page, total, options.visible_pages, old_items) : 0;
     for (size_t i = 0; i < count; ++i)
-        if (!items[i].ellipsis) {
+        if (!old_items[i].ellipsis) {
+            size_t destination = old_items[i].page;
             char label[32];
-            snprintf(label, sizeof(label), "%zu", items[i].page);
+            snprintf(label, sizeof(label), "%zu", destination);
             cui_id part = cui_numeric_part_id(id, 10 + (unsigned)i);
             cui_interact(ui, part, CUI_ROLE_BUTTON, cui_string(label),
-                         disabled || items[i].page == *page, false, 0);
+                         disabled || destination == *page, false, 0);
             cui_set_semantic_details(
-                ui, part, (cui_semantic_details){.selected = items[i].page == *page, .parent = id});
+                ui, part, (cui_semantic_details){.selected = destination == *page, .parent = id});
         }
     if (*page != original)
         cui_invalidate(ui);
@@ -931,7 +986,7 @@ typedef struct {
     bool row_open;
 } cui_pagination_layout;
 static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *layout, cui_id id,
-                                      cui_str label, bool disabled) {
+                                      cui_str label, bool disabled, bool icon) {
     const cui_theme *t = layout->theme;
     const cui_design_metrics *m = layout->metrics;
     cui_color text = id ? (disabled ? t->muted : t->on_primary) : (disabled ? t->muted : t->text);
@@ -942,9 +997,12 @@ static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *la
             cui_text(ui, label, t->font_size, text);
         return;
     }
-    float width = ceilf(cui_measure_text(ui, label, m->font_size).width);
-    if (id)
-        width += 2 * ceilf(m->padding_x);
+    float width = m->control_height;
+    if (!icon) {
+        width = ceilf(cui_measure_text(ui, label, m->font_size).width);
+        if (id)
+            width += 2 * ceilf(m->padding_x);
+    }
     if (layout->available_width > 0) {
         float occupied = layout->occupied + ceilf(m->gap) + width;
         if (layout->row_open && occupied > layout->available_width) {
@@ -971,8 +1029,16 @@ static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *la
                                 .background = disabled ? t->surface : t->primary,
                                 .border = cui_focused(ui) == id ? t->focus : t->border,
                                 .border_width = 1});
-    /* Center the font's measured line box inside the fixed control height. */
-    cui_text_line(ui, label, m->font_size, text, 0, (cui_text_style){0});
+    if (icon)
+        cui_icon_named(
+            ui, cui_numeric_part_id(id, 0), t, label,
+            (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                               .custom_size = fminf(m->indicator_size, m->control_height),
+                               .custom_color = true,
+                               .color = text});
+    else
+        /* Center the font's measured line box inside the fixed control height. */
+        cui_text_line(ui, label, m->font_size, text, 0, (cui_text_style){0});
     if (id)
         cui_end_box(ui);
 }
@@ -985,50 +1051,56 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
     cui_design_metrics metrics = {.font_size = t->font_size,
                                   .control_height = t->control_height,
                                   .padding_x = t->padding,
-                                  .gap = t->gap};
+                                  .gap = t->gap,
+                                  .indicator_size = t->font_size};
     if (options.design_size != CUI_DESIGN_INHERIT &&
         !cui_design_measure(options.design_size, t->font_size / 16, &metrics))
         return false;
-    bool compact = options.compact, disabled = options.disabled;
+    bool icon = options.icon_only, disabled = options.disabled;
     bool changed;
     if (handler) {
         cui_numeric_selection_event_result result =
-            cui_base_pagination_events(ui, id, page, total, compact, disabled, *handler);
+            cui_base_pagination_events_ex(ui, id, page, total, options, *handler);
         changed = result.control;
         *change_count = result.change_count;
     } else
-        changed = cui_base_pagination(ui, id, page, total, compact, disabled);
+        changed = cui_base_pagination_ex(ui, id, page, total, options);
     bool wrap = options.available_width > 0;
     cui_pagination_layout layout = {.theme = t,
                                     .metrics = legacy ? NULL : &metrics,
                                     .available_width = options.available_width};
     cui_begin_box(ui, id, (cui_box){.row = !wrap, .gap = metrics.gap, .align_y = CUI_ALIGN_CENTER});
-    cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 1), cui_string("First"),
-                              disabled || *page <= 1);
-    cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 2), cui_string("Previous"),
-                              disabled || *page <= 1);
-    if (compact) {
+    if (!icon)
+        cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 1), cui_string("First"),
+                                  disabled || *page <= 1, false);
+    cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 2),
+                              cui_string(icon ? "chevron-left" : "Previous"),
+                              disabled || *page <= 1, icon);
+    if (!icon && options.compact) {
         char label[64];
         snprintf(label, sizeof(label), "%zu / %zu", *page, total);
-        cui_pagination_paint_item(ui, &layout, 0, cui_string(label), false);
-    } else {
-        cui_page_item items[11];
-        size_t n = cui_pagination_items(*page, total, 2, items);
+        cui_pagination_paint_item(ui, &layout, 0, cui_string(label), false, false);
+    } else if (!icon) {
+        cui_page_item items[CUI_PAGINATION_MAX_ITEMS];
+        size_t n = cui_pagination_visible_items(*page, total, options.visible_pages, items);
         for (size_t i = 0; i < n; ++i) {
             if (items[i].ellipsis)
-                cui_pagination_paint_item(ui, &layout, 0, cui_string("..."), true);
+                cui_pagination_paint_item(ui, &layout, 0, cui_string("..."), true, false);
             else {
                 char label[32];
                 snprintf(label, sizeof(label), "%zu", items[i].page);
                 cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 10 + (unsigned)i),
-                                          cui_string(label), disabled || items[i].page == *page);
+                                          cui_string(label), disabled || items[i].page == *page,
+                                          false);
             }
         }
     }
-    cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 3), cui_string("Next"),
-                              disabled || !total || *page >= total);
-    cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 4), cui_string("Last"),
-                              disabled || !total || *page >= total);
+    cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 3),
+                              cui_string(icon ? "chevron-right" : "Next"),
+                              disabled || !total || *page >= total, icon);
+    if (!icon)
+        cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 4), cui_string("Last"),
+                                  disabled || !total || *page >= total, false);
     if (layout.row_open)
         cui_end_box(ui);
     cui_end_box(ui);

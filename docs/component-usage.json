@@ -717,12 +717,15 @@
         "cui_pagination",
         "cui_pagination_ex",
         "cui_pagination_events",
-        "cui_pagination_events_ex"
+        "cui_pagination_events_ex",
+        "cui_base_pagination_ex",
+        "cui_base_pagination_events_ex",
+        "cui_pagination_visible_items"
       ],
       "state_types": [],
       "state_ownership": "Caller retains size_t page.",
       "interaction": "Returns the page-change result and optionally notifies a synchronous aggregate observer.",
-      "usage": "Use cui_pagination_ex with cui_pagination_options for shared size presets, one-line labels and whole-item wrapping at the available content width.",
+      "usage": "Use cui_pagination_ex with cui_pagination_options for shared size presets, whole-item wrapping, a bounded numbered window or icon-only navigation.",
       "docs": [
         "docs/NUMERIC.md",
         "docs/NUMERIC_SELECTION_EVENTS.md"

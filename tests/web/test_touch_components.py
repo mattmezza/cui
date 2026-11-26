@@ -382,6 +382,35 @@ def run_cases(a):
             a.page.set_viewport_size(viewport)
     a.case('Pagination', '2xl controls wrap at 390px and keep an actionable, single-line counter',
            narrow_pagination)
+    def pagination_modes():
+        a.configure('design-size', 3)
+        a.tap(a.target('First', 1))
+        a.configure('pagination-mode', 1)
+        assert a.page.locator('#pagination-visible-pages').is_visible()
+        def page_buttons():
+            return [s for s in a.snapshot() if s['f'][0] == 1 and s['name'].isdigit()]
+        assert len(page_buttons()) == 5
+        a.configure('pagination-visible-pages', 10)
+        assert len(page_buttons()) == 10
+        assert '.visible_pages = 10' in a.page.locator('#snippet').text_content()
+        a.tap(a.target('8', 1))
+        assert a.target('Pagination', 9)['f'][8] == 8
+        a.configure('pagination-mode', 2)
+        assert a.page.locator('#pagination-visible-pages').is_hidden()
+        assert [s['name'] for s in a.snapshot() if s['f'][0] == 1] == ['Previous', 'Next']
+        assert '.icon_only = true' in a.page.locator('#snippet').text_content()
+        assert a.page.evaluate('''() => {
+            const e = cuiGallery.exports;
+            return Array.from({length: e.gallery_count()}, (_, i) => e.gallery_command(i, 0))
+                .filter(type => type === 5).length;
+        }''') == 2, 'Both arrow icons must draw as images'
+        a.tap(a.target('Previous', 1))
+        assert a.target('Pagination', 9)['f'][8] == 7
+        a.configure('disabled', True)
+        a.tap(a.target('Next', 1))
+        assert a.target('Pagination', 9)['f'][8] == 7
+        a.configure('disabled', False)
+    a.case('Pagination', 'visible-page budgets and icon-only controls support touch', pagination_modes)
     def calendar():
         day = a.target(role=1, predicate=lambda s: s['name'].endswith('-25'))
         a.tap(day)

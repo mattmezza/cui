@@ -4,14 +4,16 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
  'CUI_DESIGN_2XL', 'CUI_DESIGN_3XL', 'CUI_DESIGN_4XL', 'CUI_DESIGN_5XL',
  'CUI_DESIGN_6XL', 'CUI_DESIGN_7XL', 'CUI_DESIGN_8XL', 'CUI_DESIGN_9XL'];
 
-export function paginationUsage(size, disabled = false) {
+export function paginationUsage(size, disabled = false, mode = 0, visiblePages = 5) {
+ const layout = mode === 2 ? '.icon_only = true' :
+                mode === 1 ? `.visible_pages = ${visiblePages}` : '.compact = true';
  return `#include <cui/cui_numeric.h>
 
 /* The application retains page and supplies the layout's current content width. */
 bool draw_results_pages(cui_context *ui, cui_id id, const cui_theme *theme,
                         size_t *page, size_t total_pages, float content_width) {
     return cui_pagination_ex(ui, id, theme, page, total_pages,
-        (cui_pagination_options){.compact = true, .disabled = ${disabled},
+        (cui_pagination_options){${layout}, .disabled = ${disabled},
                                  .design_size = ${sizes[size] || 'CUI_DESIGN_BASE'},
                                  .available_width = content_width});
 }`;

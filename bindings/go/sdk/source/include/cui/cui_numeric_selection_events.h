@@ -33,6 +33,11 @@ cui_numeric_selection_event_result cui_pagination_events(cui_context *, cui_id, 
                                                          size_t *, size_t total, bool compact,
                                                          bool disabled,
                                                          cui_pagination_event_handler);
+/* Same event contract with the navigation options from cui_base_pagination_ex. */
+cui_numeric_selection_event_result cui_base_pagination_events_ex(cui_context *, cui_id, size_t *,
+                                                                 size_t total,
+                                                                 cui_pagination_options,
+                                                                 cui_pagination_event_handler);
 /* Same event contract with the layout options from cui_pagination_ex. */
 cui_numeric_selection_event_result cui_pagination_events_ex(cui_context *, cui_id,
                                                             const cui_theme *, size_t *,

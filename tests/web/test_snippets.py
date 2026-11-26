@@ -29,7 +29,7 @@ const standalone = {
     DataTable: [liveDataTableUsage, pagedDataTableUsage],
     HoverCard: [0, 1, 2].flatMap(mode => [0, 1, 2].map(preview => hoverCardUsage(mode, preview))),
     TimeField: [snippets.TimeField, timeFieldUsage(3, true)],
-    Pagination: [snippets.Pagination, paginationUsage(14, true)],
+    Pagination: [snippets.Pagination, paginationUsage(14, true, 2), paginationUsage(3, false, 1, 10)],
 };
 delete snippets.TimeField; // Compile complete sources as separate translation units.
 delete snippets.Pagination;

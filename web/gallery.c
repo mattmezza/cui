@@ -1932,6 +1932,7 @@ static char number_buffer[128] = "42";
 static cui_number_state number_state;
 static double number = 42;
 static size_t page_number = 3, current_step;
+static unsigned pagination_mode, pagination_visible_pages = 5;
 static bool stepper_details_confirmed, stepper_validation_failed;
 static unsigned stepper_request_count;
 static bool stepper_visual, stepper_vertical = true, stepper_icons;
@@ -6743,10 +6744,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 34: {
         cui_pagination_ex(ui, cui_id_from(ui, "pagination"), &t, &page_number, 20,
-                          (cui_pagination_options){.compact = true,
+                          (cui_pagination_options){.compact = pagination_mode == 0,
                                                    .disabled = disabled,
                                                    .design_size = design_size,
-                                                   .available_width = fmaxf(1, width - 48)});
+                                                   .available_width = fmaxf(1, width - 48),
+                                                   .visible_pages = pagination_visible_pages,
+                                                   .icon_only = pagination_mode == 2});
         char text[64];
         snprintf(text, sizeof(text), "Page %zu of 20", page_number);
         cui_label(ui, &t, cui_string(text));
@@ -8062,6 +8065,10 @@ int gallery_checkbox_state(int state) {
     if (state >= CUI_CHECK_UNCHECKED && state <= CUI_CHECK_MIXED)
         check_state = (cui_check_state)state;
     return check_state;
+}
+void gallery_pagination_options(unsigned mode, unsigned visible_pages) {
+    pagination_mode = mode <= 2 ? mode : 0;
+    pagination_visible_pages = visible_pages;
 }
 void gallery_design_options(int size, int radius, float spacing) {
     design_size = size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL ? (cui_design_size)size

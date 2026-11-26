@@ -105,6 +105,55 @@ static void models(void) {
     n = cui_pagination_items(SIZE_MAX - 1, SIZE_MAX, 3, items);
     assert(n <= 11 && items[n - 1].page == SIZE_MAX);
 }
+static void check_visible_pages(size_t current, size_t total, unsigned requested) {
+    cui_page_item items[CUI_PAGINATION_MAX_ITEMS];
+    size_t count = cui_pagination_visible_items(current, total, requested, items);
+    size_t budget = requested < 5 ? 5
+                    : requested > CUI_PAGINATION_MAX_VISIBLE_PAGES
+                        ? CUI_PAGINATION_MAX_VISIBLE_PAGES
+                        : requested;
+    if (!total) {
+        assert(count == 0);
+        return;
+    }
+    size_t clamped = current < 1 ? 1 : current > total ? total : current;
+    assert(count <= CUI_PAGINATION_MAX_ITEMS && count > 0);
+    assert(items[0].page == 1 && items[count - 1].page == total);
+    size_t visible = 0, previous = 0, gaps = 0;
+    bool selected = false, gap = false;
+    for (size_t i = 0; i < count; ++i) {
+        if (items[i].ellipsis) {
+            assert(i > 0 && i + 1 < count && !gap);
+            gap = true;
+            ++gaps;
+        } else {
+            size_t page = items[i].page;
+            assert(page > previous && page <= total);
+            assert(gap == (page - previous > 1));
+            selected |= page == clamped;
+            previous = page;
+            gap = false;
+            ++visible;
+        }
+    }
+    assert(visible == (total < budget ? total : budget) && selected && gaps <= 2);
+}
+static void pagination_visible_page_budgets(void) {
+    for (size_t total = 0; total <= 50; ++total)
+        for (size_t page = 0; page <= total + 1; ++page)
+            for (unsigned budget = 1; budget <= CUI_PAGINATION_MAX_VISIBLE_PAGES + 1; ++budget)
+                check_visible_pages(page, total, budget);
+    check_visible_pages(SIZE_MAX - 1, SIZE_MAX, 32);
+    check_visible_pages(SIZE_MAX / 2, SIZE_MAX, 10);
+    check_visible_pages(1, SIZE_MAX, 1);
+    check_visible_pages(SIZE_MAX, 7, 1);
+
+    cui_page_item legacy[11], options[CUI_PAGINATION_MAX_ITEMS];
+    size_t n = cui_pagination_items(50, 100, 2, legacy);
+    assert(cui_pagination_visible_items(50, 100, 0, options) == n);
+    for (size_t i = 0; i < n; ++i)
+        assert(legacy[i].page == options[i].page && legacy[i].ellipsis == options[i].ellipsis);
+}
 static void key(cui_context *ui, cui_key code, unsigned modifiers) {
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = code, .modifiers = modifiers}));
@@ -800,6 +849,7 @@ int main(void) {
 #endif
     decimal_locale();
     models();
+    pagination_visible_page_budgets();
     number_events();
     other_events();
     return 0;

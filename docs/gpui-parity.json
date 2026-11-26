@@ -2333,7 +2333,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing and responsive whole-item rows. Configurable label slots, icon-only compact presentation and arbitrary page budgets remain open."
+        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. Configurable label slots, interactive ellipsis menus and foreign layout options remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2364,6 +2364,15 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_numeric.c",
+            "tests/web/test_touch_components.py"
+          ]
+        },
+        {
+          "name": "bounded numbered window and icon-only navigation",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c",
+            "tests/unit/test_numeric_selection_events.c",
             "tests/web/test_touch_components.py"
           ]
         },

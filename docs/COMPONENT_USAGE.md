@@ -432,7 +432,7 @@ API: `cui_notification_init`, `cui_notification_push`, `cui_notifications`. [Pub
 
 **Interaction:** Returns the page-change result and optionally notifies a synchronous aggregate observer.
 
-**Usage:** Use cui_pagination_ex with cui_pagination_options for shared size presets, one-line labels and whole-item wrapping at the available content width. Load or select application data on a page change.
+**Usage:** Use cui_pagination_ex with cui_pagination_options for shared size presets, whole-item wrapping, a bounded numbered window or icon-only navigation. Load or select application data on a page change.
 
 API methods include `cui_pagination`, `cui_pagination_ex` and `cui_pagination_events_ex`. [Public header](../include/cui/cui_numeric.h) · [guide](NUMERIC.md#pagination).
 

@@ -67,6 +67,12 @@ typedef struct {
 /* One-based pages. radius <= 3; max output count is 11. Out-of-range current is clamped. */
 size_t cui_pagination_items(size_t current, size_t total, unsigned radius,
                             cui_page_item output[11]);
+enum { CUI_PAGINATION_MAX_VISIBLE_PAGES = 32, CUI_PAGINATION_MAX_ITEMS = 34 };
+/* Positive visible_pages is clamped to 5..32 numbered buttons, including
+ * first/last. Up to two additional items mark omitted ranges. Zero uses the
+ * legacy radius-two model. Pass space for CUI_PAGINATION_MAX_ITEMS items. */
+size_t cui_pagination_visible_items(size_t current, size_t total, unsigned visible_pages,
+                                    cui_page_item output[CUI_PAGINATION_MAX_ITEMS]);
 bool cui_base_pagination(cui_context *, cui_id, size_t *, size_t total, bool compact,
                          bool disabled);
 bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page, size_t total,
@@ -77,7 +83,11 @@ typedef struct {
     /* Positive content width in logical pixels wraps whole items onto new rows.
      * Zero uses one row. An individual item keeps its natural width. */
     float available_width;
+    unsigned visible_pages; /* Numbered mode only. Zero uses the legacy window. */
+    bool icon_only;         /* Submit only Previous and Next. Overrides compact. */
 } cui_pagination_options;
+/* Same owner and result as cui_base_pagination. Ignores presentation metrics. */
+bool cui_base_pagination_ex(cui_context *, cui_id, size_t *, size_t total, cui_pagination_options);
 /* Same owner and result as cui_pagination. Invalid size or width does not submit. */
 bool cui_pagination_ex(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page,
                        size_t total, cui_pagination_options);

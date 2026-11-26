@@ -122,6 +122,56 @@ static void sized_pagination(void) {
     assert(cui_bounds(f.ui, cui_numeric_part_id(2, 4)).h == 0);
     cui_destroy(f.ui);
 }
+static void pagination_modes(void) {
+    fixture f = make();
+    f.value = 3;
+    cui_pagination_options options = {
+        .design_size = CUI_DESIGN_BASE, .available_width = 180, .visible_pages = 10};
+    assert(!sized_page_frame(&f, options).control);
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(f.ui, &count);
+    assert(count == 15); /* Navigation group, four text buttons, ten numbered buttons. */
+    cui_rect eighth = {0};
+    for (size_t i = 0; i < count; ++i)
+        if (nodes[i].name.length == 1 && nodes[i].name.data[0] == '8')
+            eighth = cui_bounds(f.ui, nodes[i].id);
+    assert(eighth.w > 0 && eighth.h > 0);
+    cui_event input = {.type = CUI_EVENT_POINTER_DOWN,
+                       .x = eighth.x + .5f * eighth.w,
+                       .y = eighth.y + .5f * eighth.h};
+    assert(cui_queue_event(f.ui, input));
+    input.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(f.ui, input));
+    assert(sized_page_frame(&f, options).change_count == 1 && f.value == 8 && f.calls == 1);
+
+    activate(&f, 4);
+    options.icon_only = true;
+    options.compact = true; /* Explicit icon mode takes priority. */
+    assert(!sized_page_frame(&f, options).control && f.value == 8 && f.calls == 1);
+    nodes = cui_semantics(f.ui, &count);
+    assert(count == 3 && nodes[1].id == cui_numeric_part_id(2, 2) &&
+           nodes[2].id == cui_numeric_part_id(2, 3));
+    assert(nodes[1].name.length == 8 && !memcmp(nodes[1].name.data, "Previous", 8));
+    assert(nodes[2].name.length == 4 && !memcmp(nodes[2].name.data, "Next", 4));
+    size_t icons = 0;
+    for (size_t i = 0; i < f.draw.count; ++i) {
+        const cui_draw_command *c = &f.draw.commands[i];
+        assert(c->type != CUI_DRAW_TEXT);
+        if (c->type == CUI_DRAW_IMAGE) {
+            assert(c->bounds.w == 16 && c->bounds.h == 16 && c->bitmap.bitmap.pixels);
+            ++icons;
+        }
+    }
+    assert(icons == 2);
+    key(&f, nodes[2].id, CUI_KEY_ENTER);
+    assert(sized_page_frame(&f, options).change_count == 1 && f.value == 9 && f.calls == 2);
+    activate(&f, 2);
+    assert(sized_page_frame(&f, options).change_count == 1 && f.value == 8 && f.calls == 3);
+    options.disabled = true;
+    click(&f, 3, .5f);
+    assert(!sized_page_frame(&f, options).control && f.value == 8 && f.calls == 3);
+    cui_destroy(f.ui);
+}
 static void compare(fixture *a, fixture *b) {
     assert(a->value == b->value && cui_focused(a->ui) == cui_focused(b->ui));
     cui_rect x = cui_bounds(a->ui, 2), y = cui_bounds(b->ui, 2);
@@ -482,6 +532,7 @@ static void paired_input(bool styled) {
 }
 int main(void) {
     sized_pagination();
+    pagination_modes();
     for (unsigned styled = 0; styled < 2; ++styled) {
         pagination(styled != 0);
         stepper(styled != 0);

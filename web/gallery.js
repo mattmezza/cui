@@ -1034,7 +1034,10 @@ function render(){
  const orderedTime=orderedTimeField();
  const timeFieldHeight=designHeights[designScale]*($('density').value==='1'?.875:1);
  const wideTimeField=timeField&&designScale>=8;
- const widePagination=selected.name==='Pagination'&&designScale>=11;
+ const pagination=selected.name==='Pagination';
+ const paginationMode=Number($('pagination-mode').value);
+ const paginationPages=Number($('pagination-visible-pages').value);
+ const widePagination=pagination&&paginationMode!==2&&designScale>=11;
  const paginationMinWidth=3*designHeights[designScale]+48;
  const avatarDiameter=selected.name==='Avatar'?wasm.gallery_avatar_metric(designScale,Number($('avatar-rem').value),0):0;
  canvas.parentElement.style.overflowX=selected.name==='Avatar'||wideTimeField||widePagination?'auto':'';
@@ -1042,7 +1045,15 @@ function render(){
  canvas.style.minWidth=selected.name==='Avatar'?`${avatarDiameter+48}px`:wideTimeField?`${Math.ceil(4*timeFieldHeight)+48}px`:widePagination?`${paginationMinWidth}px`:selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
  const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):timeField?Math.max(width<420?560:360,timeFieldHeight+240):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'?($('popover-mode').value==='1'?520:320):selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<268?240:width-48<488?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?($('virtual-axis').value==='2'?390:360):selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value==='1'?8*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(orderedTime)height=Math.max(360,2*timeFieldHeight+224);
- if(selected.name==='Pagination')height=Math.max(height,5*designHeights[designScale]+4*gaps[designScale]+100);
+ if(pagination){
+  const controlHeight=designHeights[designScale],gap=gaps[designScale];
+  const items=paginationMode===1?paginationPages+6:paginationMode===2?2:5;
+  const itemWidth=paginationMode===2?controlHeight:3*controlHeight;
+  const perRow=Math.max(1,Math.floor((width-48+gap)/(itemWidth+gap)));
+  height=Math.max(height,Math.ceil(items/perRow)*(controlHeight+gap)+100);
+  $('pagination-visible-pages').hidden=paginationMode!==1;
+  wasm.gallery_pagination_options(paginationMode,paginationPages);
+ }
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1189,7 +1200,7 @@ function render(){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
  }
- if(selected.name==='Pagination')$('snippet').textContent=paginationUsage(designScale,$('disabled').checked);
+ if(pagination)$('snippet').textContent=paginationUsage(designScale,$('disabled').checked,paginationMode,paginationPages);
  if(controlShadowsEnabled()&&['Button','Checkbox','Radio','Switch','Slider'].includes(selected.name))$('snippet').textContent=controlShadowUsage(selected.name,Number($('control-size').value),Number($('design-size').value));
  controlShadowInput.disabled=selected.name==='Button'&&$('button-collection').value!=='0';
  if(selected.name==='Slider'&&!wasm.gallery_slider_stats(12))$('snippet').textContent=sliderUsage(...sliderValues(),$('disabled').checked,controlShadowsEnabled());
@@ -1520,6 +1531,8 @@ function selectComponent(){
  $('plot-mode').hidden=selected.name!=='Plot';$('plot-mode').value='0';
  $('plot-pan-axes').hidden=selected.name!=='Plot';$('plot-pan-axes').value='0';
  $('virtual-axis').hidden=selected.name!=='VirtualList';$('virtual-axis').value='0';
+ $('pagination-mode').hidden=selected.name!=='Pagination';$('pagination-mode').value='0';
+ $('pagination-visible-pages').hidden=true;$('pagination-visible-pages').value='5';
  $('time-field-tab-mode').hidden=selected.name!=='TimeField';$('time-field-tab-mode').value='segments';
  for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control','text-paint'])$(id).hidden=selected.name!=='Theme';textPaintControl.value='0';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
  $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Pagination','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar','TimeField'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
@@ -1817,7 +1830,7 @@ $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(N
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);
 $('input-mode').addEventListener('change',requestFrame);
-$('time-field-tab-mode').addEventListener('change',requestFrame);
+for(const id of ['time-field-tab-mode','pagination-mode','pagination-visible-pages'])$(id).addEventListener('change',requestFrame);
 for(const id of ['avatar-source','avatar-palette','avatar-hue','avatar-placeholder','avatar-rem','message-alignment','message-variant','message-inset','message-avatar','message-scrollbar','dropdown-names','dropdown-order','dropdown-skip','dropdown-toggle','dropdown-paint','dropdown-shadow','dropdown-variant','dropdown-size','dropdown-halves','dropdown-action','dropdown-anchor','dropdown-outline','dropdown-selected','tabs-mode','tabs-size','tabs-variant','tabs-manual','progress-shape','progress-mode','shimmer-mode','disclosure-mode','disclosure-multiple','notification-anchor','notification-kind','notification-autohide','tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
 $('otp-groups').addEventListener('change',requestFrame);
 $('otp-mask').addEventListener('change',requestFrame);

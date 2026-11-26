@@ -380,6 +380,23 @@ static void go_load_optional_symbol(void *destination, size_t size, const char *
 
 static cui_bridge_status (*radio_motion_set)(cui_bridge_app *, cui_bridge_node, uint32_t);
 
+static cui_bridge_status (*radio_content_set)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static void go_radio_content_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&radio_content_set, sizeof radio_content_set,
+                          "cui_bridge_radio_item_set_content_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else { radio_content_set = cui_bridge_radio_item_set_content_v1; }
+#endif
+}
+static int go_radio_content_supported(void) { return radio_content_set != NULL; }
+static cui_bridge_status go_set_radio_content(cui_bridge_app *app, cui_bridge_node node,
+                                              uint32_t enabled) {
+ return radio_content_set ? radio_content_set(app, node, enabled)
+                          : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+
 static void go_radio_motion_initialize(void) {
  if (bridge_lib) {
   go_load_optional_symbol(&radio_motion_set, sizeof radio_motion_set,
@@ -479,6 +496,7 @@ static int bridge_open(const char *path) {
  go_skeleton_initialize();
  go_pagination_initialize();
  go_radio_motion_initialize();
+ go_radio_content_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -509,6 +527,7 @@ static int bridge_open(const char *path) {
  go_skeleton_initialize();
  go_pagination_initialize();
  go_radio_motion_initialize();
+ go_radio_content_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -599,7 +618,7 @@ type Node struct {
 	hasHover                             bool
 	click                                func(Event)
 	change                               func(Event)
-	checked, radioMotion                 bool
+	checked, radioMotion, radioContent   bool
 	value, min, max, step                float64
 	hasRange, hasValue, hasChecked       bool
 	detail                               string
@@ -1681,12 +1700,23 @@ func (a *App) Mount(root *Node) error {
 	seen := map[*Node]bool{}
 	keys := map[string]bool{}
 	usesResponsiveSkeleton := false
-	var visit func(*Node, int) error
-	visit = func(n *Node, d int) error {
+	var visit func(*Node, *Node, int, bool) error
+	visit = func(n, parent *Node, d int, content bool) error {
 		if n == nil || seen[n] || n.app != nil || n.removed {
 			return errors.New("invalid or reused node")
 		}
 		seen[n] = true
+		if content && !radioContentKind(n.kind) {
+			return errors.New("RadioGroup Item decorations require passive content")
+		}
+		if n.radioContent {
+			if parent == nil || parent.kind != int(C.CUI_BRIDGE_RADIO_GROUP) {
+				return errors.New("decorative content requires a direct RadioGroup Item")
+			}
+			if C.go_radio_content_supported() == 0 {
+				return ErrRadioItemContentUnavailable
+			}
+		}
 		if n.tableRowCapacity != 0 {
 			if err := a.requireDataTableCapacity(n.tableRowCapacity); err != nil {
 				return err
@@ -1807,13 +1837,13 @@ func (a *App) Mount(root *Node) error {
 			}
 		}
 		for _, ch := range n.children {
-			if err := visit(ch, d+1); err != nil {
+			if err := visit(ch, n, d+1, content || n.radioContent); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
-	if err := visit(root, 1); err != nil {
+	if err := visit(root, nil, 1, false); err != nil {
 		return err
 	}
 	if usesResponsiveSkeleton && C.go_skeleton_supported() == 0 {
@@ -1849,6 +1879,11 @@ func (a *App) Mount(root *Node) error {
 		n.app = a
 		n.handle = h
 		a.nodes[keyID(h)] = n
+		if n.radioContent {
+			if err := n.SetRadioItemContent(true); err != nil {
+				return err
+			}
+		}
 		if n.radioMotion {
 			if err := n.SetRadioMotion(true); err != nil {
 				return err
@@ -2612,6 +2647,61 @@ func Toggle(key string) *Node   { return &Node{kind: 8, key: key} }
 func Slider(key string) *Node   { return &Node{kind: 9, key: key, min: 0, max: 1, step: 0.01} }
 func Progress(key string) *Node { return &Node{kind: 10, key: key} }
 func Badge(text string) *Node   { return &Node{kind: 11, text: text} }
+
+// ErrRadioItemContentUnavailable indicates the provider lacks passive RadioGroup Item content.
+var ErrRadioItemContentUnavailable = errors.New("RadioGroup Item content is unavailable in this bridge")
+
+// SupportsRadioItemContent reports whether passive Item decorations are available.
+func (a *App) SupportsRadioItemContent() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_radio_content_supported() != 0, nil
+}
+
+// DecorateContent opts a direct RadioGroup Item into passive child rendering.
+// Use SetRadioItemContent to handle mounted update errors directly.
+func (n *Node) DecorateContent(enabled bool) *Node {
+	if n != nil && n.err == nil {
+		n.err = n.SetRadioItemContent(enabled)
+	}
+	return n
+}
+
+// SetRadioItemContent enables or hides retained passive children without changing selection.
+// Only direct RadioGroup Items may enable it. Children accept Row, Column, Label,
+// plain Badge, Avatar, Kbd, Tag, Icon and Image; the radio row owns their input.
+// Disabling remains usable with older providers.
+func (n *Node) SetRadioItemContent(enabled bool) error {
+	if n == nil || n.removed || n.kind != int(C.CUI_BRIDGE_ITEM) {
+		return errors.New("decorative content requires a live RadioGroup Item")
+	}
+	if n.app != nil {
+		supported, err := n.app.SupportsRadioItemContent()
+		if err != nil {
+			return err
+		}
+		if supported {
+			if err := result(C.go_set_radio_content(n.app.ptr, n.handle, C.uint32_t(btoi(enabled)))); err != nil {
+				return err
+			}
+		} else if enabled {
+			return ErrRadioItemContentUnavailable
+		}
+	}
+	n.radioContent = enabled
+	return nil
+}
+
+func radioContentKind(kind int) bool {
+	switch kind {
+	case int(C.CUI_BRIDGE_ROW), int(C.CUI_BRIDGE_COLUMN), int(C.CUI_BRIDGE_LABEL),
+		int(C.CUI_BRIDGE_BADGE), int(C.CUI_BRIDGE_AVATAR), int(C.CUI_BRIDGE_KBD),
+		int(C.CUI_BRIDGE_TAG), int(C.CUI_BRIDGE_ICON), int(C.CUI_BRIDGE_IMAGE):
+		return true
+	}
+	return false
+}
 
 // ErrRadioMotionUnavailable indicates the selected bridge lacks retained Radio motion.
 var ErrRadioMotionUnavailable = errors.New("Radio motion is unavailable in this bridge")

@@ -15,9 +15,9 @@
 
 - RadioGroup options can show accessible descriptions and decorative content.
   Retained builders use the existing Item detail setter for descriptions.
-  C bridge, Python, JavaScript, TypeScript and Rust callers can opt direct Items into
-  a bounded set of decorative children while keeping one focus and selection
-  target for the row.
+  C bridge, Python, JavaScript, TypeScript, Go and Rust callers can opt direct
+  Items into a bounded set of decorative children while keeping one focus and
+  selection target for the row.
 
 ## 0.1.0-alpha.7
 

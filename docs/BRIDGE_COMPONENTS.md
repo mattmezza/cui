@@ -257,7 +257,10 @@ Rust supports the same capability probe and provides
 `Builder::decorate_content(enabled)` and `app.decorate_content(item, enabled)`.
 [Runnable Rust delivery form](RUST_BUILDERS.md#compose-radio-options-from-rust)
 
-Go currently exposes Item descriptions.
+Go uses `item.DecorateContent(enabled)` and
+`item.SetRadioItemContent(enabled)`. Check `app.SupportsRadioItemContent()`
+for the provider capability. [Runnable Go delivery form](GO_BUILDERS.md#compose-radio-options-from-go)
+
 For arbitrary frame-local decorative drawing, use the
 [immediate C presenter](RADIO_GROUP.md#add-descriptions-and-custom-content).
 

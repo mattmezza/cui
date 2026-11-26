@@ -571,7 +571,7 @@ add_test(NAME bridge_python_radio_delivery_example COMMAND ${CMAKE_COMMAND} -E e
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/examples/radio_delivery.py)
 
-option(CUI_GO_RADIO_MOTION_TESTS "Check retained Radio motion with Go on Linux" OFF)
+option(CUI_GO_RADIO_MOTION_TESTS "Check retained Radio presentation with Go on Linux" OFF)
 if(CUI_GO_RADIO_MOTION_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR "Go Radio motion provider tests currently support Linux only")
@@ -580,15 +580,16 @@ if(CUI_GO_RADIO_MOTION_TESTS)
  function(cui_go_radio_motion_test suffix library legacy)
   add_test(NAME bridge_go_radio_motion_${suffix} COMMAND ${CMAKE_COMMAND} -E env
    CUI_BRIDGE_LIBRARY=${library} CUI_TEST_RADIO_MOTION_LEGACY=${legacy}
+   CUI_TEST_RADIO_CONTENT_LEGACY=${legacy}
    SDL_RENDER_DRIVER=software
    ${CUI_GO_RADIO_MOTION_EXECUTABLE} ${ARGN})
   set_tests_properties(bridge_go_radio_motion_${suffix} PROPERTIES
    WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/go" RUN_SERIAL TRUE TIMEOUT 300)
  endfunction()
  cui_go_radio_motion_test(dynamic $<TARGET_FILE:cui_bridge> 0
-  test -p=1 -tags cui_dynamic ./cui -run ^TestRadioMotion$ -count=1)
+  test -p=1 -tags cui_dynamic ./cui -run ^TestRadio -count=1)
  cui_go_radio_motion_test(static "" 0
-  test -p=1 ./cui -run ^TestRadioMotion$ -count=1)
+  test -p=1 ./cui -run ^TestRadio -count=1)
  cui_go_radio_motion_test(example "" 0 run -p=1 ./examples/radio_delivery)
  set(CUI_GO_RADIO_LEGACY_LIBRARY "" CACHE FILEPATH "Optional bridge without retained Radio motion")
  if(CUI_GO_RADIO_LEGACY_LIBRARY)
@@ -596,9 +597,9 @@ if(CUI_GO_RADIO_MOTION_TESTS)
    message(FATAL_ERROR "CUI_GO_RADIO_LEGACY_LIBRARY must name an existing provider")
   endif()
   cui_go_radio_motion_test(legacy "${CUI_GO_RADIO_LEGACY_LIBRARY}" 1
-   test -p=1 -tags cui_dynamic ./cui -run ^TestRadioMotion$ -count=1)
+   test -p=1 -tags cui_dynamic ./cui -run ^TestRadio -count=1)
   cui_go_radio_motion_test(legacy_bundled "${CUI_GO_RADIO_LEGACY_LIBRARY}" 1
-   test -p=1 ./cui -run ^TestRadioMotion$ -count=1)
+   test -p=1 ./cui -run ^TestRadio -count=1)
  endif()
  if(CUI_BRIDGE_NATIVE_TESTS)
   cui_go_radio_motion_test(native $<TARGET_FILE:cui_bridge> 0
@@ -606,7 +607,7 @@ if(CUI_GO_RADIO_MOTION_TESTS)
  endif()
 endif()
 
-option(CUI_RUST_RADIO_MOTION_TESTS "Check retained Radio motion with Rust on Linux" OFF)
+option(CUI_RUST_RADIO_MOTION_TESTS "Check retained Radio presentation with Rust on Linux" OFF)
 if(CUI_RUST_RADIO_MOTION_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR "Rust Radio motion provider tests currently support Linux only")

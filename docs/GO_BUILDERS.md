@@ -161,6 +161,28 @@ go run ./examples/radio_delivery
 go run -tags cui_native ./examples/radio_delivery --font ../../third_party/inter/Inter-Regular.otf
 ```
 
+## Compose Radio options from Go
+
+Call `DecorateContent(enabled)` on an Item owned by a RadioGroup. The example
+uses the provider capability so the option works with earlier bridge
+versions. [Complete delivery example](../bindings/go/examples/radio_delivery/main.go)
+
+```go
+decorate, err := app.SupportsRadioItemContent()
+if err != nil {
+    return err
+}
+priority := cui.Item("priority", "Priority").
+    Detail("Tracked delivery. Recommended.").
+    DecorateContent(decorate).
+    Children(cui.Tag("recommended", "Recommended"))
+```
+
+Call `priority.SetRadioItemContent(false)` to hide the children after mounting.
+The option remains selectable and the group's usual callback reports it.
+See the allowed decorative kinds in the
+[bridge composition guide](BRIDGE_COMPONENTS.md#compose-retained-radio-option-content).
+
 ## Configure Pagination from Go
 
 `ConfiguredPagination` records copied layout options on a detached node. Set `AvailableWidth` to the current inner width in logical pixels to wrap, or use zero for a single row. Send committed pages to your results view through `OnChange`. For a dynamic provider, check `app.SupportsPaginationOptions()` before opting in. Ordinary `Pagination(key)` and its change callback also work with earlier providers.

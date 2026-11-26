@@ -22,10 +22,14 @@ func main() {
 	must(err)
 	defer app.Close()
 
+	content, err := app.SupportsRadioItemContent()
+	must(err)
 	motion, err := app.SupportsRadioMotion()
 	must(err)
 	standard := cui.Item("standard", "Standard")
-	priority := cui.Item("priority", "Priority").Detail("Tracked delivery")
+	decoration := cui.Tag("recommended", "Recommended")
+	priority := cui.Item("priority", "Priority").Detail("Tracked delivery. Recommended.").
+		DecorateContent(content).Children(decoration)
 	summary := cui.Label("Estimated arrival: Friday")
 	delivery := cui.RadioGroup("delivery").Children(standard, priority).Selected(standard).
 		AnimateSelection(motion).OnChange(func(event cui.Event) {
@@ -43,7 +47,11 @@ func main() {
 		return
 	}
 	must(app.Step(.016))
-	bounds, err := app.Bounds(priority)
+	target := priority
+	if content {
+		target = decoration
+	}
+	bounds, err := app.Bounds(target)
 	must(err)
 	x, y := bounds.X+bounds.Width/2, bounds.Y+bounds.Height/2
 	must(app.QueuePointer(cui.PointerDown, x, y))

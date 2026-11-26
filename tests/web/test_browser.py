@@ -190,6 +190,7 @@ def verify_notification_close(browser, url):
     try:
         page.goto(url + '#Notification')
         page.wait_for_function('window.cuiGallery && cuiGallery.renderedComponent === "Notification"')
+        notification_url = page.url
         canvas = page.locator('canvas')
         canvas.scroll_into_view_if_needed()
         metric = """name => {
@@ -207,6 +208,14 @@ def verify_notification_close(browser, url):
             value = page.wait_for_function(metric, arg=name).json_value()
             x, y, w, h = value['bounds']
             canvas.tap(position={'x':x+w/2,'y':y+h/2})
+        focused = """() => {
+            const e = window.cuiGallery?.exports;
+            if (!e) return null;
+            for (let i = 0; i < e.gallery_semantic_count(); i++) {
+                if (e.gallery_semantic(i, 7)) return String(e.gallery_semantic_id(i));
+            }
+            return null;
+        }"""
         tap('Add persistent notice')
         page.wait_for_function('cuiGallery.exports.gallery_notification_stats(0)===1 && cuiGallery.exports.gallery_notification_entry(0,0)===1')
         page.wait_for_function(metric, arg='Close')
@@ -222,13 +231,24 @@ def verify_notification_close(browser, url):
         canvas.focus()
         # Only real Tab events choose Close; do not set C focus or hover the toast.
         for _ in range(12):
+            previous = page.evaluate(focused)
             page.keyboard.press('Tab')
+            page.wait_for_function(f'''before => {{
+                const current = ({focused})();
+                return document.activeElement.id === "preview" && current !== null && current !== before;
+            }}''', arg=previous)
             if page.evaluate(metric, 'Close')['focused']:
                 break
         else:
             raise AssertionError('Actionless persistent notice Close is not keyboard reachable')
         page.keyboard.press('Enter')
-        page.wait_for_function('cuiGallery.exports.gallery_notification_stats(0)===0 && cuiGallery.exports.gallery_notification_stats(3)===1')
+        page.wait_for_function('''() => {
+            const gallery = window.cuiGallery;
+            if (gallery?.renderedComponent !== "Notification") return false;
+            const stats = gallery.exports.gallery_notification_stats;
+            return stats(0) === 0 && stats(3) === 1;
+        }''')
+        assert page.url == notification_url
         assert page.evaluate('cuiGallery.exports.gallery_notification_stats(1)') == 0
         page.set_viewport_size({'width': 274, 'height': 844})
         page.wait_for_function("document.querySelector('canvas').clientWidth < 274")

@@ -27,8 +27,9 @@ def main():
    def containment():
     card=a.target('Attachment 1',9);x,y,w,h=card['f'][1:5]
     paints=a.page.evaluate(PAINT)
-    matches=[d for d in paints if x<=d['b'][0]<x+w and y<=d['b'][1]<y+h and(d['text'].startswith('Attachment')or'Workspace'in d['text']or d['text']=='Open')]
-    assert any('Workspace'in d['text']for d in matches),'Subtitle not painted'
+    matches=[d for d in paints if x<=d['b'][0]<x+w and y<=d['b'][1]<y+h and(d['text'].startswith(('Workspace','PDF'))or d['text']=='Open')]
+    assert any(d['text'].startswith('Workspace')for d in matches),'Filename not painted'
+    assert any(d['text'].startswith('PDF')for d in matches),'Description not painted'
     assert any(d['text']=='Open'for d in matches),'Open action not painted'
     for d in matches:
      b=d['b'];assert b[1]+b[3]<=y+h+.2,(d,card)
@@ -45,12 +46,14 @@ def main():
    def pixels_and_scroll():
     containment();canvas=a.page.locator('canvas');canvas.scroll_into_view_if_needed()
     image=Image.open(BytesIO(canvas.screenshot())).convert('RGB')
-    subtitle=next(d for d in a.page.evaluate(PAINT)if d['text']=='Workspace file')
+    subtitle=next(d for d in a.page.evaluate(PAINT)if d['text'].startswith('PDF document'))
     x,y,w,h=subtitle['b'];crop=image.crop((int(x),int(y),min(image.width,int(x+w+1)),int(y+h+1)))
     assert len(set(crop.getdata()))>3,'Subtitle visible pixels missing'
     owner=a.target(predicate=lambda s:s['f'][17]and s['f'][20]>40)
     before=owner['f'][18];a.drag(owner,-60,0,rx=.5,ry=.5)
     assert a.value(owner,18)>before,'Actual touch failed horizontal group scroll'
+    a.drag(owner,60,0,rx=.5,ry=.5)
+    assert abs(a.value(owner,18)-before)<.2,'Reverse pan did not restore the viewport'
    a.case('Attachment','actual subtitle pixels and CDP horizontal pan',pixels_and_scroll)
    a.page.set_viewport_size({'width':390,'height':900})
    for density in [0,1]:
@@ -62,11 +65,20 @@ def main():
    a.page.set_viewport_size({'width':1280,'height':900});a.configure('density',0);a.configure('design-size',14)
    def reachable_action():
     owner=a.target(predicate=lambda s:s['f'][17]and s['f'][20]>40)
-    button=a.target('Open');assert button['f'][1]>owner['f'][1]+owner['f'][3],'Expected initially offscreen large action'
+    left,width=owner['f'][1],owner['f'][3]
+    right=left+width
+    button=a.target('Open')
+    assert button['f'][1]>right,'Expected initially offscreen large action'
     for _ in range(12):
-     a.drag(owner,-400,0,rx=.8,ry=.5)
+     before=a.value(owner,18)
+     # Pan toward the button's center. A fixed step can jump across the
+     # narrow scroll interval that fits the entire button at the largest size.
+     remaining=button['f'][1]+button['f'][3]/2-(left+width/2)
+     delta=min(400,width*.6,max(16,remaining))
+     a.drag(owner,-delta,0,rx=.8,ry=.5)
      button=a.target('Open')
-     if button['f'][1]>=owner['f'][1]and button['f'][1]+button['f'][3]<=owner['f'][1]+owner['f'][3]:break
+     assert a.value(owner,18)>before,'Actual touch failed to pan toward the large action'
+     if button['f'][1]>=left and button['f'][1]+button['f'][3]<=right:break
     else:raise AssertionError('Touch pan did not expose large Open action')
     before=a.page.evaluate('cuiGallery.exports.gallery_attachment_stats(3)')
     a.tap(button)

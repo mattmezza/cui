@@ -13,6 +13,24 @@ from threading import Thread
 from playwright.sync_api import sync_playwright
 
 
+def hold_frame_delivery(page):
+    # Check the gate when each callback is delivered, including a request that
+    # was pending before the test paused animation frames.
+    page.add_init_script('''(() => {
+        const request = window.requestAnimationFrame.bind(window);
+        const deferred = [];
+        let held = false;
+        window.requestAnimationFrame = callback => request(time => {
+            if (held) deferred.push(callback);
+            else callback(time);
+        });
+        window.holdTimeFieldFrame = () => { held = true; };
+        window.restoreTimeFieldFrame = () => {
+            held = false;
+            for (const callback of deferred.splice(0)) request(callback);
+        };
+    })()''')
+
 
 def set_candidate(cdp, value):
     cdp.send('Input.imeSetComposition',
@@ -78,16 +96,13 @@ def ordered_tab_preview(page):
     def digit_then_tab(digit, field, destination):
         # Use real key events while holding the async frame. The digit must
         # change the Tab outcome even though no preceding paint has run.
-        page.evaluate('''()=>{
-          const queued=[],raf=window.requestAnimationFrame;
-          window.requestAnimationFrame=callback=>queued.push(callback);
-          window.restoreTimeFieldFrame=()=>{
-            window.requestAnimationFrame=raf;
-            for(const callback of queued)raf(callback);
-          };
+        frame = page.evaluate('''() => {
+            window.holdTimeFieldFrame();
+            return cuiGallery.frame;
         }''')
         try:
             page.keyboard.press(digit)
+            assert page.evaluate('cuiGallery.frame') == frame
             assert value(field, 'Hour') != int(digit)
             page.keyboard.press('Tab')
             focused(destination)
@@ -382,6 +397,7 @@ def main():
 
             page = browser.new_page(viewport={'width': 1280, 'height': 900})
             page.on('pageerror', lambda error: errors.append(str(error)))
+            hold_frame_delivery(page)
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/#TimeField')
             page.wait_for_function('window.cuiGallery?.renderedComponent==="TimeField"')
             ordered_tab_preview(page)

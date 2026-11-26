@@ -542,7 +542,12 @@ Python, JS/TS, Go and Rust provide typed options and independent probes for
 presentation and previews. Retained progress uses a fraction. See
 `docs/MEDIA.md#fit-file-names-and-descriptions` and
 `docs/BRIDGE_COMPONENTS.md#show-an-attachment-preview-in-a-language-builder`
-for calls and runnable examples. Composed remove/retry slots use immediate C.
+for calls and runnable examples. Retained C can opt into built-in Open, Remove
+and Retry with `cui_bridge_attachment_set_actions_v1`. Request
+`CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1` when polling. The actions request app
+work and never change transfer status. Language builders currently cover
+presentation and previews. Custom slots use immediate C. See
+`docs/ATTACHMENT_EVENTS.md#retained-actions`.
 
 For a pinned navigation header/footer with body-only scrolling, use
 `cui_sidebar` with a persistent measurement cache. Tab and accessibility focus

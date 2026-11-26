@@ -123,14 +123,16 @@
         "cui_attachment_part_id",
         "cui_attachment_child_part_id",
         "cui_bridge_attachment_configure_v1",
-        "cui_bridge_attachment_set_preview_rgba_v1"
+        "cui_bridge_attachment_set_preview_rgba_v1",
+        "cui_bridge_attachment_set_actions_v1",
+        "cui_bridge_poll_value_notification_v1"
       ],
       "state_types": [
         "cui_attachment_model",
         "cui_attachment_state"
       ],
       "state_ownership": "Caller retains cui_attachment_state and owns attachment model, metadata and resource lifetime.",
-      "interaction": "cui_attachment_result reports actions; cui_attachment_action_fn receives remove/retry activation.",
+      "interaction": "Immediate C reports actions and can call typed observers. Retained C opts into Open, Remove and Retry through the shared queued ACTIVATE notification.",
       "usage": "Submit transfer status and progress. Handle removal and retry in action callbacks. Use cui_attachment_with_metadata for one-line grapheme ellipsis, full labels and typography in immediate C. Retained C and the Python, JavaScript, TypeScript, Go and Rust builders can copy layout and text options and a decoded RGBA8 preview through separate bridge capabilities. Retained progress is a fraction in [0,1].",
       "docs": [
         "docs/MEDIA.md",

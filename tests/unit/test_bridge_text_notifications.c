@@ -163,7 +163,8 @@ static void overflow(void) {
 }
 int main(void) {
     assert(cui_bridge_notification_value_payloads_v1() ==
-           (CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 | CUI_BRIDGE_VALUE_SELECTION_V1));
+           (CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 | CUI_BRIDGE_VALUE_SELECTION_V1 |
+            CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1));
     producers();
     capacity_and_interleave();
     overflow();

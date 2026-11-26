@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "../base/cui_table_internal.h"
+#include "../components/cui_media_internal.h"
 #include "cui/cui_media.h"
 #include "cui/cui_message.h"
 #include "cui/cui_stepper_presentation.h"
@@ -3246,11 +3247,13 @@ cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *app, cui_bridge_node h
          node->kind != CUI_BRIDGE_COMMAND && node->kind != CUI_BRIDGE_VIRTUAL_LIST &&
          node->kind != CUI_BRIDGE_SIDEBAR && node->kind != CUI_BRIDGE_SPEECH &&
          node->kind != CUI_BRIDGE_QUESTIONNAIRE && node->kind != CUI_BRIDGE_DOCK &&
-         node->kind != CUI_BRIDGE_BADGE_CONFIGURED))
+         node->kind != CUI_BRIDGE_BADGE_CONFIGURED && node->kind != CUI_BRIDGE_ATTACHMENT))
         return CUI_BRIDGE_INVALID_STATE;
     if (disabled > 1)
         return CUI_BRIDGE_INVALID_ARGUMENT;
     node->disabled = disabled != 0;
+    if (node->kind == CUI_BRIDGE_ATTACHMENT)
+        cui_invalidate(app->ui);
     if (node->disabled && node->data_table)
         bridge_data_table_clear_load_more(node->data_table);
     return CUI_BRIDGE_OK;
@@ -3311,7 +3314,26 @@ cui_bridge_status cui_bridge_set_attachment_status(cui_bridge_app *app, cui_brid
         return CUI_BRIDGE_INVALID_STATE;
     if (value < CUI_BRIDGE_ATTACHMENT_PENDING || value > CUI_BRIDGE_ATTACHMENT_COMPLETE)
         return CUI_BRIDGE_INVALID_ARGUMENT;
-    node->attachment_status = value;
+    if (node->attachment_status != value) {
+        node->attachment_status = value;
+        cui_invalidate(app->ui);
+    }
+    return CUI_BRIDGE_OK;
+}
+cui_bridge_status cui_bridge_attachment_set_actions_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                       uint32_t actions) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_ATTACHMENT)
+        return CUI_BRIDGE_INVALID_STATE;
+    const uint32_t allowed = CUI_BRIDGE_ATTACHMENT_OPEN_V1 | CUI_BRIDGE_ATTACHMENT_REMOVE_V1 |
+                             CUI_BRIDGE_ATTACHMENT_RETRY_V1;
+    if (actions & ~allowed)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->attachment_actions = actions;
+    cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
 cui_bridge_status cui_bridge_set_stepper_visual(cui_bridge_app *app, cui_bridge_node handle,
@@ -3900,21 +3922,24 @@ typedef struct {
     cui_bridge_app *app;
     uint32_t slot;
 } bridge_click_binding;
-static void bridge_click(void *user, const cui_button_click_event *event) {
-    bridge_click_binding *binding = user;
-    cui_bridge_app *app = binding->app;
+static void bridge_enqueue_click(cui_bridge_app *app, uint32_t slot, uint64_t frame,
+                                 cui_bridge_event_payload payload) {
     if (app->event_count == app->max_events) {
         app->frame_error = CUI_BRIDGE_CAPACITY;
         return;
     }
-    cui_bridge_node_record *node = &app->nodes[binding->slot];
+    cui_bridge_node_record *node = &app->nodes[slot];
     uint32_t tail = (app->event_head + app->event_count) % app->max_events;
-    app->event_payloads[tail] = (cui_bridge_event_payload){
-        .node_kind = app->nodes[binding->slot].kind, .payload_kind = CUI_BRIDGE_PAYLOAD_NONE};
-    app->events[tail] = (cui_bridge_event){.type = CUI_BRIDGE_EVENT_CLICK,
-                                           .node = {binding->slot, node->generation},
-                                           .frame_sequence = event->frame_sequence};
+    payload.node_kind = node->kind;
+    app->event_payloads[tail] = payload;
+    app->events[tail] = (cui_bridge_event){
+        .type = CUI_BRIDGE_EVENT_CLICK, .node = {slot, node->generation}, .frame_sequence = frame};
     app->event_count++;
+}
+static void bridge_click(void *user, const cui_button_click_event *event) {
+    bridge_click_binding *binding = user;
+    bridge_enqueue_click(binding->app, binding->slot, event->frame_sequence,
+                         (cui_bridge_event_payload){.payload_kind = CUI_BRIDGE_PAYLOAD_NONE});
 }
 static void bridge_change(cui_bridge_app *app, uint32_t slot) {
     if (app->event_count == app->max_events) {
@@ -4111,17 +4136,8 @@ static void bridge_data_table_change(cui_bridge_app *app, uint32_t slot, const c
     app->event_count++;
 }
 static void bridge_click_simple(cui_bridge_app *app, uint32_t slot) {
-    if (app->event_count == app->max_events) {
-        app->frame_error = CUI_BRIDGE_CAPACITY;
-        return;
-    }
-    uint32_t tail = (app->event_head + app->event_count) % app->max_events;
-    app->event_payloads[tail] = (cui_bridge_event_payload){.node_kind = app->nodes[slot].kind,
-                                                           .payload_kind = CUI_BRIDGE_PAYLOAD_NONE};
-    app->events[tail] = (cui_bridge_event){.type = CUI_BRIDGE_EVENT_CLICK,
-                                           .node = {slot, app->nodes[slot].generation},
-                                           .frame_sequence = cui_frame_sequence(app->ui)};
-    app->event_count++;
+    bridge_enqueue_click(app, slot, cui_frame_sequence(app->ui),
+                         (cui_bridge_event_payload){.payload_kind = CUI_BRIDGE_PAYLOAD_NONE});
 }
 static void bridge_surface_close(cui_bridge_app *app, uint32_t slot, cui_surface_result result) {
     if (app->event_count == app->max_events) {
@@ -4669,11 +4685,68 @@ static cui_image_load bridge_image_loader(void *user, cui_image_source source) {
         return (cui_image_load){.status = CUI_IMAGE_PENDING};
     return (cui_image_load){.status = CUI_IMAGE_READY, .frames = &node->image_frame, .count = 1};
 }
+typedef struct {
+    cui_bridge_node_record *node;
+    cui_id description_retry;
+} bridge_attachment_binding;
+
+_Static_assert(sizeof(cui_bridge_attachment_action_v1) == sizeof(cui_bridge_table_notification_v1),
+               "Attachment action must preserve the V1 payload union");
+_Static_assert((int)CUI_BRIDGE_ACTIVATION_SOURCE_POINTER_V1 ==
+                       (int)CUI_COMPONENT_EVENT_SOURCE_POINTER &&
+                   (int)CUI_BRIDGE_ACTIVATION_SOURCE_KEYBOARD_V1 ==
+                       (int)CUI_COMPONENT_EVENT_SOURCE_KEYBOARD &&
+                   (int)CUI_BRIDGE_ACTIVATION_SOURCE_ACCESSIBILITY_V1 ==
+                       (int)CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY,
+               "Attachment source uses shared event origins");
+
+static uint32_t bridge_attachment_action_part(bridge_attachment_binding binding, cui_id target) {
+    cui_id card = binding.node->id;
+    if (target == card)
+        return CUI_BRIDGE_ATTACHMENT_ACTION_PART_CARD_V1;
+    if (target == cui_attachment_remove_id(card))
+        return CUI_BRIDGE_ATTACHMENT_ACTION_PART_REMOVE_V1;
+    if (target == cui_attachment_retry_id(card))
+        return CUI_BRIDGE_ATTACHMENT_ACTION_PART_MEDIA_RETRY_V1;
+    if (target && target == binding.description_retry)
+        return CUI_BRIDGE_ATTACHMENT_ACTION_PART_DESCRIPTION_RETRY_V1;
+    return CUI_BRIDGE_ATTACHMENT_ACTION_PART_UNKNOWN_V1;
+}
+
+static void bridge_attachment_action(void *user, const cui_attachment_action_event *event) {
+    bridge_attachment_binding *binding = user;
+    cui_bridge_node_record *node = binding->node;
+    const cui_component_event_metadata *evidence = &event->event;
+    const uint32_t action_bits[] = {
+        [CUI_ATTACHMENT_ACTION_OPEN] = CUI_BRIDGE_ATTACHMENT_OPEN_V1,
+        [CUI_ATTACHMENT_ACTION_REMOVE] = CUI_BRIDGE_ATTACHMENT_REMOVE_V1,
+        [CUI_ATTACHMENT_ACTION_RETRY] = CUI_BRIDGE_ATTACHMENT_RETRY_V1,
+    };
+    cui_bridge_attachment_action_v1 action = {.action = action_bits[event->action]};
+    if (evidence->flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION)
+        action.part = bridge_attachment_action_part(*binding, evidence->activation.target);
+    if (evidence->flags & CUI_COMPONENT_EVENT_HAS_SOURCE) {
+        action.source = (uint32_t)evidence->source;
+        action.flags |= CUI_BRIDGE_ACTIVATION_HAS_SOURCE_V1;
+    }
+    if ((evidence->flags & CUI_COMPONENT_EVENT_HAS_INDEX) && evidence->event_index <= UINT32_MAX) {
+        action.event_index = (uint32_t)evidence->event_index;
+        action.flags |= CUI_BRIDGE_ACTIVATION_HAS_INDEX_V1;
+    }
+    const cui_bridge_event_payload payload = {
+        .payload_kind = CUI_BRIDGE_PAYLOAD_ATTACHMENT_ACTION,
+        .notification.attachment_action = action,
+        .value = action.action,
+    };
+    bridge_enqueue_click(node->owner, node->own_slot, evidence->frame_sequence, payload);
+}
+
 static void bridge_render_attachment(cui_bridge_app *app, cui_bridge_node_record *node) {
     const cui_bridge_attachment_config_v1 *config = node->attachment_config;
     uint32_t flags = config ? config->flags : 0;
     cui_attachment_child children[2];
     size_t count = 0;
+    bridge_attachment_binding binding = {.node = node};
     if (!config || node->text[0]) {
         children[count] =
             (cui_attachment_child){.kind = CUI_ATTACHMENT_TITLE, .text = cui_string(node->text)};
@@ -4684,6 +4757,8 @@ static void bridge_render_attachment(cui_bridge_app *app, cui_bridge_node_record
         count++;
     }
     if (node->detail[0]) {
+        binding.description_retry =
+            cui_attachment_child_part_id(node->id, count, CUI_ATTACHMENT_CHILD_PART_RETRY);
         children[count] = (cui_attachment_child){.kind = CUI_ATTACHMENT_DESCRIPTION,
                                                  .text = cui_string(node->detail)};
         if (config)
@@ -4700,6 +4775,8 @@ static void bridge_render_attachment(cui_bridge_app *app, cui_bridge_node_record
     options.model.design_size = (cui_design_size)node->size;
     options.model.vertical = (flags & CUI_BRIDGE_ATTACHMENT_VERTICAL_V1) != 0;
     options.model.media = (flags & CUI_BRIDGE_ATTACHMENT_MEDIA_V1) != 0;
+    uint32_t actions = node->disabled ? 0 : node->attachment_actions;
+    options.model.identified = actions != 0;
     if (config && config->media_aspect)
         options.model.media_aspect = config->media_aspect;
     options.children = children;
@@ -4712,20 +4789,34 @@ static void bridge_render_attachment(cui_bridge_app *app, cui_bridge_node_record
         options.image_loader = bridge_image_loader;
         options.image_user = node;
     }
-    cui_attachment_result result;
+    cui_attachment_metadata_style metadata = {0};
     if (config) {
-        cui_attachment_metadata_style metadata = {
+        metadata = (cui_attachment_metadata_style){
             .title = bridge_attachment_text_style(config->title),
             .description = bridge_attachment_text_style(config->description),
             .custom_title = (config->title.flags & CUI_BRIDGE_ATTACHMENT_TEXT_STYLE_V1) != 0,
             .custom_description =
                 (config->description.flags & CUI_BRIDGE_ATTACHMENT_TEXT_STYLE_V1) != 0,
         };
-        result = cui_attachment_with_metadata(app->ui, node->id, &app->theme,
-                                              &node->attachment_state, options, metadata);
-    } else {
-        result = cui_attachment(app->ui, node->id, &app->theme, &node->attachment_state, options);
     }
+    const cui_attachment_handler handler = {
+        .on_activate = actions & CUI_BRIDGE_ATTACHMENT_OPEN_V1 ? bridge_attachment_action : NULL,
+        .on_remove = actions & CUI_BRIDGE_ATTACHMENT_REMOVE_V1 ? bridge_attachment_action : NULL,
+        .on_retry = actions & CUI_BRIDGE_ATTACHMENT_RETRY_V1 ? bridge_attachment_action : NULL,
+        .user = &binding,
+    };
+    unsigned interaction_flags = 0;
+    if (handler.on_activate)
+        interaction_flags |= CUI_ATTACHMENT_FOCUSABLE_OPEN;
+    if (handler.on_remove)
+        interaction_flags |= CUI_ATTACHMENT_PERSISTENT_REMOVE;
+    if (node->disabled)
+        interaction_flags |= CUI_ATTACHMENT_DISABLED;
+    cui_attachment_result result =
+        cui_attachment_present_events(app->ui, node->id, &app->theme, &node->attachment_state,
+                                      options, handler, config ? &metadata : NULL,
+                                      interaction_flags)
+            .control;
     if (!result.valid)
         app->frame_error = CUI_BRIDGE_CORE_ERROR;
 }
@@ -6474,6 +6565,10 @@ uint32_t cui_bridge_notification_v1_size(void) {
 uint32_t cui_bridge_notification_versions(void) {
     return 1u;
 }
+static const uint32_t bridge_supported_value_payloads =
+    CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 | CUI_BRIDGE_VALUE_SELECTION_V1 |
+    CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1;
+
 static cui_bridge_status bridge_poll_notification_v1(cui_bridge_app *app, uint32_t struct_size,
                                                      cui_bridge_notification_v1 *out, char *text,
                                                      uint32_t capacity, uint32_t *required_capacity,
@@ -6482,8 +6577,7 @@ static cui_bridge_status bridge_poll_notification_v1(cui_bridge_app *app, uint32
     if (status != CUI_BRIDGE_OK)
         return status;
     if (!out || !required_capacity || struct_size != sizeof(*out) ||
-        (enabled_payloads &
-         ~(CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 | CUI_BRIDGE_VALUE_SELECTION_V1)))
+        (enabled_payloads & ~bridge_supported_value_payloads))
         return CUI_BRIDGE_INVALID_ARGUMENT;
     while (app->event_count) {
         uint32_t index = app->event_head;
@@ -6510,7 +6604,8 @@ static cui_bridge_status bridge_poll_notification_v1(cui_bridge_app *app, uint32
                                                             : CUI_BRIDGE_NOTIFY_CHANGE;
         value.payload_kind = (payload.payload_kind == CUI_BRIDGE_PAYLOAD_SCALAR ||
                               payload.payload_kind == CUI_BRIDGE_PAYLOAD_TEXT ||
-                              payload.payload_kind == CUI_BRIDGE_PAYLOAD_SELECTION) &&
+                              payload.payload_kind == CUI_BRIDGE_PAYLOAD_SELECTION ||
+                              payload.payload_kind == CUI_BRIDGE_PAYLOAD_ATTACHMENT_ACTION) &&
                                      !(enabled_payloads & (1u << payload.payload_kind))
                                  ? CUI_BRIDGE_PAYLOAD_LEGACY
                                  : payload.payload_kind;
@@ -6543,7 +6638,7 @@ static cui_bridge_status bridge_poll_notification_v1(cui_bridge_app *app, uint32
 }
 
 uint32_t cui_bridge_notification_value_payloads_v1(void) {
-    return CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 | CUI_BRIDGE_VALUE_SELECTION_V1;
+    return bridge_supported_value_payloads;
 }
 cui_bridge_status cui_bridge_poll_notification_v1(cui_bridge_app *app, uint32_t struct_size,
                                                   cui_bridge_notification_v1 *out, char *text,

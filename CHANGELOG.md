@@ -10,6 +10,8 @@
   previews and copied RGBA images in C, Python, JavaScript, TypeScript, Go and
   Rust. A progress fraction of 0.4 displays 40%.
   Media-only cards respect the preview aspect at explicit widths.
+- Retained C Attachment offers opt-in Open, Remove and Retry with a typed
+  activation payload on the existing notification queue.
 
 ## 0.1.0-alpha.10
 

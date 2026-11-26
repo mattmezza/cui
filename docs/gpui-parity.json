@@ -367,6 +367,7 @@
       "tests": [
         "tests/unit/test_media.c",
         "tests/unit/test_bridge_attachment.c",
+        "tests/unit/test_bridge_attachment_actions.c",
         "tests/web/test_browser.py",
         "tests/unit/test_compound_shadow_parts.c",
         "tests/unit/test_compound_shadow_legacy.c"
@@ -377,7 +378,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Immediate and retained C have opt-in styled end ellipsis. Retained C and all five language facades support named sizes, axis, media aspect, child status overrides and copied RGBA previews. Retained actions, encoded file/network decoding, shared resource cache, fully inherited styling and platform accessibility remain open."
+        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Immediate and retained C have opt-in styled end ellipsis. Retained C and all five language facades support named sizes, axis, media aspect, child status overrides and copied RGBA previews. Retained C has opt-in queued Open, Remove and Retry. Language action builders, composed retained slots, encoded file/network decoding, a shared resource cache, fully inherited styling and platform accessibility remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -409,7 +410,7 @@
             "tests/unit/test_media.c",
             "docs/BRIDGE_COMPONENTS.md"
           ],
-          "scope": "Headless draw geometry, copy and replacement, media aspect, status overrides, normalized progress and accessible full labels. Retained composed actions are pending."
+          "scope": "Headless draw geometry, copy and replacement, media aspect, status overrides, normalized progress and accessible full labels. Arbitrary retained action composition is pending."
         },
         {
           "name": "retained Attachment in language builders",
@@ -423,6 +424,15 @@
             "docs/BRIDGE_COMPONENTS.md"
           ],
           "scope": "Fitted metadata, axis, shared sizes, lifecycle refinements and copied previews in Python, JavaScript/TypeScript, Go and Rust. Headless geometry, replacement and optional-symbol handling. Retained composed actions remain open."
+        },
+        {
+          "name": "retained Attachment action notifications",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_attachment_actions.c",
+            "docs/ATTACHMENT_EVENTS.md"
+          ],
+          "scope": "Retained C Open, Remove and Retry with real pointer, keyboard and core accessibility evidence. Legacy and typed polls consume one queue. Language authoring and physical accessibility remain open."
         },
         {
           "name": "preview/remove actions",

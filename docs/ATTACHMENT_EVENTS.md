@@ -77,6 +77,57 @@ userdata/order, real pointer/key/accessibility evidence, description/media retry
 ambiguity, late callback changes, custom child isolation, passive/inert scopes and
 copied payload/deferred omission. The existing `media` suite covers image,
 Attachment and AttachmentGroup regressions. Run native tests only through
-`scripts/test_local.py`; browser/binding/full family parity is not implied.
-Foreign languages retain their existing queued generic notifications; this direct
-C facade does not add typed callback wrappers to them.
+`scripts/test_local.py`. The tests cover immediate C.
+
+## Retained actions
+
+Use `cui_bridge_attachment_set_actions_v1` to enable built-in Open, Remove, and
+Retry on a retained Attachment. These actions use the app's existing queue.
+They work independently of fitted metadata and decoded previews.
+
+```c
+/* app owns a mounted Attachment called card. Its lifecycle belongs to your app. */
+cui_bridge_status enable_file_actions(cui_bridge_app *app, cui_bridge_node card) {
+    return cui_bridge_attachment_set_actions_v1(
+        app, card, CUI_BRIDGE_ATTACHMENT_OPEN_V1 | CUI_BRIDGE_ATTACHMENT_REMOVE_V1 |
+                       CUI_BRIDGE_ATTACHMENT_RETRY_V1);
+}
+
+cui_bridge_status read_file_action(cui_bridge_app *app, cui_bridge_notification_v1 *notice,
+                                   char *text, uint32_t capacity, uint32_t *required) {
+    return cui_bridge_poll_value_notification_v1(app, sizeof *notice,
+        CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1, notice, text, capacity, required);
+}
+```
+
+Check `notice.payload_kind == CUI_BRIDGE_PAYLOAD_ATTACHMENT_ACTION` and switch on
+`notice.payload.attachment_action.action`. Run navigation, removal, or retry once
+through the polling path. The action does not update the Attachment's status
+or complete a file operation. Read the queue after stepping. Each poll consumes
+its next event, including ordinary events from other controls. Request any other
+categories your decoder understands in the same mask. An Attachment action has
+empty text. The general buffer and capacity rules apply.
+
+Open can receive focus and keyboard activation. Remove remains available on
+keyboard and touch without hover. Its control and the media Retry button use
+the card's measured bounds and can appear on the paint pass after initial
+layout. Retry is offered while Failed where the card has media or a description.
+Open and Remove remain independent of upload progress. `cui_bridge_set_disabled`
+suppresses new actions, and a zero action mask clears all three controls.
+Already copied events remain readable after a disable or configuration change.
+Removing the originating node discards its unread events.
+
+The surrounding `ACTIVATE` record carries the retained node and its frame.
+The Attachment record carries the action, the actual part when established,
+and source and event index when their flags are set. Multiple Retry controls
+activated during one frame give one Retry with unknown origin. Actions on the
+same card queue in Open, Remove, Retry order. Polling never repeats an action.
+The old polls still drain this queue. They expose `CLICK` as the event type.
+Extended views carry the numeric action code in `legacy.value` or
+`cui_bridge_event_ex.value`.
+
+For dynamic loading, check the setter and
+`CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1` separately. Older language helpers know
+their existing notification categories. The new action setter and typed
+Attachment payload are available directly through C. Language authoring,
+custom retained slots, and physical accessibility verification remain open.

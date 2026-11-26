@@ -56,7 +56,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | TitleBar | `cui_title_bar` | Item text labels, retained title state | No native window host controls |
 | Icon | `cui_icon_named`, optional `cui_icon` | Legacy catalog name and dimensions, or a shared owned resource and full copied Icon options | An unknown legacy name fails the frame. A configured Icon reports its own artwork error separately. [C presentation guide](BRIDGE_ICON_PRESENTATION.md). |
 | Message | `cui_message` | Copied body/header, width | Incoming filled bubble, one body |
-| Attachment | `cui_attachment` | Copied labels, transfer status and fractional progress. Optional named sizes, metadata styles, axis and decoded previews in C and the language builders | File transport and retained action controls remain application-owned. [Presentation and examples](#configure-a-retained-attachment-from-c). |
+| Attachment | `cui_attachment` | Copied labels, transfer status and fractional progress. Optional named sizes, metadata styles, axis and decoded previews in C and the language builders | Retained C can queue built-in Open, Remove and Retry. The application owns file operations. [Presentation and examples](#configure-a-retained-attachment-from-c) · [Actions](ATTACHMENT_EVENTS.md#retained-actions) |
 | Image | `cui_image` | Owned RGBA8 pixels, revision, description, size | At most 16 MiB; no path, URI, animated loader |
 | Tree | `cui_tree` | 64 flat Item records with preorder depth, expansion and selected Item events | Item step status is depth 0..63; no custom row content |
 | TimeField | `cui_time_field` | HH:MM:SS state, keyboard change, copied event text, disabled | 24-hour fixed format |
@@ -617,8 +617,10 @@ Use `SetAttachmentOptions(nil)` to reset and `ClearAttachmentPreview` to clear.
 Rust offers `attachment_options` and `attachment_preview_rgba` on the mounted
 builder and `App::configure_attachment` and `App::clear_attachment_preview`
 for updates. The Go and Rust upload examples include an application-owned
-button that completes the transfer. Retained Attachment itself emits no action
-events. Use the immediate C slots and observers for built-in remove and retry.
+button that completes the transfer. Applications using the C bridge can opt
+into built-in Open, Remove and Retry and read them from the notification queue.
+Language builders cover presentation and previews. Use immediate C for custom
+media, metadata and action slots. [Retained C actions](ATTACHMENT_EVENTS.md#retained-actions)
 
 From the repository root, build the headless C bridge and Node addon,
 then run the examples:

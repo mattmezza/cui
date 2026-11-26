@@ -261,7 +261,8 @@ int main(void) {
     assert(cui_bridge_notification_versions() == 1 &&
            cui_bridge_notification_v1_size() == sizeof(cui_bridge_notification_v1));
     assert(cui_bridge_notification_value_payloads_v1() ==
-           (CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 | CUI_BRIDGE_VALUE_SELECTION_V1));
+           (CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 | CUI_BRIDGE_VALUE_SELECTION_V1 |
+            CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1));
     number_and_protocol();
     other_scalars();
     overflow_and_interleave();

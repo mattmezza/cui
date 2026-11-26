@@ -31,6 +31,10 @@ add_executable(test_bridge_attachment ${CUI_BRIDGE_ROOT}/tests/unit/test_bridge_
 target_link_libraries(test_bridge_attachment PRIVATE cui_software)
 cui_warnings(test_bridge_attachment)
 add_test(NAME bridge_attachment COMMAND test_bridge_attachment)
+add_executable(test_bridge_attachment_actions ${CUI_BRIDGE_ROOT}/tests/unit/test_bridge_attachment_actions.c)
+target_link_libraries(test_bridge_attachment_actions PRIVATE cui)
+cui_warnings(test_bridge_attachment_actions)
+add_test(NAME bridge_attachment_actions COMMAND test_bridge_attachment_actions)
 add_executable(bridge_disclosure_preferences_example
  ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/disclosure_preferences.c)
 target_link_libraries(bridge_disclosure_preferences_example PRIVATE cui_bridge)

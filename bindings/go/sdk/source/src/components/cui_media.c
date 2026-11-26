@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include "../base/cui_design_metrics.h"
 #include "cui/cui_icon.h"
-#include "cui/cui_media_events.h"
 #include "cui/cui_scroll.h"
 #include "cui/cui_text_overflow.h"
+#include "cui_media_internal.h"
 #include "cui_status_internal.h"
 #include "cui_text_overflow_internal.h"
 #include <math.h>
@@ -464,11 +464,10 @@ static bool cui_media_metadata_style_valid(cui_text_style style, uint32_t capabi
            isfinite(style.letter_spacing) &&
            (!style.letter_spacing || (capabilities & CUI_TEXT_CAP_LETTER_SPACING));
 }
-static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t,
-                                                   cui_attachment_state *state,
-                                                   cui_attachment_options o,
-                                                   cui_media_action_observer *observer,
-                                                   const cui_attachment_metadata_style *metadata) {
+static cui_attachment_result
+cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t, cui_attachment_state *state,
+                      cui_attachment_options o, cui_media_action_observer *observer,
+                      const cui_attachment_metadata_style *metadata, unsigned interaction_flags) {
     cui_attachment_result r = {0};
     if (!ui || !id || !t || !state || !isfinite(t->radius) || t->radius < 0 ||
         (o.name.length && !o.name.data) || (o.remove_label.length && !o.remove_label.data) ||
@@ -508,6 +507,8 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
     o.model.image = o.image_state && o.image_loader;
     o.model.media = o.model.media || o.model.image || o.media_content;
     o.model.remove = o.on_remove != NULL || (observer && observer->handler.on_remove);
+    /* Persistent actions use the planner's existing always-visible layout. */
+    o.model.touch |= (interaction_flags & CUI_ATTACHMENT_PERSISTENT_REMOVE) != 0;
     o.model.retry = o.on_retry != NULL || (observer && observer->handler.on_retry);
     o.model.hovered = cui_hover_within(ui, id);
     if (!cui_base_attachment(o.model, &r.plan))
@@ -530,10 +531,14 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
     }
     float radius = o.model.size == CUI_MEDIA_XSMALL ? t->radius : t->radius * 1.5f;
     bool click = o.model.identified && (o.on_click || (observer && observer->handler.on_activate));
-    cui_interaction root = cui_interact(ui, id, CUI_ROLE_GROUP, o.name, false, false, 0);
+    bool focusable = click && (interaction_flags & CUI_ATTACHMENT_FOCUSABLE_OPEN);
+    bool disabled = (interaction_flags & CUI_ATTACHMENT_DISABLED) != 0;
+    cui_interaction root = cui_interact(ui, id, CUI_ROLE_GROUP, o.name, disabled, false, 0);
     cui_set_semantic_details(
         ui, id,
         (cui_semantic_details){.pointer_activatable = click,
+                               .focusable = focusable,
+                               .cursor = focusable ? CUI_CURSOR_POINTER : CUI_CURSOR_DEFAULT,
                                .busy = cui_attachment_in_progress(o.model.status)});
     r.clicked = click && root.activated;
     cui_media_action_capture(ui, observer, CUI_ATTACHMENT_ACTION_OPEN, id, r.clicked);
@@ -541,19 +546,22 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
     cui_begin_box(ui, cui_media_id(id, 9), (cui_box){.height = p.overhang, .fixed_height = true});
     cui_end_box(ui);
     cui_begin_box(ui, cui_media_id(id, 10), (cui_box){.width = p.width + p.overhang, .row = true});
-    cui_begin_box(
-        ui, id,
-        (cui_box){.width = p.width,
-                  .height = p.flush ? p.height : 0,
-                  .row = !o.model.vertical,
-                  .gap = o.model.vertical ? p.metrics.gap : 0,
-                  .align_x = o.model.vertical ? CUI_ALIGN_CENTER : CUI_ALIGN_START,
-                  .padding = o.model.vertical && !p.flush ? p.metrics.card_padding : 0,
-                  .radius = radius,
-                  .background = root.hovered && click ? t->surface : t->background,
-                  .border = o.model.status == CUI_ATTACHMENT_FAILED ? t->danger : t->border,
-                  .border_width = p.dashed ? 0 : 1,
-                  .align_y = CUI_ALIGN_CENTER});
+    bool focus_ring = focusable && root.focus_visible;
+    cui_color border = o.model.status == CUI_ATTACHMENT_FAILED ? t->danger : t->border;
+    cui_begin_box(ui, id,
+                  (cui_box){.width = p.width,
+                            .height = p.flush ? p.height : 0,
+                            .row = !o.model.vertical,
+                            .gap = o.model.vertical ? p.metrics.gap : 0,
+                            .align_x = o.model.vertical ? CUI_ALIGN_CENTER : CUI_ALIGN_START,
+                            .padding = o.model.vertical && !p.flush ? p.metrics.card_padding : 0,
+                            .radius = radius,
+                            .background = root.hovered && click ? t->surface : t->background,
+                            .border = focus_ring ? t->focus : border,
+                            .border_width = focus_ring ? 2
+                                            : p.dashed ? 0
+                                                       : 1,
+                            .align_y = CUI_ALIGN_CENTER});
     cui_track_bounds(ui, id, &state->card);
     if (!o.model.vertical) {
         /* Preserve the nominal chip minimum, but fit real metadata/action height. */
@@ -567,6 +575,12 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
     }
     cui_id media_id = cui_media_id(id, 3);
     bool has_media = p.media_width > 0 && p.media_height > 0;
+    /* The retained action portals need a paint pass after their anchors
+     * acquire geometry, including when there is no active pointer. */
+    if (interaction_flags && cui_frame_paint_enabled(ui) &&
+        ((p.remove_visible && state->card.w <= 0) ||
+         (p.retry_media && has_media && state->media.w <= 0)))
+        cui_invalidate(ui);
     if (!has_media)
         state->media = (cui_rect){0};
     if (has_media) {
@@ -719,28 +733,30 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
 
 cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme *theme,
                                      cui_attachment_state *state, cui_attachment_options options) {
-    return cui_attachment_common(ui, id, theme, state, options, NULL, NULL);
+    return cui_attachment_common(ui, id, theme, state, options, NULL, NULL, 0);
 }
 cui_attachment_result cui_attachment_with_metadata(cui_context *ui, cui_id id,
                                                    const cui_theme *theme,
                                                    cui_attachment_state *state,
                                                    cui_attachment_options options,
                                                    cui_attachment_metadata_style metadata) {
-    return cui_attachment_common(ui, id, theme, state, options, NULL, &metadata);
+    return cui_attachment_common(ui, id, theme, state, options, NULL, &metadata, 0);
 }
-static cui_attachment_event_result
-cui_attachment_events_common(cui_context *ui, cui_id id, const cui_theme *theme,
-                             cui_attachment_state *state, cui_attachment_options options,
-                             cui_attachment_handler handler,
-                             const cui_attachment_metadata_style *metadata) {
+cui_attachment_event_result
+cui_attachment_present_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                              cui_attachment_state *state, cui_attachment_options options,
+                              cui_attachment_handler handler,
+                              const cui_attachment_metadata_style *metadata, unsigned flags) {
     cui_attachment_event_result result = {0};
     if (!handler.on_activate && !handler.on_remove && !handler.on_retry) {
-        result.control = cui_attachment_common(ui, id, theme, state, options, NULL, metadata);
+        result.control =
+            cui_attachment_common(ui, id, theme, state, options, NULL, metadata, flags);
         return result;
     }
     cui_media_action_observer observer = {.id = id, .handler = handler, .result = &result};
     observer.frame = cui_frame_paint_enabled(ui) ? cui_frame_sequence(ui) : 0;
-    result.control = cui_attachment_common(ui, id, theme, state, options, &observer, metadata);
+    result.control =
+        cui_attachment_common(ui, id, theme, state, options, &observer, metadata, flags);
     return result;
 }
 cui_attachment_event_result cui_attachment_events(cui_context *ui, cui_id id,
@@ -748,14 +764,14 @@ cui_attachment_event_result cui_attachment_events(cui_context *ui, cui_id id,
                                                   cui_attachment_state *state,
                                                   cui_attachment_options options,
                                                   cui_attachment_handler handler) {
-    return cui_attachment_events_common(ui, id, theme, state, options, handler, NULL);
+    return cui_attachment_present_events(ui, id, theme, state, options, handler, NULL, 0);
 }
 cui_attachment_event_result
 cui_attachment_events_with_metadata(cui_context *ui, cui_id id, const cui_theme *theme,
                                     cui_attachment_state *state, cui_attachment_options options,
                                     cui_attachment_metadata_style metadata,
                                     cui_attachment_handler handler) {
-    return cui_attachment_events_common(ui, id, theme, state, options, handler, &metadata);
+    return cui_attachment_present_events(ui, id, theme, state, options, handler, &metadata, 0);
 }
 
 static float cui_media_transition(float value, float *start, float *target, double *epoch,

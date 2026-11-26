@@ -829,18 +829,46 @@ typedef struct {
 #define CUI_BRIDGE_PAYLOAD_TABLE 5u
 #define CUI_BRIDGE_PAYLOAD_SURFACE 6u
 #define CUI_BRIDGE_PAYLOAD_LEGACY 7u
+#define CUI_BRIDGE_PAYLOAD_ATTACHMENT_ACTION 8u /* opt-in activation snapshot */
 #define CUI_BRIDGE_NOTIFY_HAS_FRAME 1u
 #define CUI_BRIDGE_TABLE_SELECTION 1u
 #define CUI_BRIDGE_TABLE_SORT 2u
 typedef struct {
     uint32_t reason, row, column, sort_column, sort_direction;
 } cui_bridge_table_notification_v1;
+enum {
+    CUI_BRIDGE_ATTACHMENT_OPEN_V1 = 1u << 0,
+    CUI_BRIDGE_ATTACHMENT_REMOVE_V1 = 1u << 1,
+    CUI_BRIDGE_ATTACHMENT_RETRY_V1 = 1u << 2
+};
+enum {
+    CUI_BRIDGE_ATTACHMENT_ACTION_PART_UNKNOWN_V1 = 0,
+    CUI_BRIDGE_ATTACHMENT_ACTION_PART_CARD_V1,
+    CUI_BRIDGE_ATTACHMENT_ACTION_PART_REMOVE_V1,
+    CUI_BRIDGE_ATTACHMENT_ACTION_PART_MEDIA_RETRY_V1,
+    CUI_BRIDGE_ATTACHMENT_ACTION_PART_DESCRIPTION_RETRY_V1
+};
+enum {
+    CUI_BRIDGE_ACTIVATION_SOURCE_UNKNOWN_V1 = 0,
+    CUI_BRIDGE_ACTIVATION_SOURCE_POINTER_V1 = 2,
+    CUI_BRIDGE_ACTIVATION_SOURCE_KEYBOARD_V1 = 3,
+    CUI_BRIDGE_ACTIVATION_SOURCE_ACCESSIBILITY_V1 = 4,
+    CUI_BRIDGE_ACTIVATION_HAS_INDEX_V1 = 1u << 1,
+    CUI_BRIDGE_ACTIVATION_HAS_SOURCE_V1 = 1u << 2
+};
+/* Action is one mask bit. Part is UNKNOWN if the originating control is
+ * ambiguous or unavailable. Source and event_index require their flags.
+ * The index is local to the frame sequence of the enclosing notification. */
+typedef struct {
+    uint32_t action, part, source, flags, event_index;
+} cui_bridge_attachment_action_v1;
 typedef union {
     uint32_t boolean_value;   /* exactly0 or1 */
     double scalar_value;      /* opt-in scalar notification view */
     cui_bridge_node selected; /* opt-in full slot/generation snapshot */
     cui_bridge_table_notification_v1 table;
     uint32_t surface_result;
+    cui_bridge_attachment_action_v1 attachment_action;
 } cui_bridge_notification_value_v1;
 typedef struct {
     uint32_t struct_size, schema_version;
@@ -873,9 +901,13 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_notification_v1(cui_bridge_app 
 #define CUI_BRIDGE_VALUE_SCALAR_V1 (1u << CUI_BRIDGE_PAYLOAD_SCALAR)
 #define CUI_BRIDGE_VALUE_TEXT_V1 (1u << CUI_BRIDGE_PAYLOAD_TEXT)
 #define CUI_BRIDGE_VALUE_SELECTION_V1 (1u << CUI_BRIDGE_PAYLOAD_SELECTION)
+#define CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1 (1u << CUI_BRIDGE_PAYLOAD_ATTACHMENT_ACTION)
 /* SCALAR: Slider/NumberInput/Rating/Pagination.
  * TEXT: plain Input/Textarea/Editor/InputGroup only, copied separately.
- * SELECTION: RadioGroup/Tabs/Select/List/Stepper only. */
+ * SELECTION: RadioGroup/Tabs/Select/List/Stepper only.
+ * ATTACHMENT_ACTION: opt-in Attachment ACTIVATE. The LEGACY view is a CLICK
+ * with the same retained handle, frame and action code in legacy.value.
+ * Capability queries may include additional bits. Request only understood bits. */
 CUI_BRIDGE_API uint32_t cui_bridge_notification_value_payloads_v1(void);
 /* Unsupported mask bits/invalid size fail before queue cleanup or consumption.
  * Unrequested categories return LEGACY; all existing typed tags stay unchanged.
@@ -1281,6 +1313,15 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_attachment_configure_v1(
 CUI_BRIDGE_API cui_bridge_status cui_bridge_attachment_set_preview_rgba_v1(
     cui_bridge_app *, cui_bridge_node, const uint8_t *pixels, uint32_t width, uint32_t height,
     uint32_t stride, uint32_t byte_count);
+/* Opt into the supplied Open/Remove/Retry mask. Zero clears all actions.
+ * Open is keyboard-focusable, Remove stays visible, and Retry needs Failed.
+ * Disabled Attachments are inert. Capture is queued once per enabled category,
+ * in Open/Remove/Retry order per card and frame. Existing queued actions stay
+ * readable until polled or their node is removed. Applications own all file
+ * operations and lifecycle changes. Call between steps on the owner thread. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_attachment_set_actions_v1(cui_bridge_app *,
+                                                                      cui_bridge_node,
+                                                                      uint32_t actions);
 /* Opt-in Stepper visual composition. Density: 0 MD, 1 XS, 2 SM, 3 LG.
  * Legacy is default; bridge remains selection-owned with aggregate CHANGE.
  * Visual paint snapshots selection until the next frame. Group cap remains 64. */

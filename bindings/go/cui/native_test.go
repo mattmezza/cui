@@ -1133,6 +1133,68 @@ func TestCarousel(t *testing.T) {
 	carousel.Disabled(true)
 	check(t, carousel.Err())
 }
+func TestCarouselBasis(t *testing.T) {
+	a := app(t)
+	supported, err := a.SupportsCarouselBasis()
+	check(t, err)
+	legacy := os.Getenv("CUI_TEST_LEGACY_CAROUSEL_BASIS") == "1"
+	if supported == legacy {
+		t.Fatalf("Carousel basis capability = %t, legacy test = %t", supported, legacy)
+	}
+	first := Item("one", "Overview").CarouselBasis(.5)
+	second := Item("two", "Activity").CarouselBasis(.5)
+	third := Item("three", "Reports")
+	var changes []Event
+	carousel := Carousel("slides").VisualSize(240, 100).Children(first, second, third).
+		OnChange(func(e Event) { changes = append(changes, e) })
+	root := Column("root").Children(carousel)
+	if legacy {
+		if err := a.Mount(root); err != ErrCarouselBasisUnavailable {
+			t.Fatalf("expected unavailable before mounting, got %v", err)
+		}
+		check(t, first.CarouselBasis(0).Err())
+		check(t, second.CarouselBasis(0).Err())
+	} else {
+		bad := Column("bad-root").Children(Tabs("tabs").Children(Item("tab", "Tab").CarouselBasis(.5)))
+		if err := a.Mount(bad); err == nil {
+			t.Fatal("accepted a fractional slide outside Carousel")
+		}
+	}
+	check(t, a.Mount(root))
+	check(t, a.Step(.016))
+	bounds, err := a.Bounds(carousel)
+	check(t, err)
+	firstBounds, err := a.Bounds(first)
+	check(t, err)
+	secondBounds, err := a.Bounds(second)
+	check(t, err)
+	stride := float32(128)
+	if legacy {
+		stride = 256
+	}
+	if secondBounds.X-firstBounds.X != stride {
+		t.Fatalf("slide stride %+v %+v, expected %v", firstBounds, secondBounds, stride)
+	}
+	check(t, a.QueueScroll(bounds.X+30, bounds.Y+30, -1, 0))
+	check(t, a.Step(.016))
+	count, err := a.Dispatch()
+	check(t, err)
+	if count != 1 || len(changes) != 1 || changes[0].Selected != second {
+		t.Fatalf("expected one selected Item event, got %+v", changes)
+	}
+	if !legacy {
+		check(t, first.CarouselBasis(0).Err())
+		check(t, a.Step(.016))
+		selected, err := a.Selected(carousel)
+		check(t, err)
+		count, err = a.Dispatch()
+		check(t, err)
+		if count != 0 || selected != second {
+			t.Fatalf("layout update changed selection or emitted an event")
+		}
+	}
+}
+
 func TestResizable(t *testing.T) {
 	a := app(t)
 	first := Item("first", "First panel").PanelSize(240)

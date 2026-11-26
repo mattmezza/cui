@@ -881,6 +881,59 @@ fn carousel_selection_and_navigation() {
     assert!(app.bounds(panel).unwrap().width > 0.);
 }
 #[test]
+fn carousel_slide_basis() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let carousel = app
+        .build_child(root, Kind::Carousel, "carousel")
+        .unwrap()
+        .visual_size(240., 100.)
+        .unwrap()
+        .finish();
+    let legacy = std::env::var("CUI_TEST_LEGACY_CAROUSEL_BASIS").as_deref() == Ok("1");
+    assert_eq!(app.supports_carousel_basis(), !legacy);
+    let mut builder = app.build_child(carousel, Kind::Item, "overview").unwrap();
+    if !legacy {
+        builder = builder.carousel_basis(0.5).unwrap();
+    }
+    let first = builder.text("Overview").unwrap().finish();
+    let second = app.child(carousel, Kind::Item, "activity").unwrap();
+    app.child(carousel, Kind::Item, "reports").unwrap();
+    if legacy {
+        assert_eq!(
+            app.carousel_basis(first, 0.5).err(),
+            Some(Error::CAROUSEL_BASIS_UNAVAILABLE)
+        );
+    } else {
+        app.carousel_basis(second, 0.5).unwrap();
+        assert_eq!(app.carousel_basis(second, f32::NAN).err(), Some(Error(3)));
+        assert_eq!(app.carousel_basis(carousel, 0.5).err(), Some(Error(8)));
+    }
+    let selected = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let changes = selected.clone();
+    app.on_change_event(carousel, move |e| changes.borrow_mut().push(e.selected))
+        .unwrap();
+    app.step(0.016).unwrap();
+    let a = app.bounds(first).unwrap();
+    let b = app.bounds(second).unwrap();
+    assert_eq!(b.x - a.x, if legacy { 256. } else { 128. });
+    let frame = app.bounds(carousel).unwrap();
+    app.scroll(frame.x + 30., frame.y + 30., -1., 0.).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(*selected.borrow(), [Some(second)]);
+    if !legacy {
+        app.carousel_basis(first, 0.).unwrap();
+        app.step(0.016).unwrap();
+        assert_eq!(app.selected(carousel).unwrap(), Some(second));
+        assert_eq!(app.dispatch().unwrap(), 0);
+        app.remove(first).unwrap();
+        assert_eq!(app.carousel_basis(first, 0.5).err(), Some(Error(4)));
+    }
+}
+
+#[test]
 fn resizable_panel_drag() {
     let _guard = NATIVE.lock().unwrap();
     let mut app = App::headless(500., 300.).unwrap();

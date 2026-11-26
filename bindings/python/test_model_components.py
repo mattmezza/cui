@@ -108,6 +108,38 @@ class Models(unittest.TestCase):
             app.queue_text('3');app.step();app.dispatch();self.assertEqual(otp.current_text(),'123');self.assertEqual(events[-1].text,'123')
             otp.disabled();app.step();events.clear();app.queue_text('4');app.step();app.dispatch();self.assertEqual(events,[]);self.assertEqual(otp.current_text(),'123')
 
+    def test_carousel_basis(self):
+        for value in (-.1, 1.1, float("nan"), float("inf")):
+            with self.assertRaises(ValueError): c.item("bad").carousel_basis(value)
+        with self.assertRaises(TypeError): c.item("bad").carousel_basis(True)
+        with self.assertRaises(ValueError): c.label("bad").carousel_basis(.5)
+        with c.App(width=640) as app:
+            slide=c.item("slide", "Slide").carousel_basis(.5)
+            root=c.column().children(slide)
+            with self.assertRaises(ValueError): app.mount(root)
+            self.assertIsNone(slide._handle)
+        with c.App(width=640) as app:
+            self.assertTrue(app.supports_carousel_basis())
+            events=[]
+            slide=c.item("slide", "Slide").carousel_basis(.5)
+            other=c.item("other", "Other")
+            carousel=c.carousel("slides").visual_size(400,100).children(slide,other).on_change(events.append)
+            app.mount(c.column().children(carousel));app.step()
+            half=app.bounds(slide)[2]
+            slide.carousel_basis(.25);app.step()
+            self.assertAlmostEqual(app.bounds(slide)[2],half/2,delta=1)
+            slide.carousel_basis(0);app.step()
+            self.assertGreater(app.bounds(slide)[2],half)
+            app.dispatch();self.assertEqual(events,[])
+        with c.App() as app:
+            with patch.object(app._api, "set_carousel_basis", None):
+                self.assertFalse(app.supports_carousel_basis())
+                slide=c.item("zero").carousel_basis(.5).carousel_basis(0)
+                app.mount(c.column().children(c.carousel("legacy").children(slide)))
+                slide.carousel_basis(0)
+                with self.assertRaises(RuntimeError): slide.carousel_basis(.5)
+                self.assertEqual(slide._carousel_basis,0)
+
     def test_message_scroller_and_carousel(self):
         with c.App() as app:
             messages=c.message_scroller('messages').visual_size(280,100).children(*[c.item('m'+str(i),'Message '+str(i)).detail('Alex').step_status(i%2) for i in range(20)])

@@ -5786,6 +5786,7 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_carousel.c",
+        "bindings/bridge/tests/test_bridge_components.c",
         "tests/web/test_browser.py",
         "tests/web/test_touch_page_navigation.py"
       ],
@@ -5795,7 +5796,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Intrinsic sizing from arbitrary slide content, the first growing-width estimate, retained basis authoring and host gesture/tooltip services remain open; see docs/CAROUSEL.md."
+        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support horizontal basis sizing. Intrinsic sizing from arbitrary slide content, the first growing-width estimate and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5812,11 +5813,17 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_carousel.c",
+            "bindings/bridge/tests/test_bridge_components.c",
+            "bindings/python/test_model_components.py",
+            "bindings/node/test/models.test.cjs",
+            "bindings/typescript/components.typecheck.ts",
+            "bindings/go/cui/native_test.go",
+            "bindings/rust/tests/builders.rs",
             "tests/web/test_touch_page_navigation.py",
             "tests/web/test_snippets.py",
             "docs/CAROUSEL.md"
           ],
-          "scope": "Immediate C and the WASM gallery. Horizontal and vertical fractions, mixed extents, narrow clipping, silent resize, fractional geometry and touch snapping."
+          "scope": "Immediate C and the WASM gallery cover both axes, mixed extents, clipping, silent resizing and touch snapping. The C bridge covers horizontal fractional slides, fixed and growing viewports, resetting and selection identity. Language bindings expose the optional retained setter and capability probe."
         },
         {
           "name": "keyboard, pointer drag and wheel navigation with nested child ownership and cross-axis page handoff",

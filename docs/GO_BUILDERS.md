@@ -97,6 +97,12 @@ MessageScroller accepts up to 64 `Item` children. Item text is the message body,
 
 Carousel accepts up to 64 `Item` slides with text or child content. `VisualSize` sets the viewport, `Selected(item)` changes the slide, and `App.Selected` reads it. Native wheel, drag, and keyboard navigation emit `OnChange` with a full selected Item handle snapshot. The bridge currently uses horizontal orientation and does not support nested Carousels.
 
+After checking `App.SupportsCarouselBasis()`, call `CarouselBasis(0.5)` on
+each Item to show two slides. Use `VisualSize(0, height)` on the Carousel to
+grow with the parent, or set a positive width for a fixed Carousel. Reset an
+Item to full width with `CarouselBasis(0)`. See the
+[retained Carousel guide](CAROUSEL.md#retained-slides).
+
 Resizable accepts up to 64 `Item` panels in a horizontal split. Set an Item's initial width with `PanelSize(100..4096)`, read its live width with `App.Value(item)`, and locate a divider with `App.ResizableHandleBounds(group, precedingItem)`. Dragging a divider emits `OnChange` on the resized Item with numeric `Event.Value`. `VisualSize` configures the group and `Disabled(true)` suppresses dragging.
 
 TextView renders owned Markdown (default), HTML, or plain source. Use `Format(Markdown/HTML/Plain)`, `Text` or `SetText`, and `VisualSize`. `App.SelectText(view, anchor, cursor)` selects rendered UTF-8 byte offsets; `App.CopySelection(view)` returns plain selected text. Pointer selection emits `OnChange` with a copied selected-text snapshot. Disabled TextView suppresses pointer selection.

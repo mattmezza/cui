@@ -2985,6 +2985,20 @@ cui_bridge_status cui_bridge_set_visual_size(cui_bridge_app *app, cui_bridge_nod
     node->visual_height = height;
     return CUI_BRIDGE_OK;
 }
+cui_bridge_status cui_bridge_set_carousel_slide_basis_v1(cui_bridge_app *app,
+                                                         cui_bridge_node handle, float basis) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_ITEM || !node->parent ||
+        app->nodes[node->parent].kind != CUI_BRIDGE_CAROUSEL)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (!isfinite(basis) || basis < 0 || basis > 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->carousel_basis = basis;
+    return CUI_BRIDGE_OK;
+}
 cui_bridge_status cui_bridge_set_scroll_extent(cui_bridge_app *app, cui_bridge_node handle,
                                                float width, float height) {
     cui_bridge_node_record *node;
@@ -5039,6 +5053,7 @@ typedef struct {
     uint32_t slot;
     uint32_t slots[64];
     cui_carousel_item items[64];
+    float basis[64];
 } bridge_carousel_binding;
 static void bridge_carousel_slide(cui_context *ui, const cui_theme *theme, size_t index,
                                   void *user) {
@@ -5078,12 +5093,16 @@ static void bridge_render_carousel(cui_bridge_app *app, uint32_t slot,
     binding->app = app;
     binding->slot = slot;
     size_t count = 0, selected = SIZE_MAX;
+    bool has_basis = false;
     for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {
+        cui_bridge_node_record *slide = &app->nodes[child];
         binding->slots[count] = child;
-        binding->items[count] = (cui_carousel_item){.id = app->nodes[child].id,
-                                                    .label = cui_string(app->nodes[child].text),
+        binding->items[count] = (cui_carousel_item){.id = slide->id,
+                                                    .label = cui_string(slide->text),
                                                     .render = bridge_carousel_slide,
                                                     .user = binding};
+        binding->basis[count] = slide->carousel_basis;
+        has_basis |= slide->carousel_basis > 0;
         if ((uint32_t)node->value == child)
             selected = count;
         count++;
@@ -5093,13 +5112,16 @@ static void bridge_render_carousel(cui_bridge_app *app, uint32_t slot,
     node->carousel_state->on_change = bridge_carousel_change;
     node->carousel_state->change_user = binding;
     cui_carousel_options options = cui_carousel_default();
-    options.width = node->visual_width > 0 ? node->visual_width : 300;
+    if (node->visual_width > 0)
+        options.width = node->visual_width;
+    else if (!has_basis)
+        options.width = 300;
     options.height = node->visual_height > 0 ? node->visual_height : 200;
     options.now_seconds = app->now_seconds;
     options.disabled = node->disabled;
     options.label = cui_string(node->text);
-    if (!cui_carousel(app->ui, node->id, &app->theme, node->carousel_state, binding->items, count,
-                      options))
+    if (!cui_carousel_with_basis(app->ui, node->id, &app->theme, node->carousel_state,
+                                 binding->items, count, options, has_basis ? binding->basis : NULL))
         app->frame_error = CUI_BRIDGE_CORE_ERROR;
     if (node->carousel_state->selected < count)
         node->value = binding->slots[node->carousel_state->selected];

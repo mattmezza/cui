@@ -99,6 +99,10 @@ function requestsRadioMotion(node) {
 }
 const stepperFillUnavailable = 'Stepper Fill requires cui_bridge_set_stepper_fill';
 function preflightNodeOptions(app, node, insideDecoration = false, insideAttachmentSlot = false) {
+  if (node.carouselBasisValue) {
+    if (node.parent?.kind !== 65) throw new TypeError('carousel_basis requires a direct Carousel Item');
+    if (!app.supports_carousel_basis()) throw new Error('Carousel basis unavailable');
+  }
   if (node.stepperFillValue && !app.supports_stepper_fill()) throw new Error(stepperFillUnavailable);
   if (insideDecoration && !radioContentKinds.has(node.kind))
     throw new TypeError('RadioGroup Item decoration requires passive children');
@@ -189,6 +193,7 @@ class Node {
     this.roundingValue = 0; this.radiusValue = 0; this.disabledValue = false;
     this.extentValue=null; this.anchorValue=null; this.visualValue=null; this.closeValue=null; this.totalValue=kind===43?5:kind===59?6:10; this.attachmentValue=0; this.imageValue=null;this.chartDataValue=[];this.chartKindValue=0;this.plotPointsValue=[];this.matrixValue=null;this.selectionModeValue=0;this.textFormatValue=0;this.panelValue=null; this.timeValue=[0,0,0];this.dateValue=[2026,1,1];this.colorValue=0x000000ff; this.statusValue=null; this.openValue = false;this.openSet=false;this.checkedSet=false; this.detailValue = ""; this.selectedValue = null; this.checkedValue = false; this.numericValue = kind===42?1:0; this.rangeValue = kind===42?[1,10,1]:kind===43?[0,5,1]:[0,1,.01]; this.changeValue = undefined;
     this.radioPaintValues = null;
+    this.carouselBasisValue = 0;
     this.radioMotionValue = false;
     this.radioTabIndexValue = null;
     this.radioContentValue = false;
@@ -393,6 +398,20 @@ class Node {
   anchor(node) {if(![27,28,29].includes(this.kind)||!(node instanceof Node))throw new TypeError('invalid anchor');if(this.owner){if(node.owner!==this.owner)throw new Error('foreign anchor');native.setAnchor(this.owner.handle,this[NODE],node[NODE]);}this.anchorValue=node;return this;}
   is_open() {if(![15,20,24,25,26,27,28,29,58,62,63,75].includes(this.kind))throw new Error('component has no open state');if(!this.owner)return this.openValue;return native.getOpen(this.owner.handle,this[NODE]);}
   on_close(callback) {if(!surfaces.has(this.kind)||typeof callback!=='function')throw new TypeError('invalid close callback');this.closeValue=callback;return this;}
+  carousel_basis(fraction) {
+    if (this.kind !== 20) throw new TypeError('carousel_basis requires an Item');
+    if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1)
+      throw new TypeError('fraction must be finite and in [0, 1]');
+    if (this.owner) {
+      this.owner._alive();
+      if (fraction || this.carouselBasisValue) {
+        if (!this.owner.supports_carousel_basis()) throw new Error('Carousel basis unavailable');
+        native.setCarouselBasis(this.owner.handle, this[NODE], fraction);
+      }
+    }
+    this.carouselBasisValue = fraction;
+    return this;
+  }
   visual_size(width,height) {if(!visualKinds.has(this.kind)||![width,height].every(x=>Number.isFinite(x)&&x>=0&&x<=4096))throw new TypeError('invalid visual size');if(this.owner)native.setVisualSize(this.owner.handle,this[NODE],width,height);this.visualValue=[width,height];return this;}
   total(value) {if(![42,43,59].includes(this.kind)||!Number.isInteger(value)||value<1||value>(this.kind===43?10:this.kind===59?256:1000000))throw new TypeError('invalid total');if(this.owner)native.setTotal(this.owner.handle,this[NODE],value);this.totalValue=value;if(this.kind===59)return this;this.rangeValue=[this.kind===42?1:0,value,1];this.numericValue=Math.min(this.numericValue,value);return this;}
   step_status(value) {if(this.kind!==20||!Number.isInteger(value)||value<0||value>63)throw new TypeError('invalid step status/depth');if(this.owner)native.setStepStatus(this.owner.handle,this[NODE],value);this.statusValue=value;return this;}
@@ -608,6 +627,7 @@ class Node {
     if (!(item instanceof Node) || item.kind !== 20 || item.owner || item.parent ||
         item.childrenValue.length || this.childrenValue.length >= 64)
       throw new TypeError('unattached leaf Item required; capacity is 64');
+    if (item.carouselBasisValue) throw new TypeError('carousel_basis requires a direct Carousel Item');
     if (item.radioContentValue || item.radioTooltipValue || item.radioMotionValue ||
         item.radioTabIndexValue !== null || item.radioPaintValues)
       throw new TypeError('RadioGroup Item options unavailable here');
@@ -818,6 +838,7 @@ class App {
         for (const [layer, paint] of node.radioPaintValues)
           native.setRadioPaint(this.handle, node[NODE], layer, paint);
       }
+      if (node.carouselBasisValue) native.setCarouselBasis(this.handle, node[NODE], node.carouselBasisValue);
       if (node.radioMotionValue) native.setRadioMotion(this.handle, node[NODE], true);
       if (node.radioTabIndexValue !== null)
         native.setRadioTabIndex(this.handle, node[NODE], true, node.radioTabIndexValue);
@@ -1022,6 +1043,11 @@ class App {
   supports_stepper_fill() {
     this._alive();
     return typeof native.supportsStepperFill==='function' && typeof native.setStepperFill==='function' && native.supportsStepperFill();
+  }
+  supports_carousel_basis() {
+    this._alive();
+    return typeof native.supportsCarouselBasis === 'function' &&
+      typeof native.setCarouselBasis === 'function' && native.supportsCarouselBasis();
   }
   supports_radio_motion() {
     this._alive();

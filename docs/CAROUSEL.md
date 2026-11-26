@@ -82,8 +82,7 @@ final snap, Next and Previous skip the duplicates. Explicit pagination can
 still select any index.
 
 Choose **Two slides** or **Three slides** in the live Carousel gallery to
-try the layout in either orientation. The retained language builders currently
-use their existing slide layout.
+try the layout in either orientation.
 
 Frame bounds are retained through `cui_track_bounds`. Growing width starts with
 a 300px estimate until the first completed layout; fixed width uses its declared
@@ -96,6 +95,55 @@ The default movement spring has a 280ms response, damping .85 and settling
 precision .5px. Styled rendering uses Theme `spring_move` response/damping;
 reduced motion or disabled travel settles immediately. Critical and overdamped
 settings also have an analytic solution. Settled motion does not request frames.
+
+### Retained slides
+
+In the C bridge, set each direct Carousel Item's fraction with
+`cui_bridge_set_carousel_slide_basis_v1(app, item, fraction)` before or after
+the first frame. The bridge stores the fraction with the Item. A positive
+Carousel width from `cui_bridge_set_visual_size` fixes the viewport. Leaving
+the width unset or passing zero grows it to the parent allocation while
+any Item has a positive fraction. Reset to zero for a full-width slide.
+Resetting or removing the last fractional slide restores the default 300px
+viewport when no width was set. These layout edits are silent.
+
+Python, JavaScript and TypeScript use `item(...).carousel_basis(0.5)`. Go uses
+`Item(...).CarouselBasis(0.5)`. In Rust, use `carousel_basis(0.5)?` on an Item
+Builder or `app.carousel_basis(item, 0.5)?` after creating the Item. Each binding
+can query `supports_carousel_basis()` (Go `SupportsCarouselBasis()`). With an
+older bridge, omit the setter to keep full-width slides and ordinary navigation.
+
+This Python example mounts a Carousel with two visible slides and a third to
+scroll to. The equivalent JavaScript or TypeScript uses the same builder methods.
+Use the native app constructor and run loop to show the UI in a window. The
+[builder guide](BINDING_BUILDERS.md) shows how to start a native app.
+
+```python
+import cui_bridge as cui
+
+with cui.App(width=640, height=360) as app:
+    slides = [
+        cui.item("overview", "Overview"),
+        cui.item("activity", "Activity"),
+        cui.item("reports", "Reports"),
+    ]
+    if app.supports_carousel_basis():
+        for slide in slides:
+            slide.carousel_basis(0.5)
+
+    rail = cui.carousel("dashboard").visual_size(320, 120).children(*slides)
+    app.mount(cui.column("root").children(rail))
+    app.step()
+    x, y, _, _ = app.bounds(rail)
+    app.queue_scroll(x + 30, y + 30, -1, 0)
+    app.step()
+    assert rail.selected() is slides[1]
+```
+
+Retained Carousel uses horizontal orientation and default spacing. Vertical
+orientation, looping and custom controls use the immediate C API.
+
+## Input ownership
 
 Pointer processing happens before child callbacks using Core's previous-frame
 logical scope ownership and the measured slide-frame bounds. Navigation and pagination controls outside that frame never start a drag, so clicking them during spring motion cannot first snap to a different slide. A tap retains ordinary child press/release/activation.

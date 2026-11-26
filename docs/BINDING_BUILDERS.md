@@ -680,7 +680,11 @@ explicitly after stepping; Node dispatches as part of `step()`.
 MessageScroller contains Item messages; `detail` is the sender and
 `step_status(0/1)` selects incoming/outgoing. It follows the newest message on
 its initial frame. Carousel contains Item slides and provides `select` and
-`selected`. Resizable contains Item panels with `panel_size(100..4096)` widths;
+`selected`. Set a direct slide Item's `carousel_basis(0.5)` to fit two slides.
+Check `app.supports_carousel_basis()` before using this with an older bridge.
+Use `visual_size(0, height)` for a growing fractional Carousel. See the
+[retained Carousel example](CAROUSEL.md#retained-slides).
+Resizable contains Item panels with `panel_size(100..4096)` widths;
 real divider dragging updates the panel and emits its numeric change event.
 VirtualList contains up to 64 keyed Item rows in a fixed-height vertical viewport.
 `scroll_to` and `scroll_offset` work on MessageScroller and VirtualList.

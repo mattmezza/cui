@@ -299,6 +299,10 @@ class _API:
         self.get_selected = bind("get_selected", C.c_int, C.c_void_p, _Handle, C.POINTER(_Handle))
         self.get_open = bind("get_open", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_uint32))
         self.set_anchor = bind("set_anchor", C.c_int, C.c_void_p, _Handle, _Handle)
+        self.set_carousel_basis = None
+        if hasattr(lib, "cui_bridge_set_carousel_slide_basis_v1"):
+            self.set_carousel_basis = bind("set_carousel_slide_basis_v1", C.c_int,
+                                           C.c_void_p, _Handle, C.c_float)
         self.set_visual = bind("set_visual_size", C.c_int, C.c_void_p, _Handle, C.c_float, C.c_float)
         self.set_total = bind("set_total", C.c_int, C.c_void_p, _Handle, C.c_uint32)
         self.set_step_status = bind("set_step_status", C.c_int, C.c_void_p, _Handle, C.c_uint32)
@@ -539,6 +543,7 @@ class Widget:
         self._selected: Widget | None = None
         self._anchor: Widget | None = None
         self._extent: tuple[float, float] | None = None
+        self._carousel_basis = 0.0
         self._visual: tuple[float, float] | None = None
         self._total = 5 if kind == "rating" else 6 if kind == "otp_input" else 10
         self._chart_data = ()
@@ -1009,6 +1014,23 @@ class Widget:
         if self.kind not in _SURFACE or not callable(callback):
             raise ValueError("on_close requires a surface and callback")
         self._close_callback = callback
+        return self
+
+    def carousel_basis(self, fraction: float) -> "Widget":
+        """Size a direct Carousel Item relative to the inner viewport; zero resets."""
+        if self.kind != "item":
+            raise ValueError("carousel_basis requires an Item")
+        if isinstance(fraction, bool) or not isinstance(fraction, (int, float)):
+            raise TypeError("fraction must be a number")
+        if not 0 <= fraction <= 1:
+            raise ValueError("fraction must be finite and in [0, 1]")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is not None and (fraction or self._carousel_basis):
+            if not self._app.supports_carousel_basis():
+                raise RuntimeError("Carousel basis requires cui_bridge_set_carousel_slide_basis_v1")
+            self._change("set_carousel_basis", fraction)
+        self._carousel_basis = float(fraction)
         return self
 
     def visual_size(self, width: float, height: float) -> "Widget":
@@ -1492,6 +1514,8 @@ class Widget:
         if (not isinstance(item, Widget) or item.kind != "item" or item._app is not None or
                 item._disposed or item._children or len(self._children) >= 64):
             raise ValueError("unattached leaf Item required; capacity is 64")
+        if item._carousel_basis:
+            raise ValueError("carousel_basis requires a direct Carousel Item")
         if (item._radio_content or item._radio_tooltip or item._radio_motion or
                 item._radio_tab_index is not None or item._radio_paints):
             raise ValueError("RadioGroup Item options are unavailable here")
@@ -1994,6 +2018,10 @@ class App:
         self._ensure_open()
         return self._api.set_matrix_keyed is not None
 
+    def supports_carousel_basis(self) -> bool:
+        self._ensure_open()
+        return self._api.set_carousel_basis is not None
+
     def supports_radio_motion(self) -> bool:
         """Report whether the loaded bridge can animate Radio and RadioGroup."""
         self._ensure_open()
@@ -2128,6 +2156,11 @@ class App:
                 node._preflight_pagination(self)
             if node._stepper_fill is not None:
                 self._require_stepper_fill()
+            if node._carousel_basis:
+                if parent is None or parent.kind != "carousel":
+                    raise ValueError("carousel_basis requires a direct Carousel Item")
+                if not self.supports_carousel_basis():
+                    raise RuntimeError("Carousel basis requires cui_bridge_set_carousel_slide_basis_v1")
             if node._radio_motion:
                 self._require_radio_motion()
             if node._radio_tab_index is not None:
@@ -2208,6 +2241,8 @@ class App:
                     node._change("set_gap", node._gap)
                 if node.kind in _BOOLEAN or (node.kind == "item" and node._checked_set):
                     node._change("set_checked", int(node._checked))
+                if node._carousel_basis:
+                    node._change("set_carousel_basis", node._carousel_basis)
                 if node._radio_motion:
                     node._change("radio_set_motion", 1)
                 if node._radio_tab_index is not None:

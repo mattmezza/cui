@@ -1559,6 +1559,36 @@ static napi_value set_radio_flag(napi_env env, napi_callback_info info, const ch
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 
+typedef cui_bridge_status (*carousel_basis_fn)(cui_bridge_app *, cui_bridge_node, float);
+static carousel_basis_fn carousel_basis_symbol(void) {
+    carousel_basis_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_set_carousel_slide_basis_v1");
+    return set;
+}
+static napi_value supports_carousel_basis(napi_env env, napi_callback_info info) {
+    (void)info;
+    napi_value result;
+    if (napi_get_boolean(env, carousel_basis_symbol() != NULL, &result) != napi_ok)
+        return NULL;
+    return result;
+}
+static napi_value set_carousel_basis(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *node;
+    double basis;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !number_arg(env, v[2], &basis))
+        return NULL;
+    if (basis < 0 || basis > 1)
+        return fail(env, "fraction must be in [0, 1]");
+    carousel_basis_fn set = carousel_basis_symbol();
+    if (!set)
+        return fail(env, "Carousel basis requires cui_bridge_set_carousel_slide_basis_v1");
+    cui_bridge_status code = set(app->bridge, node->node, (float)basis);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 static napi_value supports_radio_motion(napi_env env, napi_callback_info info) {
     (void)info;
     return supports_radio_flag(env, radio_motion_symbol);
@@ -2721,6 +2751,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setChecked", set_num, 6);
     EXPORT("supportsRadioPaint", supports_radio_paint, 0);
     EXPORT("setRadioPaint", set_radio_paint, 0);
+    EXPORT("supportsCarouselBasis", supports_carousel_basis, 0);
+    EXPORT("setCarouselBasis", set_carousel_basis, 0);
     EXPORT("supportsRadioMotion", supports_radio_motion, 0);
     EXPORT("supportsRadioItemContent", supports_radio_item_content, 0);
     EXPORT("setRadioItemContent", set_radio_item_content, 0);

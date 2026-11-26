@@ -186,3 +186,23 @@ console.log('PASS native Dock split layout, activation snapshots and metadata fr
  settings.settings_query('').settings_select(general);app.step();toggle.disabled();fields.length=0;press(app,settings.settings_field_bounds(toggle));assert.equal(fields.length,0);
  assert.throws(()=>settings.disabled());app.dispose();assert.throws(()=>settings.settings_page());
 }
+
+{
+ for(const value of [-.1,1.1,NaN,Infinity,true,'0.5']) assert.throws(()=>c.item('bad').carousel_basis(value));
+ assert.throws(()=>c.label('bad').carousel_basis(.5));
+ const invalid=new c.App(),bad=c.item('bad').carousel_basis(.5);
+ assert.throws(()=>invalid.mount(c.column().children(bad)),/direct Carousel/);
+ assert.ok(!bad.owner);invalid.dispose();
+ const app=new c.App({width:640}),events=[],slide=c.item('basis','Slide').carousel_basis(.5);
+ assert.equal(app.supports_carousel_basis(),true);
+ const carousel=c.carousel('basis-slides').visual_size(400,100).children(slide,c.item('other','Other')).on_change(e=>events.push(e));
+ app.mount(c.column().children(carousel)).step();const half=slide.bounds().width;
+ slide.carousel_basis(.25);app.step();assert.ok(Math.abs(slide.bounds().width-half/2)<1);
+ slide.carousel_basis(0);app.step();assert.ok(slide.bounds().width>half);assert.deepEqual(events,[]);
+ app.dispose();assert.throws(()=>slide.carousel_basis(0),/disposed/);
+ const legacy=new c.App();legacy.supports_carousel_basis=()=>false;
+ const zero=c.item('zero').carousel_basis(.5).carousel_basis(0);
+ legacy.mount(c.column().children(c.carousel('legacy').children(zero)));
+ zero.carousel_basis(0);assert.throws(()=>zero.carousel_basis(.5),/unavailable/);
+ assert.equal(zero.carouselBasisValue,0);legacy.dispose();
+}

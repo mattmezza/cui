@@ -1259,6 +1259,14 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_anchor(cui_bridge_app *, cui_bri
                                                        cui_bridge_node anchor);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_visual_size(cui_bridge_app *, cui_bridge_node,
                                                             float width, float height);
+/* Optional Carousel operation. Item must be a direct child of a Carousel.
+ * Basis is a finite fraction in [0,1]. Zero restores the full-viewport extent.
+ * With any positive basis, an unset or zero Carousel visual width grows to the
+ * layout allocation. An explicit positive width still fixes the viewport.
+ * This changes layout only and never queues a selection event. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_slide_basis_v1(cui_bridge_app *,
+                                                                        cui_bridge_node item,
+                                                                        float basis);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_total(cui_bridge_app *, cui_bridge_node,
                                                       uint32_t total);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_step_status(cui_bridge_app *, cui_bridge_node item,

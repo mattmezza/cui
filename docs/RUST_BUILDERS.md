@@ -63,6 +63,12 @@ MessageScroller uses Item messages (`text` body, `detail_text` sender, `step_sta
 
 Carousel accepts Item slides and uses `select`/`selected`; native wheel, drag, and keyboard navigation emit selected Item snapshots.
 
+Use `app.supports_carousel_basis()` before setting a fraction. For example,
+`app.build_child(carousel, Kind::Item, "activity")?.text("Activity")?.carousel_basis(0.5)?.finish()`
+creates a slide that takes half of the viewport. Use
+`app.carousel_basis(item, 0.)?` to restore full width. See the
+[retained Carousel guide](CAROUSEL.md#retained-slides).
+
 Resizable accepts Item panels with pixel widths in `value`; `resizable_handle_bounds` locates a draggable divider and change events carry new sizes.
 
 TextView owns Markdown, HTML, or plain source in `text`; `text_view_format` selects its parser. `text_view_select` uses rendered UTF-8 byte offsets, and `text_view_selection` copies plain selected text. Native pointer selection delivers a copied text snapshot through `on_change_event`.

@@ -741,7 +741,7 @@
         "rust": "tested_subset"
       },
       "limitations": [
-        "Viewport-relative slide basis is available in immediate C through cui_carousel_with_basis. The retained C bridge and language builders use the existing slide layout."
+        "All five builders expose optional horizontal fractional slides on current bridges. Probe supports_carousel_basis or SupportsCarouselBasis. Older providers retain full-width slides. Vertical orientation, custom controls and looping are immediate C only."
       ]
     },
     {

@@ -132,3 +132,7 @@ const stepperFillSupported: boolean = app.supports_stepper_fill();
 visualStepper().stepper_fill(false, 'huge');
 // @ts-expect-error width must be numeric
 visualStepper().stepper_fill(false, 'md', '300');
+
+const fractionalSlide: c.Item = c.item("slide").carousel_basis(.5).carousel_basis(0);
+const hasCarouselBasis: boolean = app.supports_carousel_basis();
+void fractionalSlide; void hasCarouselBasis;

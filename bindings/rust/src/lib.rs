@@ -5,6 +5,7 @@ pub use attachment::{
     AttachmentActions, AttachmentOptions, AttachmentSlot, AttachmentTextStyle,
     AttachmentTextWeight, AttachmentTypography,
 };
+mod carousel;
 mod disclosure;
 pub use disclosure::{
     DisclosureAlignment, DisclosureCard, DisclosureConfig, DisclosureCursor, DisclosureDivider,

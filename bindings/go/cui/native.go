@@ -705,6 +705,21 @@ static cui_bridge_status go_attachment_preview(cui_bridge_app *a, cui_bridge_nod
  return attachment_preview(a, n, pixels, w, h, stride, length);
 }
 
+static cui_bridge_status (*carousel_set_basis)(cui_bridge_app *, cui_bridge_node, float);
+static void go_carousel_initialize(void) {
+ if (bridge_lib)
+  go_load_optional_symbol(&carousel_set_basis, sizeof carousel_set_basis,
+                          "cui_bridge_set_carousel_slide_basis_v1");
+#if defined(CUI_GO_STATIC)
+ else
+  carousel_set_basis = cui_bridge_set_carousel_slide_basis_v1;
+#endif
+}
+static int go_carousel_basis_supported(void) { return carousel_set_basis != NULL; }
+static cui_bridge_status go_carousel_set_basis(cui_bridge_app *a, cui_bridge_node slide, float basis) {
+ return carousel_set_basis(a, slide, basis);
+}
+
 static int bridge_open(const char *path) {
  if (bridge_initialized) return 0;
 #if defined(CUI_GO_STATIC)
@@ -725,6 +740,7 @@ static int bridge_open(const char *path) {
  go_virtual_list_initialize();
  go_disclosure_initialize();
  go_attachment_initialize();
+ go_carousel_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -764,6 +780,7 @@ static int bridge_open(const char *path) {
  go_virtual_list_initialize();
  go_disclosure_initialize();
  go_attachment_initialize();
+ go_carousel_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -887,6 +904,7 @@ type Node struct {
 	attachmentActions                    AttachmentActions
 	attachmentSlot                       AttachmentSlotRole
 	attachmentSlotWidth                  float32
+	carouselBasis                        float32
 	imagePixels                          []byte
 	imageWidth, imageHeight, imageStride uint32
 	timeValue                            Time
@@ -2019,6 +2037,14 @@ func (a *App) Mount(root *Node) error {
 		if err := a.validateAttachmentSlots(n, parent); err != nil {
 			return err
 		}
+		if n.carouselBasis > 0 {
+			if parent == nil || parent.kind != int(C.CUI_BRIDGE_CAROUSEL) {
+				return errors.New("CarouselBasis requires a direct Carousel Item")
+			}
+			if C.go_carousel_basis_supported() == 0 {
+				return ErrCarouselBasisUnavailable
+			}
+		}
 		if content && !radioContentKind(n.kind) {
 			return errors.New("RadioGroup Item decorations require passive content")
 		}
@@ -2489,6 +2515,11 @@ func (a *App) Mount(root *Node) error {
 		if n.hasVisualSize {
 			if e := result(C.go_set_visual_size(a.ptr, h, C.float(n.visualWidth), C.float(n.visualHeight))); e != nil {
 				return e
+			}
+		}
+		if n.carouselBasis > 0 {
+			if err := result(C.go_carousel_set_basis(a.ptr, h, C.float(n.carouselBasis))); err != nil {
+				return err
 			}
 		}
 		if n.iconConfig != nil {
@@ -3928,6 +3959,44 @@ func FocusTrap(key string) *Node       { return &Node{kind: 63, key: key} }
 func MessageScroller(key string) *Node { return &Node{kind: 64, key: key} }
 func Carousel(key string) *Node        { return &Node{kind: 65, key: key} }
 func Resizable(key string) *Node       { return &Node{kind: 66, key: key} }
+
+// ErrCarouselBasisUnavailable means the loaded bridge lacks fractional slide sizing.
+var ErrCarouselBasisUnavailable = errors.New("Carousel basis requires cui_bridge_set_carousel_slide_basis_v1")
+
+// SupportsCarouselBasis reports whether the loaded bridge supports fractional slides.
+func (a *App) SupportsCarouselBasis() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_carousel_basis_supported() != 0, nil
+}
+
+// CarouselBasis sets the fraction of the viewport occupied by this Carousel
+// Item. Zero resets it to the full viewport. Layout changes emit no selection events.
+func (n *Node) CarouselBasis(fraction float32) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != int(C.CUI_BRIDGE_ITEM) || n.removed || !finite(fraction) || fraction < 0 || fraction > 1 {
+		n.err = errors.New("CarouselBasis requires a live Item and a finite fraction in [0,1]")
+		return n
+	}
+	if n.app != nil && (fraction > 0 || n.carouselBasis > 0) {
+		supported, err := n.app.SupportsCarouselBasis()
+		if err != nil {
+			n.err = err
+		} else if !supported {
+			n.err = ErrCarouselBasisUnavailable
+		} else {
+			n.err = result(C.go_carousel_set_basis(n.app.ptr, n.handle, C.float(fraction)))
+		}
+		if n.err != nil {
+			return n
+		}
+	}
+	n.carouselBasis = fraction
+	return n
+}
 
 type TextViewFormat uint32
 

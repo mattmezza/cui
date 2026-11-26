@@ -40,6 +40,8 @@ export class App {
   mount(root: Row | Column | RootView): this;
   /** Whether this app's native bridge offers retained Stepper Fill. */
   supports_stepper_fill(): boolean;
+  /** Whether this app's native bridge supports fractional Carousel slides. */
+  supports_carousel_basis(): boolean;
   /** Whether this app's native bridge can animate retained Radio selection. */
   supports_radio_motion(): boolean;
   supports_radio_paint(): boolean;
@@ -107,6 +109,8 @@ export interface Composite extends Node {children(...items: (Node | Node[])[]): 
 export interface Disclosure extends Label, Composite, DisclosureTriggerStyled {open(value?: boolean): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Group extends Composite {select(item: Item): this; selected(): Item | undefined; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Item extends Disclosure, RadioTooltip, RadioPaintStyled {
+  /** Direct Carousel Item viewport fraction in [0, 1]; zero resets. */
+  carousel_basis(fraction: number): this;
   /** Enable or hide passive children of a direct RadioGroup Item. */
   decorate_content(enabled?: boolean): this;
 }

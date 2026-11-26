@@ -274,8 +274,11 @@ reveals focused controls in short windows. Its Projects page keeps separate
 Resizable state per axis, sizes a bounded Tabs strip from the detail pane,
 and restores tab focus when the overflow button leaves the layout.
 For multiple visible Carousel slides, use `cui_carousel_with_basis` and pass
-one fraction per slide. See `docs/CAROUSEL.md#show-several-slides-at-once` for
-gap, resize and clipping behavior and the immediate C example.
+one fraction per slide. In the retained C bridge, set the fraction on each
+Carousel Item with `cui_bridge_set_carousel_slide_basis_v1`. In the language
+builders, check `supports_carousel_basis` (`SupportsCarouselBasis` in Go) and
+use `carousel_basis` (`CarouselBasis` in Go) on a direct Item. Read
+`docs/CAROUSEL.md` for layout and examples.
 For a Command palette inside a dialog, set `cui_command_options.width = -1` to fit
 the body. Rows and hit targets fill the current allocation. Width-dependent
 custom row heights settle on a follow-up frame. See `docs/COMMAND.md`.

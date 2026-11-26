@@ -55,7 +55,10 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 
 ## Existing work still in scope
 
-Full GPUI Kit 0.7.1 parity remains unfinished. See `gpui-parity.json` and `swarm-status.md`. Questionnaire batched input/confirmation event ordering remains under investigation in the isolated event-order worktree.
+Full GPUI Kit 0.7.1 parity remains unfinished. See `gpui-parity.json` and `swarm-status.md`.
+The Questionnaire's batched input and confirmation paths now have native
+regressions for 11 same-frame cases, including paste, early Enter, and edits
+after navigation or completion. See [the ordered input fixture](../tests/unit/test_questionnaire_styled.c).
 
 ## First polish batch evidence
 

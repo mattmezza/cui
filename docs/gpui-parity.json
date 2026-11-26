@@ -4534,7 +4534,7 @@
         "cui_questionnaire_submit"
       ],
       "public_header": "include/cui/cui_questionnaire.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_questionnaire.c",
         "tests/unit/test_questionnaire_styled.c",
@@ -4552,9 +4552,10 @@
         "tests/fixtures/questionnaire_geometry/legacy_card.h",
         "tests/fixtures/questionnaire_geometry/header.cpp"
       ],
-      "status": "implemented",
+      "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Retained models, automatic root keyboard capture, cross-item focus transfer, ordered input routing, palette/size cards and custom slot renderers have scoped tests. Bounded box-only indicator/content/shortcut refinements and six localized action/error labels are covered by headless tests; see docs/QUESTIONNAIRE.md for precedence and ABI rebuild requirements. General Styled typography/inheritance, complete nested-root and callback choreography, comprehensive localization and physical accessibility acceptance remain unfinished. Existing browser story evidence predates the new slot/localization API; no browser proof of those additions is claimed.",
@@ -4571,7 +4572,7 @@
       "features": [
         {
           "name": "step and answer models",
-          "status": "implemented",
+          "status": "tested",
           "evidence": [
             "tests/unit/test_questionnaire.c",
             "tests/unit/test_questionnaire_styled.c"
@@ -4579,21 +4580,28 @@
         },
         {
           "name": "validation/navigation",
-          "status": "implemented",
+          "status": "tested",
           "evidence": [
             "tests/unit/test_questionnaire.c",
-            "tests/unit/test_questionnaire_styled.c"
+            "tests/unit/test_questionnaire_styled.c",
+            "tests/web/test_questionnaire_shortcuts_gallery.py"
           ]
         },
         {
           "name": "compound UI semantics",
-          "status": "implemented",
+          "status": "tested",
           "evidence": [
-            "tests/unit/test_questionnaire.c",
-            "tests/unit/test_questionnaire_styled.c"
+            "tests/unit/test_questionnaire_styled.c",
+            "tests/unit/test_questionnaire_geometry.c"
           ]
+        },
+        {
+          "name": "ordered text, paste and confirmation in one frame",
+          "status": "tested",
+          "evidence": ["tests/unit/test_questionnaire_styled.c"]
         }
       ],
+      "last_tested_commit": "745517a545507b863712e116335e0c1dfbc2a993",
       "upstream_doc": {
         "path": "website/component/questionnaire.md",
         "sha256": "4dd0da1253b532ce55600868bb1a10fbe74a3c91c70b435176957224401e3d28",

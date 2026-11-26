@@ -99,8 +99,8 @@ double draw_delivery_choice(cui_context *ui, const cui_theme *theme,
 ```
 
 Use the returned deadline on the frame clock. Zero means the animation needs
-no frame. The first submission snaps to the model, and later accepted
-selections crossfade the outgoing and incoming marks. Selection callbacks,
+no frame. The first submission snaps to the model. Later accepted selections
+crossfade the outgoing and incoming marks and their circular fills. Selection callbacks,
 keyboard focus and checked semantics reflect the new choice in that frame.
 Reversing selection redirects the running spring. Motion follows stable item
 IDs on reorder, and removed options release their slots. The theme's
@@ -109,8 +109,25 @@ IDs on reorder, and removed options release their slots. The theme's
 Use `presentation.parts` and `presentation.part_count` to combine animation
 with [named indicator styling](NAMED_SELECTION_INDICATORS.md). Existing
 `on_change` and typed selection observers preserve their synchronous order.
-With a null motion pointer, the style has immediate marks. The standalone
-Radio and the retained language builders use their existing presentation.
+With a null motion pointer, the style has immediate marks.
+
+### Standalone Radio
+
+Use `cui_radio_present` when a standalone Radio needs an animated mark. Retain
+one zero-initialized `cui_radio_motion` per option. The existing shared integer
+and `bool` change result follow `cui_radio_ex`. For sibling choices, use
+RadioGroup when you need coordinated paint, checked semantics and arrow navigation.
+
+```c
+/* Keep selected and priority_motion in your application model. */
+bool changed = cui_radio_present(ui, cui_id_from(ui, "priority"), theme,
+    cui_string("Priority"), &selected, 1, (cui_radio_options){0},
+    (cui_radio_presentation){.motion = &priority_motion});
+```
+
+Schedule `priority_motion.next_wake_seconds` as you would for the group. The
+context reduced-motion setting applies to both. The retained bridge and language
+builders continue to use immediate marks.
 
 The headless test asserts same-frame selection paint, semantic set relationships,
 callback rejection/acceptance, selected no-op, keyboard wrap/disabled skipping,

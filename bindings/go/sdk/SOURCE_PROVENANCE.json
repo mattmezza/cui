@@ -1,6 +1,6 @@
 {
-  "source_revision": "4e5c1d7332aa9cd1dbc4c1146f253f2ba87c52a0",
+  "source_revision": "4e0778bc45a6142d35504014297298145060023e",
   "canonical_tracked_sources_dirty": true,
-  "tracked_diff_sha256": "92d43607e71aa9387b17ae2fd5cdb0b735093eeef23fa1e3a5d8487bc7dec5bc",
-  "snapshot_manifest_sha256": "3b3037efde87e3f250fbb66890ec4592172ba59dd580bc299f39db53a3d3b83e"
+  "tracked_diff_sha256": "2568512ff8781f77fbc8565c5aa4b82848ccdc4f9e53c08adefe37ca57ed45ba",
+  "snapshot_manifest_sha256": "b950aa82f0c781bd51c7896e5fde22b5c5dc700019e3a587b77d752062ea2933"
 }

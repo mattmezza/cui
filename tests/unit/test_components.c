@@ -443,6 +443,59 @@ static void test_radio_shared_redraw(void) {
     cui_destroy(ui);
 }
 
+static unsigned radio_motion_frame(cui_context *ui, const cui_theme *theme, int *selected,
+                                   cui_radio_motion *motion, cui_id id, bool disabled,
+                                   bool expected_change) {
+    assert(cui_begin_frame(ui, 240, 100, .016f));
+    bool changed = cui_radio_present(ui, id, theme, cui_string("Priority"), selected, 1,
+                                     (cui_radio_options){.disabled = disabled},
+                                     (cui_radio_presentation){.motion = motion, .parts = {190}});
+    assert(changed == expected_change);
+    cui_draw_list list = cui_end_frame(ui);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    assert(cui_last_error(ui) == CUI_OK && cui_bounds(ui, 190).w == 16);
+    assert(count == 1 && sem[0].id == id && sem[0].role == CUI_ROLE_RADIO &&
+           sem[0].checked == (*selected == 1) && sem[0].disabled == disabled);
+    for (size_t i = 0; i < list.count; i++)
+        if (list.commands[i].type == CUI_DRAW_IMAGE) {
+            assert(list.commands[i].bounds.w == 12);
+            return list.commands[i].bitmap.tint.a;
+        }
+    return 0;
+}
+
+static void test_radio_motion(void) {
+    cui_context *ui = cui_create((cui_config){.width = 240, .height = 100});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_radio_motion motion = {0};
+    int selected = 0;
+    assert(radio_motion_frame(ui, &theme, &selected, &motion, 91, false, false) == 0);
+    cui_focus(ui, 91);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    unsigned incoming = radio_motion_frame(ui, &theme, &selected, &motion, 91, false, true);
+    assert(selected == 1 && incoming > 0 && incoming < theme.on_primary.a);
+    assert(motion.next_wake_seconds > cui_frame_time(ui) && cui_needs_redraw(ui));
+    for (unsigned i = 0; i < 10; i++)
+        radio_motion_frame(ui, &theme, &selected, &motion, 91, false, false);
+    selected = 0;
+    unsigned outgoing = radio_motion_frame(ui, &theme, &selected, &motion, 91, false, false);
+    assert(outgoing > incoming && outgoing < theme.on_primary.a);
+    selected = 1;
+    for (unsigned i = 0; i < 120; i++)
+        radio_motion_frame(ui, &theme, &selected, &motion, 91, false, false);
+    assert(motion.next_wake_seconds == 0 && !cui_needs_redraw(ui));
+    assert(radio_motion_frame(ui, &theme, &selected, &motion, 92, true, false) ==
+           theme.on_primary.a / 2);
+    assert(motion.mark.id == 92 && motion.next_wake_seconds == 0);
+    cui_set_reduced_motion(ui, true);
+    selected = 0;
+    assert(radio_motion_frame(ui, &theme, &selected, &motion, 92, false, false) == 0);
+    assert(motion.next_wake_seconds == 0);
+    cui_destroy(ui);
+}
+
 static cui_draw_list switch_frame(cui_context *ui, cui_theme *t, bool *value,
                                   cui_switch_state *state, cui_switch_options o) {
     assert(cui_begin_frame(ui, 400, 200, .016f));
@@ -1519,6 +1572,7 @@ int main(void) {
     test_checkbox_geometry();
     test_radio_geometry();
     test_radio_shared_redraw();
+    test_radio_motion();
     test_semantic_theme_contrast();
     test_button_intent_outlines();
     test_button_palette_overrides();

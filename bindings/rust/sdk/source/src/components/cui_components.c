@@ -1903,7 +1903,8 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
 
 static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_theme *t,
                                         cui_str name, int *value, int option,
-                                        cui_radio_options options, cui_id indicator) {
+                                        cui_radio_options options, cui_id indicator,
+                                        cui_radio_motion *motion) {
     cui_design_metrics design;
     if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
         return false;
@@ -1927,15 +1928,34 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
         font = design.font_size;
     }
     bool selected = *value == option;
+    float opacity = selected ? 1 : 0;
+    if (motion) {
+        if (motion->mark.id != id)
+            *motion = (cui_radio_motion){.mark = {.id = id}};
+        cui_disclosure_motion_step_ex(&motion->mark, selected, cui_frame_delta(ui),
+                                      t->spring_control, cui_reduced_motion(ui));
+        if (!isfinite(motion->mark.progress) || !isfinite(motion->mark.velocity)) {
+            motion->mark.progress = opacity;
+            motion->mark.velocity = 0;
+        }
+        bool active = motion->mark.progress != opacity || motion->mark.velocity != 0;
+        double now = cui_frame_time(ui);
+        motion->next_wake_seconds = active && isfinite(now) && now <= 1e12 ? now + 1.0 / 60 : 0;
+        if (motion->next_wake_seconds)
+            cui_invalidate(ui);
+        opacity = fminf(1, fmaxf(0, motion->mark.progress));
+    }
     cui_color ink = options.invalid ? t->danger : selected ? t->primary : t->input;
-    cui_color dot = t->on_primary;
-    cui_color background = selected ? t->primary : t->input_background;
+    cui_color dot = t->on_primary, selected_background = t->primary;
     if (options.disabled) {
         ink.a /= 2;
         dot.a /= 2;
-        if (selected)
-            background.a /= 2;
+        selected_background.a /= 2;
     }
+    cui_color background =
+        motion     ? cui_color_mix_oklab(t->input_background, selected_background, opacity)
+        : selected ? selected_background
+                   : t->input_background;
     cui_box outer = {.row = true, .gap = 8 * density, .radius = t->radius * .5f};
     if (!options.hide_focus_ring && cui_focused(ui) == id) {
         outer.border = t->focus;
@@ -1956,7 +1976,8 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
                             .background = background,
                             .align_x = CUI_ALIGN_CENTER,
                             .align_y = CUI_ALIGN_CENTER});
-    if (selected) {
+    if (opacity > 0) {
+        dot.a = (uint8_t)(dot.a * opacity);
         cui_checkmark(ui, size - 4 * density, dot);
     }
     cui_end_box(ui);
@@ -1974,14 +1995,25 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
 }
 bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                   int option, cui_radio_options options) {
-    return cui_components_radio_render(ui, id, t, name, value, option, options, 0);
+    return cui_components_radio_render(ui, id, t, name, value, option, options, 0, NULL);
 }
 bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                              int *value, int option, cui_radio_options options,
                              cui_selection_indicator_parts parts) {
     if (!cui_components_indicator_parts_valid(ui, id, parts))
         return false;
-    return cui_components_radio_render(ui, id, t, name, value, option, options, parts.indicator);
+    return cui_components_radio_render(ui, id, t, name, value, option, options, parts.indicator,
+                                       NULL);
+}
+bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
+                       int option, cui_radio_options options, cui_radio_presentation presentation) {
+    if (presentation.parts.indicator &&
+        !cui_components_indicator_parts_valid(ui, id, presentation.parts))
+        return false;
+    if (!ui || !id || !cui_frame_is_submitting(ui))
+        return false;
+    return cui_components_radio_render(ui, id, t, name, value, option, options,
+                                       presentation.parts.indicator, presentation.motion);
 }
 bool cui_radio_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                           int option, bool disabled, cui_selection_indicator_parts parts) {

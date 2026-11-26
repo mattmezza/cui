@@ -75,7 +75,7 @@ cui_radio_group_event_result cui_radio_group_events_with_parts(
 /* Optional caller-owned decoration state. Zero initialize and retain between
  * frames. Stable item IDs survive reorder; omitted items are cleared on each
  * successful submission. Reusing storage with a different group resets it.
- * Initial/reduced-motion submissions snap; only check-glyph opacity animates.
+ * Initial/reduced-motion submissions snap. The check and circular fill fade.
  * next_wake_seconds is host frame time, or zero when settled. */
 typedef struct {
     cui_id id;

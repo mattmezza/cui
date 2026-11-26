@@ -5,6 +5,8 @@
 - C RadioGroup can crossfade selection marks with the theme spring while
   updating selection and accessibility in the same frame. The WASM example
   shows the animation with reduced-motion support.
+- Standalone C Radio has an opt-in animated mark and keeps the existing
+  shared-integer selection contract.
 
 ## 0.1.0-alpha.7
 

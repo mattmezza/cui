@@ -388,6 +388,21 @@ bool cui_radio_ex_with_parts(cui_context *, cui_id, const cui_theme *, cui_str, 
                              cui_radio_options, cui_selection_indicator_parts);
 bool cui_radio_with_parts(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                           bool disabled, cui_selection_indicator_parts);
+/* Optional caller-owned mark and fill state for one standalone Radio. Zero initialize
+ * once and retain between frames. The first submission and reduced motion snap.
+ * The deadline uses frame time and is zero once the mark settles. */
+typedef struct {
+    cui_disclosure_motion mark;
+    double next_wake_seconds;
+} cui_radio_motion;
+/* A zero indicator is anonymous. NULL motion preserves immediate marks. The
+ * options and shared-integer mutation behavior match cui_radio_ex. */
+typedef struct {
+    cui_radio_motion *motion;
+    cui_selection_indicator_parts parts;
+} cui_radio_presentation;
+bool cui_radio_present(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
+                       cui_radio_options, cui_radio_presentation);
 /* Double controlled Styled facade: include cui_styled_slider_events.h. */
 /* Existing Slider track identity. Root id also includes label/framing; this
  * entry has no separate thumb. Returns0 for owner0 or derived zero. Identity

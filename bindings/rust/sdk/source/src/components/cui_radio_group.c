@@ -69,14 +69,18 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
     cui_begin_box(ui, id, (cui_box){.row = !o.vertical, .gap = o.gap > 0 ? o.gap : 12 * density});
     for (size_t i = 0; i < count; i++) {
         bool disabled = o.disabled || items[i].disabled, checked = *selected == items[i].id;
+        float opacity = motion ? fminf(1, fmaxf(0, motion->items[i].progress)) : checked ? 1 : 0;
         cui_color ink = o.invalid ? t->danger : checked ? t->primary : t->input;
-        cui_color background = checked ? t->primary : t->input_background, dot = t->on_primary;
+        cui_color selected_background = t->primary, dot = t->on_primary;
         if (disabled) {
             ink.a /= 2;
             dot.a /= 2;
-            if (checked)
-                background.a /= 2;
+            selected_background.a /= 2;
         }
+        cui_color background =
+            motion    ? cui_color_mix_oklab(t->input_background, selected_background, opacity)
+            : checked ? selected_background
+                      : t->input_background;
         cui_box row = {.row = true, .gap = 8 * density, .radius = t->radius * .5f};
         if (!o.hide_focus_ring && cui_focused(ui) == items[i].id) {
             row.border = t->focus;
@@ -97,7 +101,6 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
                                 .background = background,
                                 .align_x = CUI_ALIGN_CENTER,
                                 .align_y = CUI_ALIGN_CENTER});
-        float opacity = motion ? fminf(1, fmaxf(0, motion->items[i].progress)) : checked ? 1 : 0;
         dot.a = (uint8_t)((float)dot.a * opacity);
         if (opacity > 0)
             cui_checkmark(ui, size - 4 * density, dot);

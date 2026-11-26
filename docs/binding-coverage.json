@@ -349,7 +349,7 @@
         "rust": "tested_subset"
       },
       "limitations": [
-        "The immediate C RadioGroup animation state and presentation options are outside the retained bridge and the five language builders."
+        "Standalone Radio and RadioGroup animation is available in immediate C. The retained bridge and five language builders use immediate marks."
       ]
     },
     {

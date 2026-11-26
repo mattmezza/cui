@@ -25,13 +25,18 @@ RADIO_MARKS = """() => {
         rows[name] = {bounds: [1, 2, 3, 4].map(f => e.gallery_semantic(i, f)), alpha: 0};
     }
     for (let i = 0; i < e.gallery_count(); i++) {
-        if (e.gallery_command(i, 0) !== 5) continue;
-        const x = e.gallery_command(i, 1) + e.gallery_command(i, 3) / 2;
-        const y = e.gallery_command(i, 2) + e.gallery_command(i, 4) / 2;
+        const type = e.gallery_command(i, 0);
+        if (type !== 0 && type !== 5) continue;
+        const side = e.gallery_command(i, 3), commandHeight = e.gallery_command(i, 4);
+        const x = e.gallery_command(i, 1) + side / 2;
+        const y = e.gallery_command(i, 2) + commandHeight / 2;
         for (const row of Object.values(rows)) {
             const [left, top, width, height] = row.bounds;
-            if (x >= left && x < left + width && y >= top && y < top + height)
+            if (!(x >= left && x < left + width && y >= top && y < top + height)) continue;
+            if (type === 5)
                 row.alpha = Math.max(row.alpha, e.gallery_bitmap(i, 13));
+            else if (side === commandHeight && side === 2 * e.gallery_command(i, 9))
+                row.background = [5, 6, 7, 8].map(f => e.gallery_command(i, f));
         }
     }
     return rows;
@@ -44,6 +49,7 @@ def check_animated_marks(browser, url):
     page.on('pageerror', lambda error: errors.append(str(error)))
     try:
         page.clock.install()
+        page.emulate_media(color_scheme='light', reduced_motion='no-preference')
         page.goto(url + '/#Radio')
         page.wait_for_function('window.cuiGallery?.renderedComponent === "Radio"')
         canvas = page.locator('#preview')
@@ -65,9 +71,14 @@ def check_animated_marks(browser, url):
             assert page.evaluate('cuiGallery.exports.gallery_radio_stat(0)') == votes + 1
 
         assert alphas() == (255, 0)
+        before = page.evaluate(RADIO_MARKS)
+        endpoints = (before['Standard']['background'], before['Priority']['background'])
+        assert endpoints[0] != endpoints[1]
         select('Priority')
         rising = alphas()
         assert all(0 < value < 255 for value in rising), rising
+        during = page.evaluate(RADIO_MARKS)
+        assert all(during[name]['background'] not in endpoints for name in ('Standard', 'Priority'))
         assert page.evaluate('cuiGallery.exports.gallery_next_wake()') > 0
         select('Standard')
         page.clock.run_for(55)

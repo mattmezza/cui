@@ -2682,7 +2682,18 @@
             "docs/RADIO_GROUP.md"
           ],
           "limitations": [
-            "The application owns the selected ID and motion storage. Motion shares theme springs and context reduced motion. Standalone Radio and retained bindings use immediate marks."
+            "The application owns the selected ID and motion storage. Motion shares theme springs and context reduced motion. Retained bindings use immediate marks."
+          ]
+        },
+        {
+          "name": "standalone Radio checkmark opacity",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c:test_radio_motion",
+            "docs/RADIO_GROUP.md"
+          ],
+          "limitations": [
+            "The immediate C presenter takes optional per-option motion and keeps the shared-integer activation contract. Use RadioGroup for atomic sibling paint and roving focus. Retained bindings use immediate marks."
           ]
         }
       ],

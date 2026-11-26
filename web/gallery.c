@@ -1335,13 +1335,15 @@ static void gallery_paint_renderer_fixture(cui_context *ui) {
                      (cui_box){.width = 60, .height = 60, .radius = 12});
     cui_end_box(ui);
 }
+#include "attachment_slots_example.h"
 #include "gallery_image.inc"
 static const cui_image_frame image_frames[] = {{gallery_lake_pixels, 256, 144, 1024, 1, 0}};
 static cui_image_state image_state, attachment_images[6];
 static cui_attachment_state attachment_states[6];
 static cui_attachment_group_state attachment_group_state;
+static attachment_slots_example attachment_slots;
 static int image_mode, image_fit, image_grayscale, image_half_opacity;
-static int attachment_status = CUI_ATTACHMENT_COMPLETE, attachment_vertical;
+static int attachment_status = CUI_ATTACHMENT_COMPLETE, attachment_vertical, attachment_composed;
 static unsigned attachment_removed_mask, attachment_clicks, attachment_removes, attachment_retries,
     attachment_actions;
 static cui_attachment_group_result attachment_group_result;
@@ -5287,6 +5289,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 63: {
+        if (attachment_composed) {
+            draw_attachment_with_slots(ui, cui_id_from(ui, "attachment-custom-slots"), &t,
+                                       &attachment_slots, width - 48, attachment_vertical != 0,
+                                       design_size, disabled != 0);
+            break;
+        }
         cui_attachment_group_options options = cui_attachment_group_options_default();
         options.scrollbar_theme = &t;
         options.width = width - 48;
@@ -8488,9 +8496,10 @@ double gallery_image_stats(unsigned field) {
         return 0;
     }
 }
-void gallery_attachment_options(int status, int vertical) {
+void gallery_attachment_options(int status, int vertical, int composed) {
     attachment_status = status;
     attachment_vertical = vertical;
+    attachment_composed = composed;
 }
 double gallery_attachment_stats(unsigned field) {
     switch (field) {

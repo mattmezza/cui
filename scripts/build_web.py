@@ -108,6 +108,8 @@ def main():
     (out / 'index.html').write_text(index, encoding='utf-8')
     wasm_version = hashlib.sha256((out / 'gallery.wasm').read_bytes()).hexdigest()[:16]
     javascript = (ROOT / 'web/gallery.js').read_text(encoding='utf-8').replace('__CUI_WASM_VERSION__', wasm_version)
+    attachment_example = (ROOT / 'web/attachment_slots_example.h').read_text(encoding='utf-8')
+    javascript = javascript.replace("'__CUI_ATTACHMENT_SLOTS__'", json.dumps(attachment_example))
     (out / 'gallery.js').write_text(javascript, encoding='utf-8', newline='\n')
     shutil.copyfile(ROOT / 'third_party/gpui_themes/presets.json', out / 'themes.json')
     subprocess.run(['uv', 'run', str(ROOT / 'scripts/build_docs.py'), '--output', str(out), '--profile', 'web-default-icons' + ('-regex' if args.regex_library else '')], check=True)

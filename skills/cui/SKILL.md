@@ -547,8 +547,9 @@ and Retry with `cui_bridge_attachment_set_actions_v1`. Request
 `CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1` when polling. The actions request app
 work and never change transfer status. Python, JS/TS, Go and Rust support the
 independent actions through optional builders and manual component notification
-polls. Manual polling and ordinary dispatch share one queue. Immediate and
-retained C support custom slots. In retained C use
+polls. Manual polling and ordinary dispatch share one queue. For immediate C
+slot composition, read `docs/MEDIA.md#compose-a-file-card-with-custom-slots` and
+`web/attachment_slots_example.h`. In retained C use
 `cui_bridge_attachment_slot_create_v1` for preview fallback, overlay, metadata
 or an action row. Children keep their own events and are removed with the slot.
 In Python and JS/TS compose `attachment_slot(key, role, preferred_width)` as

@@ -100,6 +100,28 @@ must shrink to fit. A vertical media-only card follows its explicit aspect
 ratio. Retained C can opt into fitted labels and supply a decoded preview
 through the bridge. [Retained Attachment](BRIDGE_COMPONENTS.md#configure-a-retained-attachment-from-c)
 
+### Compose a file card with custom slots
+
+Open [Attachment in the gallery](https://matteo.merola.co/cui/components/attachment/)
+and select **Custom slots**. **Copy code** copies the same C source that draws
+the preview. Call `draw_attachment_with_slots` inside your frame with a stable
+ID, the available width and one zero-initialized `attachment_slots_example`
+per file. The example stacks the card when the available width can no longer
+fit the requested size.
+
+The example uses `media_content` for file artwork when there is no decoded
+preview. The `media_overlay` callback paints an inspection check over the
+preview. A `CUI_ATTACHMENT_CUSTOM` child paints a status below the typed
+filename. The `actions` callback mounts an ordinary Button with its own ID,
+keyboard focus and result. It updates application state and invalidates the
+frame so the overlay and status can reflect the change. The custom renderers
+receive the dimensions available to them. Use the matching user fields to pass
+state to each renderer. A host loader can supply a real RGBA preview when the
+file has one.
+
+See the [complete C frame example](../web/attachment_slots_example.h) and the
+[retained slot examples](BRIDGE_COMPONENTS.md#compose-a-retained-attachment-in-a-language-builder).
+
 AttachmentGroup retains a horizontal scroll offset, or uses an explicit external
 scroll state. Its default gap is 12 and vertical padding is 4. Dominant horizontal
 wheel input updates it, while ties remain vertical for the parent chain. Optional

@@ -521,8 +521,9 @@ def verify_notification_close(browser, url):
 
 
 def verify_attachment_metadata(browser, url):
-    """Mobile WASM paint retains full accessible metadata and working actions."""
-    context = browser.new_context(viewport={'width':390, 'height':844}, has_touch=True)
+    """Mobile WASM paint retains full labels and renders custom child slots."""
+    context = browser.new_context(viewport={'width':390, 'height':844}, has_touch=True,
+                                  permissions=['clipboard-read', 'clipboard-write'])
     page = context.new_page()
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
@@ -627,6 +628,71 @@ def verify_attachment_metadata(browser, url):
         retries = page.evaluate('cuiGallery.exports.gallery_attachment_stats(2)')
         click('Retry attachment')
         page.wait_for_function('n=>cuiGallery.exports.gallery_attachment_stats(2)===n+1&&cuiGallery.exports.gallery_attachment_stats(9)===1', arg=retries)
+
+        def image_bounds():
+            return page.evaluate("""() => {
+                const e = cuiGallery.exports;
+                return Array.from({length: e.gallery_count()}, (_, i) => i)
+                    .filter(i => e.gallery_command(i, 0) === 5)
+                    .map(i => [1, 2, 3, 4].map(f => e.gallery_command(i, f)));
+            }""")
+
+        composed = page.locator('#attachment-composed')
+        composed.check()
+        page.wait_for_function(metric, arg='Shared')
+        assert page.locator('#attachment-status').is_hidden()
+        assert page.locator('#scrollbar-policy').is_hidden()
+        assert page.locator('#accessible').get_by_text('Release notes.pdf', exact=True).count() == 1
+        fallback, = image_bounds()
+        assert all(size > 0 for size in fallback[2:]), fallback
+        click('Inspect', touch=True)
+        page.wait_for_function(metric, arg='Inspected')
+        painted = image_bounds()
+        assert len(painted) == 2 and fallback in painted, painted
+        check, = [image for image in painted if image != fallback]
+        assert check[0] > fallback[0] and check[1] > fallback[1], painted
+        assert page.evaluate('cuiGallery.exports.gallery_attachment_stats(0)') == clicks+1
+
+        inspect = page.locator('#accessible [aria-label="Inspect"]')
+        inspect.focus()
+        page.keyboard.press('Enter')
+        page.wait_for_function(metric, arg='Shared')
+        assert image_bounds() == [fallback]
+        configure(True, '3')
+        card = page.wait_for_function(metric, arg='Release notes attachment').json_value()
+        button = page.evaluate(metric, 'Inspect')
+        assert all(card[i] <= button[i] and button[i] + button[i+2] <= card[i] + card[i+2]
+                   for i in range(2)), (card, button)
+        page.locator('#disabled').check()
+        click('Inspect')
+        assert page.evaluate(metric, 'Inspected') is None
+        page.locator('#disabled').uncheck()
+        click('Inspect')
+        page.wait_for_function(metric, arg='Inspected')
+        assert len(image_bounds()) == 2
+        configure(False, '3')
+        restored = image_bounds()
+        assert len(restored) == len(painted), (restored, painted)
+        assert all(abs(actual-expected)<.5
+                   for a, b in zip(restored, painted)
+                   for actual, expected in zip(a, b)), (restored, painted)
+
+        configure(False, '7')
+        card = page.evaluate(metric, 'Release notes attachment')
+        button = page.evaluate(metric, 'Inspect')
+        assert card[3] > card[2] *.8, card  # A large size stacks at mobile width.
+        assert all(card[i] <= button[i] and button[i] + button[i+2] <= card[i] + card[i+2]
+                   for i in range(2)), (card, button)
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+
+        source = Path(__file__).resolve().parents[2] / 'web/attachment_slots_example.h'
+        page.locator('#copy-snippet').click()
+        page.wait_for_function("document.querySelector('#copy-snippet').textContent==='Copied'")
+        assert page.evaluate('navigator.clipboard.readText()') == source.read_text()
+        composed.uncheck()
+        page.wait_for_function(metric, arg=title)
+        assert page.locator('#attachment-status').is_visible()
+        assert not page.evaluate('cuiGallery.exports.gallery_error()')
         assert not errors, errors
     finally:
         context.close()
@@ -726,7 +792,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=Path('build/web'))
     parser.add_argument('--chromium', help='Optional installed Chromium executable')
-    parser.add_argument('--attachment-only', action='store_true', help='Run focused Attachment metadata checks only')
+    parser.add_argument('--attachment-only', action='store_true',
+                        help='Run focused Attachment metadata and composition checks only')
     parser.add_argument('--sidebar-only', action='store_true', help='Run focused Sidebar scrolling checks only')
     parser.add_argument('--notification-only', action='store_true', help='Run focused Notification checks only')
     parser.add_argument('--pagination-only', action='store_true', help='Run focused Pagination checks only')

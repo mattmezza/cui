@@ -424,7 +424,18 @@
             "bindings/rust/tests/attachment.rs",
             "docs/BRIDGE_COMPONENTS.md"
           ],
-          "scope": "Fitted metadata, axis, shared sizes, lifecycle refinements and copied previews in Python, JavaScript/TypeScript, Go and Rust. Headless geometry, replacement and optional-symbol handling. Retained composed actions remain open."
+          "scope": "Fitted metadata, axis, shared sizes, lifecycle refinements and copied previews in Python, JavaScript/TypeScript, Go and Rust. Headless geometry, replacement and optional-symbol handling. Independent action and slot tests are recorded separately."
+        },
+        {
+          "name": "immediate Attachment slot composition in the gallery",
+          "status": "tested",
+          "evidence": [
+            "web/attachment_slots_example.h",
+            "tests/web/test_browser.py",
+            "tests/web/test_snippets.py",
+            "docs/MEDIA.md"
+          ],
+          "scope": "WASM file artwork fallback, overlay, custom status metadata and a child action in horizontal and vertical cards. Chromium exercises the keyboard and touch action, disabled state and copying the exact C11 source."
         },
         {
           "name": "retained Attachment action notifications",

@@ -30,6 +30,7 @@ const inline = {
     Collapsible: [false, true].map(interactive => disclosureHeadingUsage(false, interactive)),
 };
 const standalone = {
+    Attachment: [readFileSync(join(process.argv[2], '..', 'attachment_slots_example.h'), 'utf8')],
     VirtualList: [virtualInboxUsage],
     Radio: [radioStyledUsage, radioControlledUsage],
     DataTable: [liveDataTableUsage, pagedDataTableUsage],

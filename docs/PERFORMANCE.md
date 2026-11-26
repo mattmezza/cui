@@ -148,6 +148,26 @@ spent 165.88 seconds on `agent_skill_contract` and 98.43 seconds on
 these timings are a baseline, not measured savings from the scheduling change.
 Hosted duration, memory use and any contention regressions still need comparison.
 
+### Release tag scheduling
+
+The two alpha.6 version tags triggered six additional workflow runs after the
+same commit passed the main-branch release checks. GitHub reported 38 started
+jobs and 13,015 seconds (about 217 minutes) summed across job start-to-finish
+times. This sum includes successful and failed jobs and measures neither wall
+time nor billed minutes. The build and evidence runs alone accounted for 12,213
+seconds. [Library-tag build](https://github.com/mattmezza/cui/actions/runs/45734713874)
+· [Go-tag build](https://github.com/mattmezza/cui/actions/runs/45734713599)
+· [Library-tag bindings](https://github.com/mattmezza/cui/actions/runs/45734713629)
+· [Go-tag bindings](https://github.com/mattmezza/cui/actions/runs/45734713625)
+· [Library-tag Speech](https://github.com/mattmezza/cui/actions/runs/45734713957)
+· [Go-tag Speech](https://github.com/mattmezza/cui/actions/runs/45734713556)
+
+Branch pushes and pull requests continue to qualify source. The build,
+native binding and optional Speech workflows now filter push events to branches.
+Speech keeps its existing path filter, and bindings and Speech remain available
+through manual dispatch. Pages already builds and deploys on main pushes.
+Tag scheduling still needs confirmation on the next publication.
+
 ## Browser probe transport
 
 Eleven standalone headless browser probes use `route_wasm_probe` from

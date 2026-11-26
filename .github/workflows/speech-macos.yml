@@ -1,6 +1,7 @@
 name: Optional macOS Speech host fixtures
 on:
   push:
+    branches: ['**']
     paths:
       - '.github/workflows/speech-macos.yml'
       - 'examples/speech_macos_recognizer/**'

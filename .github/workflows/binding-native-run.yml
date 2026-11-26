@@ -1,5 +1,9 @@
 name: Native binding callback runners
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:

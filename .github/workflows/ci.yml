@@ -1,5 +1,9 @@
 name: CUI build and evidence
-on: [push, pull_request]
+on:
+  push:
+    # Release tags reference a revision already qualified by the main push.
+    branches: ['**']
+  pull_request:
 permissions:
   contents: read
 concurrency:

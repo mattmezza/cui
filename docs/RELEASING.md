@@ -265,6 +265,9 @@ third-party licensing to the top-level MIT license.
 
 The integrator executes these steps after checking the final manifest and tests.
 Set `release_sha` to the full frozen commit and `assets` to the reviewed output.
+Before pushing either the library tag or the nested Go tag, verify successful
+build, native binding and Pages/browser runs for that exact SHA on main. Pushes
+of the tags themselves no longer schedule the branch qualification workflows.
 Generate checksums over the final uploaded files, excluding SHA256SUMS itself;
 verify them after downloading the draft assets. Avoid uploading duplicate asset
 basenames. Prepare release notes describing the tested subset, explicit platform

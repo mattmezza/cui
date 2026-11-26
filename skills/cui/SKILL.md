@@ -460,6 +460,12 @@ give medium titles and regular descriptions. The semantic tree keeps the full
 labels. See `docs/MEDIA.md#fit-file-names-and-descriptions`. Retained builders
 currently expose the earlier presentation.
 
+For a pinned navigation header/footer with body-only scrolling, use
+`cui_sidebar` with a persistent measurement cache. Tab and accessibility focus
+reveal mounted controls using the previous completed geometry. Pass a
+`scrollbar_style` to configure the lane. See `docs/SIDEBAR.md` for scroll,
+focus and virtualization behavior.
+
 For opt-in C control shadow examples, read `docs/CONTROL_SURFACE_SHADOW_GALLERY.md`.
 Button's captured instance patch replays after disabled; an instance shadow must
 explicitly clear for disabled if that is the intended result. Named selection

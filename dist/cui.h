@@ -1507,6 +1507,15 @@ const void *cui_core_ordered_retained(const cui_context *, cui_id owner, cui_id 
 #endif
 
 /* SPDX-License-Identifier: MIT */
+#ifndef CUI_SCROLL_FOCUS_INTERNAL_H
+#define CUI_SCROLL_FOCUS_INTERNAL_H
+
+/* Use the last completed semantic layout. Returns untrimmed bounds when
+ * visible focus newly enters a live layout descendant of this viewport. */
+bool cui_core_new_focus_bounds(const cui_context *, cui_id viewport, cui_rect *);
+#endif
+
+/* SPDX-License-Identifier: MIT */
 #ifndef CUI_SCROLL_X_INTERNAL_H
 #define CUI_SCROLL_X_INTERNAL_H
 
@@ -14995,6 +15004,27 @@ cui_id cui_semantic_parent(cui_context *ui, cui_id id) {
 }
 cui_id cui_focused(cui_context *ui) {
     return ui && !cui_core_inert(ui) ? ui->focus : 0;
+}
+bool cui_core_new_focus_bounds(const cui_context *ui, cui_id viewport, cui_rect *out) {
+    if (!ui || !ui->in_frame || !viewport || !out || !ui->focus || !ui->focus_visible ||
+        cui_core_inert(ui) || cui_core_layout_only(ui))
+        return false;
+    for (size_t i = 0; i < ui->previous_count; i++) {
+        const cui_semantic *target = &ui->previous[i];
+        if (target->id != ui->focus)
+            continue;
+        if (target->focused || !cui_core_focusable(target) || !cui_core_previous_allowed(ui, i))
+            return false;
+        for (size_t p = ui->previous_parents[i]; p < ui->previous_count;
+             p = ui->previous_parents[p]) {
+            if (ui->previous[p].id == viewport) {
+                *out = target->bounds;
+                return true;
+            }
+        }
+        return false;
+    }
+    return false;
 }
 void cui_focus(cui_context *ui, cui_id id) {
     if (!cui_core_mutation(ui))

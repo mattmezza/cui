@@ -2136,7 +2136,7 @@
       ],
       "state_ownership": "Caller retains sidebar state/cache, entry descriptors and selected application route.",
       "interaction": "cui_sidebar_content_fn composes regions; menu-item results expose selection/activation.",
-      "usage": "Initialize measurement cache, submit current entries, and update routing from menu-item events.",
+      "usage": "Initialize measurement cache, submit current entries, and update routing from menu-item events. The body reveals newly keyboard-focused mounted rows between pinned regions. Hidden scrollbars return their lane to the rows.",
       "docs": [
         "docs/SIDEBAR.md",
         "docs/SIDEBAR_EVENTS.md",

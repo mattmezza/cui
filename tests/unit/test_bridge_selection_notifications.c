@@ -22,7 +22,8 @@ static cui_bridge_app *create(uint32_t events, cui_bridge_kind kind, cui_bridge_
     assert(cui_bridge_node_create(app, *group, CUI_BRIDGE_ITEM, "second", second) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_text(app, *first, "First") == CUI_BRIDGE_OK);
     assert(cui_bridge_set_text(app, *second, "Second") == CUI_BRIDGE_OK);
-    assert(cui_bridge_set_selected(app, *group, *first) == CUI_BRIDGE_OK);
+    if (kind != CUI_BRIDGE_SIDEBAR)
+        assert(cui_bridge_set_selected(app, *group, *first) == CUI_BRIDGE_OK);
     assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
     return app;
 }
@@ -227,6 +228,45 @@ static void omitted_commands(void) {
     empty(app);
     cui_bridge_destroy(app);
 }
+static void sidebar_focus_carries_into_bridge(void) {
+    cui_bridge_node sidebar, rows[6];
+    cui_bridge_app *app = create(16, CUI_BRIDGE_SIDEBAR, &sidebar, &rows[0], &rows[1]);
+    const char *keys[] = {"Projects", "Reports", "Billing", "Settings"};
+    for (size_t i = 2; i < 6; ++i) {
+        const char *key = keys[i - 2];
+        assert(cui_bridge_node_create(app, sidebar, CUI_BRIDGE_ITEM, key, &rows[i]) ==
+               CUI_BRIDGE_OK);
+        assert(cui_bridge_set_text(app, rows[i], key) == CUI_BRIDGE_OK);
+    }
+    assert(cui_bridge_set_visual_size(app, sidebar, 240, 112) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect viewport;
+    assert(cui_bridge_node_bounds(app, sidebar, &viewport) == CUI_BRIDGE_OK);
+    target(app, rows[0]);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    for (size_t i = 1; i < 6; ++i) {
+        assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, CUI_BRIDGE_KEY_TAB, 0, 0) ==
+               CUI_BRIDGE_OK);
+        assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_UP, CUI_BRIDGE_KEY_TAB, 0, 0) ==
+               CUI_BRIDGE_OK);
+        assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+        cui_bridge_rect bounds;
+        assert(cui_bridge_node_bounds(app, rows[i], &bounds) == CUI_BRIDGE_OK && bounds.height > 0);
+        assert(bounds.y >= viewport.y - .01f &&
+               bounds.y + bounds.height <= viewport.y + viewport.height + .01f);
+        cui_bridge_node selected;
+        assert(cui_bridge_get_selected(app, sidebar, &selected) == CUI_BRIDGE_OK &&
+               selected.slot == rows[0].slot);
+    }
+    assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, CUI_BRIDGE_KEY_ENTER, 0, 0) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_node selected;
+    assert(cui_bridge_get_selected(app, sidebar, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == rows[5].slot);
+    cui_bridge_destroy(app);
+}
 int main(void) {
     assert(cui_bridge_notification_value_payloads_v1() ==
            (CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 | CUI_BRIDGE_VALUE_SELECTION_V1));
@@ -234,5 +274,6 @@ int main(void) {
     repeated_and_aggregate();
     lifetime_capacity_overflow();
     omitted_commands();
+    sidebar_focus_carries_into_bridge();
     return 0;
 }

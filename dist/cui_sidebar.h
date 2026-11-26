@@ -510,6 +510,15 @@ cui_base_sidebar_toggle_events(cui_context *ui, cui_id id, cui_sidebar_toggle_op
 /* src/components/cui_sidebar.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_SCROLL_FOCUS_INTERNAL_H
+#define CUI_SCROLL_FOCUS_INTERNAL_H
+
+/* Use the last completed semantic layout. Returns untrimmed bounds when
+ * visible focus newly enters a live layout descendant of this viewport. */
+bool cui_core_new_focus_bounds(const cui_context *, cui_id viewport, cui_rect *);
+#endif
+
 #include <math.h>
 #include <string.h>
 static void cui_sidebar_spacer(cui_context *ui, float width, float height) {
@@ -934,6 +943,18 @@ static void cui_sidebar_section_outer(cui_context *ui, const cui_theme *t,
         cui_sidebar_spacer(ui, 0, 12);
     cui_end_box(ui);
 }
+static void cui_sidebar_reveal_focus(cui_context *ui, cui_sidebar_state *s, cui_id body,
+                                     cui_id content, float height) {
+    cui_rect target;
+    if (cui_focused(ui) == cui_scrollbar_id(body, true) ||
+        !cui_core_new_focus_bounds(ui, body, &target))
+        return;
+    cui_rect last_content = cui_bounds(ui, content);
+    if (target.h <= 0 || last_content.h <= 0)
+        return;
+    float top = target.y - last_content.y;
+    s->scroll.y = fminf(top, fmaxf(s->scroll.y, top + target.h - height));
+}
 bool cui_sidebar(cui_context *ui, cui_id id, const cui_theme *t, cui_sidebar_state *s,
                  const cui_sidebar_entry *entries, size_t count, cui_sidebar_options o) {
     if (!ui || !id || !t || !s || count > s->capacity || count > CUI_SIDEBAR_ENTRY_LIMIT ||
@@ -993,7 +1014,7 @@ bool cui_sidebar(cui_context *ui, cui_id id, const cui_theme *t, cui_sidebar_sta
                                       .h = -1});
     if (o.header)
         cui_sidebar_section_outer(ui, t, o.header, o.header_user, s->icon_collapsed, false);
-    cui_id body = cui_sidebar_part_id(id, 1);
+    cui_id body = cui_sidebar_part_id(id, 1), content = cui_sidebar_part_id(id, 2);
     float width = s->viewport.w > 0 ? s->viewport.w : s->target_child_width;
     float height = s->viewport.h > 0 ? s->viewport.h : o.height > 0 ? o.height : 300;
     float total = cui_sidebar_content_height(s) + (s->icon_collapsed ? 16 : 0);
@@ -1008,10 +1029,13 @@ bool cui_sidebar(cui_context *ui, cui_id id, const cui_theme *t, cui_sidebar_sta
                                  .scrollbar_style = &scrollbar_skin};
     scroll = cui_scroll_resolve(t, scroll);
     cui_scroll_geometry geometry = cui_scroll_layout(scroll);
+    float bar = geometry.maximum_y > 0 ? width - geometry.viewport.width : 0;
+    scroll.hide_scrollbars |= bar <= 0;
+    cui_sidebar_reveal_focus(ui, s, body, content, geometry.viewport.height);
     cui_base_scrollable(ui, body, &s->scroll, scroll);
     cui_begin_box(ui, body, (cui_box){.width = -1, .height = -1, .clip = true, .row = true});
     cui_track_bounds(ui, body, &s->viewport);
-    cui_begin_absolute_box(ui, cui_sidebar_part_id(id, 2), (cui_box){0},
+    cui_begin_absolute_box(ui, content, (cui_box){0},
                            (cui_rect){.y = -s->scroll.y, .w = -1, .h = total});
     float pad = s->icon_collapsed ? 8 : 12, top = count               ? s->icon_collapsed ? 20 : 12
                                                   : s->icon_collapsed ? 8
@@ -1034,7 +1058,7 @@ bool cui_sidebar(cui_context *ui, cui_id id, const cui_theme *t, cui_sidebar_sta
             entries[i].render(ui, &scoped, s->icon_collapsed, entries[i].user);
             cui_track_bounds(ui, entries[i].id, &cache->bounds);
             cui_end_box(ui);
-            cui_sidebar_spacer(ui, pad + (geometry.maximum_y > 0 ? 8 : 0), 0);
+            cui_sidebar_spacer(ui, pad + bar, 0);
             cui_end_box(ui);
         } else
             cui_sidebar_spacer(ui, 0, cache->height);
@@ -1042,13 +1066,10 @@ bool cui_sidebar(cui_context *ui, cui_id id, const cui_theme *t, cui_sidebar_sta
     }
     cui_sidebar_spacer(ui, 0, count ? s->icon_collapsed ? 20 : 12 : s->icon_collapsed ? 8 : 0);
     cui_end_box(ui);
-    if (geometry.maximum_y > 0) {
+    if (bar > 0) {
         cui_sidebar_spacer(ui, -1, 0);
         cui_begin_box(ui, 0,
-                      (cui_box){.width = scroll.hide_scrollbars ? 0 : scroll.bar_thickness,
-                                .fixed_width = true,
-                                .height = -1,
-                                .clip = true});
+                      (cui_box){.width = bar, .fixed_width = true, .height = -1, .clip = true});
         cui_begin_absolute_box(ui, 0, (cui_box){0}, (cui_rect){.w = -1, .h = -1});
         cui_scrollbar(ui, body, t, &s->scroll, geometry, scroll, true);
         cui_end_box(ui);

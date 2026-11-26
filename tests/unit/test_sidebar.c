@@ -337,6 +337,96 @@ static void test_virtual_and_animation(void) {
     assert(!cui_needs_redraw(ui));
     cui_destroy(ui);
 }
+static void test_focus_reveal_and_scrollbar_width(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    cui_theme t = cui_theme_light();
+    cui_sidebar_state s;
+    cui_sidebar_cache cache[6];
+    assert(cui_sidebar_state_init(&s, cache, 6));
+    content_state rows[6];
+    cui_sidebar_entry entries[6];
+    for (size_t i = 0; i < 6; i++) {
+        rows[i] = (content_state){.height = 34, .control = 1100 + i};
+        entries[i] = (cui_sidebar_entry){
+            .id = 2100 + i, .render = content, .user = &rows[i], .estimated_height = 34};
+    }
+    content_state header = {.height = 22, .control = 102}, footer = {.height = 28, .control = 103};
+    cui_scrollbar_style skin = {.visibility = CUI_SCROLLBAR_VISIBLE, .thickness = 24};
+    cui_sidebar_options o = cui_sidebar_default();
+    o.height = 180;
+    o.viewport_height = 300;
+    o.header = content;
+    o.footer = content;
+    o.header_user = &header;
+    o.footer_user = &footer;
+    o.scrollbar_style = &skin;
+    for (unsigned pass = 0; pass < 2; pass++)
+        render_frame(ui, &t, &s, entries, 6, o);
+    cui_rect pinned_header = cui_bounds(ui, header.control);
+    cui_rect pinned_footer = cui_bounds(ui, footer.control);
+    cui_rect first = cui_bounds(ui, rows[0].control);
+    cui_id bar_id = cui_scrollbar_id(cui_sidebar_part_id(100, 1), true);
+    cui_rect bar = cui_bounds(ui, bar_id);
+    closef(bar.w, 24);
+    closef(first.x + first.w + 12, bar.x);
+    skin.visibility = CUI_SCROLLBAR_HIDDEN;
+    render_frame(ui, &t, &s, entries, 6, o);
+    first = cui_bounds(ui, rows[0].control);
+    closef(first.x + first.w + 12, s.viewport.x + s.viewport.w);
+    for (size_t i = 0; i < 6; i++) {
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_TAB}));
+        render_frame(ui, &t, &s, entries, 6, o);
+        if (i == 0) {
+            assert(cui_focused(ui) == header.control);
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_TAB}));
+            render_frame(ui, &t, &s, entries, 6, o);
+        }
+        assert(cui_focused(ui) == rows[i].control);
+        cui_rect row = cui_bounds(ui, rows[i].control);
+        assert(row.y >= s.viewport.y - .01f && row.y + row.h <= s.viewport.y + s.viewport.h + .01f);
+        closef(cui_bounds(ui, header.control).y, pinned_header.y);
+        closef(cui_bounds(ui, footer.control).y, pinned_footer.y);
+    }
+    assert(s.scroll.y > 0);
+    /* Keeping the same focused control must allow explicit scrolling away. */
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = s.viewport.x + 20,
+                                           .y = s.viewport.y + 30,
+                                           .dy = 300,
+                                           .scroll_precise = true}));
+    render_frame(ui, &t, &s, entries, 6, o);
+    closef(s.scroll.y, 0);
+    render_frame(ui, &t, &s, entries, 6, o);
+    closef(s.scroll.y, 0);
+    assert(cui_focused(ui) == rows[5].control && cui_last_error(ui) == CUI_OK);
+    cui_rect partial = cui_bounds(ui, rows[2].control);
+    float bottom = s.viewport.y + s.viewport.h;
+    assert(partial.y < bottom && partial.y + partial.h > bottom);
+    cui_event press = {.type = CUI_EVENT_POINTER_DOWN, .x = partial.x + 10, .y = bottom - 2};
+    assert(cui_queue_event(ui, press));
+    render_frame(ui, &t, &s, entries, 6, o);
+    assert(cui_focused(ui) == rows[2].control);
+    closef(s.scroll.y, 0);
+    press.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(ui, press));
+    render_frame(ui, &t, &s, entries, 6, o);
+    closef(s.scroll.y, 0);
+    assert(cui_queue_accessibility_action(ui, rows[5].control, CUI_ACCESSIBILITY_FOCUS));
+    render_frame(ui, &t, &s, entries, 6, o);
+    assert(cui_focused(ui) == rows[5].control && s.scroll.y > 0);
+    assert(cui_bounds(ui, rows[5].control).y + rows[5].height <= bottom + .01f);
+    skin.visibility = CUI_SCROLLBAR_VISIBLE;
+    for (unsigned pass = 0; pass < 2; pass++)
+        render_frame(ui, &t, &s, entries, 1, o);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        assert(semantics[i].id != bar_id);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 static void test_toggle(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 128});
     assert(ui);
@@ -690,6 +780,7 @@ int main(void) {
     test_layout();
     test_menu();
     test_icon_clipping();
+    test_focus_reveal_and_scrollbar_width();
     test_virtual_and_animation();
     test_toggle();
     test_composition();

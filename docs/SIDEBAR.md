@@ -1,10 +1,8 @@
 # Sidebar
 
-The module follows the frozen GPUI Kit 0.7.1 `component/src/sidebar` family:
-Sidebar, SidebarHeader, SidebarFooter, SidebarGroup, SidebarMenu,
-SidebarMenuItem and SidebarToggleButton. There is no separate frozen base
-Sidebar; CUI separates its pure cache/motion model and event behavior from
-styled rendering.
+Sidebar provides a navigation container, pinned header and footer, virtual
+groups, menu items and a collapse button. CUI separates the cache, animation
+model and events from styled rendering.
 
 `cui_sidebar_state_init` attaches a caller-owned cache with capacity 1..1024.
 The cache and state must remain valid through `cui_end_frame`; they allocate no
@@ -29,6 +27,24 @@ header/footer/available extent use retained geometry for scroll metrics, then
 correct it in the measurement frame. The scrollbar's right edge follows parent
 layout immediately, including percentage widths. The application drives frames
 until `cui_needs_redraw` is false.
+
+When Tab or an accessibility focus request moves focus to a mounted body control,
+Sidebar scrolls just far enough to reveal it. This also applies to host calls to
+`cui_focus` before Sidebar submission. A control taller than the viewport aligns
+at its top. Pointer focus leaves the scroll offset alone, so a partially visible
+row can still receive a complete click. Wheel and touch scrolling can move
+away from the focused row. Focus is released if virtualization unmounts it.
+The reveal uses the previous completed geometry and applies only to controls
+ordered under the body, including nested rows and custom content. Header and
+footer controls keep their fixed positions.
+
+The scrollbar lane uses the configured thickness after the normal geometry
+clamp. Set `scrollbar_style` to override the theme. Hidden bars and non-overflowing
+bodies use the full row width and omit the scrollbar control. An auto-hide bar
+reserves its lane while faded so row widths do not shift.
+The retained bridge uses the same focus reveal and theme geometry. Custom pinned
+regions and per-Sidebar scrollbar style are available through direct C
+composition.
 
 Defaults are width 255, left side, expanded, Icon collapse mode and a 200ms cubic
 in-out transition. Icon collapse renders children at 48px immediately and animates
@@ -121,8 +137,8 @@ through the temporary Theme's `text`. `label_content` and `custom_label_box`
 bridge source label styling, with accessible text still supplied by the label
 or accessibility override. Suffix content gets the same inherited foreground.
 Callbacks own any further controls, loaders or persistent state they compose.
-The current text API does not expose font weight, so source active-item
-`font_medium` emphasis is represented by its accent colors, without fake bold.
+Built-in rows use accent colors for selection. Use `label_content` with
+`cui_text_line` to choose a font family, weight or style on supported hosts.
 
 Collapsed icon items use the real delayed Tooltip primitive. Supply
 `tooltip_options.viewport` with the host viewport; the default side is Right,

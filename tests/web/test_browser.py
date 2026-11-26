@@ -346,12 +346,103 @@ def verify_attachment_metadata(browser, url):
         context.close()
 
 
+def verify_sidebar_scrolling(browser, url):
+    snapshot = """() => {
+        const e = cuiGallery.exports, decoder = new TextDecoder(), rows = {};
+        for (let i = 0; i < e.gallery_semantic_count(); i++) {
+            const field = n => e.gallery_semantic(i, n);
+            const name = decoder.decode(new Uint8Array(e.memory.buffer,
+                e.gallery_semantic_name(i), e.gallery_semantic_length(i)));
+            if (field(0) === 23 || ['Workspace sidebar', 'Scrollable content',
+                'Vertical scroll', 'Toggle sidebar'].includes(name))
+                rows[name] = {bounds:[1,2,3,4].map(field), focused:!!field(7),
+                    value:field(8), max:field(0)===32?field(13):field(21)};
+        }
+        return {rows, scroll:e.gallery_sidebar_stats(2)};
+    }"""
+    pinned_pixels = """([sidebar, body, compare]) => {
+        const canvas = document.querySelector('canvas'), scale = canvas.width/canvas.clientWidth;
+        const x0 = Math.ceil(sidebar[0]*scale), x1 = Math.floor((sidebar[0]+sidebar[2])*scale);
+        const y0 = Math.floor(body[1]*scale), y1 = Math.ceil((body[1]+body[3])*scale);
+        const image = canvas.getContext('2d');
+        const parts = [image.getImageData(x0,0,x1-x0,y0).data,
+            image.getImageData(x0,y1,x1-x0,canvas.height-y1).data];
+        if (!compare) {
+            window.sidebarPinnedPixels = parts;
+            return true;
+        }
+        return parts.every((part,i)=>part.length===sidebarPinnedPixels[i].length &&
+            part.every((value,index)=>value===sidebarPinnedPixels[i][index]));
+    }"""
+    for width, scale, side in ((1080, 1, '1'), (390, 2, '0')):
+        context = browser.new_context(viewport={'width':width, 'height':950},
+                                      device_scale_factor=scale, reduced_motion='reduce',
+                                      color_scheme='light' if scale == 1 else 'dark')
+        page = context.new_page()
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        try:
+            page.goto(url + '#Sidebar')
+            page.wait_for_function('window.cuiGallery && cuiGallery.renderedComponent==="Sidebar"')
+            page.locator('#sidebar-side').select_option(side)
+            page.locator('#scrollbar-policy').select_option('1')
+            page.locator('#scrollbar-width').select_option('16')
+            page.wait_for_function(f'() => ({snapshot})().rows["Vertical scroll"]?.bounds[2]===16')
+            canvas = page.locator('canvas')
+            canvas.scroll_into_view_if_needed()
+            page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+            start = page.evaluate(snapshot)
+            sidebar = start['rows']['Workspace sidebar']['bounds']
+            body = start['rows']['Scrollable content']['bounds']
+            track = start['rows']['Vertical scroll']['bounds']
+            first = start['rows']['Overview']['bounds']
+            assert first[0]+first[2]+12 == track[0], (first, track)
+            assert page.evaluate(pinned_pixels, [sidebar, body, False])
+            rect = canvas.bounding_box()
+            page.mouse.move(rect['x']+body[0]+40, rect['y']+body[1]+75)
+            canvas.evaluate('canvas=>canvas.addEventListener("wheel",e=>window.sidebarWheel=e.deltaY,{once:true})')
+            page.mouse.wheel(0, 37)
+            page.wait_for_function('window.sidebarWheel>0&&Math.abs(cuiGallery.exports.gallery_sidebar_stats(2)-sidebarWheel)<.1')
+            wheel = page.evaluate(snapshot)
+            assert abs(wheel['rows']['Overview']['bounds'][1]-first[1]+wheel['scroll']) < .1
+            assert page.evaluate(pinned_pixels, [sidebar, body, True])
+            maximum = wheel['rows']['Vertical scroll']['max']
+            thumb = max(12, track[3]**2 / (track[3]+maximum))
+            drag_y = track[1]+thumb/2+(track[3]-thumb)*wheel['scroll']/maximum
+            page.mouse.move(rect['x']+track[0]+track[2]/2, rect['y']+drag_y)
+            page.mouse.down()
+            page.mouse.move(rect['x']+track[0]+track[2]/2, rect['y']+drag_y+track[3]-thumb, steps=4)
+            page.mouse.up()
+            page.wait_for_function('n=>cuiGallery.exports.gallery_sidebar_stats(2)>=n-.1', arg=maximum)
+            end = page.evaluate(snapshot)
+            assert end['rows']['Vertical scroll']['bounds'] == track
+            assert end['rows']['Help']['bounds'][1]+end['rows']['Help']['bounds'][3] <= body[1]+body[3]
+            assert page.evaluate(pinned_pixels, [sidebar, body, True])
+            page.locator('#scrollbar-policy').select_option('2')
+            page.wait_for_function(f'() => !({snapshot})().rows["Vertical scroll"]')
+            hidden = page.evaluate(snapshot)['rows']['Help']['bounds']
+            assert hidden[0]+hidden[2]+12 == body[0]+body[2], (hidden, body)
+            canvas.focus()
+            for name in ('Toggle sidebar', 'Overview', 'Files', 'Activity', 'Reviews',
+                         'Alerts', 'Search', 'Projects', 'Deployments', 'Usage',
+                         'Billing', 'Team', 'Help'):
+                page.keyboard.press('Tab')
+                page.wait_for_function(f'name => ({snapshot})().rows[name]?.focused', arg=name)
+                if name != 'Toggle sidebar':
+                    row = page.evaluate(snapshot)['rows'][name]['bounds']
+                    assert row[1] >= body[1]-.1 and row[1]+row[3] <= body[1]+body[3]+.1, (name, row, body)
+            assert not errors, errors
+        finally:
+            context.close()
+
+
 def main():
     subprocess.run([sys.executable, str(Path(__file__).with_name('test_snippets.py'))], check=True)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=Path('build/web'))
     parser.add_argument('--chromium', help='Optional installed Chromium executable')
     parser.add_argument('--attachment-only', action='store_true', help='Run focused Attachment metadata checks only')
+    parser.add_argument('--sidebar-only', action='store_true', help='Run focused Sidebar scrolling checks only')
     parser.add_argument('--notification-only', action='store_true', help='Run focused Notification checks only')
     parser.add_argument('--pagination-only', action='store_true', help='Run focused Pagination checks only')
     args = parser.parse_args()
@@ -377,6 +468,10 @@ def main():
                 verify_attachment_metadata(browser, f'http://127.0.0.1:{server.server_port}/cui/')
                 browser.close()
                 return
+            if args.sidebar_only:
+                verify_sidebar_scrolling(browser, f'http://127.0.0.1:{server.server_port}/cui/')
+                browser.close()
+                return
             if args.notification_only:
                 verify_notification_close(browser, f'http://127.0.0.1:{server.server_port}/cui/')
                 browser.close()
@@ -388,6 +483,7 @@ def main():
                 return
             verify_notification_close(browser, f'http://127.0.0.1:{server.server_port}/cui/')
             verify_attachment_metadata(browser, f'http://127.0.0.1:{server.server_port}/cui/')
+            verify_sidebar_scrolling(browser, f'http://127.0.0.1:{server.server_port}/cui/')
             page = browser.new_page(viewport={'width': 1280, 'height': 900}, device_scale_factor=2, permissions=['clipboard-read', 'clipboard-write'])
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))

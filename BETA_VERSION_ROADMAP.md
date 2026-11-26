@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.6**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.6) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
 | Public website | Interactive WASM gallery and docs at alpha.6. The Pages deployment from `d3711979` serves the same native starter bytes as the GitHub release. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45732688558) |
-| Working source | The integration branch adds responsive Pagination, Notification cards with accessible dismissal, and Attachment cards that fit long metadata. These changes await the next release. |
+| Working source | The integration branch adds responsive Pagination, accessible Notification dismissal, fitted Attachment metadata, and Sidebar focus reveal with consistent scrollbar geometry. These changes await the next release. |
 | Packages | Alpha.6 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -134,7 +134,7 @@ Check reported regressions against the current gallery as each slice lands.
 | Overlays | Finish Dialog root and host lifecycle; finish Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |
 | Charts/plots | Scales, axes/ticks, series/legend, layout/motion, tooltips, selection and accessibility; verify existing pan/zoom/touch. |
-| App structure | Carousel arrows and pagination honor Disabled in native and WASM tests. Horizontal touch yields vertical page pans. Carousel intrinsic layout, Sidebar clipping/scrolling, Settings, Command lifecycle/width and Root/window services remain open. Verify composed apps. |
+| App structure | Carousel arrows and pagination honor Disabled in native and WASM tests. Horizontal touch yields vertical page pans. Sidebar has native and Chromium proof for pinned clipping, proportional scroll/drag and focus reveal on mounted rows. Carousel intrinsic layout, broader Sidebar composition and platform accessibility, Settings, Command lifecycle/width and Root/window services remain open. Verify composed apps. |
 | Text/editing | TextView parser/plugins/selection/typography and Textarea behavior. Questionnaire batched input and confirmation have native regressions. Its remaining work includes styling, localization, nested-root integration and accessibility. Editor expansion remains lower priority. |
 | Video/audio/speech | Verify physical audio and media lifecycle on advertised hosts, and expand native codec coverage. Keep browser decoding, native dummy audio and physical audio output as separate checks. |
 | Every other family | Audit current code, frozen behavior and limitations even when recorded feature rows are green. Fix outstanding reported demo regressions; do not infer whole-family completion. |

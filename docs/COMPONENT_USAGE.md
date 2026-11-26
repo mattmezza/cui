@@ -1010,7 +1010,7 @@ Additional event includes: `cui/cui_surface_events.h`.
 
 **Interaction:** cui_sidebar_content_fn composes regions; menu-item results expose selection/activation.
 
-**Usage:** Initialize measurement cache, submit current entries, and update routing from menu-item events.
+**Usage:** Initialize measurement cache, submit current entries, and update routing from menu-item events. The body reveals newly keyboard-focused mounted rows between pinned regions. Hidden scrollbars return their lane to the rows.
 
 API: `cui_sidebar_state_init`, `cui_sidebar`. [Public header](../include/cui/cui_sidebar.h); [guide](SIDEBAR.md).
 

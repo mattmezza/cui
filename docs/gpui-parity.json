@@ -6507,6 +6507,8 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_sidebar.c",
+        "tests/unit/test_bridge_selection_notifications.c",
+        "tests/web/test_browser.py",
         "examples/native_starter/test_app.c",
         "tests/integration/test_continuous_resize.c"
       ],
@@ -6517,7 +6519,7 @@
         "linux_x11": "tested_partial"
       },
       "limitations": [
-        "Variable-height bounded navigation, nested items, independent carets, callbacks and animated Icon/Offcanvas collapse are tested. Full font-weight styling, intrinsic virtual measurement and host popup placement remain partial; see docs/SIDEBAR.md."
+        "Variable-height bounded navigation, nested items, independent carets, callbacks and animated Icon/Offcanvas collapse are tested. Pinned regions, custom scrollbar geometry and reveal on new focus are verified in immediate C and the gallery. Built-in typography styling, intrinsic virtual measurement and host popup placement remain partial; see docs/SIDEBAR.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -6542,6 +6544,17 @@
           "evidence": [
             "tests/unit/test_sidebar.c"
           ]
+        },
+        {
+          "name": "pinned sections, scrollbar gutter and reveal on new body focus",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_sidebar.c",
+            "tests/unit/test_bridge_selection_notifications.c",
+            "tests/web/test_browser.py",
+            "docs/SIDEBAR.md"
+          ],
+          "scope": "Native tests cover custom and hidden scrollbar lanes, new keyboard and accessibility focus, and partial-row pointer focus. The retained bridge verifies Tab reveal and Enter selection. Chromium checks byte-identical pinned regions, wheel pixels, thumb dragging and Tab traversal at 1x and 2x. Platform assistive technology and foreign composition authoring remain open."
         },
         {
           "name": "responsive native sidebar with pinned account footer",

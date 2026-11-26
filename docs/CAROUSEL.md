@@ -70,8 +70,11 @@ Both locked drags and cross-axis cancellation cancel only their pending release
 activation, leaving the release and capture cleanup available to the child.
 Controls can be clicked normally again after the gesture. Primary-axis pointer
 motion/release are cooperatively consumed; unrelated controls and overlays keep
-Core hit priority. Disabled navigation cancels gestures and ignores keys/wheel;
-host callbacks remain responsible for disabling any child controls they own.
+Core hit priority. A disabled Carousel cancels gestures and ignores keys and
+wheel navigation. Its built-in arrows and pagination inherit that state on the
+same frame, including when a held button is released or a queued keyboard or
+accessibility activation arrives. The current slide stays selected. Apply your
+own disabled policy to custom interactive children.
 
 Wheel delta signs match Core and Scroll: a positive delta moves backward,
 negative forward. A discrete wheel burst steps once and remains owned until

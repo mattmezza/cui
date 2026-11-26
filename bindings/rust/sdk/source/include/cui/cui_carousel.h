@@ -94,7 +94,7 @@ bool cui_carousel(cui_context *, cui_id, const cui_theme *, cui_carousel_state *
                   const cui_carousel_item *, size_t, cui_carousel_options);
 /* Navigation control: Medium32 by default; caller may select a semantic/custom size,
  * label, appearance and content. Place inside the open Carousel root; positions use retained frame
- * bounds. */
+ * bounds. The built-in control inherits the root's current disabled state. */
 typedef enum {
     CUI_CAROUSEL_CONTROL_DEFAULT,
     CUI_CAROUSEL_CONTROL_XSMALL,
@@ -119,7 +119,7 @@ bool cui_carousel_control(cui_context *, cui_id, const cui_theme *, cui_carousel
 /* Pair end only when begin succeeds. Default centered row with 8px gap. */
 bool cui_carousel_pagination_begin(cui_context *, cui_id, cui_str label, const cui_box *custom_box);
 void cui_carousel_pagination_end(cui_context *);
-/* Pagination items default XS20, ordinary buttons with selected metadata. */
+/* Pagination items default XS20, with selected metadata and the root's disabled state. */
 bool cui_carousel_pagination_item(cui_context *, cui_id, const cui_theme *, cui_carousel_state *,
                                   cui_id root, size_t, cui_carousel_control_options);
 #ifdef __cplusplus

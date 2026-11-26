@@ -154,6 +154,40 @@ def run_cases(a):
     a.case('Resizable', 'protected divider drag resizes without moving page', lambda: protected_drag('Resizable', 'Resize panels', 40, 24, -35))
     a.case('ColorPicker', 'protected 2D color drag changes color without moving page', lambda: protected_drag('ColorPicker', 'Saturation/value', 5, -25, 30))
 
+    def carousel_state():
+        return a.page.evaluate('''()=>[0,1].map(field=>
+            cuiGallery.exports.gallery_carousel_stats(field))''')
+
+    def disabled_carousel():
+        next_slide = a.target('Next slide', 1)
+        last_slide = a.target('Go to slide 4', 1)
+        before = carousel_state()
+        a.configure('disabled', True)
+        try:
+            a.tap(next_slide)
+            a.tap(last_slide)
+            assert carousel_state() == before, 'Disabled arrow or pagination activated'
+            assert a.value(next_slide, 5) and a.value(last_slide, 5), 'Disabled controls reported as enabled'
+        finally:
+            a.configure('disabled', False)
+        a.tap(last_slide)
+        assert carousel_state() == [3, before[1]+1], 'Enabled pagination did not activate once'
+
+    a.case('Carousel', 'disabled arrows and pagination reject taps and recover when enabled',
+           disabled_carousel)
+
+    def carousel_page_pan():
+        align_canvas(a)
+        point = a.point(a.target('Workflow carousel'), .5, .35)
+        before_page = a.page.evaluate('scrollY')
+        before = carousel_state()
+        swipe(a, point, -80)
+        assert a.page.evaluate('scrollY') > before_page+25, 'Horizontal Carousel blocked vertical page pan'
+        assert carousel_state() == before, 'Vertical page pan changed Carousel selection'
+
+    a.case('Carousel', 'horizontal viewport yields vertical pan without changing slides',
+           carousel_page_pan)
+
     def plot():
         align_canvas(a)
         target = a.target('Projected sine wave', 20)

@@ -78,7 +78,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 | Done | Area | Remaining work |
 | --- | --- | --- |
 | [ ] | Component parity | Audit all 78 families against the frozen baseline; complete missing behavior, styling, lifecycle and documented exceptions. See the family breakdown below. |
-| [ ] | Responsive layout and speed | Native starter and dashboard pass continuous resize on private X11. Verify physical drag and other native backends, and measure hover through a long inbox. Single-line Input follows each resolved width for caret, selection and IME. Finish intrinsic sizing, overflow and multiline rewrap. |
+| [ ] | Responsive layout and speed | Native starter and dashboard pass continuous resize on private X11. The SDL software inbox verifies same-frame hover in 1,000 and 10,000 rows. Physical input-to-display latency, resize on other hosts, intrinsic sizing, overflow and multiline rewrap remain open. Single-line Input follows each resolved width for caret, selection and IME. [Inbox measurements](docs/PERFORMANCE.md#native-datatable-inbox) |
 | [ ] | Shadows and backgrounds | Complete root, nested-part and popup shadow ownership across components/bindings; finish gradients and renderer support, clipping, opacity, resource limits and failure behavior. Preserve legacy rendering. |
 | [ ] | Typography and design tokens | Complete font-family/provider, weights/stretch/axes, tracking, line-height, wrapping and alignment coverage; consistent sizes, spacing, rounding and gradient text across advertised hosts/bindings. |
 | [ ] | Events and async UX | All 78 C families have a documented event disposition and compatibility contract. The optional Linux async example has offline worker and transport tests. Extend foreign bindings and platform/accessibility proof within the documented contracts. [Event coverage](docs/design/COMPONENT_EVENTS_REMAINING.md) · [Async example](examples/async_fetch/README.md) |
@@ -128,7 +128,7 @@ Check reported regressions against the current gallery as each slice lands.
 | Overlays | Finish Dialog root and host lifecycle; finish Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |
 | Charts/plots | Scales, axes/ticks, series/legend, layout/motion, tooltips, selection and accessibility; verify existing pan/zoom/touch. |
-| App structure | Carousel intrinsic layout, Sidebar clipping/scrolling, Settings, Command lifecycle/width and Root/window services; verify composed apps. |
+| App structure | Carousel arrows and pagination honor Disabled in native and WASM tests. Horizontal touch yields vertical page pans. Carousel intrinsic layout, Sidebar clipping/scrolling, Settings, Command lifecycle/width and Root/window services remain open. Verify composed apps. |
 | Text/editing | TextView parser/plugins/selection/typography, Textarea behavior and Questionnaire model/navigation/semantics. Editor expansion remains lower priority. |
 | Video/audio/speech | Verify physical audio and media lifecycle on advertised hosts, and expand native codec coverage. Keep browser decoding, native dummy audio and physical audio output as separate checks. |
 | Every other family | Audit current code, frozen behavior and limitations even when recorded feature rows are green. Fix outstanding reported demo regressions; do not infer whole-family completion. |

@@ -5198,7 +5198,8 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_carousel.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/web/test_touch_page_navigation.py"
       ],
       "status": "tested",
       "platforms": {
@@ -5219,17 +5220,19 @@
           ]
         },
         {
-          "name": "keyboard, pointer drag and wheel navigation with nested child ownership",
+          "name": "keyboard, pointer drag and wheel navigation with nested child ownership and cross-axis page handoff",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_carousel.c"
+            "tests/unit/test_carousel.c",
+            "tests/web/test_touch_page_navigation.py"
           ]
         },
         {
-          "name": "themed SVG controls and accessible item positions",
+          "name": "themed SVG controls, accessible item positions and inherited disabled state",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_carousel.c"
+            "tests/unit/test_carousel.c",
+            "tests/web/test_touch_page_navigation.py"
           ]
         },
         {

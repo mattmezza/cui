@@ -287,6 +287,14 @@ bool cui_carousel(cui_context *ui, cui_id id, const cui_theme *theme, cui_carous
     cui_end_focus_scope(ui);
     return true;
 }
+static bool cui_carousel_root_disabled(cui_context *ui, cui_id root) {
+    size_t count;
+    const cui_semantic *items = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (items[i].id == root)
+            return items[i].disabled;
+    return false;
+}
 static bool cui_carousel_button(cui_context *ui, cui_id id, const cui_theme *theme,
                                 cui_carousel_state *s, cui_id root, size_t index, bool next,
                                 bool pagination, cui_carousel_control_options o) {
@@ -295,8 +303,10 @@ static bool cui_carousel_button(cui_context *ui, cui_id id, const cui_theme *the
         (o.size == CUI_CAROUSEL_CONTROL_CUSTOM && o.custom_size <= 0) ||
         !cui_carousel_string_valid(o.label))
         return false;
-    bool disabled = pagination ? index >= s->count
-                               : cui_carousel_navigation(s, next) == CUI_CAROUSEL_NO_SELECTION;
+    /* The root is submitted before these controls, including on the first disabled frame. */
+    bool unavailable = pagination ? index >= s->count
+                                  : cui_carousel_navigation(s, next) == CUI_CAROUSEL_NO_SELECTION;
+    bool disabled = unavailable || cui_carousel_root_disabled(ui, root);
     char pagination_name[48];
     snprintf(pagination_name, sizeof(pagination_name), "Go to slide %zu", index + 1);
     cui_str name = o.label.length ? o.label

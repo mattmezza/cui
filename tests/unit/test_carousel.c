@@ -257,6 +257,52 @@ static void pagination(cui_context *ui, const cui_theme *theme, cui_carousel_sta
                                      (cui_carousel_control_options){0});
     cui_carousel_pagination_end(ui);
 }
+static void test_disabled_controls(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    cui_theme theme = cui_theme_light();
+    cui_carousel_state state;
+    cui_carousel_geometry workspace[8];
+    setup(&state, workspace, 3);
+    cui_carousel_options options = cui_carousel_default();
+    options.width = 200;
+    options.height = 80;
+    options.reduced_motion = true;
+    options.controls = controls;
+    options.pagination = pagination;
+    frame(ui, &theme, &state, options);
+
+    /* The first disabled frame can receive activations routed by the last frame. */
+    cui_focus(ui, 2001);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(cui_queue_accessibility_action(ui, 2012, CUI_ACCESSIBILITY_ACTIVATE));
+    options.disabled = true;
+    frame(ui, &theme, &state, options);
+    assert(state.selected == 0 && changes == 0 && cui_focused(ui) == 0);
+    assert(find(ui, 2000)->disabled && find(ui, 2001)->disabled);
+    for (cui_id page = 2010; page <= 2012; ++page)
+        assert(find(ui, page)->disabled);
+    assert(find(ui, 2010)->details.selected);
+
+    options.disabled = false;
+    frame(ui, &theme, &state, options);
+    assert(!find(ui, 2001)->disabled && !find(ui, 2012)->disabled);
+    cui_rect next = find(ui, 2001)->bounds;
+    float x = next.x + next.w / 2, y = next.y + next.h / 2;
+    pointer(ui, CUI_EVENT_POINTER_DOWN, x, y);
+    frame(ui, &theme, &state, options);
+    assert(cui_pressed(ui, 2001));
+    pointer(ui, CUI_EVENT_POINTER_UP, x, y);
+    options.disabled = true;
+    frame(ui, &theme, &state, options);
+    assert(!cui_pressed(ui, 2001) && state.selected == 0 && changes == 0);
+
+    options.disabled = false;
+    frame(ui, &theme, &state, options);
+    assert(cui_queue_accessibility_action(ui, 2012, CUI_ACCESSIBILITY_ACTIVATE));
+    frame(ui, &theme, &state, options);
+    assert(state.selected == 2 && changes == 1);
+    cui_destroy(ui);
+}
 static void test_controls_during_motion(void) {
     for (unsigned axis = 0; axis < 2; axis++) {
         cui_context *ui = cui_create((cui_config){.max_elements = 256});
@@ -859,6 +905,7 @@ int main(void) {
     test_scrollbar_skin();
     test_widget();
     test_controls();
+    test_disabled_controls();
     test_controls_during_motion();
     test_parent_handoff();
     test_disjoint_bursts();

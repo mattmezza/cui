@@ -850,7 +850,7 @@ Ordered dispatch with delegated segment focus uses the direct C route.
 
 **State:** Caller retains state, geometry workspace and slide data.
 
-**Interaction:** cui_carousel_change_fn observes selection; cui_carousel_render_fn composes slides.
+**Interaction:** cui_carousel_change_fn observes selection; cui_carousel_render_fn composes slides. A disabled Carousel also disables its built-in arrows and pagination.
 
 **Usage:** Initialize capacity once, submit slides each frame and handle selected-index changes separately from slide rendering.
 

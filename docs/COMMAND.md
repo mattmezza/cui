@@ -89,11 +89,20 @@ space as well.
 
 Built-in labels use a clipped single line. For custom wrapping or variable
 heights, supply `measure` and `content` callbacks. The measure callback receives
-the estimated available row width and font size and returns the complete outer
-height. A growing palette starts with the default width scaled by density
-and uses the previous allocation thereafter. If the allocation changes, it
-requests a follow-up frame to update custom heights. The row width itself
-already follows the current allocation. When heights change, the virtual
+the available row width and font size and returns the complete outer height.
+Inside a fixed-width, unclipped column such as a Dialog body, a growing
+palette measures against the current width on opening and resizing. The
+scrollbar gutter and list insets still apply. Custom headers may extend wider
+than the list within the palette's clip.
+
+When a parent still needs to resolve the width, such as a row with other
+growing siblings, Command starts with its scaled default width and then uses
+the last allocation. The row width follows layout and a follow-up frame
+updates custom heights. In very short lists, the scrollbar can also reduce
+its gutter after measuring the rows, making the measurement width an
+estimate. Hiding the scrollbar removes that dependence on list height.
+
+When heights change, the virtual
 list keeps a previously fully visible selection in view. Scrolling the
 selection out of view leaves the viewport under the user's control, subject
 to the usual content bounds. Reflow emits no new selection callback. Keep

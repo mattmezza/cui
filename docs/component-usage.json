@@ -2493,7 +2493,7 @@
       ],
       "state_ownership": "Caller retains command state, row workspace, cui_edit query and command descriptors.",
       "interaction": "on_select/on_query/on_confirm/on_cancel observe synchronous interaction; command item action invokes application work.",
-      "usage": "Initialize bounded query/row storage, submit entries each frame, and execute actions only from confirmation/action events. Set width=-1 to grow inside a Dialog or other bounded parent. Custom row heights settle on a follow-up frame, keeping a fully visible selection in view.",
+      "usage": "Initialize bounded query/row storage, submit entries each frame, and execute actions only from confirmation/action events. Set width=-1 to grow inside a Dialog. Custom heights use the current width in a fixed-width column. When layout still needs to allocate the width, heights settle on a follow-up frame.",
       "docs": [
         "docs/COMMAND.md",
         "docs/COMMAND_EVENTS.md"

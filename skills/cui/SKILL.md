@@ -304,9 +304,9 @@ Probe `supports_carousel_navigation` (`SupportsCarouselNavigation` in Go)
 before using the wrapper methods. Query after layout. Read
 `docs/CAROUSEL.md` for layout and examples.
 For a Command palette inside a dialog, set `cui_command_options.width = -1` to fit
-the body. Rows and hit targets fill the current allocation. Width-dependent
-custom row heights settle on a follow-up frame and preserve a fully visible
-selection. See `docs/COMMAND.md`.
+the body. Custom rows measure at the current width in a fixed-width, unclipped
+column, or follow up when layout still needs to allocate width. Reflow keeps
+a fully visible selection in view. See `docs/COMMAND.md`.
 For shortcut hints, `cui_kbd_format_stroke` uppercases the first Unicode scalar,
 including expansions. Use `CUI_KBD_TEXT_CAPACITY` for a complete result. Hosts
 own shortcut bindings. Retained C and the five language builders support

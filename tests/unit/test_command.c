@@ -396,6 +396,10 @@ static void custom_header(cui_context *ui, const cui_theme *theme, const cui_com
     (void)user;
     assert(cui_set_prepaint(
         ui, (cui_prepaint_options){.callback = custom_header_prepaint, .command_budget = 1}));
+    /* A clipped header can be wider than the palette. Keep the list at the
+     * resolved width while retaining the header's own layout. */
+    cui_begin_box(ui, 40, (cui_box){.width = 620, .height = 10});
+    cui_end_box(ui);
 }
 
 static void test_grow_custom_measure(void) {
@@ -416,15 +420,15 @@ static void test_grow_custom_measure(void) {
     assert(ui && edit && cui_command_init(&state, rows, 8, edit));
     cui_id row_id = cui_command_row_id(42, (cui_command_index){0, 0});
     grow_panel(ui, &state, &entry, 1, 260, options, false);
-    assert(measured_width > 300 && cui_bounds(ui, row_id).h == 32 && cui_needs_redraw(ui));
-    grow_panel(ui, &state, &entry, 1, 260, options, false);
     cui_rect row = cui_bounds(ui, row_id);
     assert(fabsf(row.w - measured_width) < .01f && row.h == 60 && !cui_needs_redraw(ui));
     grow_panel(ui, &state, &entry, 1, 520, options, false);
-    assert(cui_bounds(ui, row_id).h == 60 && cui_needs_redraw(ui));
-    grow_panel(ui, &state, &entry, 1, 520, options, false);
     row = cui_bounds(ui, row_id);
     assert(fabsf(row.w - measured_width) < .01f && row.h == 32 && !cui_needs_redraw(ui));
+    grow_panel(ui, &state, &entry, 1, 260, options, true);
+    row = cui_bounds(ui, row_id);
+    assert(fabsf(row.w - measured_width) < .01f && row.h == 60 && !cui_needs_redraw(ui));
+    assert(row.w == 234);
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
@@ -454,13 +458,10 @@ static void test_custom_height_reflow_keeps_visible_selection(void) {
     cui_command_index target = {0, 7}, selected;
     cui_id target_id = cui_command_row_id(42, target);
     grow_panel(ui, &state, entries, 10, 520, options, false);
-    grow_panel(ui, &state, entries, 10, 520, options, false);
     assert(cui_command_select(&state, target, true, options));
     grow_panel(ui, &state, entries, 10, 520, options, false);
     assert(state.scroll.y == 160 && cui_bounds(ui, target_id).h == 32);
 
-    grow_panel(ui, &state, entries, 10, 260, options, false);
-    assert(cui_needs_redraw(ui) && state.scroll.y == 160);
     grow_panel(ui, &state, entries, 10, 260, options, false);
     cui_rect viewport = cui_bounds(ui, cui_command_list_id(42));
     const cui_semantic *item = semantic(ui, target_id);
@@ -479,10 +480,44 @@ static void test_custom_height_reflow_keeps_visible_selection(void) {
     grow_panel(ui, &state, entries, 10, 260, options, false);
     assert(cui_event_consumed(ui, 0) && state.scroll.y == 40 && !semantic(ui, target_id));
     grow_panel(ui, &state, entries, 10, 520, options, false);
-    grow_panel(ui, &state, entries, 10, 520, options, false);
     assert(state.scroll.y == 40 && !semantic(ui, target_id) && order_count == 1);
     assert(cui_command_selected(&state, &selected) && cui_command_index_equal(selected, target));
 
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+
+static void test_custom_height_with_later_sibling(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    char buffer[32] = {0};
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_command_state state;
+    cui_command_row rows[8];
+    float measured_width = 0;
+    cui_command_entry entry = {.kind = CUI_COMMAND_ITEM,
+                               .item = {.label = cui_string("Wrapped entry"),
+                                        .measure = measure_width,
+                                        .content_user = &measured_width}};
+    cui_command_options options = cui_command_default();
+    options.width = -1;
+    options.searchable = false;
+    cui_theme theme = cui_theme_light();
+    assert(ui && edit && cui_command_init(&state, rows, 8, edit));
+    for (unsigned frame = 0; frame < 2; ++frame) {
+        assert(cui_begin_frame(ui, 700, 400, .016f));
+        cui_begin_box(ui, 41, (cui_box){.width = 520, .padding = 8, .gap = 12, .row = true});
+        assert(cui_command(ui, 42, &theme, &state, &entry, 1, options));
+        cui_begin_box(ui, 43, (cui_box){.width = 250, .height = 20});
+        cui_end_box(ui);
+        cui_end_box(ui);
+        (void)cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        cui_rect row = cui_bounds(ui, cui_command_row_id(42, (cui_command_index){0, 0}));
+        assert(row.w == 222 && row.h == (frame ? 60 : 32));
+        assert(cui_needs_redraw(ui) == !frame);
+        if (frame)
+            assert(row.w == measured_width);
+    }
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
@@ -634,7 +669,7 @@ static void cancel(void *u) {
     cui_surface_request_close(h->ui, h->surface, CUI_SURFACE_CANCELLED);
 }
 static void dialog_frame(cui_context *ui, cui_surface_state *surface, cui_command_state *s,
-                         cui_command_entry *entry, cui_command_options o) {
+                         cui_command_entry *entry, cui_command_options o, float width) {
     cui_theme t = cui_theme_light();
     assert(cui_begin_frame(ui, 600, 400, .016f));
     (void)cui_base_button(ui, 1, cui_string("Open"), false);
@@ -643,7 +678,7 @@ static void dialog_frame(cui_context *ui, cui_surface_state *surface, cui_comman
     cui_end_box(ui);
     if (cui_surface_begin(ui, &t, surface, cui_string("Commands"), (cui_str){0},
                           (cui_surface_options){.viewport = {0, 0, 600, 400},
-                                                .width = 420,
+                                                .width = width,
                                                 .height = 300,
                                                 .no_escape_dismiss = true,
                                                 .hide_close = true})) {
@@ -662,7 +697,11 @@ static void test_dialog(void) {
     cui_command_state s;
     cui_command_row rows[8];
     assert(cui_command_init(&s, rows, 8, edit));
-    cui_command_entry e = {.kind = CUI_COMMAND_ITEM, .item = {.label = cui_string("Profile")}};
+    float measured_width = 0;
+    cui_command_entry e = {.kind = CUI_COMMAND_ITEM,
+                           .item = {.label = cui_string("Profile"),
+                                    .measure = measure_width,
+                                    .content_user = &measured_width}};
     cui_surface_state surface;
     cui_surface_init(&surface, 100, CUI_SURFACE_DIALOG);
     host h = {ui, &surface, 0};
@@ -670,24 +709,30 @@ static void test_dialog(void) {
     o.on_cancel = cancel;
     o.user = &h;
     o.bordered = false;
-    dialog_frame(ui, &surface, &s, &e, o);
+    o.width = -1;
+    dialog_frame(ui, &surface, &s, &e, o, 270);
     cui_focus(ui, 1);
     cui_surface_open(ui, &surface, 1);
-    dialog_frame(ui, &surface, &s, &e, o);
+    dialog_frame(ui, &surface, &s, &e, o, 270);
+    cui_id row_id = cui_command_row_id(42, (cui_command_index){0, 0});
+    cui_rect row = cui_bounds(ui, row_id);
+    assert(row.h == 60 && row.w == measured_width);
     cui_command_focus(ui, 42, o);
-    dialog_frame(ui, &surface, &s, &e, o);
+    dialog_frame(ui, &surface, &s, &e, o, 420);
+    row = cui_bounds(ui, row_id);
+    assert(row.h == 32 && row.w == measured_width);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "pro"}));
-    dialog_frame(ui, &surface, &s, &e, o);
+    dialog_frame(ui, &surface, &s, &e, o, 420);
     assert(cui_edit_get_text(edit).length == 3);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
-    dialog_frame(ui, &surface, &s, &e, o);
+    dialog_frame(ui, &surface, &s, &e, o, 420);
     assert(surface.overlay.open && h.cancelled == 0 && cui_edit_get_text(edit).length == 0 &&
            cui_event_consumed(ui, 0));
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
-    dialog_frame(ui, &surface, &s, &e, o);
+    dialog_frame(ui, &surface, &s, &e, o, 420);
     assert(surface.overlay.open && h.cancelled == 1 &&
            surface.pending_close == CUI_SURFACE_CANCELLED);
-    dialog_frame(ui, &surface, &s, &e, o);
+    dialog_frame(ui, &surface, &s, &e, o, 420);
     assert(!surface.overlay.open && cui_focused(ui) == 1 &&
            cui_surface_take_result(&surface) == CUI_SURFACE_CANCELLED);
     cui_edit_destroy(edit);
@@ -705,6 +750,7 @@ int main(void) {
     test_grow_panel_width();
     test_grow_custom_measure();
     test_custom_height_reflow_keeps_visible_selection();
+    test_custom_height_with_later_sibling();
     test_dialog();
     test_slots_and_loading();
 #endif

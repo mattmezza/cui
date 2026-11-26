@@ -2,6 +2,7 @@
 #include "cui/cui.h"
 #include "cui/cui_draw_v2.h"
 #include "cui_background_valid_internal.h"
+#include "cui_column_width_internal.h"
 #include "cui_drop_shadow_bounds_internal.h"
 #include "cui_ordered_input_internal.h"
 #include "cui_scroll_focus_internal.h"
@@ -2359,6 +2360,20 @@ static Clay_SizingAxis cui_core_box_axis(float n, bool fixed, float maximum, boo
 }
 static uint16_t cui_core_scalar(float x) {
     return !isfinite(x) || x < 0 ? 0 : x > 65535 ? 65535 : (uint16_t)x;
+}
+float cui_core_fixed_column_inner_width(cui_context *ui) {
+    if (!cui_frame_is_submitting(ui) || !ui->depth || ui->overflow_depth ||
+        !ui->opened[ui->depth - 1] || ui->clay->booleanWarnings.maxElementsExceeded)
+        return 0;
+    cui_core_select_context(ui);
+    const Clay_LayoutElement *parent = Clay__GetOpenLayoutElement();
+    const Clay_LayoutConfig *layout = &parent->config.layout;
+    const Clay_SizingAxis width = layout->sizing.width;
+    if (layout->layoutDirection != CLAY_TOP_TO_BOTTOM || parent->config.clip.horizontal ||
+        width.type != CLAY__SIZING_TYPE_FIXED || !isfinite(width.size.minMax.min) ||
+        width.size.minMax.min != width.size.minMax.max)
+        return 0;
+    return fmaxf(0, width.size.minMax.min - layout->padding.left - layout->padding.right);
 }
 static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_rect *portal,
                                int16_t layer, bool absolute) {

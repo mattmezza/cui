@@ -507,6 +507,15 @@ bool cui_command_events_private_confirm(cui_command_state *, cui_command_options
                                         cui_command_events_private_observer *);
 #endif
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_COLUMN_WIDTH_INTERNAL_H
+#define CUI_COLUMN_WIDTH_INTERNAL_H
+
+/* Inner width of the open, fixed-width, unclipped column. Zero when the
+ * available width depends on content, sibling allocation or overflow. */
+float cui_core_fixed_column_inner_width(cui_context *);
+#endif
+
 
 
 
@@ -661,11 +670,16 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
     float density = t->font_size / 16;
     if (!isfinite(density) || density <= 0)
         return false;
-    float width = grow_width ? cui_bounds(ui, id).w : o.width;
+    float inset = truncf(4 * density), font = 14 * density;
+    float frame_border = o.bordered ? 2 : 0;
+    float fixed_parent_width = grow_width ? cui_core_fixed_column_inner_width(ui) : 0;
+    /* Below this width, the existing GROW layout can clip the row's insets
+     * and scrollbar. Leave that layout to Core. */
+    bool definite_width = fixed_parent_width >= frame_border + 2 * inset + 1;
+    float width = definite_width ? fixed_parent_width : grow_width ? cui_bounds(ui, id).w : o.width;
     if (width <= 0)
         width = 380 * density;
-    float inset = truncf(4 * density), font = 14 * density;
-    cui_scroll_options scroll = {.width = fmaxf(1, width - (o.bordered ? 2 : 0)),
+    cui_scroll_options scroll = {.width = fmaxf(1, width - frame_border),
                                  .height = o.max_height,
                                  .vertical = true,
                                  .disabled = o.disabled};
@@ -770,7 +784,8 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
     }
     scroll.height = viewport;
     scroll.content_height = s->row_count ? total : viewport;
-    bool list_open = grow_width
+    bool unresolved_width = grow_width && !definite_width;
+    bool list_open = unresolved_width
                          ? cui_scroll_private_begin_vertical_grow(ui, list, t, &s->scroll, scroll)
                          : cui_scrollable_begin(ui, list, t, &s->scroll, scroll);
     if (list_open) {
@@ -792,7 +807,7 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
         }
         if (s->row_count) {
             /* Let the scrollbar and insets take their space before attaching rows. */
-            cui_id allocation = grow_width && custom_measure ? id ^ UINT64_C(0x9a875c00) : 0;
+            cui_id allocation = unresolved_width && custom_measure ? id ^ UINT64_C(0x9a875c00) : 0;
             cui_begin_box(ui, allocation,
                           (cui_box){.width = -1,
                                     .height = -1,

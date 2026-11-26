@@ -5,6 +5,7 @@
 #include "cui/cui_icon.h"
 #include "cui_button_paint_internal.h"
 #include "cui_input_private.h"
+#include "cui_radio_paint_internal.h"
 #include "cui_radio_tooltip_internal.h"
 #include "cui_spring_internal.h"
 #include <math.h>
@@ -1905,7 +1906,8 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
 static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_theme *t,
                                         cui_str name, int *value, int option,
                                         cui_radio_options options,
-                                        cui_radio_presentation presentation) {
+                                        cui_radio_presentation presentation,
+                                        const cui_radio_styles *styles) {
     cui_design_metrics design;
     if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
         return false;
@@ -1949,47 +1951,15 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
             cui_invalidate(ui);
         opacity = fminf(1, fmaxf(0, motion->mark.progress));
     }
-    cui_color ink = options.invalid ? t->danger : selected ? t->primary : t->input;
-    cui_color dot = t->on_primary, selected_background = t->primary;
-    if (options.disabled) {
-        ink.a /= 2;
-        dot.a /= 2;
-        selected_background.a /= 2;
-    }
-    cui_color background =
-        motion     ? cui_color_mix_oklab(t->input_background, selected_background, opacity)
-        : selected ? selected_background
-                   : t->input_background;
-    cui_box outer = {.row = true, .gap = 8 * density, .radius = t->radius * .5f};
-    if (!options.hide_focus_ring && cui_focused(ui) == id) {
-        outer.border = t->focus;
-        outer.border_width = 2;
-    }
-    cui_begin_box(ui, id, outer);
-    cui_begin_box(ui, 0, (cui_box){.width = size});
-    if (name.length || options.content) {
-        cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
-        cui_end_box(ui);
-    }
-    cui_begin_box(ui, presentation.parts.indicator,
-                  (cui_box){.width = size,
-                            .height = size,
-                            .radius = size / 2,
-                            .border_width = 1,
-                            .border = ink,
-                            .background = background,
-                            .align_x = CUI_ALIGN_CENTER,
-                            .align_y = CUI_ALIGN_CENTER});
-    if (opacity > 0) {
-        dot.a = (uint8_t)(dot.a * opacity);
-        cui_checkmark(ui, size - 4 * density, dot);
-    }
-    cui_end_box(ui);
-    cui_end_box(ui);
+    cui_radio_paint paint = cui_radio_resolve_paint(
+        ui, id, t, size, font, density, selected, options.disabled, options.invalid,
+        options.hide_focus_ring, motion != NULL, opacity, styles);
+    cui_radio_begin_option(ui, id, presentation.parts.indicator, &paint,
+                           name.length || options.content, opacity, density);
     if (name.length || options.content) {
         cui_begin_box(ui, 0, (cui_box){.gap = 4 * density});
         if (name.length)
-            cui_text(ui, name, font, options.disabled ? t->muted : t->text);
+            cui_radio_paint_text(ui, name, paint.label);
         if (options.content)
             options.content(ui, options.content_user);
         cui_end_box(ui);
@@ -2001,7 +1971,7 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
 bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                   int option, cui_radio_options options) {
     return cui_components_radio_render(ui, id, t, name, value, option, options,
-                                       (cui_radio_presentation){0});
+                                       (cui_radio_presentation){0}, NULL);
 }
 bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                              int *value, int option, cui_radio_options options,
@@ -2009,10 +1979,16 @@ bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui
     if (!cui_components_indicator_parts_valid(ui, id, parts))
         return false;
     return cui_components_radio_render(ui, id, t, name, value, option, options,
-                                       (cui_radio_presentation){.parts = parts});
+                                       (cui_radio_presentation){.parts = parts}, NULL);
 }
 bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                        int option, cui_radio_options options, cui_radio_presentation presentation) {
+    return cui_radio_present_styled(ui, id, t, name, value, option, options, presentation,
+                                    (cui_radio_styles){0});
+}
+bool cui_radio_present_styled(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                              int *value, int option, cui_radio_options options,
+                              cui_radio_presentation presentation, cui_radio_styles styles) {
     if (presentation.parts.indicator &&
         !cui_components_indicator_parts_valid(ui, id, presentation.parts))
         return false;
@@ -2024,7 +2000,8 @@ bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str n
                                                     .id = id});
         return false;
     }
-    return cui_components_radio_render(ui, id, t, name, value, option, options, presentation);
+    return cui_components_radio_render(ui, id, t, name, value, option, options, presentation,
+                                       &styles);
 }
 bool cui_radio_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                           int option, bool disabled, cui_selection_indicator_parts parts) {

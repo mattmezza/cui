@@ -429,6 +429,30 @@ typedef struct {
 } cui_radio_presentation;
 bool cui_radio_present(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                        cui_radio_options, cui_radio_presentation);
+typedef struct {
+    cui_color color;
+    float font_size, line_height;
+    cui_text_style style;
+} cui_radio_text_paint;
+typedef struct {
+    cui_box root, indicator;
+    cui_color mark;
+    cui_radio_text_paint label, description;
+} cui_radio_paint;
+typedef void (*cui_radio_style_fn)(cui_context *, void *user, cui_id option, bool checked,
+                                   bool disabled, cui_radio_paint *);
+typedef struct {
+    cui_radio_style_fn instance, checked, disabled;
+    void *user;
+} cui_radio_styles;
+/* Refine initialized paint after selection has resolved, in instance, checked,
+ * then disabled order. Each call borrows paint and userdata synchronously.
+ * Query interaction state or edit paint. Leave selection, active descriptors and
+ * frame composition alone. The option remains a horizontal row. Visibility and
+ * input eligibility stay with the component. Motion still scales mark opacity;
+ * overriding indicator.background sets the fill for that frame. */
+bool cui_radio_present_styled(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
+                              cui_radio_options, cui_radio_presentation, cui_radio_styles);
 /* Double controlled Styled facade: include cui_styled_slider_events.h. */
 /* Existing Slider track identity. Root id also includes label/framing; this
  * entry has no separate thumb. Returns0 for owner0 or derived zero. Identity
@@ -1003,6 +1027,87 @@ cui_input_event_result cui_input_private_reduce(cui_context *, cui_id, const cui
                                                 cui_input_behavior_state *, cui_input_options *,
                                                 cui_base_input_options, cui_rect viewport,
                                                 bool synthetic_hit, cui_component_text_handler);
+#endif
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_RADIO_PAINT_INTERNAL_H
+#define CUI_RADIO_PAINT_INTERNAL_H
+
+#include <math.h>
+
+static cui_radio_paint cui_radio_resolve_paint(cui_context *ui, cui_id id, const cui_theme *theme,
+                                               float size, float font, float density, bool checked,
+                                               bool disabled, bool invalid, bool hide_focus,
+                                               bool animated, float opacity,
+                                               const cui_radio_styles *styles) {
+    cui_color border = invalid ? theme->danger : checked ? theme->primary : theme->input;
+    cui_color fill = theme->primary, mark = theme->on_primary;
+    if (disabled) {
+        border.a /= 2;
+        fill.a /= 2;
+        mark.a /= 2;
+    }
+    cui_color background = animated  ? cui_color_mix_oklab(theme->input_background, fill, opacity)
+                           : checked ? fill
+                                     : theme->input_background;
+    cui_radio_paint paint = {
+        .root = {.row = true, .gap = 8 * density, .radius = theme->radius * .5f},
+        .indicator = {.width = size,
+                      .height = size,
+                      .radius = size / 2,
+                      .border_width = 1,
+                      .border = border,
+                      .background = background,
+                      .align_x = CUI_ALIGN_CENTER,
+                      .align_y = CUI_ALIGN_CENTER},
+        .mark = mark,
+        .label = {.color = disabled ? theme->muted : theme->text, .font_size = font},
+        .description = {.color = theme->muted, .font_size = font * .875f},
+    };
+    if (!hide_focus && cui_focused(ui) == id) {
+        paint.root.border = theme->focus;
+        paint.root.border_width = 2;
+    }
+    if (styles) {
+        if (styles->instance)
+            styles->instance(ui, styles->user, id, checked, disabled, &paint);
+        if (checked && styles->checked)
+            styles->checked(ui, styles->user, id, checked, disabled, &paint);
+        if (disabled && styles->disabled)
+            styles->disabled(ui, styles->user, id, checked, disabled, &paint);
+    }
+    paint.root.row = true;
+    paint.root.layout_only = false;
+    paint.root.inert = false;
+    paint.indicator.layout_only = false;
+    paint.indicator.inert = false;
+    return paint;
+}
+
+/* Compose the indicator and leave the option root open for text and content. */
+static void cui_radio_begin_option(cui_context *ui, cui_id id, cui_id indicator,
+                                   const cui_radio_paint *paint, bool has_content, float opacity,
+                                   float density) {
+    cui_begin_box(ui, id, paint->root);
+    cui_begin_box(ui, 0, (cui_box){.width = paint->indicator.width});
+    if (has_content) {
+        cui_begin_box(ui, 0, (cui_box){.height = paint->indicator.height * .125f});
+        cui_end_box(ui);
+    }
+    cui_begin_box(ui, indicator, paint->indicator);
+    if (opacity > 0) {
+        cui_color mark = paint->mark;
+        mark.a = (uint8_t)(mark.a * opacity);
+        float size = fminf(paint->indicator.width, paint->indicator.height);
+        cui_checkmark(ui, fmaxf(0, size - 4 * density), mark);
+    }
+    cui_end_box(ui);
+    cui_end_box(ui);
+}
+
+static void cui_radio_paint_text(cui_context *ui, cui_str text, cui_radio_text_paint paint) {
+    cui_text_ex(ui, text, paint.font_size, paint.color, paint.line_height, paint.style);
+}
 #endif
 
 /* SPDX-License-Identifier: MIT */
@@ -2997,7 +3102,8 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
 static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_theme *t,
                                         cui_str name, int *value, int option,
                                         cui_radio_options options,
-                                        cui_radio_presentation presentation) {
+                                        cui_radio_presentation presentation,
+                                        const cui_radio_styles *styles) {
     cui_design_metrics design;
     if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
         return false;
@@ -3041,47 +3147,15 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
             cui_invalidate(ui);
         opacity = fminf(1, fmaxf(0, motion->mark.progress));
     }
-    cui_color ink = options.invalid ? t->danger : selected ? t->primary : t->input;
-    cui_color dot = t->on_primary, selected_background = t->primary;
-    if (options.disabled) {
-        ink.a /= 2;
-        dot.a /= 2;
-        selected_background.a /= 2;
-    }
-    cui_color background =
-        motion     ? cui_color_mix_oklab(t->input_background, selected_background, opacity)
-        : selected ? selected_background
-                   : t->input_background;
-    cui_box outer = {.row = true, .gap = 8 * density, .radius = t->radius * .5f};
-    if (!options.hide_focus_ring && cui_focused(ui) == id) {
-        outer.border = t->focus;
-        outer.border_width = 2;
-    }
-    cui_begin_box(ui, id, outer);
-    cui_begin_box(ui, 0, (cui_box){.width = size});
-    if (name.length || options.content) {
-        cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
-        cui_end_box(ui);
-    }
-    cui_begin_box(ui, presentation.parts.indicator,
-                  (cui_box){.width = size,
-                            .height = size,
-                            .radius = size / 2,
-                            .border_width = 1,
-                            .border = ink,
-                            .background = background,
-                            .align_x = CUI_ALIGN_CENTER,
-                            .align_y = CUI_ALIGN_CENTER});
-    if (opacity > 0) {
-        dot.a = (uint8_t)(dot.a * opacity);
-        cui_checkmark(ui, size - 4 * density, dot);
-    }
-    cui_end_box(ui);
-    cui_end_box(ui);
+    cui_radio_paint paint = cui_radio_resolve_paint(
+        ui, id, t, size, font, density, selected, options.disabled, options.invalid,
+        options.hide_focus_ring, motion != NULL, opacity, styles);
+    cui_radio_begin_option(ui, id, presentation.parts.indicator, &paint,
+                           name.length || options.content, opacity, density);
     if (name.length || options.content) {
         cui_begin_box(ui, 0, (cui_box){.gap = 4 * density});
         if (name.length)
-            cui_text(ui, name, font, options.disabled ? t->muted : t->text);
+            cui_radio_paint_text(ui, name, paint.label);
         if (options.content)
             options.content(ui, options.content_user);
         cui_end_box(ui);
@@ -3093,7 +3167,7 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
 bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                   int option, cui_radio_options options) {
     return cui_components_radio_render(ui, id, t, name, value, option, options,
-                                       (cui_radio_presentation){0});
+                                       (cui_radio_presentation){0}, NULL);
 }
 bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                              int *value, int option, cui_radio_options options,
@@ -3101,10 +3175,16 @@ bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui
     if (!cui_components_indicator_parts_valid(ui, id, parts))
         return false;
     return cui_components_radio_render(ui, id, t, name, value, option, options,
-                                       (cui_radio_presentation){.parts = parts});
+                                       (cui_radio_presentation){.parts = parts}, NULL);
 }
 bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                        int option, cui_radio_options options, cui_radio_presentation presentation) {
+    return cui_radio_present_styled(ui, id, t, name, value, option, options, presentation,
+                                    (cui_radio_styles){0});
+}
+bool cui_radio_present_styled(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                              int *value, int option, cui_radio_options options,
+                              cui_radio_presentation presentation, cui_radio_styles styles) {
     if (presentation.parts.indicator &&
         !cui_components_indicator_parts_valid(ui, id, presentation.parts))
         return false;
@@ -3116,7 +3196,8 @@ bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str n
                                                     .id = id});
         return false;
     }
-    return cui_components_radio_render(ui, id, t, name, value, option, options, presentation);
+    return cui_components_radio_render(ui, id, t, name, value, option, options, presentation,
+                                       &styles);
 }
 bool cui_radio_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                           int option, bool disabled, cui_selection_indicator_parts parts) {

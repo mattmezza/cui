@@ -328,3 +328,44 @@ void calendar_view_destroy(calendar_view *view) {
     *view = (calendar_view){0};
 }`;
 }
+export const radioStyledUsage = `#include "cui/cui_radio_group.h"
+
+static void delivery_panel(cui_context *ui, void *user, cui_id id, cui_box *paint) {
+    (void)ui;
+    (void)id;
+    const cui_theme *theme = user;
+    paint->padding = 10;
+    paint->radius = theme->radius;
+    paint->background = theme->surface;
+    paint->border = theme->border;
+    paint->border_width = 1;
+}
+
+static void delivery_option(cui_context *ui, void *user, cui_id id, bool checked,
+                            bool disabled, cui_radio_paint *paint) {
+    const cui_theme *theme = user;
+    paint->root.padding = 8;
+    paint->root.radius = theme->radius;
+    if (checked) {
+        paint->root.background = theme->secondary;
+        paint->label.style.weight = CUI_TEXT_WEIGHT_SEMIBOLD;
+    } else if (!disabled && cui_hovered(ui, id)) {
+        paint->root.background = theme->list_hover;
+    }
+}
+
+void delivery_options(cui_context *ui, cui_theme *theme, cui_id *selected,
+                      cui_radio_group_state *state) {
+    const cui_radio_group_item items[] = {
+        {cui_id_from(ui, "standard"), cui_string("Standard"), false},
+        {cui_id_from(ui, "priority"), cui_string("Priority"), false}
+    };
+    cui_radio_group_present_styled(ui, cui_id_from(ui, "delivery"), theme,
+        items, 2, selected, state,
+        (cui_radio_group_options){.name = cui_string("Delivery options"), .vertical = true},
+        (cui_radio_group_presentation){0}, NULL, 0,
+        (cui_radio_group_styles){
+            .group = delivery_panel, .group_user = theme,
+            .items = {.instance = delivery_option, .user = theme}
+        }, (cui_selection_handler){0});
+}`;

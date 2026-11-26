@@ -1259,7 +1259,7 @@ static void gallery_checkbox_detail(cui_context *ui, void *user) {
 static int design_radius = -1;
 static float design_spacing = -1;
 static int control_size, choice_required, choice_invalid, choice_skip_tab;
-static bool radio_custom_order;
+static bool radio_custom_order, radio_styled_cards;
 static int gallery_xsmall_second_size(void) {
     return control_size == 1 ? 2 : control_size == 2 ? 3 : control_size == 3 ? 1 : 0;
 }
@@ -1527,6 +1527,29 @@ static void gallery_radio_change(void *user, cui_id selected) {
     (void)user;
     radio_requests++;
     radio_selected = selected;
+}
+static void gallery_radio_group_style(cui_context *context, void *user, cui_id id, cui_box *paint) {
+    (void)context;
+    (void)id;
+    const cui_theme *theme = user;
+    paint->padding = 10;
+    paint->gap = 5;
+    paint->radius = theme->radius;
+    paint->background = theme->surface;
+    paint->border = theme->border;
+    paint->border_width = 1;
+}
+static void gallery_radio_item_style(cui_context *context, void *user, cui_id id, bool checked,
+                                     bool disabled, cui_radio_paint *paint) {
+    const cui_theme *theme = user;
+    paint->root.padding = 8;
+    paint->root.radius = theme->radius;
+    if (checked) {
+        paint->root.background = theme->secondary;
+        paint->label.style.weight = CUI_TEXT_WEIGHT_SEMIBOLD;
+    } else if (!disabled && cui_hovered(context, id)) {
+        paint->root.background = theme->list_hover;
+    }
 }
 unsigned gallery_radio_stat(unsigned field) {
     return field == 0 ? radio_requests : 0;
@@ -4882,9 +4905,15 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
              .max_width = 205,
              .tooltip = &priority_hint},
             {.description = cui_string("Unavailable for this address"), .max_width = 205}};
-        cui_radio_group_present_with_content(ui, cui_id_from(ui, "radio-group"), &t, items, 3,
-                                             &radio_selected, &radio_group_state, radio_options,
-                                             presentation, content, 3, (cui_selection_handler){0});
+        cui_radio_group_styles styles = {0};
+        if (radio_styled_cards)
+            styles = (cui_radio_group_styles){
+                .group = gallery_radio_group_style,
+                .group_user = &t,
+                .items = {.instance = gallery_radio_item_style, .user = &t}};
+        cui_radio_group_present_styled(
+            ui, cui_id_from(ui, "radio-group"), &t, items, 3, &radio_selected, &radio_group_state,
+            radio_options, presentation, content, 3, styles, (cui_selection_handler){0});
         if (control_surface_shadows)
             for (size_t i = 0; i < 3; i++)
                 gallery_control_shadow(ui, parts[i].indicator,
@@ -8166,7 +8195,7 @@ void gallery_design_options(int size, int radius, float spacing) {
 }
 void gallery_control_options(int size, int required, int invalid, int skip_tab, int label_left,
                              int custom_color, int variant, int segmented, int multiple,
-                             int shadows, int radio_tab_order) {
+                             int shadows, int radio_tab_order, int radio_cards) {
     control_size =
         size >= CUI_CONTROL_MEDIUM && size <= CUI_CONTROL_XSMALL ? size : CUI_CONTROL_MEDIUM;
     control_surface_shadows = shadows != 0;
@@ -8175,6 +8204,7 @@ void gallery_control_options(int size, int required, int invalid, int skip_tab, 
     choice_invalid = invalid;
     choice_skip_tab = skip_tab;
     radio_custom_order = radio_tab_order != 0;
+    radio_styled_cards = radio_cards != 0;
     switch_label_left = label_left;
     switch_custom_color = custom_color;
     toggle_variant = variant;

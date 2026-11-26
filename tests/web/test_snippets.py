@@ -15,7 +15,8 @@ import {runInNewContext} from 'node:vm';
 const source=readFileSync(process.argv[1],'utf8');
 const load = name => import('data:text/javascript;base64,' +
     readFileSync(join(process.argv[2], name)).toString('base64'));
-const {paginationUsage, timeFieldUsage, virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage} =
+const {paginationUsage, timeFieldUsage, virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage,
+       radioStyledUsage} =
     await load('cui_usage.js');
 const {hoverCardUsage} = await load('cui_hover_card_usage.js');
 const pick=(name)=>{const start=source.indexOf('const '+name+' = {');
@@ -26,6 +27,7 @@ runInNewContext(pick('stories')+'\n'+pick('snippets')+'\nglobalThis.data={storie
 const {stories, snippets} = context.data;
 const standalone = {
     VirtualList: [virtualInboxUsage],
+    Radio: [radioStyledUsage],
     DataTable: [liveDataTableUsage, pagedDataTableUsage],
     HoverCard: [0, 1, 2].flatMap(mode => [0, 1, 2].map(preview => hoverCardUsage(mode, preview))),
     TimeField: [snippets.TimeField, timeFieldUsage(3, true)],

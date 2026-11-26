@@ -221,6 +221,49 @@ def check_tab_order(browser, url):
         page.close()
 
 
+def check_styled_cards(browser, url):
+    page = browser.new_page(viewport={'width': 1280, 'height': 900})
+    try:
+        page.emulate_media(color_scheme='light', reduced_motion='reduce')
+        page.goto(url + '/#Radio')
+        page.wait_for_function('window.cuiGallery?.renderedComponent === "Radio"')
+        canvas = page.locator('#preview')
+        cards = page.get_by_role('checkbox', name='Styled cards')
+        initial = page.evaluate(RADIO_MARKS)
+        cards.check()
+        page.wait_for_function(
+            'document.querySelector("#snippet").textContent.includes("cui_radio_group_present_styled")')
+        canvas.scroll_into_view_if_needed()
+        rows = page.evaluate(RADIO_MARKS)
+        assert rows['Standard']['bounds'][3] >= initial['Standard']['bounds'][3] + 16
+
+        def row_color(name):
+            x, y, w, h = rows[name]['bounds']
+            return canvas.evaluate("""(canvas, [x,y]) => Array.from(canvas.getContext('2d')
+                .getImageData(Math.floor(x), Math.floor(y), 1, 1).data)""", [x + w - 4, y + h / 2])
+
+        first_selected = row_color('Standard')
+        first_plain = row_color('Priority')
+        assert first_selected != first_plain
+        canvas.focus()
+        page.keyboard.press('Tab')
+        page.keyboard.press('ArrowDown')
+        priority = page.locator('#accessible').get_by_role('radio', name='Priority')
+        page.wait_for_function("""() => document.querySelector(
+            '#accessible [role=radio][aria-label=Priority][aria-checked=true]') !== null""")
+        assert priority.get_attribute('aria-description') == 'Arrives Wednesday with tracked delivery'
+        assert row_color('Priority') == first_selected and row_color('Standard') == first_plain
+        assert page.evaluate('cuiGallery.exports.gallery_radio_stat(0)') == 1
+
+        cards.uncheck()
+        page.wait_for_function(
+            '!document.querySelector("#snippet").textContent.includes("cui_radio_group_present_styled")')
+        assert page.evaluate(RADIO_MARKS)['Standard']['bounds'][3] == initial['Standard']['bounds'][3]
+        assert priority.get_attribute('aria-checked') == 'true'
+    finally:
+        page.close()
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--directory',type=Path,default=Path('build/web'))
@@ -333,6 +376,8 @@ def main():
                    lambda: check_tooltip(browser, f'http://127.0.0.1:{server.server_port}'))
             a.case('Radio', 'signed tab order follows the roving option and respects Skip Tab',
                    lambda: check_tab_order(browser, f'http://127.0.0.1:{server.server_port}'))
+            a.case('Radio', 'styled cards paint the selected row and preserve keyboard selection',
+                   lambda: check_styled_cards(browser, f'http://127.0.0.1:{server.server_port}'))
             args.report.parent.mkdir(parents=True,exist_ok=True)
             args.report.write_text(json.dumps(a.results,indent=2)+'\n')
             failures=[r for r in a.results if r['status']!='verified']

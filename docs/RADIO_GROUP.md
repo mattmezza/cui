@@ -68,7 +68,52 @@ same indicator/font/theme colors as the standalone radio. The separate base API
 registers/reduces behavior without styled layout; a custom renderer must submit
 boxes with the same IDs. Do not register another interactive radio with the same
 ID after calling the base API. Standalone Radio accepts decorative composition
-through `cui_radio_options.content`. The full styling audit remains open.
+through `cui_radio_options.content`.
+
+## Style the group and its options
+
+Use `cui_radio_group_present_styled` to customize the container and rows.
+Pass the same `cui_radio_styles` item callbacks to
+`cui_radio_present_styled` for a standalone option. Callbacks receive the
+resolved theme, size and state as editable paint. The `cui_box` fields control
+padding, gaps, backgrounds, borders and radii. Set indicator sizes in logical
+pixels. Label and description paint use the standard CUI font family, weight,
+size and line-height controls.
+
+```c
+static void emphasize_selected(cui_context *ui, void *user, cui_id option,
+                               bool checked, bool disabled, cui_radio_paint *paint) {
+    (void)ui;
+    (void)option;
+    (void)checked;
+    (void)disabled;
+    const cui_theme *theme = user;
+    paint->root.padding = 8;
+    paint->root.radius = theme->radius;
+    paint->root.background = theme->secondary;
+    paint->label.style.weight = CUI_TEXT_WEIGHT_SEMIBOLD;
+}
+
+/* Inside composition, with a writable theme and caller-owned selected/state. */
+cui_radio_group_present_styled(ui, group_id, theme, items, item_count, &selected,
+    &state, (cui_radio_group_options){.vertical = true},
+    (cui_radio_group_presentation){0}, NULL, 0,
+    (cui_radio_group_styles){.items = {.checked = emphasize_selected, .user = theme}},
+    (cui_selection_handler){0});
+```
+
+Selection requests and observers run before painting. Each option applies
+the instance callback, then the checked callback if selected, and the disabled
+callback if ineligible. The optional group callback runs first. Paint and
+userdata are borrowed for the synchronous call. Use interaction queries from
+style callbacks and leave composition and the selection model alone. Group
+orientation comes from `options.vertical`. The built-in fill and checkmark can
+animate together. A callback that sets the indicator background chooses the
+fill for that frame, and mark alpha still follows the motion sample.
+
+Try **Styled cards** in the Radio gallery to copy a complete C example with a
+styled container, hover and checked rows. Custom paint callbacks are immediate C
+APIs. Retained builders expose the documented shared size and shadow controls.
 
 ## Set keyboard tab order
 

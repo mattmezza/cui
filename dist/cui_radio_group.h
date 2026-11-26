@@ -124,6 +124,22 @@ cui_radio_group_event_result cui_radio_group_present_with_content(
     cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *, size_t, cui_id *,
     cui_radio_group_state *, cui_radio_group_options, cui_radio_group_presentation,
     const cui_radio_group_content *, size_t content_count, cui_selection_handler);
+typedef void (*cui_radio_group_style_fn)(cui_context *, void *user, cui_id group, cui_box *);
+typedef struct {
+    cui_radio_group_style_fn group;
+    void *group_user;
+    cui_radio_styles items;
+} cui_radio_group_styles;
+/* Same selection and content contract as cui_radio_group_present_with_content.
+ * Optional group refinement runs once after event callbacks and before item
+ * refinements, which run in submission order. options.vertical owns direction.
+ * Borrowing and restrictions match cui_radio_present_styled. */
+cui_radio_group_event_result
+cui_radio_group_present_styled(cui_context *, cui_id, const cui_theme *,
+                               const cui_radio_group_item *, size_t, cui_id *,
+                               cui_radio_group_state *, cui_radio_group_options,
+                               cui_radio_group_presentation, const cui_radio_group_content *,
+                               size_t content_count, cui_radio_group_styles, cui_selection_handler);
 #ifdef __cplusplus
 }
 #endif
@@ -334,6 +350,87 @@ cui_base_radio_group_events(cui_context *ui, cui_id id, const cui_radio_group_it
 /* SPDX-License-Identifier: MIT */
 
 /* SPDX-License-Identifier: MIT */
+#ifndef CUI_RADIO_PAINT_INTERNAL_H
+#define CUI_RADIO_PAINT_INTERNAL_H
+
+#include <math.h>
+
+static cui_radio_paint cui_radio_resolve_paint(cui_context *ui, cui_id id, const cui_theme *theme,
+                                               float size, float font, float density, bool checked,
+                                               bool disabled, bool invalid, bool hide_focus,
+                                               bool animated, float opacity,
+                                               const cui_radio_styles *styles) {
+    cui_color border = invalid ? theme->danger : checked ? theme->primary : theme->input;
+    cui_color fill = theme->primary, mark = theme->on_primary;
+    if (disabled) {
+        border.a /= 2;
+        fill.a /= 2;
+        mark.a /= 2;
+    }
+    cui_color background = animated  ? cui_color_mix_oklab(theme->input_background, fill, opacity)
+                           : checked ? fill
+                                     : theme->input_background;
+    cui_radio_paint paint = {
+        .root = {.row = true, .gap = 8 * density, .radius = theme->radius * .5f},
+        .indicator = {.width = size,
+                      .height = size,
+                      .radius = size / 2,
+                      .border_width = 1,
+                      .border = border,
+                      .background = background,
+                      .align_x = CUI_ALIGN_CENTER,
+                      .align_y = CUI_ALIGN_CENTER},
+        .mark = mark,
+        .label = {.color = disabled ? theme->muted : theme->text, .font_size = font},
+        .description = {.color = theme->muted, .font_size = font * .875f},
+    };
+    if (!hide_focus && cui_focused(ui) == id) {
+        paint.root.border = theme->focus;
+        paint.root.border_width = 2;
+    }
+    if (styles) {
+        if (styles->instance)
+            styles->instance(ui, styles->user, id, checked, disabled, &paint);
+        if (checked && styles->checked)
+            styles->checked(ui, styles->user, id, checked, disabled, &paint);
+        if (disabled && styles->disabled)
+            styles->disabled(ui, styles->user, id, checked, disabled, &paint);
+    }
+    paint.root.row = true;
+    paint.root.layout_only = false;
+    paint.root.inert = false;
+    paint.indicator.layout_only = false;
+    paint.indicator.inert = false;
+    return paint;
+}
+
+/* Compose the indicator and leave the option root open for text and content. */
+static void cui_radio_begin_option(cui_context *ui, cui_id id, cui_id indicator,
+                                   const cui_radio_paint *paint, bool has_content, float opacity,
+                                   float density) {
+    cui_begin_box(ui, id, paint->root);
+    cui_begin_box(ui, 0, (cui_box){.width = paint->indicator.width});
+    if (has_content) {
+        cui_begin_box(ui, 0, (cui_box){.height = paint->indicator.height * .125f});
+        cui_end_box(ui);
+    }
+    cui_begin_box(ui, indicator, paint->indicator);
+    if (opacity > 0) {
+        cui_color mark = paint->mark;
+        mark.a = (uint8_t)(mark.a * opacity);
+        float size = fminf(paint->indicator.width, paint->indicator.height);
+        cui_checkmark(ui, fmaxf(0, size - 4 * density), mark);
+    }
+    cui_end_box(ui);
+    cui_end_box(ui);
+}
+
+static void cui_radio_paint_text(cui_context *ui, cui_str text, cui_radio_text_paint paint) {
+    cui_text_ex(ui, text, paint.font_size, paint.color, paint.line_height, paint.style);
+}
+#endif
+
+/* SPDX-License-Identifier: MIT */
 #ifndef CUI_RADIO_TOOLTIP_INTERNAL_H
 #define CUI_RADIO_TOOLTIP_INTERNAL_H
 
@@ -388,7 +485,8 @@ static cui_radio_group_result cui_radio_group_render(
     cui_context *ui, cui_id id, const cui_theme *t, const cui_radio_group_item *items, size_t count,
     cui_id *selected, cui_radio_group_state *state, cui_radio_group_options o,
     cui_selection_handler handler, cui_selection_event_result *observed,
-    cui_radio_group_presentation presentation, const cui_radio_group_content *content) {
+    cui_radio_group_presentation presentation, const cui_radio_group_content *content,
+    const cui_radio_group_styles *styles) {
     cui_radio_group_result r = {0};
     if (!t)
         return r;
@@ -459,54 +557,30 @@ static cui_radio_group_result cui_radio_group_render(
         if (motion->next_wake_seconds)
             cui_invalidate(ui);
     }
-    cui_begin_box(ui, id, (cui_box){.row = !o.vertical, .gap = o.gap > 0 ? o.gap : 12 * density});
+    cui_box group = {.row = !o.vertical, .gap = o.gap > 0 ? o.gap : 12 * density};
+    if (styles && styles->group)
+        styles->group(ui, styles->group_user, id, &group);
+    group.row = !o.vertical;
+    group.layout_only = false;
+    group.inert = false;
+    cui_begin_box(ui, id, group);
     for (size_t i = 0; i < count; i++) {
         bool disabled = o.disabled || items[i].disabled, checked = *selected == items[i].id;
         float opacity = motion ? fminf(1, fmaxf(0, motion->items[i].progress)) : checked ? 1 : 0;
-        cui_color ink = o.invalid ? t->danger : checked ? t->primary : t->input;
-        cui_color selected_background = t->primary, dot = t->on_primary;
-        if (disabled) {
-            ink.a /= 2;
-            dot.a /= 2;
-            selected_background.a /= 2;
-        }
-        cui_color background =
-            motion    ? cui_color_mix_oklab(t->input_background, selected_background, opacity)
-            : checked ? selected_background
-                      : t->input_background;
-        cui_box row = {.row = true, .gap = 8 * density, .radius = t->radius * .5f};
-        if (!o.hide_focus_ring && cui_focused(ui) == items[i].id) {
-            row.border = t->focus;
-            row.border_width = 2;
-        }
-        cui_begin_box(ui, items[i].id, row);
-        cui_begin_box(ui, 0, (cui_box){.width = size});
+        cui_radio_paint paint = cui_radio_resolve_paint(
+            ui, items[i].id, t, size, font, density, checked, disabled, o.invalid,
+            o.hide_focus_ring, motion != NULL, opacity, styles ? &styles->items : NULL);
         const cui_radio_group_content *extra = content ? &content[i] : NULL;
         bool rich = extra && (extra->description.length || extra->content || extra->max_width > 0);
-        if (items[i].label.length || rich) {
-            cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
-            cui_end_box(ui);
-        }
-        cui_begin_box(ui, presentation.parts ? presentation.parts[i].indicator : 0,
-                      (cui_box){.width = size,
-                                .height = size,
-                                .radius = size / 2,
-                                .border_width = 1,
-                                .border = ink,
-                                .background = background,
-                                .align_x = CUI_ALIGN_CENTER,
-                                .align_y = CUI_ALIGN_CENTER});
-        dot.a = (uint8_t)((float)dot.a * opacity);
-        if (opacity > 0)
-            cui_checkmark(ui, size - 4 * density, dot);
-        cui_end_box(ui);
-        cui_end_box(ui);
+        cui_radio_begin_option(ui, items[i].id,
+                               presentation.parts ? presentation.parts[i].indicator : 0, &paint,
+                               items[i].label.length || rich, opacity, density);
         if (rich) {
             cui_begin_box(ui, 0, (cui_box){.gap = 3 * density, .max_width = extra->max_width});
             if (items[i].label.length)
-                cui_text(ui, items[i].label, font, disabled ? t->muted : t->text);
+                cui_radio_paint_text(ui, items[i].label, paint.label);
             if (extra->description.length)
-                cui_text(ui, extra->description, font * .875f, t->muted);
+                cui_radio_paint_text(ui, extra->description, paint.description);
             if (extra->content) {
                 cui_begin_box(ui, 0, (cui_box){.inert = true});
                 extra->content(ui, extra->content_user);
@@ -514,7 +588,7 @@ static cui_radio_group_result cui_radio_group_render(
             }
             cui_end_box(ui);
         } else if (items[i].label.length)
-            cui_text(ui, items[i].label, font, disabled ? t->muted : t->text);
+            cui_radio_paint_text(ui, items[i].label, paint.label);
         cui_end_box(ui);
     }
     cui_end_box(ui);
@@ -533,7 +607,7 @@ cui_radio_group_result cui_radio_group(cui_context *ui, cui_id id, const cui_the
                                        cui_radio_group_options options) {
     return cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
                                   (cui_selection_handler){0}, NULL,
-                                  (cui_radio_group_presentation){0}, NULL);
+                                  (cui_radio_group_presentation){0}, NULL, NULL);
 }
 cui_radio_group_event_result cui_radio_group_events(cui_context *ui, cui_id id,
                                                     const cui_theme *theme,
@@ -545,7 +619,7 @@ cui_radio_group_event_result cui_radio_group_events(cui_context *ui, cui_id id,
     memset(&result, 0, sizeof(result));
     result.legacy =
         cui_radio_group_render(ui, id, theme, items, count, selected, state, options, handler,
-                               &result.events, (cui_radio_group_presentation){0}, NULL);
+                               &result.events, (cui_radio_group_presentation){0}, NULL, NULL);
     return result;
 }
 
@@ -584,7 +658,7 @@ cui_radio_group_with_parts(cui_context *ui, cui_id id, const cui_theme *theme,
         return (cui_radio_group_result){0};
     return cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
                                   (cui_selection_handler){0}, NULL,
-                                  (cui_radio_group_presentation){.parts = copied}, NULL);
+                                  (cui_radio_group_presentation){.parts = copied}, NULL, NULL);
 }
 cui_radio_group_event_result cui_radio_group_events_with_parts(
     cui_context *ui, cui_id id, const cui_theme *theme, const cui_radio_group_item *items,
@@ -594,9 +668,9 @@ cui_radio_group_event_result cui_radio_group_events_with_parts(
     cui_selection_indicator_parts copied[CUI_RADIO_GROUP_MAX];
     if (!cui_radio_group_parts_copy(ui, id, items, count, parts, part_count, copied))
         return result;
-    result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                           handler, &result.events,
-                                           (cui_radio_group_presentation){.parts = copied}, NULL);
+    result.legacy = cui_radio_group_render(
+        ui, id, theme, items, count, selected, state, options, handler, &result.events,
+        (cui_radio_group_presentation){.parts = copied}, NULL, NULL);
     return result;
 }
 
@@ -638,6 +712,16 @@ cui_radio_group_event_result cui_radio_group_present_with_content(
     size_t count, cui_id *selected, cui_radio_group_state *state, cui_radio_group_options options,
     cui_radio_group_presentation presentation, const cui_radio_group_content *content,
     size_t content_count, cui_selection_handler handler) {
+    return cui_radio_group_present_styled(ui, id, theme, items, count, selected, state, options,
+                                          presentation, content, content_count,
+                                          (cui_radio_group_styles){0}, handler);
+}
+
+cui_radio_group_event_result cui_radio_group_present_styled(
+    cui_context *ui, cui_id id, const cui_theme *theme, const cui_radio_group_item *items,
+    size_t count, cui_id *selected, cui_radio_group_state *state, cui_radio_group_options options,
+    cui_radio_group_presentation presentation, const cui_radio_group_content *content,
+    size_t content_count, cui_radio_group_styles styles, cui_selection_handler handler) {
     cui_radio_group_event_result result = {0};
     cui_selection_indicator_parts copied[CUI_RADIO_GROUP_MAX];
     if (presentation.parts || presentation.part_count) {
@@ -662,9 +746,9 @@ cui_radio_group_event_result cui_radio_group_present_with_content(
         if (count)
             memcpy(copied_content, content, count * sizeof(*content));
     }
-    result.legacy =
-        cui_radio_group_render(ui, id, theme, items, count, selected, state, options, handler,
-                               &result.events, presentation, content ? copied_content : NULL);
+    result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
+                                           handler, &result.events, presentation,
+                                           content ? copied_content : NULL, &styles);
     return result;
 }
 

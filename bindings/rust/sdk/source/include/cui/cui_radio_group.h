@@ -123,6 +123,22 @@ cui_radio_group_event_result cui_radio_group_present_with_content(
     cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *, size_t, cui_id *,
     cui_radio_group_state *, cui_radio_group_options, cui_radio_group_presentation,
     const cui_radio_group_content *, size_t content_count, cui_selection_handler);
+typedef void (*cui_radio_group_style_fn)(cui_context *, void *user, cui_id group, cui_box *);
+typedef struct {
+    cui_radio_group_style_fn group;
+    void *group_user;
+    cui_radio_styles items;
+} cui_radio_group_styles;
+/* Same selection and content contract as cui_radio_group_present_with_content.
+ * Optional group refinement runs once after event callbacks and before item
+ * refinements, which run in submission order. options.vertical owns direction.
+ * Borrowing and restrictions match cui_radio_present_styled. */
+cui_radio_group_event_result
+cui_radio_group_present_styled(cui_context *, cui_id, const cui_theme *,
+                               const cui_radio_group_item *, size_t, cui_id *,
+                               cui_radio_group_state *, cui_radio_group_options,
+                               cui_radio_group_presentation, const cui_radio_group_content *,
+                               size_t content_count, cui_radio_group_styles, cui_selection_handler);
 #ifdef __cplusplus
 }
 #endif

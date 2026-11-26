@@ -57,6 +57,122 @@ static void touch(cui_event_type type, float x, float y) {
         (cui_event){
             .type = type, .pointer_type = CUI_POINTER_TOUCH, .pointer_id = 42, .x = x, .y = y}));
 }
+
+typedef struct {
+    char order[12];
+    size_t count;
+} style_trace;
+
+static void record_style(style_trace *trace, char step) {
+    assert(trace->count < sizeof trace->order);
+    trace->order[trace->count++] = step;
+}
+
+static void style_select(void *user, cui_id id) {
+    selected = id;
+    record_style(user, 'S');
+}
+
+static void style_group(cui_context *context, void *user, cui_id id, cui_box *paint) {
+    assert(context == ui && id == 10 && !paint->row);
+    record_style(user, 'G');
+    paint->width = 260;
+    paint->padding = 9;
+    paint->gap = 7;
+    paint->radius = 11;
+    paint->background = (cui_color){11, 22, 33, 255};
+}
+
+static void style_option(cui_context *context, void *user, cui_id id, bool checked, bool disabled,
+                         cui_radio_paint *paint) {
+    assert(context == ui && (id == 201 || checked == (id == selected)));
+    assert(disabled == (id == 13) && paint->indicator.width == 16);
+    record_style(user, 'I');
+    paint->root.padding = 5;
+    paint->indicator.width = 22;
+    paint->indicator.height = 22;
+    paint->indicator.radius = 6;
+    paint->label.font_size = 18;
+    paint->label.style.weight = CUI_TEXT_WEIGHT_SEMIBOLD;
+    paint->description.color = (cui_color){70, 90, 120, 255};
+}
+
+static void style_checked(cui_context *context, void *user, cui_id id, bool checked, bool disabled,
+                          cui_radio_paint *paint) {
+    assert(context == ui && (id == 201 || id == selected) && checked && !disabled);
+    assert(paint->indicator.width == 22 && paint->label.font_size == 18);
+    record_style(user, 'C');
+    paint->indicator.background = (cui_color){60, 80, 100, 255};
+}
+
+static void style_disabled(cui_context *context, void *user, cui_id id, bool checked, bool disabled,
+                           cui_radio_paint *paint) {
+    assert(context == ui && id == 13 && !checked && disabled && paint->root.padding == 5);
+    record_style(user, 'D');
+    paint->root.background = (cui_color){80, 60, 40, 255};
+}
+
+static void test_style(void) {
+    style_trace trace = {0};
+    const cui_radio_group_styles styles = {.group = style_group,
+                                           .group_user = &trace,
+                                           .items = {.instance = style_option,
+                                                     .checked = style_checked,
+                                                     .disabled = style_disabled,
+                                                     .user = &trace}};
+    const cui_radio_group_options options = {
+        .vertical = true, .on_change = style_select, .change_user = &trace};
+    const cui_radio_group_content content[3] = {
+        [0] = {.description = {"Delivery in four days", 21}}};
+    const cui_selection_indicator_parts parts[] = {{101}, {102}, {103}};
+    const cui_radio_group_presentation presentation = {.parts = parts, .part_count = 3};
+    selected = 11;
+    state = (cui_radio_group_state){0};
+    assert(cui_begin_frame(ui, 420, 350, .016f));
+    cui_radio_group_event_result result = cui_radio_group_present_styled(
+        ui, 10, &theme, items, 3, &selected, &state, options, presentation, content, 3, styles,
+        (cui_selection_handler){0});
+    const cui_draw_list first = cui_end_frame(ui);
+    assert(result.legacy.valid && !result.legacy.changed && selected == 11);
+    assert(trace.count == 6);
+    assert(memcmp(trace.order, "GICIID", trace.count) == 0);
+    cui_rect group = cui_bounds(ui, 10), a = cui_bounds(ui, 11), b = cui_bounds(ui, 12);
+    assert(group.w == 260 && a.x == group.x + 9 && b.y == a.y + a.h + 7);
+    assert(cui_bounds(ui, 101).w == 22 && cui_bounds(ui, 102).h == 22);
+    bool group_fill = false, selected_fill = false, mark = false, description = false;
+    for (size_t i = 0; i < first.count; i++) {
+        const cui_draw_command *draw = &first.commands[i];
+        if (draw->type == CUI_DRAW_RECT) {
+            group_fill |= draw->bounds.w == 260 && draw->radius == 11 && draw->color.r == 11;
+            selected_fill |= draw->bounds.w == 22 && draw->radius == 6 && draw->color.r == 60;
+        } else if (draw->type == CUI_DRAW_IMAGE)
+            mark |= draw->bounds.w == 18;
+        else if (draw->type == CUI_DRAW_TEXT)
+            description |= draw->color.r == 70 && draw->color.b == 120;
+    }
+    assert(group_fill && selected_fill && mark && description);
+    size_t semantic_count;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    assert(semantic_count == 4 && semantics[1].checked && semantics[3].disabled);
+    assert(semantics[1].details.description.length == 21);
+
+    trace.count = 0;
+    cui_focus(ui, 11);
+    key(CUI_KEY_DOWN);
+    assert(cui_begin_frame(ui, 420, 350, .016f));
+    result = cui_radio_group_present_styled(ui, 10, &theme, items, 3, &selected, &state, options,
+                                            presentation, content, 3, styles,
+                                            (cui_selection_handler){0});
+    int number = 1;
+    assert(!cui_radio_present_styled(ui, 201, &theme, cui_string("Standalone"), &number, 1,
+                                     (cui_radio_options){0},
+                                     (cui_radio_presentation){.parts = {202}}, styles.items));
+    cui_end_frame(ui);
+    assert(result.legacy.changed && selected == 12 && cui_focused(ui) == 12);
+    assert(trace.count == 9 && memcmp(trace.order, "SGIICIDIC", trace.count) == 0);
+    assert(cui_bounds(ui, 202).w == 22 && cui_last_error(ui) == CUI_OK);
+}
+
 static cui_radio_group_event_result motion_frame(cui_radio_group_motion *motion,
                                                  const cui_radio_group_item *list, size_t count,
                                                  cui_radio_group_options options,
@@ -548,6 +664,7 @@ int main(void) {
     assert(!frame(3, o).valid);
     items[1].id = saved;
     theme = cui_theme_light();
+    test_style();
     test_motion();
     test_rich_content();
     test_radio_group_tooltip();

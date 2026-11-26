@@ -428,6 +428,30 @@ typedef struct {
 } cui_radio_presentation;
 bool cui_radio_present(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                        cui_radio_options, cui_radio_presentation);
+typedef struct {
+    cui_color color;
+    float font_size, line_height;
+    cui_text_style style;
+} cui_radio_text_paint;
+typedef struct {
+    cui_box root, indicator;
+    cui_color mark;
+    cui_radio_text_paint label, description;
+} cui_radio_paint;
+typedef void (*cui_radio_style_fn)(cui_context *, void *user, cui_id option, bool checked,
+                                   bool disabled, cui_radio_paint *);
+typedef struct {
+    cui_radio_style_fn instance, checked, disabled;
+    void *user;
+} cui_radio_styles;
+/* Refine initialized paint after selection has resolved, in instance, checked,
+ * then disabled order. Each call borrows paint and userdata synchronously.
+ * Query interaction state or edit paint. Leave selection, active descriptors and
+ * frame composition alone. The option remains a horizontal row. Visibility and
+ * input eligibility stay with the component. Motion still scales mark opacity;
+ * overriding indicator.background sets the fill for that frame. */
+bool cui_radio_present_styled(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
+                              cui_radio_options, cui_radio_presentation, cui_radio_styles);
 /* Double controlled Styled facade: include cui_styled_slider_events.h. */
 /* Existing Slider track identity. Root id also includes label/framing; this
  * entry has no separate thumb. Returns0 for owner0 or derived zero. Identity

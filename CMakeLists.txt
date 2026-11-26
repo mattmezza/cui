@@ -2354,6 +2354,11 @@ add_executable(test_boolean_styled_events tests/unit/test_boolean_styled_events.
 target_link_libraries(test_boolean_styled_events PRIVATE cui)
 cui_warnings(test_boolean_styled_events)
 add_test(NAME boolean_events_styled COMMAND test_boolean_styled_events)
+
+add_executable(test_radio_events tests/unit/test_radio_events.c)
+target_link_libraries(test_radio_events PRIVATE cui)
+cui_warnings(test_radio_events)
+add_test(NAME radio_events COMMAND test_radio_events)
 if(TARGET cui_bridge)
  add_executable(test_bridge_notifications tests/unit/test_bridge_notifications.c)
  target_link_libraries(test_bridge_notifications PRIVATE cui_bridge)

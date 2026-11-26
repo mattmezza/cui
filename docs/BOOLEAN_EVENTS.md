@@ -1,4 +1,4 @@
-# Controlled boolean Base requests
+# Controlled boolean requests
 
 `cui_boolean_events.h` adds `cui_base_switch_events` and
 `cui_base_toggle_events`. These portable C11 Base reducers draw nothing; submit
@@ -6,7 +6,7 @@ one inside its same-ID layout box. Switch retains `CUI_ROLE_SWITCH`; Toggle
 retains `CUI_ROLE_BUTTON`. Neither is implemented by remapping Check semantics.
 The separate shared `cui_control_events.h` provides the result and metadata types.
 `cui_components.h` adds Styled `cui_switch_events` and `cui_toggle_events`.
-Language bindings and generated build/export registration remain separate work.
+The retained bridge and its language bindings expose their own queued events.
 
 ```c
 #include <cui/cui_boolean_events.h>
@@ -82,9 +82,7 @@ The unit fixture exercises mouse/touch, Enter/Space/repeat filtering,
 accessibility multiplicity and later-event consumption, both initial bool values,
 owner acceptance/rejection, no-handler read-only behavior, invalid arguments,
 protected phases, inert/layout-only/omitted/disabled submissions, exact role/focus
-policy, disabled-parent routing, and legacy aggregate compatibility. Build
-registration and generated SDK resources must be integrated by the module owner;
-this guide does not claim those snapshots already contain the new API.
+policy, disabled-parent routing, and legacy aggregate compatibility.
 
 
 ## Styled Switch and Toggle
@@ -138,3 +136,30 @@ callback/content mutation timing. Existing Button/Check and Base boolean fixture
 remain independent regression coverage. Active-context destruction and recursive
 submission remain unsupported as documented above; no cross-language event
 coverage is implied.
+
+## Standalone Radio
+
+`cui_base_radio_events` and `cui_radio_events` use the same boolean handler.
+An unchecked Radio requests `false → true`. Activating a checked Radio counts
+as an attempt and delivers no request. The entry snapshot stays fixed throughout
+the submission, even when a handler accepts the first of several attempts.
+The owner can clear the selection on a later submission. Use RadioGroup for
+exclusive sibling choices, arrow navigation and coordinated same-frame paint.
+
+Base submits inside a same-ID box. Its semantic node reports `checked`,
+`selected` and boolean numeric value, plus optional required, invalid, and
+one-based set position. Supply both position and size together, with position
+within the set. Styled owns the box and accepts the same style callbacks,
+motion and tooltip as the standalone presenter. Its checkbox-derived
+`on_change` and `change_user` fields must both be zero. Use the typed event
+handler for selection. Passive composition leaves caller-owned motion and
+tooltip storage alone.
+
+The caller owns acceptance and schedules a frame to display an accepted
+assignment. Result and request lifetimes follow the same rules as Switch and
+Toggle above. Existing shared-integer Radio entry points keep their immediate
+assignment, aggregate result and invalidation behavior. This per-activation
+facade is available in immediate C. The retained C bridge and its Python,
+JavaScript, TypeScript, Go and Rust bindings keep their queued events.
+
+See the [copyable standalone example](RADIO_GROUP.md#request-standalone-selection).

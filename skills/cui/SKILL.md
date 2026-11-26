@@ -72,7 +72,11 @@ complete matching headers. `--declaration` explicitly selects the concise API vi
 No output is clipped or filtered by safety keywords.
 
 For RadioGroup descriptions, decorative content, tooltips, signed tab order
-and C-only paint callbacks, read `docs/RADIO_GROUP.md`. For retained order,
+and C-only paint callbacks, read `docs/RADIO_GROUP.md`. For a controlled
+standalone Radio, use `cui_radio_events` or `cui_base_radio_events` in C.
+An unchecked option can synchronously request selection. The caller owns
+acceptance and invalidates to display the change. Retained bindings use queued
+events. See `docs/BOOLEAN_EVENTS.md#standalone-radio`. For retained order,
 probe the optional bridge symbol `cui_bridge_radio_set_tab_index_v1` or the
 matching capability on Python, JS/TS, Go or Rust. For Rust, probe before
 `build_child`. See `docs/BRIDGE_COMPONENTS.md#set-signed-radio-tab-order`.

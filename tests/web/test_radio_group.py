@@ -264,6 +264,50 @@ def check_styled_cards(browser, url):
         page.close()
 
 
+def check_controlled(browser, url):
+    page = browser.new_page(viewport={'width': 1280, 'height': 900})
+    try:
+        page.goto(url + '/#Radio')
+        page.wait_for_function('window.cuiGallery?.renderedComponent === "Radio"')
+        page.locator('#radio-mode').select_option('1')
+        radio = page.locator('#accessible').get_by_role('radio', name='Standalone choice')
+        radio.wait_for(state='attached')
+        for control in ['radio-tab-order-control', 'radio-styled-cards-control', 'control-shadow-control']:
+            assert page.locator('#' + control).is_hidden()
+        def stat(field):
+            return page.evaluate('(f) => cuiGallery.exports.gallery_radio_stat(f)', field)
+        def click_radio():
+            x, y, w, h = page.evaluate(RADIO_MARKS)['Standalone choice']['bounds']
+            canvas = page.locator('#preview').bounding_box()
+            page.mouse.click(canvas['x'] + x + w / 2, canvas['y'] + y + h / 2)
+        page.locator('#radio-accept').uncheck()
+        click_radio()
+        page.wait_for_function('cuiGallery.exports.gallery_radio_stat(1) === 1')
+        assert stat(2) == 0 and stat(3) == 0
+        assert stat(4) == 0 and stat(5) == 1
+        assert radio.get_attribute('aria-checked') == 'false'
+        click_radio()
+        page.wait_for_function('cuiGallery.exports.gallery_radio_stat(1) === 2')
+        assert stat(2) == 0 and stat(3) == 0
+        page.locator('#radio-accept').check()
+        click_radio()
+        page.wait_for_function('cuiGallery.exports.gallery_radio_stat(2) === 1')
+        page.wait_for_function('document.querySelector("#accessible [role=radio]").getAttribute("aria-checked") === "true"')
+        click_radio()
+        page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+        assert stat(1) == 3 and stat(2) == 1 and stat(3) == 1
+        # Clear through the real C button, then another activation is a new request.
+        button = page.locator('#accessible').get_by_role('button', name='Clear selection')
+        button.evaluate('(el) => el.click()')
+        page.wait_for_function('cuiGallery.exports.gallery_radio_stat(3) === 0')
+        click_radio()
+        page.wait_for_function('cuiGallery.exports.gallery_radio_stat(2) === 2')
+        assert stat(1) == 4 and stat(4) == 0 and stat(5) == 1
+        assert 'cui_radio_events' in page.locator('#snippet').text_content()
+    finally:
+        page.close()
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--directory',type=Path,default=Path('build/web'))
@@ -378,6 +422,8 @@ def main():
                    lambda: check_tab_order(browser, f'http://127.0.0.1:{server.server_port}'))
             a.case('Radio', 'styled cards paint the selected row and preserve keyboard selection',
                    lambda: check_styled_cards(browser, f'http://127.0.0.1:{server.server_port}'))
+            a.case('Radio', 'controlled standalone requests, owner acceptance and checked no-op',
+                   lambda: check_controlled(browser, f'http://127.0.0.1:{server.server_port}'))
             args.report.parent.mkdir(parents=True,exist_ok=True)
             args.report.write_text(json.dumps(a.results,indent=2)+'\n')
             failures=[r for r in a.results if r['status']!='verified']

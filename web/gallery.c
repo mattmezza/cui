@@ -1259,7 +1259,20 @@ static void gallery_checkbox_detail(cui_context *ui, void *user) {
 static int design_radius = -1;
 static float design_spacing = -1;
 static int control_size, choice_required, choice_invalid, choice_skip_tab;
-static bool radio_custom_order, radio_styled_cards;
+static bool radio_custom_order, radio_styled_cards, radio_standalone, radio_accept = true;
+static bool radio_checked;
+static unsigned radio_controlled_requests, radio_controlled_accepted;
+static bool radio_request_current, radio_request_requested;
+static void gallery_radio_request(void *user, const cui_component_boolean_request *request) {
+    (void)user;
+    radio_controlled_requests++;
+    radio_request_current = request->current;
+    radio_request_requested = request->requested;
+    if (radio_accept) {
+        radio_checked = request->requested;
+        radio_controlled_accepted++;
+    }
+}
 static int gallery_xsmall_second_size(void) {
     return control_size == 1 ? 2 : control_size == 2 ? 3 : control_size == 3 ? 1 : 0;
 }
@@ -1552,7 +1565,15 @@ static void gallery_radio_item_style(cui_context *context, void *user, cui_id id
     }
 }
 unsigned gallery_radio_stat(unsigned field) {
-    return field == 0 ? radio_requests : 0;
+    switch (field) {
+    case 0: return radio_requests;
+    case 1: return radio_controlled_requests;
+    case 2: return radio_controlled_accepted;
+    case 3: return radio_checked;
+    case 4: return radio_request_current;
+    case 5: return radio_request_requested;
+    default: return 0;
+    }
 }
 static cui_bubble_state gallery_bubble_states[4];
 typedef struct {
@@ -4863,6 +4884,22 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 4: {
+        if (radio_standalone) {
+            if (cui_button(ui, cui_id_from(ui, "radio-clear"), &t,
+                           cui_string("Clear selection"), disabled))
+                radio_checked = false;
+            const bool before = radio_checked;
+            cui_radio_events(ui, cui_id_from(ui, "radio-controlled"), &t,
+                cui_string("Standalone choice"), radio_checked,
+                (cui_radio_options){.size = (cui_control_size)control_size,
+                    .design_size = design_size, .disabled = disabled,
+                    .required = choice_required != 0, .invalid = choice_invalid != 0,
+                    .skip_tab = choice_skip_tab != 0},
+                (cui_radio_presentation){0}, (cui_radio_styles){0},
+                (cui_component_boolean_handler){.callback = gallery_radio_request});
+            if (before != radio_checked) cui_invalidate(ui);
+            break;
+        }
         cui_radio_group_item items[] = {
             {cui_id_from(ui, "radio-a"), cui_string("Standard"), false},
             {cui_id_from(ui, "radio-b"), cui_string("Priority"), false},
@@ -8195,7 +8232,8 @@ void gallery_design_options(int size, int radius, float spacing) {
 }
 void gallery_control_options(int size, int required, int invalid, int skip_tab, int label_left,
                              int custom_color, int variant, int segmented, int multiple,
-                             int shadows, int radio_tab_order, int radio_cards) {
+                             int shadows, int radio_tab_order, int radio_cards,
+                             int standalone, int accept_requests) {
     control_size =
         size >= CUI_CONTROL_MEDIUM && size <= CUI_CONTROL_XSMALL ? size : CUI_CONTROL_MEDIUM;
     control_surface_shadows = shadows != 0;
@@ -8203,6 +8241,8 @@ void gallery_control_options(int size, int required, int invalid, int skip_tab, 
     choice_required = required;
     choice_invalid = invalid;
     choice_skip_tab = skip_tab;
+    radio_standalone = standalone != 0;
+    radio_accept = accept_requests != 0;
     radio_custom_order = radio_tab_order != 0;
     radio_styled_cards = radio_cards != 0;
     switch_label_left = label_left;

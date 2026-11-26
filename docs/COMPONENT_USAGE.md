@@ -455,13 +455,13 @@ API: `cui_progress_defaults`, `cui_progress`, `cui_progress_ex`, `cui_progress_c
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Keep one selected ID and cui_radio_group_state per group. Standalone radios share one integer. For animated marks, keep zero-initialized cui_radio_group_motion per group or cui_radio_motion per standalone option. For a tooltip, keep one zero-initialized cui_radio_tooltip_state per option in immediate C. The retained C bridge owns its option tooltip state and copies the hint.
+**State:** Keep one selected ID and cui_radio_group_state per group. A controlled standalone radio takes an owner-held bool. The legacy standalone API uses a shared integer. For animated marks, keep zero-initialized cui_radio_group_motion per group or cui_radio_motion per standalone option. For a tooltip, keep one zero-initialized cui_radio_tooltip_state per option in immediate C. The retained C bridge owns its option tooltip state and copies the hint.
 
-**Interaction:** cui_radio_group resolves controlled callback requests before painting and provides arrow/Home/End navigation with one Tab stop; standalone functions return true when selection changes. Optional signed tab ordering in immediate C and the retained C bridge keeps the group as one stop.
+**Interaction:** cui_radio_group resolves controlled callback requests before painting and provides arrow/Home/End navigation with one Tab stop. cui_radio_events sends select-only boolean requests for unchecked options. Legacy standalone functions return true when selection changes. Optional signed tab ordering in immediate C and the retained C bridge keeps the group as one stop.
 
-**Usage:** Submit stable unique item IDs. Use cui_radio_group_present or cui_radio_present with motion storage, and schedule its next frame on the host clock. Use cui_radio_group_present_with_content to add descriptions and decorative label content to grouped options. Attach optional tooltips to the standalone presentation or the group item content descriptor. In retained C, use cui_bridge_radio_set_tooltip_v1 with a Radio or direct RadioGroup Item. Use cui_bridge_radio_set_tab_index_v1 on a retained Radio or RadioGroup.
+**Usage:** Submit stable unique item IDs. With cui_radio_events, update the bool in the handler and request a frame to show the change. Use cui_radio_group_present or cui_radio_present with motion storage, and schedule its next frame on the host clock. Use cui_radio_group_present_with_content to add descriptions and decorative label content to grouped options. Attach optional tooltips to the standalone presentation or the group item content descriptor. In retained C, use cui_bridge_radio_set_tooltip_v1 with a Radio or direct RadioGroup Item. Use cui_bridge_radio_set_tab_index_v1 on a retained Radio or RadioGroup.
 
-API: `cui_radio`, `cui_radio_ex`, `cui_radio_present`, `cui_radio_group_present`. [Group header](../include/cui/cui_radio_group.h) · [Group and standalone guide](RADIO_GROUP.md) · [Retained tooltips](BRIDGE_COMPONENTS.md#add-tooltips-to-retained-radio-options).
+The primary calls are `cui_radio_group` and `cui_radio_events`. See the [group and standalone guide](RADIO_GROUP.md), [typed request contract](BOOLEAN_EVENTS.md#standalone-radio) and [retained tooltip guide](BRIDGE_COMPONENTS.md#add-tooltips-to-retained-radio-options).
 
 ## Rating
 

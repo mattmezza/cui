@@ -298,3 +298,38 @@ stable mark geometry and state across reorder, removal and disabled options.
 Chromium checks fading, reversal, reduced motion and that frames stop when the
 fade settles. It also exercises mouse, keyboard and CDP touch on the visible options.
 Chromium touch emulation is not evidence from a physical mobile device.
+
+### Request standalone selection
+
+Use a controlled boolean when the application can decline selection. Keep
+`choice` alive between frames and pass it to `draw_choice` inside your
+application's parent box. The handler runs synchronously. This example accepts
+when `editable` is true and requests a new frame to display the assigned value.
+
+```c
+#include <cui/cui_components.h>
+
+typedef struct {
+    cui_context *ui;
+    bool checked, editable;
+} choice;
+
+static void request_priority(void *user, const cui_component_boolean_request *event) {
+    choice *model = user;
+    if (model->editable) {
+        model->checked = event->requested;
+        cui_invalidate(model->ui);
+    }
+}
+
+cui_component_action_result draw_choice(choice *model, cui_id id, const cui_theme *theme) {
+    return cui_radio_events(model->ui, id, theme, cui_string("Priority"), model->checked,
+        (cui_radio_options){0}, (cui_radio_presentation){0}, (cui_radio_styles){0},
+        (cui_component_boolean_handler){request_priority, model});
+}
+```
+
+Use `request_count` to summarize deliveries. Perform the assignment through
+one path. The handler in this example owns the assignment. See
+[Controlled boolean requests](BOOLEAN_EVENTS.md#standalone-radio) for timing,
+payload ownership and compatibility.

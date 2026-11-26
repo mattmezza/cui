@@ -453,6 +453,15 @@ typedef struct {
  * overriding indicator.background sets the fill for that frame. */
 bool cui_radio_present_styled(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                               cui_radio_options, cui_radio_presentation, cui_radio_styles);
+/* Compose one styled Radio with the same entry snapshot and borrowed handler
+ * as cui_base_radio_events. The styled call supplies its own layout box.
+ * options.on_change and options.change_user must both be NULL. If a handler
+ * accepts, schedule another frame to make that owner assignment visible.
+ * Passive composition does not advance caller-owned motion or tooltip state. */
+cui_component_action_result cui_radio_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                             bool checked, cui_radio_options,
+                                             cui_radio_presentation, cui_radio_styles,
+                                             cui_component_boolean_handler);
 /* Double controlled Styled facade: include cui_styled_slider_events.h. */
 /* Existing Slider track identity. Root id also includes label/framing; this
  * entry has no separate thumb. Returns0 for owner0 or derived zero. Identity
@@ -3099,21 +3108,11 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
     return changed;
 }
 
-static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_theme *t,
-                                        cui_str name, int *value, int option,
-                                        cui_radio_options options,
-                                        cui_radio_presentation presentation,
-                                        const cui_radio_styles *styles) {
-    cui_design_metrics design;
-    if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
-        return false;
-    cui_str accessible = options.accessibility_label.length ? options.accessibility_label : name;
-    bool changed = cui_base_radio(ui, id, accessible, value, option, options.disabled);
-    cui_set_semantic_details(
-        ui, id, (cui_semantic_details){.required = options.required, .invalid = options.invalid});
-    cui_set_tab_stop(ui, id, !options.skip_tab);
-    if (presentation.custom_tab_index)
-        cui_set_tab_index(ui, id, presentation.tab_index);
+static void cui_components_radio_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                                       bool selected, cui_radio_options options,
+                                       cui_radio_presentation presentation,
+                                       const cui_radio_styles *styles,
+                                       const cui_design_metrics *design, bool active_submission) {
     float density = t->font_size / 16;
     float size = (options.size == CUI_CONTROL_XSMALL  ? 12
                   : options.size == CUI_CONTROL_SMALL ? 14
@@ -3125,13 +3124,12 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
                                                       : 14) *
                  density;
     if (options.design_size != CUI_DESIGN_INHERIT) {
-        size = design.indicator_size;
-        font = design.font_size;
+        size = design->indicator_size;
+        font = design->font_size;
     }
-    bool selected = *value == option;
     float opacity = selected ? 1 : 0;
     cui_radio_motion *motion = presentation.motion;
-    if (motion) {
+    if (motion && active_submission) {
         if (motion->mark.id != id)
             *motion = (cui_radio_motion){.mark = {.id = id}};
         cui_disclosure_motion_step_ex(&motion->mark, selected, cui_frame_delta(ui),
@@ -3161,7 +3159,26 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
         cui_end_box(ui);
     }
     cui_end_box(ui);
-    cui_radio_tooltip_show(ui, t, id, options.disabled, presentation.tooltip);
+    if (active_submission)
+        cui_radio_tooltip_show(ui, t, id, options.disabled, presentation.tooltip);
+}
+static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_theme *t,
+                                        cui_str name, int *value, int option,
+                                        cui_radio_options options,
+                                        cui_radio_presentation presentation,
+                                        const cui_radio_styles *styles) {
+    cui_design_metrics design;
+    if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
+        return false;
+    cui_str accessible = options.accessibility_label.length ? options.accessibility_label : name;
+    bool changed = cui_base_radio(ui, id, accessible, value, option, options.disabled);
+    cui_set_semantic_details(
+        ui, id, (cui_semantic_details){.required = options.required, .invalid = options.invalid});
+    cui_set_tab_stop(ui, id, !options.skip_tab);
+    if (presentation.custom_tab_index)
+        cui_set_tab_index(ui, id, presentation.tab_index);
+    cui_components_radio_paint(ui, id, t, name, *value == option, options, presentation, styles,
+                               &design, true);
     return changed;
 }
 bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
@@ -3182,6 +3199,15 @@ bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str n
     return cui_radio_present_styled(ui, id, t, name, value, option, options, presentation,
                                     (cui_radio_styles){0});
 }
+static bool cui_components_radio_tooltip_valid(cui_context *ui, cui_id id,
+                                               cui_radio_presentation presentation) {
+    if (cui_radio_tooltip_valid(presentation.tooltip, id, presentation.parts.indicator))
+        return true;
+    cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_INVALID_ACTION,
+                                                .operation = "radio_tooltip",
+                                                .id = id});
+    return false;
+}
 bool cui_radio_present_styled(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                               int *value, int option, cui_radio_options options,
                               cui_radio_presentation presentation, cui_radio_styles styles) {
@@ -3190,14 +3216,41 @@ bool cui_radio_present_styled(cui_context *ui, cui_id id, const cui_theme *t, cu
         return false;
     if (!ui || !id || !cui_frame_is_submitting(ui))
         return false;
-    if (!cui_radio_tooltip_valid(presentation.tooltip, id, presentation.parts.indicator)) {
-        cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_INVALID_ACTION,
-                                                    .operation = "radio_tooltip",
-                                                    .id = id});
+    if (!cui_components_radio_tooltip_valid(ui, id, presentation))
         return false;
-    }
     return cui_components_radio_render(ui, id, t, name, value, option, options, presentation,
                                        &styles);
+}
+cui_component_action_result cui_radio_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                             cui_str label, bool checked, cui_radio_options options,
+                                             cui_radio_presentation presentation,
+                                             cui_radio_styles styles,
+                                             cui_component_boolean_handler handler) {
+    cui_component_action_result result = {0};
+    cui_design_metrics design;
+    if (!ui || !id || !theme || (label.length && !label.data) ||
+        (options.accessibility_label.length && !options.accessibility_label.data) ||
+        options.on_change || options.change_user || options.size < CUI_CONTROL_MEDIUM ||
+        options.size > CUI_CONTROL_XSMALL || !isfinite(theme->font_size) || theme->font_size <= 0 ||
+        !cui_components_design(theme, options.design_size, &design) ||
+        (presentation.parts.indicator &&
+         !cui_components_indicator_parts_valid(ui, id, presentation.parts)) ||
+        !cui_components_radio_tooltip_valid(ui, id, presentation))
+        return result;
+    result.valid = true;
+    if (!cui_frame_is_submitting(ui))
+        return result;
+    cui_str name = options.accessibility_label.length ? options.accessibility_label : label;
+    cui_radio_event_options events = {
+        .interaction = {.disabled = options.disabled,
+                        .skip_tab = options.skip_tab,
+                        .tab_index = presentation.custom_tab_index ? presentation.tab_index : 0},
+        .required = options.required,
+        .invalid = options.invalid};
+    result = cui_base_radio_events(ui, id, name, checked, events, handler);
+    cui_components_radio_paint(ui, id, theme, label, checked, options, presentation, &styles,
+                               &design, result.submitted);
+    return result;
 }
 bool cui_radio_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                           int option, bool disabled, cui_selection_indicator_parts parts) {

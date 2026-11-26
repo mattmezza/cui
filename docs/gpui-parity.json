@@ -2614,6 +2614,7 @@
         "tests/unit/test_components.c",
         "tests/unit/test_radio_group.c",
         "tests/unit/test_radio_group_base.c",
+        "tests/unit/test_radio_events.c",
         "tests/web/test_radio_group.py"
       ],
       "status": "tested",
@@ -2623,7 +2624,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. RadioGroup supports descriptions and decorative callbacks in immediate C. The retained C bridge, Python, JavaScript, TypeScript, Go and Rust support Item descriptions and opt-in passive children. Optional tooltips are available for standalone and grouped options in immediate C, the retained C bridge, Python, JavaScript, TypeScript, Go and Rust. Immediate C, retained C, Python, JavaScript, TypeScript, Go and Rust support signed tab ordering. Immediate C offers group, option, indicator and typography refinements. Retained paint callbacks and native accessibility acceptance remain open."
+        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. RadioGroup supports descriptions and decorative callbacks in immediate C. The retained C bridge, Python, JavaScript, TypeScript, Go and Rust support Item descriptions and opt-in passive children. Optional tooltips are available for standalone and grouped options in immediate C, the retained C bridge, Python, JavaScript, TypeScript, Go and Rust. Immediate C, retained C, Python, JavaScript, TypeScript, Go and Rust support signed tab ordering. Immediate C offers group, option, indicator and typography refinements. Immediate C and the gallery support controlled standalone select-only requests. Retained paint callbacks, synchronous requests in the bindings and native accessibility acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2798,6 +2799,18 @@
           ],
           "limitations": [
             "Immediate C callbacks borrow paint and userdata for the submission. Retained builder paint callbacks are omitted."
+          ]
+        },
+        {
+          "name": "standalone Radio select-only requests",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_radio_events.c",
+            "tests/web/test_radio_group.py:check_controlled",
+            "docs/BOOLEAN_EVENTS.md"
+          ],
+          "limitations": [
+            "The immediate Base and Styled C facades deliver typed requests synchronously while keeping the entry boolean for semantics and paint. Retained bindings preserve their queued events."
           ]
         }
       ],

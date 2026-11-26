@@ -3,7 +3,7 @@ import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
 import {createCuiMeshRenderer} from "./modules/cui_mesh.js";
 import {paintGradientText} from "./modules/cui_text_paint.js";
-import {selectedUsage,paginationUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage,radioStyledUsage} from "./modules/cui_usage.js";
+import {selectedUsage,paginationUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage,radioStyledUsage,radioControlledUsage} from "./modules/cui_usage.js";
 import {resizableUsage} from "./modules/cui_resizable_usage.js";
 import {stepperUsage} from "./modules/cui_stepper_usage.js";
 import {spinnerUsage} from "./modules/cui_spinner_usage.js";
@@ -1112,7 +1112,7 @@ function render(){
  wasm.gallery_virtual_mode(Number($('virtual-axis').value));
  wasm.gallery_design_options(($('design-size').hidden?0:Number($('design-size').value)),Number($('design-radius').value),Number($('design-spacing').value));
  wasm.gallery_slider_options(...sliderValues());
- wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value),Number(controlShadowsEnabled()),Number($('radio-tab-order').checked),Number($('radio-styled-cards').checked));
+ wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value),Number(controlShadowsEnabled()),Number($('radio-tab-order').checked),Number($('radio-styled-cards').checked),Number($('radio-mode').value),Number($('radio-accept').checked));
  wasm.gallery_avatar_options(Number($('avatar-source').value),Number($('avatar-palette').checked),Number($('avatar-hue').value),Number($('avatar-placeholder').value),Number($('avatar-rem').value));
  wasm.gallery_message_options(Number($('message-alignment').value),Number($('message-variant').value),Number($('message-inset').value),Number($('message-avatar').checked),Number($('message-scrollbar').checked));
  $('dropdown-shadow').disabled=$('dropdown-paint').value==='0'||$('dropdown-variant').value!=='11';
@@ -1211,7 +1211,15 @@ function render(){
  }
  if(pagination)$('snippet').textContent=paginationUsage(designScale,$('disabled').checked,paginationMode,paginationPages,paginationFrench,paginationCustom);
  if(controlShadowsEnabled()&&['Button','Checkbox','Switch','Slider'].includes(selected.name))$('snippet').textContent=controlShadowUsage(selected.name,Number($('control-size').value),Number($('design-size').value));
- if(selected.name==='Radio')$('snippet').textContent=$('radio-styled-cards').checked?radioStyledUsage:
+ if(selected.name==='Radio') {
+  const standalone=$('radio-mode').value==='1';
+  for(const id of ['radio-tab-order-control','radio-styled-cards-control'])$(id).hidden=standalone;
+  controlShadowLabel.hidden=standalone;
+  $('radio-accept-control').hidden=!standalone;
+  $('radio-requests').hidden=!standalone;
+  $('radio-requests').textContent=`Requests: ${wasm.gallery_radio_stat(1)} · Accepted: ${wasm.gallery_radio_stat(2)} · Checked: ${Boolean(wasm.gallery_radio_stat(3))}`;
+ }
+ if(selected.name==='Radio')$('snippet').textContent=$('radio-mode').value==='1'?radioControlledUsage:$('radio-styled-cards').checked?radioStyledUsage:
   controlShadowsEnabled()?controlShadowUsage('Radio',Number($('control-size').value),designScale):snippets.Radio;
  controlShadowInput.disabled=selected.name==='Button'&&$('button-collection').value!=='0';
  if(selected.name==='Slider'&&!wasm.gallery_slider_stats(12))$('snippet').textContent=sliderUsage(...sliderValues(),$('disabled').checked,controlShadowsEnabled());
@@ -1553,6 +1561,10 @@ function selectComponent(){
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
  $('design-radius').value='-1';$('design-spacing').value='-1';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);
+ $('radio-mode').hidden=selected.name!=='Radio';
+ $('radio-mode').value='0';
+ $('radio-accept-control').hidden=true;
+ $('radio-requests').hidden=true;
  $('radio-tab-order-control').hidden=selected.name!=='Radio';
  $('radio-styled-cards-control').hidden=selected.name!=='Radio';
  for(const id of ['switch-side-control','switch-color-control'])$(id).hidden=selected.name!=='Switch';
@@ -1840,7 +1852,7 @@ for(const id of ['description-columns','description-size','description-vertical'
 for(const id of ['toolbar-size','toolbar-grouped','toolbar-input'])$(id).addEventListener('change',requestFrame);
 for(const id of ['title-decoration','title-close','title-fullscreen'])$(id).addEventListener('change',requestFrame);
 for(const id of ['motion-duration','motion-stagger','motion-easing','questionnaire-size','questionnaire-shortcuts','questionnaire-numbers','questionnaire-custom','speech-size','speech-unavailable','chart-kind','chart-curve','chart-dots','chart-labels','chart-animate','chart-custom-rows','chart-tooltip-appearance','text-view-format','text-view-scroll','text-view-fade','settings-size','settings-variant','carousel-axis','carousel-loop','command-modal','command-loading','command-filterable','sidebar-mode','sidebar-side','sidebar-collapsed','textarea-rows','textarea-grow','textarea-readonly','textarea-nowrap'])$(id).addEventListener('change',requestFrame);
-for(const id of ['button-collection','control-size','choice-required','choice-invalid','choice-skip-tab','radio-tab-order','radio-styled-cards','switch-side','switch-color','toggle-variant','toggle-segmented','toggle-selection'])$(id).addEventListener('change',requestFrame);
+for(const id of ['button-collection','control-size','choice-required','choice-invalid','choice-skip-tab','radio-mode','radio-accept','radio-tab-order','radio-styled-cards','switch-side','switch-color','toggle-variant','toggle-segmented','toggle-selection'])$(id).addEventListener('change',requestFrame);
 for(const id of ['design-size','design-radius','design-spacing'])$(id).addEventListener('change',requestFrame);
 $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(Number($('checkbox-state').value));requestFrame();});
 $('selection-mode').addEventListener('change',requestFrame);

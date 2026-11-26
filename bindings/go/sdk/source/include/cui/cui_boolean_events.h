@@ -35,6 +35,18 @@ cui_component_action_result cui_base_switch_events(cui_context *, cui_id, cui_st
 cui_component_action_result cui_base_toggle_events(cui_context *, cui_id, cui_str, bool value,
                                                    cui_boolean_event_options,
                                                    cui_component_boolean_handler);
+typedef struct {
+    cui_boolean_event_options interaction;
+    bool required, invalid;
+    /* Both zero to omit position, or 1 <= pos_in_set <= set_size. */
+    unsigned pos_in_set, set_size;
+} cui_radio_event_options;
+/* Same same-ID box and borrowing rules as Switch/Toggle above. An unchecked
+ * Radio can request true. Checked Radio activations still count, with no request.
+ * checked, selected and numeric 0/1 semantics reflect the entry snapshot. */
+cui_component_action_result cui_base_radio_events(cui_context *, cui_id, cui_str, bool checked,
+                                                  cui_radio_event_options,
+                                                  cui_component_boolean_handler);
 #ifdef __cplusplus
 }
 #endif

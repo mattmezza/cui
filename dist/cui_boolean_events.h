@@ -36,6 +36,18 @@ cui_component_action_result cui_base_switch_events(cui_context *, cui_id, cui_st
 cui_component_action_result cui_base_toggle_events(cui_context *, cui_id, cui_str, bool value,
                                                    cui_boolean_event_options,
                                                    cui_component_boolean_handler);
+typedef struct {
+    cui_boolean_event_options interaction;
+    bool required, invalid;
+    /* Both zero to omit position, or 1 <= pos_in_set <= set_size. */
+    unsigned pos_in_set, set_size;
+} cui_radio_event_options;
+/* Same same-ID box and borrowing rules as Switch/Toggle above. An unchecked
+ * Radio can request true. Checked Radio activations still count, with no request.
+ * checked, selected and numeric 0/1 semantics reflect the entry snapshot. */
+cui_component_action_result cui_base_radio_events(cui_context *, cui_id, cui_str, bool checked,
+                                                  cui_radio_event_options,
+                                                  cui_component_boolean_handler);
 #ifdef __cplusplus
 }
 #endif
@@ -56,6 +68,7 @@ static void count_event(size_t *count, bool *overflow) {
 static cui_component_action_result boolean_events(cui_context *ui, cui_id id, cui_str name,
                                                   bool value, cui_role role,
                                                   cui_boolean_event_options options,
+                                                  cui_semantic_details details,
                                                   cui_component_boolean_handler handler) {
     cui_component_action_result result = {0};
     if (!ui || !id || (name.length && !name.data))
@@ -65,11 +78,11 @@ static cui_component_action_result boolean_events(cui_context *ui, cui_id id, cu
     if (!cui_frame_sequence(ui))
         return result;
     result.submitted = true;
-    (void)cui_interact(ui, id, role, name, options.disabled, value, 0);
-    cui_set_semantic_details(
-        ui, id,
-        (cui_semantic_details){.no_pointer_focus = options.no_pointer_focus,
-                               .pointer_activatable = options.no_pointer_focus});
+    bool radio = role == CUI_ROLE_RADIO;
+    (void)cui_interact(ui, id, role, name, options.disabled, value, radio && value ? 1 : 0);
+    details.no_pointer_focus = options.no_pointer_focus;
+    details.pointer_activatable = options.no_pointer_focus;
+    cui_set_semantic_details(ui, id, details);
     cui_set_tab_index(ui, id, options.tab_index);
     cui_set_tab_stop(ui, id, !options.skip_tab);
     size_t count = 0;
@@ -84,7 +97,7 @@ static cui_component_action_result boolean_events(cui_context *ui, cui_id id, cu
                                                  &snapshot))
             continue;
         count_event(&result.activation_count, &result.count_overflow);
-        if (handler.callback) {
+        if (handler.callback && !(radio && value)) {
             count_event(&result.request_count, &result.count_overflow);
             handler.callback(handler.user, &request);
         }
@@ -94,12 +107,28 @@ static cui_component_action_result boolean_events(cui_context *ui, cui_id id, cu
 cui_component_action_result cui_base_switch_events(cui_context *ui, cui_id id, cui_str name,
                                                    bool value, cui_boolean_event_options options,
                                                    cui_component_boolean_handler handler) {
-    return boolean_events(ui, id, name, value, CUI_ROLE_SWITCH, options, handler);
+    return boolean_events(ui, id, name, value, CUI_ROLE_SWITCH, options, (cui_semantic_details){0},
+                          handler);
 }
 cui_component_action_result cui_base_toggle_events(cui_context *ui, cui_id id, cui_str name,
                                                    bool value, cui_boolean_event_options options,
                                                    cui_component_boolean_handler handler) {
-    return boolean_events(ui, id, name, value, CUI_ROLE_BUTTON, options, handler);
+    return boolean_events(ui, id, name, value, CUI_ROLE_BUTTON, options, (cui_semantic_details){0},
+                          handler);
+}
+cui_component_action_result cui_base_radio_events(cui_context *ui, cui_id id, cui_str name,
+                                                  bool checked, cui_radio_event_options options,
+                                                  cui_component_boolean_handler handler) {
+    if ((options.pos_in_set == 0) != (options.set_size == 0) ||
+        options.pos_in_set > options.set_size)
+        return (cui_component_action_result){0};
+    return boolean_events(ui, id, name, checked, CUI_ROLE_RADIO, options.interaction,
+                          (cui_semantic_details){.required = options.required,
+                                                 .invalid = options.invalid,
+                                                 .selected = checked,
+                                                 .pos_in_set = options.pos_in_set,
+                                                 .set_size = options.set_size},
+                          handler);
 }
 
 #endif

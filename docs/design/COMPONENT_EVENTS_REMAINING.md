@@ -13,8 +13,8 @@ run for this audit. Linked tests are evidence to inspect, not newly executed pro
 Button, Input, Checkbox, Switch, Toggle, controlled double Slider, selections,
 menus and completed dialog close already have additive C APIs. The remaining
 objective is discoverable use and honest boundaries, rather than inventing a
-new callback for every render family. Standalone legacy Radio/float Slider and
-legacy entrypoints are preserved alternatives, not automatically adapted APIs.
+new callback for every render family. Legacy shared-integer Radio and float
+Slider preserve their existing transition and callback timing.
 Controlled requests permit owner rejection; applied notifications do not. Enter
 submission, gesture commit and completed surface close are distinct events.
 
@@ -60,7 +60,7 @@ full-family verification. Each family links its authoritative public header.
 | [Notification](../../include/cui/cui_status.h) | T | Retained descriptor click/action/close callbacks with typed ID and host send/retract operations; descriptor strings/users survive use, not just submission. |
 | [Pagination](../../include/cui/cui_numeric.h) | A | [NUMERIC_SELECTION_EVENTS](../NUMERIC_SELECTION_EVENTS.md): Aggregate applied page. Styled ellipsis jumps use the Menu activation index in the existing ordered reducer. Opening and dismissal leave the page unchanged. |
 | [Progress](../../include/cui/cui_components.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
-| [Radio](../../include/cui/cui_components.h) | A | [SELECTION_EVENTS](../SELECTION_EVENTS.md): RadioGroup Base/Styled transitions covered; standalone legacy int Radio has no new facade. |
+| [Radio](../../include/cui/cui_components.h) | A | [SELECTION_EVENTS](../SELECTION_EVENTS.md): RadioGroup Base/Styled transitions. [BOOLEAN_EVENTS](../BOOLEAN_EVENTS.md#standalone-radio) covers Base/Styled standalone typed requests. |
 | [Rating](../../include/cui/cui_numeric.h) | A | [NUMERIC_SELECTION_EVENTS](../NUMERIC_SELECTION_EVENTS.md): Aggregate applied page/index/rating; normalization is not automatically notification. |
 | [Shimmer](../../include/cui/cui_status.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
 | [Skeleton](../../include/cui/cui_content.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |

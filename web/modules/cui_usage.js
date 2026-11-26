@@ -369,3 +369,30 @@ void delivery_options(cui_context *ui, cui_theme *theme, cui_id *selected,
             .items = {.instance = delivery_option, .user = theme}
         }, (cui_selection_handler){0});
 }`;
+
+
+export const radioControlledUsage = `#include "cui/cui_components.h"
+
+typedef struct {
+    bool checked, accept_requests;
+    unsigned requests;
+} choice_owner;
+
+static void request_choice(void *user, const cui_component_boolean_request *request) {
+    choice_owner *owner = user;
+    owner->requests++;
+    /* A radio requests false -> true; checked activation makes no request. */
+    if (owner->accept_requests) owner->checked = request->requested;
+}
+
+void controlled_choice(cui_context *ui, const cui_theme *theme, choice_owner *owner) {
+    if (cui_button(ui, cui_id_from(ui, "clear-choice"), theme,
+                   cui_string("Clear selection"), false)) owner->checked = false;
+    const bool submitted = owner->checked;
+    cui_radio_events(ui, cui_id_from(ui, "choice"), theme,
+        cui_string("Standalone choice"), submitted,
+        (cui_radio_options){0}, (cui_radio_presentation){0}, (cui_radio_styles){0},
+        (cui_component_boolean_handler){.callback = request_choice, .user = owner});
+    /* Owner changes appear on the next submission; schedule that frame. */
+    if (submitted != owner->checked) cui_invalidate(ui);
+}`;

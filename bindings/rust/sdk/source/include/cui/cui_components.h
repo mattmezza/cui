@@ -452,6 +452,15 @@ typedef struct {
  * overriding indicator.background sets the fill for that frame. */
 bool cui_radio_present_styled(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                               cui_radio_options, cui_radio_presentation, cui_radio_styles);
+/* Compose one styled Radio with the same entry snapshot and borrowed handler
+ * as cui_base_radio_events. The styled call supplies its own layout box.
+ * options.on_change and options.change_user must both be NULL. If a handler
+ * accepts, schedule another frame to make that owner assignment visible.
+ * Passive composition does not advance caller-owned motion or tooltip state. */
+cui_component_action_result cui_radio_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                             bool checked, cui_radio_options,
+                                             cui_radio_presentation, cui_radio_styles,
+                                             cui_component_boolean_handler);
 /* Double controlled Styled facade: include cui_styled_slider_events.h. */
 /* Existing Slider track identity. Root id also includes label/framing; this
  * entry has no separate thumb. Returns0 for owner0 or derived zero. Identity

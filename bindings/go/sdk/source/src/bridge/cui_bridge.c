@@ -1820,9 +1820,9 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app->radio_tooltips);
     free(app);
 }
-cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
-                                         cui_bridge_kind kind, const char *key_utf8,
-                                         cui_bridge_node *out_node) {
+static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
+                                            cui_bridge_kind kind, const char *key_utf8,
+                                            uint32_t attachment_role, cui_bridge_node *out_node) {
     cui_bridge_status status = bridge_ready(app);
     if (status != CUI_BRIDGE_OK)
         return status;
@@ -1872,7 +1872,8 @@ cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node pa
             p->kind != CUI_BRIDGE_TABLE && p->kind != CUI_BRIDGE_COMMAND &&
             p->kind != CUI_BRIDGE_VIRTUAL_LIST && p->kind != CUI_BRIDGE_SIDEBAR &&
             p->kind != CUI_BRIDGE_DOCK && p->kind != CUI_BRIDGE_SETTINGS &&
-            p->kind != CUI_BRIDGE_BADGE_CONFIGURED)
+            p->kind != CUI_BRIDGE_BADGE_CONFIGURED &&
+            !(p->kind == CUI_BRIDGE_ATTACHMENT && attachment_role))
             return CUI_BRIDGE_INVALID_STATE;
         if (p->kind == CUI_BRIDGE_ITEM && p->parent &&
             app->nodes[p->parent].kind == CUI_BRIDGE_ITEM &&
@@ -1946,6 +1947,8 @@ cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node pa
                 return CUI_BRIDGE_CAPACITY;
             if (app->nodes[ancestor].radio_item_content && !bridge_radio_content_kind(kind))
                 return CUI_BRIDGE_INVALID_STATE;
+            if (app->nodes[ancestor].attachment_role && kind == CUI_BRIDGE_NOTIFICATION)
+                return CUI_BRIDGE_INVALID_STATE; /* Notifications use the app-wide stack. */
         }
     }
     size_t length = 0;
@@ -2020,6 +2023,7 @@ cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node pa
         .generation = generation,
         .live = true,
         .kind = kind,
+        .attachment_role = attachment_role,
         .owner = app,
         .own_slot = slot,
         .parent = root ? 0 : parent.slot,
@@ -2160,6 +2164,11 @@ cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node pa
     *out_node = (cui_bridge_node){slot, generation};
     return CUI_BRIDGE_OK;
 }
+cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
+                                         cui_bridge_kind kind, const char *key_utf8,
+                                         cui_bridge_node *out_node) {
+    return bridge_node_create(app, parent, kind, key_utf8, 0, out_node);
+}
 static void bridge_remove_subtree(cui_bridge_app *app, uint32_t slot) {
     cui_bridge_node_record *node = &app->nodes[slot];
     if (node->kind == CUI_BRIDGE_NOTIFICATION && app->notifications)
@@ -2226,6 +2235,8 @@ cui_bridge_status cui_bridge_node_remove(cui_bridge_app *app, cui_bridge_node ha
         }
     } else
         app->root = 0;
+    if (node->attachment_role)
+        cui_invalidate(app->ui);
     bridge_remove_subtree(app, handle.slot);
     return CUI_BRIDGE_OK;
 }
@@ -3226,33 +3237,34 @@ cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *app, cui_bridge_node h
             app->nodes[ancestor].questionnaire &&
             app->nodes[ancestor].questionnaire->state.initialized)
             return CUI_BRIDGE_INVALID_STATE;
-    if (node->kind < CUI_BRIDGE_BUTTON ||
-        (node->kind > CUI_BRIDGE_SLIDER && node->kind != CUI_BRIDGE_INPUT &&
-         node->kind != CUI_BRIDGE_TEXTAREA && node->kind != CUI_BRIDGE_NUMBER_INPUT &&
-         node->kind != CUI_BRIDGE_COLLAPSIBLE && node->kind != CUI_BRIDGE_RADIO_GROUP &&
-         node->kind != CUI_BRIDGE_TABS && node->kind != CUI_BRIDGE_ACCORDION &&
-         node->kind != CUI_BRIDGE_ITEM && node->kind != CUI_BRIDGE_SELECT &&
-         node->kind != CUI_BRIDGE_COMBOBOX && node->kind != CUI_BRIDGE_DROPDOWN_BUTTON &&
-         node->kind != CUI_BRIDGE_TOOLTIP && node->kind != CUI_BRIDGE_HOVER_CARD &&
-         node->kind != CUI_BRIDGE_LIST && node->kind != CUI_BRIDGE_MENU &&
-         node->kind != CUI_BRIDGE_STEPPER && node->kind != CUI_BRIDGE_PAGINATION &&
-         node->kind != CUI_BRIDGE_RATING && node->kind != CUI_BRIDGE_TOOLBAR &&
-         node->kind != CUI_BRIDGE_TREE && node->kind != CUI_BRIDGE_TIME_FIELD &&
-         node->kind != CUI_BRIDGE_COLOR_PICKER && node->kind != CUI_BRIDGE_CALENDAR &&
-         node->kind != CUI_BRIDGE_DATE_PICKER && node->kind != CUI_BRIDGE_OTP_INPUT &&
-         node->kind != CUI_BRIDGE_FORM && node->kind != CUI_BRIDGE_INPUT_GROUP &&
-         node->kind != CUI_BRIDGE_CAROUSEL && node->kind != CUI_BRIDGE_RESIZABLE &&
-         node->kind != CUI_BRIDGE_TEXT_VIEW && node->kind != CUI_BRIDGE_EDITOR &&
-         node->kind != CUI_BRIDGE_CHART && node->kind != CUI_BRIDGE_DATA_TABLE &&
-         node->kind != CUI_BRIDGE_COMMAND && node->kind != CUI_BRIDGE_VIRTUAL_LIST &&
-         node->kind != CUI_BRIDGE_SIDEBAR && node->kind != CUI_BRIDGE_SPEECH &&
-         node->kind != CUI_BRIDGE_QUESTIONNAIRE && node->kind != CUI_BRIDGE_DOCK &&
-         node->kind != CUI_BRIDGE_BADGE_CONFIGURED && node->kind != CUI_BRIDGE_ATTACHMENT))
+    if (!node->attachment_role &&
+        (node->kind < CUI_BRIDGE_BUTTON ||
+         (node->kind > CUI_BRIDGE_SLIDER && node->kind != CUI_BRIDGE_INPUT &&
+          node->kind != CUI_BRIDGE_TEXTAREA && node->kind != CUI_BRIDGE_NUMBER_INPUT &&
+          node->kind != CUI_BRIDGE_COLLAPSIBLE && node->kind != CUI_BRIDGE_RADIO_GROUP &&
+          node->kind != CUI_BRIDGE_TABS && node->kind != CUI_BRIDGE_ACCORDION &&
+          node->kind != CUI_BRIDGE_ITEM && node->kind != CUI_BRIDGE_SELECT &&
+          node->kind != CUI_BRIDGE_COMBOBOX && node->kind != CUI_BRIDGE_DROPDOWN_BUTTON &&
+          node->kind != CUI_BRIDGE_TOOLTIP && node->kind != CUI_BRIDGE_HOVER_CARD &&
+          node->kind != CUI_BRIDGE_LIST && node->kind != CUI_BRIDGE_MENU &&
+          node->kind != CUI_BRIDGE_STEPPER && node->kind != CUI_BRIDGE_PAGINATION &&
+          node->kind != CUI_BRIDGE_RATING && node->kind != CUI_BRIDGE_TOOLBAR &&
+          node->kind != CUI_BRIDGE_TREE && node->kind != CUI_BRIDGE_TIME_FIELD &&
+          node->kind != CUI_BRIDGE_COLOR_PICKER && node->kind != CUI_BRIDGE_CALENDAR &&
+          node->kind != CUI_BRIDGE_DATE_PICKER && node->kind != CUI_BRIDGE_OTP_INPUT &&
+          node->kind != CUI_BRIDGE_FORM && node->kind != CUI_BRIDGE_INPUT_GROUP &&
+          node->kind != CUI_BRIDGE_CAROUSEL && node->kind != CUI_BRIDGE_RESIZABLE &&
+          node->kind != CUI_BRIDGE_TEXT_VIEW && node->kind != CUI_BRIDGE_EDITOR &&
+          node->kind != CUI_BRIDGE_CHART && node->kind != CUI_BRIDGE_DATA_TABLE &&
+          node->kind != CUI_BRIDGE_COMMAND && node->kind != CUI_BRIDGE_VIRTUAL_LIST &&
+          node->kind != CUI_BRIDGE_SIDEBAR && node->kind != CUI_BRIDGE_SPEECH &&
+          node->kind != CUI_BRIDGE_QUESTIONNAIRE && node->kind != CUI_BRIDGE_DOCK &&
+          node->kind != CUI_BRIDGE_BADGE_CONFIGURED && node->kind != CUI_BRIDGE_ATTACHMENT)))
         return CUI_BRIDGE_INVALID_STATE;
     if (disabled > 1)
         return CUI_BRIDGE_INVALID_ARGUMENT;
     node->disabled = disabled != 0;
-    if (node->kind == CUI_BRIDGE_ATTACHMENT)
+    if (node->kind == CUI_BRIDGE_ATTACHMENT || node->attachment_role)
         cui_invalidate(app->ui);
     if (node->disabled && node->data_table)
         bridge_data_table_clear_load_more(node->data_table);
@@ -3335,6 +3347,32 @@ cui_bridge_status cui_bridge_attachment_set_actions_v1(cui_bridge_app *app, cui_
     node->attachment_actions = actions;
     cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
+}
+cui_bridge_status cui_bridge_attachment_slot_create_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                       uint32_t role, const char *key,
+                                                       float preferred_width,
+                                                       cui_bridge_node *out_slot) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_ATTACHMENT)
+        return CUI_BRIDGE_INVALID_STATE;
+    bool actions = role == CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1;
+    if (!out_slot || role < CUI_BRIDGE_ATTACHMENT_SLOT_MEDIA_V1 ||
+        role > CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1 ||
+        (actions ? !(preferred_width > 0 && preferred_width <= 4096) : preferred_width != 0))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
+        if (app->nodes[child].attachment_role == role)
+            return CUI_BRIDGE_INVALID_STATE;
+    status = bridge_node_create(app, handle, actions ? CUI_BRIDGE_ROW : CUI_BRIDGE_COLUMN, key,
+                                role, out_slot);
+    if (status == CUI_BRIDGE_OK) {
+        app->nodes[out_slot->slot].visual_width = preferred_width;
+        cui_invalidate(app->ui);
+    }
+    return status;
 }
 cui_bridge_status cui_bridge_set_stepper_visual(cui_bridge_app *app, cui_bridge_node handle,
                                                 uint32_t enabled, uint32_t vertical,
@@ -4741,13 +4779,44 @@ static void bridge_attachment_action(void *user, const cui_attachment_action_eve
     bridge_enqueue_click(node->owner, node->own_slot, evidence->frame_sequence, payload);
 }
 
+static void bridge_attachment_slot_render(cui_context *ui, cui_id id, void *user, float width,
+                                          float height) {
+    (void)id;
+    if (width <= 0)
+        return;
+    cui_bridge_node_record *slot = user;
+    cui_bridge_app *app = slot->owner;
+    bool preview = slot->attachment_role == CUI_BRIDGE_ATTACHMENT_SLOT_MEDIA_V1 ||
+                   slot->attachment_role == CUI_BRIDGE_ATTACHMENT_SLOT_OVERLAY_V1;
+    bool was_disabled = app->render_disabled;
+    bool disabled = was_disabled || slot->disabled || app->nodes[slot->parent].disabled;
+    app->render_disabled = disabled;
+    cui_begin_box(ui, slot->id,
+                  (cui_box){.width = width,
+                            .fixed_width = true,
+                            .height = preview ? height : 0,
+                            .gap = slot->gap,
+                            .clip = true,
+                            .inert = disabled,
+                            .row = slot->kind == CUI_BRIDGE_ROW,
+                            .align_x = preview ? CUI_ALIGN_CENTER : CUI_ALIGN_START,
+                            .align_y = CUI_ALIGN_CENTER});
+    bridge_item_content(ui, slot);
+    cui_end_box(ui);
+    bridge_apply_shadows(app, slot);
+    app->render_disabled = was_disabled;
+}
+
 static void bridge_render_attachment(cui_bridge_app *app, cui_bridge_node_record *node) {
     const cui_bridge_attachment_config_v1 *config = node->attachment_config;
     uint32_t flags = config ? config->flags : 0;
-    cui_attachment_child children[2];
+    cui_bridge_node_record *slots[CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1 + 1] = {0};
+    for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
+        slots[app->nodes[child].attachment_role] = &app->nodes[child];
+    cui_attachment_child children[3];
     size_t count = 0;
     bridge_attachment_binding binding = {.node = node};
-    if (!config || node->text[0]) {
+    if ((!config && !node->first_child) || node->text[0]) {
         children[count] =
             (cui_attachment_child){.kind = CUI_ATTACHMENT_TITLE, .text = cui_string(node->text)};
         if (config)
@@ -4767,6 +4836,11 @@ static void bridge_render_attachment(cui_bridge_app *app, cui_bridge_node_record
                                          config->description_status);
         count++;
     }
+    if (slots[CUI_BRIDGE_ATTACHMENT_SLOT_METADATA_V1])
+        children[count++] =
+            (cui_attachment_child){.kind = CUI_ATTACHMENT_CUSTOM,
+                                   .render = bridge_attachment_slot_render,
+                                   .user = slots[CUI_BRIDGE_ATTACHMENT_SLOT_METADATA_V1]};
     cui_attachment_options options = cui_attachment_options_default();
     options.model.status = (cui_attachment_status)node->attachment_status;
     options.model.progress_known = !(flags & CUI_BRIDGE_ATTACHMENT_INDETERMINATE_V1);
@@ -4775,6 +4849,20 @@ static void bridge_render_attachment(cui_bridge_app *app, cui_bridge_node_record
     options.model.design_size = (cui_design_size)node->size;
     options.model.vertical = (flags & CUI_BRIDGE_ATTACHMENT_VERTICAL_V1) != 0;
     options.model.media = (flags & CUI_BRIDGE_ATTACHMENT_MEDIA_V1) != 0;
+    if (slots[CUI_BRIDGE_ATTACHMENT_SLOT_MEDIA_V1]) {
+        options.media_content = bridge_attachment_slot_render;
+        options.media_user = slots[CUI_BRIDGE_ATTACHMENT_SLOT_MEDIA_V1];
+    }
+    if (slots[CUI_BRIDGE_ATTACHMENT_SLOT_OVERLAY_V1]) {
+        options.model.media = true;
+        options.media_overlay = bridge_attachment_slot_render;
+        options.overlay_user = slots[CUI_BRIDGE_ATTACHMENT_SLOT_OVERLAY_V1];
+    }
+    if (slots[CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1]) {
+        options.actions = bridge_attachment_slot_render;
+        options.actions_user = slots[CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1];
+        options.actions_width = slots[CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1]->visual_width;
+    }
     uint32_t actions = node->disabled ? 0 : node->attachment_actions;
     options.model.identified = actions != 0;
     if (config && config->media_aspect)
@@ -4806,6 +4894,8 @@ static void bridge_render_attachment(cui_bridge_app *app, cui_bridge_node_record
         .user = &binding,
     };
     unsigned interaction_flags = 0;
+    if (node->first_child)
+        interaction_flags |= CUI_ATTACHMENT_RETAINED_SLOTS;
     if (handler.on_activate)
         interaction_flags |= CUI_ATTACHMENT_FOCUSABLE_OPEN;
     if (handler.on_remove)

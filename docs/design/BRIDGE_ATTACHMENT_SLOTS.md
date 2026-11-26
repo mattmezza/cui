@@ -33,6 +33,10 @@ an image. Typed metadata keeps its styling and retry routing. Card disablement
 suppresses input to slots without overwriting child configuration.
 
 Rendering reuses the existing immediate composition and relative paint order.
+A retained overlay and vertical action row are attached to the card's current
+layout, with ancestor clipping. The overlay covers the preview. Built-in
+lifecycle feedback keeps its foreground layer. Standalone Notification nodes
+use the app-wide stack and cannot be created inside these slots.
 A slot marked disabled or omitted cannot activate its descendants. The
 contents of the action lane use the input and event semantics of the submitted
 controls. Child events can be queued earlier than the outer card's built-in

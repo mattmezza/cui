@@ -231,6 +231,19 @@ int main(void) {
     step(app);
     assert(bounds(app, card).height == 82 && paint.image.w == 160 && paint.image.h == 80);
 
+    cui_bridge_node overlay, play;
+    assert(cui_bridge_attachment_slot_create_v1(app, card, CUI_BRIDGE_ATTACHMENT_SLOT_OVERLAY_V1,
+                                                "overlay", 0, &overlay) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, overlay, CUI_BRIDGE_BUTTON, "play", &play) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, play, "View") == CUI_BRIDGE_OK);
+    cui_color overlay_color = {57, 108, 239, 255};
+    app->theme.buttons[CUI_THEME_BUTTON_PRIMARY].normal = overlay_color;
+    step(app);
+    assert(paint.preview_count == 1 && sample_preview() == bridge_pack_color(overlay_color));
+    assert(cui_bridge_node_remove(app, overlay) == CUI_BRIDGE_OK);
+    step(app);
+    assert(sample_preview() == UINT32_C(0x108020ff));
+
     assert(cui_bridge_attachment_set_preview_rgba_v1(app, card, NULL, 0, 0, 0, 0) == CUI_BRIDGE_OK);
     step(app);
     assert(!paint.preview_count);

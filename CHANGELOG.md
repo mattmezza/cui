@@ -13,6 +13,8 @@
 - Retained Attachment offers opt-in Open, Remove and Retry in C, Python,
   JavaScript, TypeScript, Go and Rust. A manual typed poll reads actions and
   ordinary events from the existing queue.
+- Retained C Attachment cards can host custom preview fallbacks, overlays,
+  metadata and action rows with their own child controls and events.
 
 ## 0.1.0-alpha.10
 

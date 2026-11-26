@@ -368,6 +368,7 @@
         "tests/unit/test_media.c",
         "tests/unit/test_bridge_attachment.c",
         "tests/unit/test_bridge_attachment_actions.c",
+        "tests/unit/test_bridge_attachment_slots.c",
         "tests/web/test_browser.py",
         "tests/unit/test_compound_shadow_parts.c",
         "tests/unit/test_compound_shadow_legacy.c"
@@ -378,7 +379,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Immediate and retained C have opt-in styled end ellipsis. Retained C and all five language facades support named sizes, axis, media aspect, child status overrides and copied RGBA previews. Retained C, Python, JavaScript, TypeScript, Go and Rust opt into queued Open, Remove and Retry. The language action API uses the manual shared queue. Composed retained slots, encoded file/network decoding, a shared resource cache, fully inherited styling and platform accessibility remain open."
+        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Immediate and retained C have opt-in styled end ellipsis. Retained C and all five language facades support named sizes, axis, media aspect, child status overrides and copied RGBA previews. Retained C, Python, JavaScript, TypeScript, Go and Rust opt into queued Open, Remove and Retry. The language action API uses the manual shared queue. Retained C adds custom preview fallback, overlay, metadata and action slots. Language slot builders, encoded file/network decoding, a shared resource cache, fully inherited styling and platform accessibility remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -410,7 +411,7 @@
             "tests/unit/test_media.c",
             "docs/BRIDGE_COMPONENTS.md"
           ],
-          "scope": "Headless draw geometry, copy and replacement, media aspect, status overrides, normalized progress and accessible full labels. Arbitrary retained action composition is pending."
+          "scope": "Headless draw geometry, copy and replacement, media aspect, status overrides, normalized progress and accessible full labels."
         },
         {
           "name": "retained Attachment in language builders",
@@ -439,6 +440,16 @@
             "docs/ATTACHMENT_EVENTS.md"
           ],
           "scope": "Retained C Open, Remove and Retry with real pointer, keyboard and core accessibility evidence. Python, Node, Go and Rust headless runtime tests and TypeScript type checks cover the typed builders. Legacy and typed polls consume one queue. Injected core accessibility tests are distinct from physical accessibility acceptance."
+        },
+        {
+          "name": "retained C custom slots",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_attachment_slots.c",
+            "bindings/bridge/examples/attachment_slots.c",
+            "docs/BRIDGE_COMPONENTS.md"
+          ],
+          "scope": "Headless geometry in both axes, bounded action width, overlay and decoded image coexistence, child activation, inert and omitted children, capacity and generational ownership. Language builders omit the slot factory."
         },
         {
           "name": "preview/remove actions",

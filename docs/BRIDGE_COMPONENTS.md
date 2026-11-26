@@ -577,6 +577,55 @@ dynamically. Call the setters between steps on the owner thread. The
 application owns file selection, decoding, transfer state and retry.
 [Immediate C Attachment](MEDIA.md#fit-file-names-and-descriptions)
 
+### Compose a retained Attachment from C
+
+Call `cui_bridge_attachment_slot_create_v1` between steps. Create one
+container per role and give each a unique key. Use ordinary node creation for
+the children. The card can use any combination of these roles.
+
+| Role | Layout and visibility |
+| --- | --- |
+| `CUI_BRIDGE_ATTACHMENT_SLOT_MEDIA_V1` | Centered fallback in the preview. An installed image or lifecycle feedback can take its place. |
+| `CUI_BRIDGE_ATTACHMENT_SLOT_OVERLAY_V1` | Centered content over the preview, including when an image is installed. Built-in lifecycle feedback keeps its foreground layer. |
+| `CUI_BRIDGE_ATTACHMENT_SLOT_METADATA_V1` | A column after the typed title and description. |
+| `CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1` | A row at the trailing end or in the upper-right corner of a vertical card. The lane fits within the card. |
+
+Give the action row a preferred width in logical pixels, up to 4096. Pass 0
+for the other roles. Use `cui_bridge_set_gap` on the slot and choose child
+sizes that fit the lane. A slot with no room can be omitted. Slots inherit
+ancestor clipping. App-wide Notifications belong outside the slot tree.
+
+```c
+cui_bridge_node actions, inspect;
+cui_bridge_status status = cui_bridge_attachment_slot_create_v1(
+    app, card, CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1, "report-actions", 100, &actions);
+if (status == CUI_BRIDGE_OK)
+    status = cui_bridge_node_create(app, actions, CUI_BRIDGE_BUTTON, "inspect-report", &inspect);
+if (status == CUI_BRIDGE_OK)
+    status = cui_bridge_set_text(app, inspect, "Inspect");
+```
+
+A click on Inspect arrives with its Button handle and the usual activation
+payload. The card can also opt into [built-in file actions](ATTACHMENT_EVENTS.md#retained-actions).
+If both fire in a frame, child events can precede file actions. Keep handling
+them through a single chosen queue reader. Disabling a slot or its card makes
+the contents inert and preserves their settings. Removing a slot or its card
+also removes the descendants and retires their unread events. For dynamically
+loaded providers, probe the factory symbol independently. The language
+builders currently expose presentation, previews and built-in actions.
+
+Build and run the [project files example](../bindings/bridge/examples/attachment_slots.c)
+to verify that Inspect updates the summary from an ordinary Button event.
+
+```sh
+cmake -S . -B build-bridge -G Ninja -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
+cmake --build build-bridge --target bridge_attachment_slots_example
+./build-bridge/bridge_attachment_slots_example
+```
+
+Run that example with a font path and an SDL-enabled bridge to open the
+interactive native window. See [native setup](NATIVE_APP_STARTER.md) for prerequisites.
+
 ### Show an attachment preview in a language builder
 
 Python, JavaScript and TypeScript use `attachment_options` to apply the copied
@@ -619,8 +668,8 @@ builder and `App::configure_attachment` and `App::clear_attachment_preview`
 for updates. The Go and Rust upload examples include an application-owned
 button that completes the transfer. Applications using the C bridge can opt
 into built-in Open, Remove and Retry and read them from the notification queue.
-Language builders cover presentation and previews. Use immediate C for custom
-media, metadata and action slots. [Retained C actions](ATTACHMENT_EVENTS.md#retained-actions)
+Language builders cover presentation and previews. Immediate and retained C
+support custom slots. [Retained C composition](#compose-a-retained-attachment-from-c)
 
 From the repository root, build the headless C bridge and Node addon,
 then run the examples:

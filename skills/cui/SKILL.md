@@ -547,8 +547,13 @@ and Retry with `cui_bridge_attachment_set_actions_v1`. Request
 `CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1` when polling. The actions request app
 work and never change transfer status. Python, JS/TS, Go and Rust support the
 independent actions through optional builders and manual component notification
-polls. Manual polling and ordinary dispatch share one queue. Custom slots use
-immediate C. See `docs/ATTACHMENT_EVENTS.md#retained-actions-from-language-builders`.
+polls. Manual polling and ordinary dispatch share one queue. Immediate and
+retained C support custom slots. In retained C use
+`cui_bridge_attachment_slot_create_v1` for preview fallback, overlay, metadata
+or an action row. Children keep their own events and are removed with the slot.
+The language builders omit the slot factory. See
+`docs/BRIDGE_COMPONENTS.md#compose-a-retained-attachment-from-c` and
+`docs/ATTACHMENT_EVENTS.md#retained-actions-from-language-builders`.
 
 For a pinned navigation header/footer with body-only scrolling, use
 `cui_sidebar` with a persistent measurement cache. Tab and accessibility focus

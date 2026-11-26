@@ -103,6 +103,7 @@ typedef struct {
     cui_title_bar_state title_bar_state;
     cui_attachment_state attachment_state;
     uint32_t attachment_actions;
+    uint32_t attachment_role;
     cui_bridge_attachment_status attachment_status;
     cui_bridge_attachment_config_v1 *attachment_config;
     cui_image_state image_state;

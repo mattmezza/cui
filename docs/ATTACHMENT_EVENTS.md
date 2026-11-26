@@ -128,8 +128,9 @@ Extended views carry the numeric action code in `legacy.value` or
 
 For dynamic loading, check the setter and
 `CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1` separately. The existing V1 record
-retains its layout. Custom retained slots and physical accessibility
-verification remain open.
+retains its layout. [Retained C slots](BRIDGE_COMPONENTS.md#compose-a-retained-attachment-from-c)
+emit ordinary child notifications with their own handles. Physical assistive
+technology verification remains open.
 
 ## Retained actions from language builders
 

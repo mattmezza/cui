@@ -613,7 +613,8 @@ static inline bool cui_design_resolve(cui_design_size size, float density,
 enum {
     CUI_ATTACHMENT_FOCUSABLE_OPEN = 1u << 0,
     CUI_ATTACHMENT_PERSISTENT_REMOVE = 1u << 1,
-    CUI_ATTACHMENT_DISABLED = 1u << 2
+    CUI_ATTACHMENT_DISABLED = 1u << 2,
+    CUI_ATTACHMENT_RETAINED_SLOTS = 1u << 3
 };
 
 /* Retained presentation uses the same renderer and action observer as the
@@ -1193,6 +1194,19 @@ cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t, cui_attach
                                      8 * p.metrics.text);
         r.plan.width = p.width;
     }
+    bool retained_slots = (interaction_flags & CUI_ATTACHMENT_RETAINED_SLOTS) != 0;
+    bool has_media = p.media_width > 0 && p.media_height > 0;
+    const float action_inset = 12;
+    if (retained_slots && o.actions) {
+        float remaining = p.width - 2 * action_inset;
+        if (!o.model.vertical)
+            remaining = p.width - p.metrics.padding_start - p.metrics.padding_end -
+                        (has_media ? p.media_width + p.metrics.gap : 0) -
+                        (o.model.content ? p.metrics.gap : 0);
+        o.actions_width = fminf(o.actions_width, fmaxf(0, remaining));
+        if (o.actions_width <= 0)
+            o.actions = NULL;
+    }
     float radius = o.model.size == CUI_MEDIA_XSMALL ? t->radius : t->radius * 1.5f;
     bool click = o.model.identified && (o.on_click || (observer && observer->handler.on_activate));
     bool focusable = click && (interaction_flags & CUI_ATTACHMENT_FOCUSABLE_OPEN);
@@ -1225,6 +1239,7 @@ cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t, cui_attach
                             .border_width = focus_ring ? 2
                                             : p.dashed ? 0
                                                        : 1,
+                            .clip = retained_slots && o.model.vertical && o.actions,
                             .align_y = CUI_ALIGN_CENTER});
     cui_track_bounds(ui, id, &state->card);
     if (!o.model.vertical) {
@@ -1238,7 +1253,6 @@ cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t, cui_attach
         cui_end_box(ui);
     }
     cui_id media_id = cui_media_id(id, 3);
-    bool has_media = p.media_width > 0 && p.media_height > 0;
     /* The retained action portals need a paint pass after their anchors
      * acquire geometry, including when there is no active pointer. */
     if (interaction_flags && cui_frame_paint_enabled(ui) &&
@@ -1276,6 +1290,13 @@ cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t, cui_attach
                    o.media_content)
             o.media_content(ui, cui_media_id(media_id, 2), o.media_user, p.media_width,
                             p.media_height);
+        if (retained_slots && o.media_overlay) {
+            cui_begin_absolute_box(ui, cui_media_id(media_id, 5), (cui_box){0},
+                                   (cui_rect){0, 0, -1, -1});
+            o.media_overlay(ui, cui_media_id(media_id, 6), o.overlay_user, p.media_width,
+                            p.media_height);
+            cui_end_box(ui);
+        }
         cui_end_box(ui);
         cui_rect b = state->media;
         if (b.w > 0 && (p.scrim || p.spinner || p.progress_ring || p.rejection || p.retry_media)) {
@@ -1302,7 +1323,7 @@ cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t, cui_attach
                                                         .color = color});
             cui_end_box(ui);
         }
-        if (b.w > 0 && o.media_overlay) {
+        if (!retained_slots && b.w > 0 && o.media_overlay) {
             cui_begin_portal(ui, cui_media_id(media_id, 5),
                              (cui_box){.align_x = CUI_ALIGN_CENTER, .align_y = CUI_ALIGN_CENTER}, b,
                              2);
@@ -1331,12 +1352,17 @@ cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t, cui_attach
     }
     if (o.actions) {
         cui_id action_id = cui_media_id(id, 5);
+        bool local_actions = o.model.vertical && retained_slots;
+        if (local_actions)
+            cui_begin_absolute_box(ui, cui_media_id(id, 16), (cui_box){0},
+                                   (cui_rect){p.width - o.actions_width - action_inset,
+                                              action_inset, o.actions_width, -1});
         /* The cluster itself captures presses in the gaps, below its real controls. */
-        cui_interact(ui, action_id, CUI_ROLE_GROUP, cui_string("Attachment actions"), false, false,
-                     0);
+        cui_interact(ui, action_id, CUI_ROLE_GROUP, cui_string("Attachment actions"), disabled,
+                     false, 0);
         cui_set_semantic_details(ui, action_id,
                                  (cui_semantic_details){.parent = id, .pointer_activatable = true});
-        if (o.model.vertical && state->card.w > 0) {
+        if (o.model.vertical && !local_actions && state->card.w > 0) {
             cui_rect b = state->card;
             cui_begin_portal(
                 ui, action_id, (cui_box){.row = true, .gap = 4},
@@ -1349,6 +1375,8 @@ cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t, cui_attach
             o.actions(ui, cui_media_id(id, 6), o.actions_user, o.actions_width, p.height);
             cui_end_box(ui);
         }
+        if (local_actions)
+            cui_end_box(ui);
     }
     if (!o.model.vertical) {
         cui_begin_box(ui, cui_media_id(id, 7),

@@ -1322,6 +1322,24 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_attachment_set_preview_rgba_v1(
 CUI_BRIDGE_API cui_bridge_status cui_bridge_attachment_set_actions_v1(cui_bridge_app *,
                                                                       cui_bridge_node,
                                                                       uint32_t actions);
+enum {
+    CUI_BRIDGE_ATTACHMENT_SLOT_MEDIA_V1 = 1,
+    CUI_BRIDGE_ATTACHMENT_SLOT_OVERLAY_V1,
+    CUI_BRIDGE_ATTACHMENT_SLOT_METADATA_V1,
+    CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1
+};
+/* Create a retained container under an Attachment. One per role, with a
+ * copied, unique key. Use standard child creation and node removal. Actions
+ * is a row and takes a preferred width in (0, 4096] logical pixels; other
+ * roles are columns and require width 0. Media is the fallback when the card
+ * has no image or competing lifecycle feedback. Overlay sits over the
+ * preview; metadata follows the title and description. Card or slot
+ * disablement makes the slot's contents inert. Child events retain their
+ * ordinary payload and handle. Call between steps on the owner thread.
+ * Failure leaves the tree and *out_slot unchanged. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_attachment_slot_create_v1(
+    cui_bridge_app *, cui_bridge_node attachment, uint32_t role, const char *key_utf8,
+    float preferred_width, cui_bridge_node *out_slot);
 /* Opt-in Stepper visual composition. Density: 0 MD, 1 XS, 2 SM, 3 LG.
  * Legacy is default; bridge remains selection-owned with aggregate CHANGE.
  * Visual paint snapshots selection until the next frame. Group cap remains 64. */

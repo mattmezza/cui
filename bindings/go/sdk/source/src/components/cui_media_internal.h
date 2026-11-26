@@ -7,7 +7,8 @@
 enum {
     CUI_ATTACHMENT_FOCUSABLE_OPEN = 1u << 0,
     CUI_ATTACHMENT_PERSISTENT_REMOVE = 1u << 1,
-    CUI_ATTACHMENT_DISABLED = 1u << 2
+    CUI_ATTACHMENT_DISABLED = 1u << 2,
+    CUI_ATTACHMENT_RETAINED_SLOTS = 1u << 3
 };
 
 /* Retained presentation uses the same renderer and action observer as the

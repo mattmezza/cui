@@ -182,6 +182,34 @@ def run_cases(a):
     a.case('Carousel', 'disabled arrows and pagination reject taps and recover when enabled',
            disabled_carousel)
 
+    def carousel_control_sizes():
+        a.configure('design-size', 1)
+        a.tap(a.target('Go to slide 1', 1))
+        small = a.target('Next slide', 1)
+        assert abs(small['f'][3] - 20) < .1 and abs(small['f'][4] - 20) < .1, small
+        before = carousel_state()
+        a.configure('design-size', 14)
+        try:
+            root = a.target('Workflow carousel')
+            previous = a.target('Previous slide', 1)
+            following = a.target('Next slide', 1)
+            first = a.target('Go to slide 1', 1)
+            last = a.target('Go to slide 4', 1)
+            expected = min(root['f'][3], 264)
+            assert abs(following['f'][3] - expected) < .1 and following['f'][3] > small['f'][3], (
+                following, small, expected)
+            assert following['f'][2] >= previous['f'][2] + previous['f'][4], (previous, following)
+            assert last['f'][2] >= first['f'][2] + first['f'][4], (first, last)
+            assert 'CUI_DESIGN_9XL' in a.page.locator('#snippet').inner_text(), 'Snippet size is stale'
+            assert carousel_state() == before, (before, carousel_state())
+            a.tap(last)
+            assert carousel_state() == [3, before[1] + 1], (before, carousel_state())
+        finally:
+            a.configure('design-size', 3)
+
+    a.case('Carousel', 'named control sizes reflow on mobile and preserve selection',
+           carousel_control_sizes)
+
     def carousel_page_pan():
         align_canvas(a)
         point = a.point(a.target('Workflow carousel'), .5, .35)

@@ -303,6 +303,10 @@ class _API:
         self.get_selected = bind("get_selected", C.c_int, C.c_void_p, _Handle, C.POINTER(_Handle))
         self.get_open = bind("get_open", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_uint32))
         self.set_anchor = bind("set_anchor", C.c_int, C.c_void_p, _Handle, _Handle)
+        self.set_carousel_control_sizes = None
+        if hasattr(lib, "cui_bridge_set_carousel_control_sizes_v1"):
+            self.set_carousel_control_sizes = bind("set_carousel_control_sizes_v1", C.c_int,
+                                                   C.c_void_p, _Handle, C.c_uint32, C.c_uint32)
         self.set_carousel_controls = None
         if hasattr(lib, "cui_bridge_set_carousel_controls_v1"):
             self.set_carousel_controls = bind("set_carousel_controls_v1", C.c_int,
@@ -560,6 +564,7 @@ class Widget:
         self._anchor: Widget | None = None
         self._extent: tuple[float, float] | None = None
         self._carousel_axis = "horizontal"
+        self._carousel_control_sizes = (0, 0)
         self._carousel_controls = 0
         self._carousel_looping = False
         self._carousel_basis = 0.0
@@ -1057,6 +1062,22 @@ class Widget:
                 raise RuntimeError("Carousel axis requires cui_bridge_set_carousel_axis_v1")
             self._change("set_carousel_axis", int(axis == "vertical"))
         self._carousel_axis = axis
+        return self
+
+    def carousel_control_sizes(self, *, arrows: DesignSize = "inherit", pagination: DesignSize = "inherit") -> "Widget":
+        """Set navigation arrow and pagination marker sizes independently."""
+        if self.kind != "carousel":
+            raise ValueError("carousel_control_sizes requires a Carousel")
+        if not isinstance(arrows, str) or arrows not in _SIZE or not isinstance(pagination, str) or pagination not in _SIZE:
+            raise ValueError("invalid Carousel control size")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        sizes = (_SIZE[arrows], _SIZE[pagination])
+        if self._app is not None and sizes != self._carousel_control_sizes:
+            if not self._app.supports_carousel_control_sizes():
+                raise RuntimeError("Carousel control sizes requires cui_bridge_set_carousel_control_sizes_v1")
+            self._change("set_carousel_control_sizes", *sizes)
+        self._carousel_control_sizes = sizes
         return self
 
     def carousel_controls(self, *, arrows: bool = True, pagination: bool = True) -> "Widget":
@@ -2111,6 +2132,10 @@ class App:
         self._ensure_open()
         return self._api.set_carousel_axis is not None
 
+    def supports_carousel_control_sizes(self) -> bool:
+        self._ensure_open()
+        return self._api.set_carousel_control_sizes is not None
+
     def supports_carousel_controls(self) -> bool:
         """Whether the bridge supports retained Carousel navigation controls."""
         return self._api.set_carousel_controls is not None
@@ -2268,6 +2293,8 @@ class App:
                 self._require_stepper_fill()
             if node._carousel_axis == "vertical" and not self.supports_carousel_axis():
                 raise RuntimeError("Carousel axis requires cui_bridge_set_carousel_axis_v1")
+            if any(node._carousel_control_sizes) and not self.supports_carousel_control_sizes():
+                raise RuntimeError("Carousel control sizes requires cui_bridge_set_carousel_control_sizes_v1")
             if node._carousel_controls and not self.supports_carousel_controls():
                 raise RuntimeError("Carousel controls requires cui_bridge_set_carousel_controls_v1")
             if node._carousel_looping and not self.supports_carousel_looping():
@@ -2364,6 +2391,8 @@ class App:
                     node._change("set_checked", int(node._checked))
                 if node._carousel_axis == "vertical":
                     node._change("set_carousel_axis", 1)
+                if any(node._carousel_control_sizes):
+                    node._change("set_carousel_control_sizes", *node._carousel_control_sizes)
                 if node._carousel_controls:
                     node._change("set_carousel_controls", node._carousel_controls)
                 if node._carousel_looping:

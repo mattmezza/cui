@@ -5796,7 +5796,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes, fractional sizing, geometry-supported wrapping, and built-in navigation arrows and slide markers. Custom retained control content, intrinsic sizing from arbitrary slide content, the first growing-width estimate and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
+        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes, fractional sizing, geometry-supported wrapping, and named sizes and passive content for navigation arrows and slide markers. Intrinsic sizing from arbitrary slide content, the first growing-width estimate, custom retained placement and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5874,7 +5874,22 @@
             "bindings/go/cui/native_test.go",
             "bindings/rust/tests/builders.rs"
           ],
-          "scope": "Optional content and accessible-name overrides inside the built-in buttons, stable slide-owned markers, shared button activation and slide selection. The built-in layout defines retained button dimensions and placement."
+          "scope": "Optional content and accessible-name overrides inside the built-in buttons, stable slide-owned markers, shared button activation and slide selection."
+        },
+        {
+          "name": "named arrow and marker sizing with responsive wrapping",
+          "status": "tested",
+          "evidence": [
+            "bindings/bridge/tests/test_bridge_components.c",
+            "bindings/python/test_model_components.py",
+            "bindings/node/test/models.test.cjs",
+            "bindings/typescript/components.typecheck.ts",
+            "bindings/go/cui/native_test.go",
+            "bindings/rust/tests/builders.rs",
+            "tests/web/test_touch_page_navigation.py",
+            "tests/web/test_snippets.py"
+          ],
+          "scope": "Independent named sizes, viewport-width caps, responsive arrow stacking and marker wrapping. Older retained providers keep the original size defaults. Browser design-scale control and copyable C usage apply one named size to both groups."
         },
         {
           "name": "themed SVG controls, accessible item positions and inherited disabled state",

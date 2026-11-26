@@ -144,6 +144,35 @@ class Models(unittest.TestCase):
                 with self.assertRaises(RuntimeError): carousel.carousel_axis("vertical")
                 self.assertEqual(carousel._carousel_axis,"horizontal")
 
+    def test_carousel_control_sizes(self):
+        with self.assertRaises(ValueError): c.item("wrong").carousel_control_sizes()
+        with c.App(width=640) as app:
+            self.assertTrue(app.supports_carousel_control_sizes())
+            rail = c.carousel("sizes").carousel_controls().carousel_control_sizes(arrows="lg", pagination="xs").children(c.item("a"), c.item("b"))
+            app.mount(c.column().children(rail)); app.step()
+            arrow = app.numeric_part_bounds(rail, 2)[3]
+            dot = app.numeric_part_bounds(rail, 3)[3]
+            self.assertGreater(arrow, dot)
+            prior = rail._carousel_control_sizes
+            with self.assertRaises(ValueError): rail.carousel_control_sizes(arrows="xs", pagination="invalid")
+            self.assertEqual(rail._carousel_control_sizes, prior)
+            rail.carousel_control_sizes(arrows="xs", pagination="lg"); app.step()
+            self.assertEqual(app.numeric_part_bounds(rail, 2)[3], dot)
+            self.assertEqual(app.numeric_part_bounds(rail, 3)[3], arrow)
+            rail.carousel_control_sizes(); app.step()
+            self.assertEqual(app.numeric_part_bounds(rail, 2)[3], 32)
+            self.assertEqual(app.numeric_part_bounds(rail, 3)[3], 24)
+        with c.App() as app, patch.object(app._api, "set_carousel_control_sizes", None):
+            self.assertFalse(app.supports_carousel_control_sizes())
+            rail = c.carousel("legacy").carousel_control_sizes(arrows="lg").children(c.item("a"))
+            root = c.column().children(rail)
+            with self.assertRaisesRegex(RuntimeError, "control sizes"): app.mount(root)
+            self.assertIsNone(rail._app)
+            rail.carousel_control_sizes(); app.mount(root); app.step()
+            rail.carousel_control_sizes()
+            with self.assertRaisesRegex(RuntimeError, "control sizes"): rail.carousel_control_sizes(pagination="xs")
+            self.assertEqual(rail._carousel_control_sizes, (0, 0))
+
     def test_carousel_controls(self):
         with self.assertRaises(TypeError): c.carousel("bad").carousel_controls(arrows=1)
         with self.assertRaises(ValueError): c.item("bad").carousel_controls()

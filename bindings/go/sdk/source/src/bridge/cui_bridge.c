@@ -3047,6 +3047,24 @@ cui_bridge_status cui_bridge_set_carousel_controls_v1(cui_bridge_app *app, cui_b
     node->carousel_controls = mask;
     return CUI_BRIDGE_OK;
 }
+cui_bridge_status cui_bridge_set_carousel_control_sizes_v1(cui_bridge_app *app,
+                                                           cui_bridge_node handle, uint32_t arrows,
+                                                           uint32_t pagination) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_CAROUSEL)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (arrows > CUI_BRIDGE_SIZE_9XL || pagination > CUI_BRIDGE_SIZE_9XL)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (node->carousel_arrow_size != arrows || node->carousel_marker_size != pagination) {
+        node->carousel_arrow_size = arrows;
+        node->carousel_marker_size = pagination;
+        cui_invalidate(app->ui);
+    }
+    return CUI_BRIDGE_OK;
+}
 static cui_bridge_node_record *
 bridge_carousel_slot(cui_bridge_app *app, const cui_bridge_node_record *owner, uint32_t role) {
     for (uint32_t child = owner->first_child; child; child = app->nodes[child].next_sibling)
@@ -5199,15 +5217,22 @@ bridge_carousel_control_options(cui_bridge_app *app, const cui_bridge_node_recor
         .content = slot && slot->first_child ? bridge_carousel_slot_content : NULL,
         .user = slot};
 }
+static float bridge_carousel_control_size(uint32_t size, float fallback, float width) {
+    cui_design_metrics metrics;
+    if (cui_design_measure((cui_design_size)size, 1, &metrics))
+        fallback = metrics.control_height;
+    return fminf(fallback, width);
+}
 static void bridge_carousel_arrows(cui_context *ui, const cui_theme *theme,
                                    cui_carousel_state *state, cui_id root, void *user) {
     bridge_carousel_binding *binding = user;
     const cui_bridge_node_record *owner = &binding->app->nodes[binding->slot];
-    float size = fminf(32, state->frame_width);
-    cui_begin_box(
-        ui, 0,
-        (cui_box){
-            .width = -1, .row = state->frame_width >= 72, .gap = 8, .align_x = CUI_ALIGN_CENTER});
+    float size = bridge_carousel_control_size(owner->carousel_arrow_size, 32, state->frame_width);
+    cui_begin_box(ui, 0,
+                  (cui_box){.width = -1,
+                            .row = state->frame_width >= 2 * size + 8,
+                            .gap = 8,
+                            .align_x = CUI_ALIGN_CENTER});
     cui_carousel_control_inline(
         ui, bridge_carousel_part_id(root, BRIDGE_CAROUSEL_PREVIOUS), theme, state, root, false,
         bridge_carousel_control_options(binding->app, owner, CUI_BRIDGE_CAROUSEL_SLOT_PREVIOUS_V1,
@@ -5223,7 +5248,8 @@ static void bridge_carousel_pagination(cui_context *ui, const cui_theme *theme,
     bridge_carousel_binding *binding = user;
     if (!state->count)
         return;
-    float size = fminf(24, state->frame_width);
+    const cui_bridge_node_record *owner = &binding->app->nodes[binding->slot];
+    float size = bridge_carousel_control_size(owner->carousel_marker_size, 24, state->frame_width);
     size_t columns = (size_t)fmaxf(1, floorf((state->frame_width + 4) / (size + 4)));
     cui_box layout = {.width = -1, .gap = 4, .align_x = CUI_ALIGN_CENTER};
     if (!cui_carousel_pagination_begin(

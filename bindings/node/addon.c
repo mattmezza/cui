@@ -1600,6 +1600,38 @@ static napi_value set_bridge_flag(napi_env env, napi_callback_info info, const c
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 
+typedef cui_bridge_status (*carousel_control_sizes_fn)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                                                       uint32_t);
+static carousel_control_sizes_fn carousel_control_sizes_symbol(void) {
+    carousel_control_sizes_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_set_carousel_control_sizes_v1");
+    return set;
+}
+static napi_value supports_carousel_control_sizes(napi_env env, napi_callback_info info) {
+    (void)info;
+    napi_value result;
+    if (napi_get_boolean(env, carousel_control_sizes_symbol() != NULL, &result) != napi_ok)
+        return NULL;
+    return result;
+}
+static napi_value set_carousel_control_sizes(napi_env env, napi_callback_info info) {
+    napi_value v[4];
+    js_app *app;
+    js_node *node;
+    uint32_t arrows, pagination;
+    if (!args(env, info, 4, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &arrows) || !uint_arg(env, v[3], &pagination))
+        return NULL;
+    if (arrows > 14 || pagination > 14)
+        return fail(env, "invalid Carousel control size");
+    carousel_control_sizes_fn set = carousel_control_sizes_symbol();
+    if (!set)
+        return fail(env,
+                    "Carousel control sizes requires cui_bridge_set_carousel_control_sizes_v1");
+    cui_bridge_status code = set(app->bridge, node->node, arrows, pagination);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 static napi_value supports_carousel_controls(napi_env env, napi_callback_info info) {
     (void)info;
     return supports_bridge_flag(env, "cui_bridge_set_carousel_controls_v1");
@@ -2856,6 +2888,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("supportsRadioPaint", supports_radio_paint, 0);
     EXPORT("setRadioPaint", set_radio_paint, 0);
     EXPORT("supportsCarouselAxis", supports_carousel_axis, 0);
+    EXPORT("supportsCarouselControlSizes", supports_carousel_control_sizes, 0);
+    EXPORT("setCarouselControlSizes", set_carousel_control_sizes, 0);
     EXPORT("supportsCarouselControls", supports_carousel_controls, 0);
     EXPORT("setCarouselControls", set_carousel_controls, 0);
     EXPORT("supportsCarouselLooping", supports_carousel_looping, 0);

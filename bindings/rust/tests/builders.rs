@@ -1089,6 +1089,41 @@ fn carousel_controls() {
 }
 
 #[test]
+fn carousel_control_sizes() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let legacy = std::env::var("CUI_TEST_LEGACY_CAROUSEL_SIZES").as_deref() == Ok("1");
+    assert_eq!(app.supports_carousel_control_sizes(), !legacy);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let builder = app.build_child(root, Kind::Carousel, "rail").unwrap()
+        .carousel_controls(CarouselControls { arrows: true, pagination: true }).unwrap();
+    let rail = if legacy {
+        builder.finish()
+    } else {
+        builder.carousel_control_sizes(DesignSize::Lg, DesignSize::Xs).unwrap().finish()
+    };
+    app.child(rail, Kind::Item, "first").unwrap();
+    app.child(rail, Kind::Item, "second").unwrap();
+    let assert_sizes = |app: &mut App, arrow, marker| {
+        app.step(0.016).unwrap();
+        assert_eq!(app.numeric_part_bounds(rail, 2).unwrap().height, arrow);
+        assert_eq!(app.numeric_part_bounds(rail, 3).unwrap().height, marker);
+    };
+    if legacy {
+        assert_eq!(
+            app.carousel_control_sizes(rail, DesignSize::Lg, DesignSize::Xs).err(),
+            Some(Error::CAROUSEL_CONTROL_SIZES_UNAVAILABLE)
+        );
+    } else {
+        assert_sizes(&mut app, 40., 20.);
+        app.carousel_control_sizes(rail, DesignSize::Xs, DesignSize::Lg).unwrap();
+        assert_sizes(&mut app, 20., 40.);
+    }
+    app.carousel_control_sizes(rail, DesignSize::Inherit, DesignSize::Inherit).unwrap();
+    assert_sizes(&mut app, 32., 24.);
+}
+
+#[test]
 fn carousel_slots() {
     let _guard = NATIVE.lock().unwrap();
     let mut app = App::headless(640., 480.).unwrap();

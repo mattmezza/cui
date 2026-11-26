@@ -709,6 +709,8 @@ static cui_bridge_status (*carousel_set_basis)(cui_bridge_app *, cui_bridge_node
 static cui_bridge_status (*carousel_set_axis)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static cui_bridge_status (*carousel_set_looping)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static cui_bridge_status (*carousel_set_controls)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static cui_bridge_status (*carousel_set_control_sizes)(cui_bridge_app *, cui_bridge_node,
+                                                       uint32_t, uint32_t);
 static cui_bridge_status (*carousel_create_slot)(cui_bridge_app *, cui_bridge_node, uint32_t,
                                                  const char *, cui_bridge_node *);
 static void go_carousel_initialize(void) {
@@ -721,6 +723,8 @@ static void go_carousel_initialize(void) {
                           "cui_bridge_set_carousel_looping_v1");
   go_load_optional_symbol(&carousel_set_controls, sizeof carousel_set_controls,
                           "cui_bridge_set_carousel_controls_v1");
+  go_load_optional_symbol(&carousel_set_control_sizes, sizeof carousel_set_control_sizes,
+                          "cui_bridge_set_carousel_control_sizes_v1");
   go_load_optional_symbol(&carousel_create_slot, sizeof carousel_create_slot,
                           "cui_bridge_carousel_slot_create_v1");
  }
@@ -730,6 +734,7 @@ static void go_carousel_initialize(void) {
   carousel_set_axis = cui_bridge_set_carousel_axis_v1;
   carousel_set_looping = cui_bridge_set_carousel_looping_v1;
   carousel_set_controls = cui_bridge_set_carousel_controls_v1;
+  carousel_set_control_sizes = cui_bridge_set_carousel_control_sizes_v1;
   carousel_create_slot = cui_bridge_carousel_slot_create_v1;
  }
 #endif
@@ -751,6 +756,11 @@ static cui_bridge_status go_carousel_set_looping(cui_bridge_app *a, cui_bridge_n
 static int go_carousel_controls_supported(void) { return carousel_set_controls != NULL; }
 static cui_bridge_status go_carousel_set_controls(cui_bridge_app *a, cui_bridge_node carousel, uint32_t mask) {
  return carousel_set_controls(a, carousel, mask);
+}
+static int go_carousel_control_sizes_supported(void) { return carousel_set_control_sizes != NULL; }
+static cui_bridge_status go_carousel_set_control_sizes(cui_bridge_app *a, cui_bridge_node carousel,
+                                                       uint32_t arrows, uint32_t pagination) {
+ return carousel_set_control_sizes(a, carousel, arrows, pagination);
 }
 static int go_carousel_slots_supported(void) { return carousel_create_slot != NULL; }
 static cui_bridge_status go_carousel_create_slot(cui_bridge_app *a, cui_bridge_node owner,
@@ -947,6 +957,7 @@ type Node struct {
 	carouselAxis                         CarouselAxis
 	carouselLooping                      bool
 	carouselControls                     C.uint32_t
+	carouselControlSizes                 CarouselControlSizes
 	imagePixels                          []byte
 	imageWidth, imageHeight, imageStride uint32
 	timeValue                            Time
@@ -2091,6 +2102,9 @@ func (a *App) Mount(root *Node) error {
 		if n.carouselControls != 0 && C.go_carousel_controls_supported() == 0 {
 			return ErrCarouselControlsUnavailable
 		}
+		if n.carouselControlSizes != (CarouselControlSizes{}) && C.go_carousel_control_sizes_supported() == 0 {
+			return ErrCarouselControlSizesUnavailable
+		}
 		if n.carouselBasis > 0 {
 			if parent == nil || parent.kind != int(C.CUI_BRIDGE_CAROUSEL) {
 				return errors.New("CarouselBasis requires a direct Carousel Item")
@@ -2587,6 +2601,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.carouselControls != 0 {
 			if err := result(C.go_carousel_set_controls(a.ptr, h, n.carouselControls)); err != nil {
+				return err
+			}
+		}
+		if sizes := n.carouselControlSizes; sizes != (CarouselControlSizes{}) {
+			if err := n.setCarouselControlSizes(sizes); err != nil {
 				return err
 			}
 		}
@@ -4248,6 +4267,54 @@ func (n *Node) CarouselControls(options CarouselControls) *Node {
 		}
 	}
 	n.carouselControls = mask
+	return n
+}
+
+// CarouselControlSizes configures the named size of each Carousel control group.
+// Inherit restores the original dimensions.
+type CarouselControlSizes struct {
+	Arrows, Pagination DesignSize
+}
+
+var ErrCarouselControlSizesUnavailable = errors.New("Carousel control sizes require cui_bridge_set_carousel_control_sizes_v1")
+
+// SupportsCarouselControlSizes reports whether the loaded bridge accepts named control sizes.
+func (a *App) SupportsCarouselControlSizes() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_carousel_control_sizes_supported() != 0, nil
+}
+
+func (n *Node) setCarouselControlSizes(sizes CarouselControlSizes) error {
+	supported, err := n.app.SupportsCarouselControlSizes()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrCarouselControlSizesUnavailable
+	}
+	return result(C.go_carousel_set_control_sizes(n.app.ptr, n.handle, C.uint32_t(sizes.Arrows), C.uint32_t(sizes.Pagination)))
+}
+
+// CarouselControlSizes sets both sizes together, during authoring or after mount.
+func (n *Node) CarouselControlSizes(sizes CarouselControlSizes) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != int(C.CUI_BRIDGE_CAROUSEL) || n.removed ||
+		sizes.Arrows < Inherit || sizes.Arrows > Size9XL ||
+		sizes.Pagination < Inherit || sizes.Pagination > Size9XL {
+		n.err = errors.New("CarouselControlSizes requires a live Carousel and valid design sizes")
+		return n
+	}
+	if n.app != nil && sizes != n.carouselControlSizes {
+		if err := n.setCarouselControlSizes(sizes); err != nil {
+			n.err = err
+			return n
+		}
+	}
+	n.carouselControlSizes = sizes
 	return n
 }
 

@@ -1290,6 +1290,15 @@ enum { CUI_BRIDGE_CAROUSEL_ARROWS_V1 = 1u << 0, CUI_BRIDGE_CAROUSEL_PAGINATION_V
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_controls_v1(cui_bridge_app *,
                                                                      cui_bridge_node carousel,
                                                                      uint32_t mask);
+/* Configure both control groups using CUI_BRIDGE_SIZE_* values. INHERIT
+ * restores 32px arrows or 24px markers. Named sizes use the shared control
+ * height for square buttons, capped at the viewport width. Controls reflow
+ * as needed. Configuration preserves selection and emits no events. Either
+ * invalid size leaves both settings intact. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_control_sizes_v1(cui_bridge_app *,
+                                                                          cui_bridge_node carousel,
+                                                                          uint32_t arrows,
+                                                                          uint32_t pagination);
 enum {
     CUI_BRIDGE_CAROUSEL_SLOT_PREVIOUS_V1 = 1,
     CUI_BRIDGE_CAROUSEL_SLOT_NEXT_V1,

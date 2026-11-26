@@ -160,6 +160,30 @@ on the builder or the corresponding App method. Probe
 `supports_carousel_controls()` (Go `SupportsCarouselControls()`) when using
 older bridge libraries and omit the option if the provider lacks it.
 
+### Size arrows and markers
+
+The retained bridge accepts independent arrow and marker sizes with
+`cui_bridge_set_carousel_control_sizes_v1`. Use the shared `xs`, `sm`,
+`base`, `md`, `lg`, `xl`, and `2xl` through `9xl` scale. Inherit
+restores 32px arrows and 24px markers. The size names select the square
+button's edge using the shared design-scale control height. Carousel caps
+oversized buttons at the viewport width, stacks arrows when needed and wraps
+markers onto more rows. Selection and activation use the ordinary event path.
+Invalid input leaves both sizes intact.
+
+- Python uses `rail.carousel_control_sizes(arrows="lg", pagination="xs")`.
+- JavaScript and TypeScript use
+  `rail.carousel_control_sizes({arrows: "lg", pagination: "xs"})`.
+- Go uses `rail.CarouselControlSizes(cui.CarouselControlSizes{Arrows: cui.LG, Pagination: cui.XS})`.
+- Rust uses `rail.carousel_control_sizes(DesignSize::Lg, DesignSize::Xs)?` on a builder,
+  or the App method with the Carousel node.
+
+Set either group to `inherit` to restore its default. Probe
+`supports_carousel_control_sizes()` (Go `SupportsCarouselControlSizes()`)
+with older bridge providers. The live gallery applies its **Design scale**
+selection to both groups. Its copyable immediate C example uses
+`cui_design_measure` and `CUI_CAROUSEL_CONTROL_CUSTOM`.
+
 ### Customize retained control content
 
 Create a passive content row with `cui_bridge_carousel_slot_create_v1`.
@@ -222,6 +246,8 @@ with cui.App(width=640, height=360) as app:
     controls = app.supports_carousel_controls()
     if controls:
         rail.carousel_controls()
+        if app.supports_carousel_control_sizes():
+            rail.carousel_control_sizes(arrows="lg", pagination="xs")
         if app.supports_carousel_slots():
             rail.children(cui.carousel_slot("forward", "next", "Next dashboard").children(
                 cui.label("+"),
@@ -253,8 +279,8 @@ with cui.App(width=640, height=360) as app:
         assert rail.selected() is slides[-1]
 ```
 
-Retained Carousel uses default control size and spacing. Immediate C supports
-custom button boxes and layout. Use `cui_carousel_control_inline` for an
+Retained Carousel uses a built-in control layout and spacing. Immediate C
+supports custom button boxes and layout. Use `cui_carousel_control_inline` for an
 axis-aware navigation button in ordinary flow or `cui_carousel_control` for
 controls positioned at the sides of the slide viewport.
 

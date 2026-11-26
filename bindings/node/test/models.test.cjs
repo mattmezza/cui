@@ -306,3 +306,35 @@ console.log('PASS native Dock split layout, activation snapshots and metadata fr
    assert.equal(rail.carouselControlsValue, 0);
  } finally { legacy.dispose(); }
 }
+
+{
+ assert.throws(() => c.item().carousel_control_sizes(), /Carousel/);
+ const app = new c.App({width:640});
+ try {
+   assert.equal(app.supports_carousel_control_sizes(), true);
+   const rail = c.carousel('sizes').carousel_controls().carousel_control_sizes({arrows:'lg', pagination:'xs'}).children(c.item('a'), c.item('b'));
+   app.mount(c.column().children(rail)).step();
+   const arrow = rail.numeric_part_bounds(2).height, dot = rail.numeric_part_bounds(3).height;
+   assert.ok(arrow > dot);
+   const prior = rail.carouselControlSizesValue;
+   assert.throws(() => rail.carousel_control_sizes({arrows:'xs', pagination:'invalid'}), /size/);
+   assert.equal(rail.carouselControlSizesValue, prior);
+   rail.carousel_control_sizes({arrows:'xs', pagination:'lg'}); app.step();
+   assert.equal(rail.numeric_part_bounds(2).height, dot);
+   assert.equal(rail.numeric_part_bounds(3).height, arrow);
+   rail.carousel_control_sizes(); app.step();
+   assert.equal(rail.numeric_part_bounds(2).height, 32);
+   assert.equal(rail.numeric_part_bounds(3).height, 24);
+ } finally { app.dispose(); }
+ const legacy = new c.App();
+ try {
+   legacy.supports_carousel_control_sizes = () => false;
+   const rail = c.carousel('legacy').carousel_control_sizes({arrows:'lg'}).children(c.item('a'));
+   const root = c.column().children(rail);
+   assert.throws(() => legacy.mount(root), /control sizes/);
+   assert.equal(rail.owner, null);
+   rail.carousel_control_sizes(); legacy.mount(root).step(); rail.carousel_control_sizes();
+   assert.throws(() => rail.carousel_control_sizes({pagination:'xs'}), /control sizes/);
+   assert.deepEqual(rail.carouselControlSizesValue, [0,0]);
+ } finally { legacy.dispose(); }
+}

@@ -1222,37 +1222,64 @@ static void gallery_carousel_page_content(cui_context *context, const cui_theme 
     static const char *numbers[] = {"1", "2", "3", "4"};
     cui_text(context, cui_string(numbers[index]), theme->font_size * .8f, theme->text);
 }
+static cui_design_size design_size;
+static cui_carousel_control_options gallery_carousel_control_options(const cui_theme *theme,
+                                                                     float width, float fallback) {
+    cui_design_metrics metrics;
+    float extent = cui_design_measure(design_size, theme->font_size / 16, &metrics)
+                       ? metrics.control_height
+                       : fallback;
+    return (cui_carousel_control_options){.size = design_size || width < fallback
+                                                      ? CUI_CAROUSEL_CONTROL_CUSTOM
+                                                      : CUI_CAROUSEL_CONTROL_DEFAULT,
+                                          .custom_size = fminf(extent, width)};
+}
 static void gallery_carousel_controls(cui_context *context, const cui_theme *theme,
                                       cui_carousel_state *state, cui_id root, void *user) {
     (void)user;
+    cui_carousel_control_options options =
+        gallery_carousel_control_options(theme, state->frame_width, 32);
     cui_begin_box(context, 0,
-                  (cui_box){.width = -1, .row = true, .gap = 8, .align_x = CUI_ALIGN_CENTER});
+                  (cui_box){.width = -1,
+                            .row = state->frame_width >= 2 * options.custom_size + 8,
+                            .gap = 8,
+                            .align_x = CUI_ALIGN_CENTER});
     cui_carousel_control_inline(context, cui_id_from(context, "carousel-prev"), theme, state, root,
-                                false, (cui_carousel_control_options){0});
+                                false, options);
     cui_carousel_control_inline(context, cui_id_from(context, "carousel-next"), theme, state, root,
-                                true, (cui_carousel_control_options){0});
+                                true, options);
     cui_end_box(context);
 }
 static void gallery_carousel_pagination(cui_context *context, const cui_theme *theme,
                                         cui_carousel_state *state, cui_id root, void *user) {
     (void)user;
+    cui_carousel_control_options options =
+        gallery_carousel_control_options(theme, state->frame_width, 20);
+    size_t columns = (size_t)fmaxf(1, floorf((state->frame_width + 4) / (options.custom_size + 4)));
+    cui_box group = {.width = -1, .gap = 4, .align_x = CUI_ALIGN_CENTER};
     if (!cui_carousel_pagination_begin(context, cui_id_from(context, "carousel-pages"),
-                                       cui_string("Slides"), NULL))
+                                       cui_string("Slides"), &group))
         return;
     static const char *names[] = {"Go to slide 1", "Go to slide 2", "Go to slide 3",
                                   "Go to slide 4"};
-    for (size_t i = 0; i < 4; i++)
-        cui_carousel_pagination_item(
-            context, cui_id_from(context, names[i]), theme, state, root, i,
-            (cui_carousel_control_options){.label = cui_string(names[i]),
-                                           .content = gallery_carousel_page_content});
+    options.content = gallery_carousel_page_content;
+    for (size_t first = 0; first < 4; first += columns) {
+        size_t end = first + columns < 4 ? first + columns : 4;
+        cui_begin_box(context, 0,
+                      (cui_box){.width = -1, .row = true, .gap = 4, .align_x = CUI_ALIGN_CENTER});
+        for (size_t i = first; i < end; ++i) {
+            options.label = cui_string(names[i]);
+            cui_carousel_pagination_item(context, cui_id_from(context, names[i]), theme, state,
+                                         root, i, options);
+        }
+        cui_end_box(context);
+    }
     cui_carousel_pagination_end(context);
 }
 static cui_check_state check_state;
 static cui_checkbox_state checkbox_motion;
 static cui_scroll_state checkbox_scroll;
 
-static cui_design_size design_size;
 static void gallery_checkbox_detail(cui_context *ui, void *user) {
     const cui_theme *theme = user;
     cui_design_metrics metrics;
@@ -4424,7 +4451,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_begin_box(ui, cui_id_from(ui, "carousel-margin"),
                       (cui_box){.width = -1, .padding = 48});
         cui_carousel_options options = cui_carousel_default();
-        options.width = width - 144;
+        options.width = fmaxf(1, width - 144);
         options.height = 200;
         options.label = cui_string("Workflow carousel");
         options.now_seconds = host_seconds;

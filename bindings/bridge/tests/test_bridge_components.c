@@ -1135,6 +1135,66 @@ static void test_carousel_controls(void) {
     cui_bridge_destroy(app);
 }
 
+static void test_carousel_control_sizes(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_NONE,
+                                  .width = 640,
+                                  .height = 480};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root, rail, slides[3];
+    assert(cui_bridge_node_create(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root", &root) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_CAROUSEL, "rail", &rail) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, rail, 96, 72) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_carousel_controls_v1(
+               app, rail, CUI_BRIDGE_CAROUSEL_ARROWS_V1 | CUI_BRIDGE_CAROUSEL_PAGINATION_V1) ==
+           CUI_BRIDGE_OK);
+    for (unsigned i = 0; i < 3; ++i) {
+        char key[16];
+        snprintf(key, sizeof key, "sized-%u", i);
+        assert(cui_bridge_node_create(app, rail, CUI_BRIDGE_ITEM, key, &slides[i]) ==
+               CUI_BRIDGE_OK);
+    }
+    assert(cui_bridge_set_carousel_control_sizes_v1(app, root, 0, 0) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_carousel_control_sizes_v1(app, rail, CUI_BRIDGE_SIZE_XS,
+                                                    CUI_BRIDGE_SIZE_3XL) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_carousel_control_sizes_v1(app, rail, CUI_BRIDGE_SIZE_XL, UINT32_MAX) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect prev, next, first, second;
+    assert(cui_bridge_numeric_part_bounds(app, rail, 1, &prev) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 2, &next) == CUI_BRIDGE_OK);
+    assert(prev.width == 20 && next.height == 20 && next.y == prev.y);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 3, &first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 4, &second) == CUI_BRIDGE_OK);
+    assert(first.width == 64 && second.height == 64 && second.y >= first.y + first.height);
+    carousel_control_expect(app, rail, slides[0], false);
+    carousel_control_pointer(app, second, CUI_BRIDGE_POINTER_DOWN);
+    carousel_control_pointer(app, second, CUI_BRIDGE_POINTER_UP);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    carousel_control_expect(app, rail, slides[1], true);
+    assert(cui_bridge_set_carousel_control_sizes_v1(app, rail, CUI_BRIDGE_SIZE_9XL,
+                                                    CUI_BRIDGE_SIZE_XS) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 1, &prev) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 2, &next) == CUI_BRIDGE_OK);
+    assert(prev.width == 96 && next.width == 96 && next.y >= prev.y + prev.height);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 3, &first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 4, &second) == CUI_BRIDGE_OK);
+    assert(first.width == 20 && second.y == first.y);
+    assert(cui_bridge_set_carousel_control_sizes_v1(app, rail, 0, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 2, &next) == CUI_BRIDGE_OK &&
+           next.width == 32);
+    assert(cui_bridge_numeric_part_bounds(app, rail, 3, &first) == CUI_BRIDGE_OK &&
+           first.width == 24);
+    carousel_control_expect(app, rail, slides[1], false);
+    cui_bridge_destroy(app);
+}
+
 static void test_carousel_slide_basis(void) {
     cui_bridge_options o = {.struct_size = sizeof o,
                             .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -2774,6 +2834,7 @@ int main(void) {
     test_carousel_axis();
     test_carousel_looping();
     test_carousel_controls();
+    test_carousel_control_sizes();
     test_resizable();
     test_text_view();
     test_editor();

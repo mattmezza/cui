@@ -1360,6 +1360,46 @@ func TestCarouselControls(t *testing.T) {
 	}
 }
 
+func TestCarouselControlSizes(t *testing.T) {
+	a := app(t)
+	legacy := os.Getenv("CUI_TEST_LEGACY_CAROUSEL_SIZES") == "1"
+	supported, err := a.SupportsCarouselControlSizes()
+	check(t, err)
+	if supported == legacy {
+		t.Fatalf("Carousel control sizes capability = %t, legacy test = %t", supported, legacy)
+	}
+	sizes := CarouselControlSizes{Arrows: LG, Pagination: XS}
+	rail := Carousel("rail").CarouselControls(CarouselControls{Arrows: true, Pagination: true}).
+		CarouselControlSizes(sizes).Children(Item("first", "First"), Item("second", "Second"))
+	root := Column("root").Children(rail)
+	if legacy {
+		if err := a.Mount(root); err != ErrCarouselControlSizesUnavailable {
+			t.Fatalf("expected unmounted compatibility error, got %v", err)
+		}
+		check(t, rail.CarouselControlSizes(CarouselControlSizes{}).Err())
+	}
+	check(t, a.Mount(root))
+	assertSizes := func(arrow, marker float32) {
+		t.Helper()
+		check(t, a.Step(.016))
+		aBounds, err := a.NumericPartBounds(rail, 2)
+		check(t, err)
+		mBounds, err := a.NumericPartBounds(rail, 3)
+		check(t, err)
+		if aBounds.Height != arrow || mBounds.Height != marker {
+			t.Fatalf("expected %gpx arrows and %gpx markers, got %gpx and %gpx",
+				arrow, marker, aBounds.Height, mBounds.Height)
+		}
+	}
+	if !legacy {
+		assertSizes(40, 20)
+		check(t, rail.CarouselControlSizes(CarouselControlSizes{Arrows: XS, Pagination: LG}).Err())
+		assertSizes(20, 40)
+		check(t, rail.CarouselControlSizes(CarouselControlSizes{}).Err())
+	}
+	assertSizes(32, 24)
+}
+
 func TestCarouselSlots(t *testing.T) {
 	a := app(t)
 	supported, err := a.SupportsCarouselSlots()

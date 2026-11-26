@@ -158,3 +158,10 @@ void hasCarouselControls; void carouselControlBounds;
 c.carousel().carousel_controls({arrows: 1});
 // @ts-expect-error Controls are exclusive to Carousel.
 c.item().carousel_controls();
+
+const hasCarouselControlSizes: boolean = app.supports_carousel_control_sizes();
+const sizedCarousel: c.Carousel = c.carousel().carousel_control_sizes().carousel_control_sizes({arrows: "xs", pagination: "9xl"});
+// @ts-expect-error control sizes use shared DesignSize names
+c.carousel().carousel_control_sizes({arrows: "invalid"});
+// @ts-expect-error only Carousel supports control sizes
+c.item().carousel_control_sizes();

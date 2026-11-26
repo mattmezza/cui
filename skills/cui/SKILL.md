@@ -287,7 +287,9 @@ opt-in arrows and slide markers. The controls share the ordinary Carousel
 selection event. Probe `supports_carousel_slots` (`SupportsCarouselSlots` in
 Go) to compose passive arrow and marker artwork. Attach arrow slots to the
 Carousel and marker slots to the owning Item. The outer button still owns
-interaction. Read `docs/CAROUSEL.md` for layout and examples.
+interaction. Probe `supports_carousel_control_sizes` (`SupportsCarouselControlSizes`
+in Go) to set independent arrow and marker sizes with the shared design
+scale. Read `docs/CAROUSEL.md` for layout and examples.
 For a Command palette inside a dialog, set `cui_command_options.width = -1` to fit
 the body. Rows and hit targets fill the current allocation. Width-dependent
 custom row heights settle on a follow-up frame. See `docs/COMMAND.md`.

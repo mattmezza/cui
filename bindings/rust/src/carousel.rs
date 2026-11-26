@@ -1,4 +1,4 @@
-use crate::{check, string, App, Builder, Error, Node, RawNode, Result};
+use crate::{check, string, App, Builder, DesignSize, Error, Node, RawNode, Result};
 use std::{
     ffi::{c_char, c_void},
     sync::OnceLock,
@@ -6,6 +6,7 @@ use std::{
 
 type SetBasis = unsafe extern "C" fn(*mut c_void, RawNode, f32) -> u32;
 type SetOption = unsafe extern "C" fn(*mut c_void, RawNode, u32) -> u32;
+type SetControlSizes = unsafe extern "C" fn(*mut c_void, RawNode, u32, u32) -> u32;
 type CreateSlot =
     unsafe extern "C" fn(*mut c_void, RawNode, u32, *const c_char, *mut RawNode) -> u32;
 
@@ -153,6 +154,38 @@ fn resolve_controls() -> Option<SetOption> {
     None
 }
 
+fn control_sizes_setter() -> Option<SetControlSizes> {
+    static SETTER: OnceLock<Option<SetControlSizes>> = OnceLock::new();
+    *SETTER.get_or_init(resolve_control_sizes)
+}
+
+#[cfg(cui_bridge_static)]
+fn resolve_control_sizes() -> Option<SetControlSizes> {
+    extern "C" {
+        fn cui_bridge_set_carousel_control_sizes_v1(
+            app: *mut c_void,
+            carousel: RawNode,
+            arrows: u32,
+            pagination: u32,
+        ) -> u32;
+    }
+    Some(cui_bridge_set_carousel_control_sizes_v1)
+}
+
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn resolve_control_sizes() -> Option<SetControlSizes> {
+    unsafe {
+        let symbol =
+            crate::notification_symbol_v1(c"cui_bridge_set_carousel_control_sizes_v1".as_ptr());
+        (!symbol.is_null()).then(|| std::mem::transmute::<*mut c_void, SetControlSizes>(symbol))
+    }
+}
+
+#[cfg(not(any(cui_bridge_static, unix, windows)))]
+fn resolve_control_sizes() -> Option<SetControlSizes> {
+    None
+}
+
 fn slot_factory() -> Option<CreateSlot> {
     static FACTORY: OnceLock<Option<CreateSlot>> = OnceLock::new();
     *FACTORY.get_or_init(resolve_slot_factory)
@@ -194,6 +227,8 @@ impl Error {
     pub const CAROUSEL_LOOPING_UNAVAILABLE: Self = Self(9);
     /// The loaded bridge lacks the optional Carousel controls setter.
     pub const CAROUSEL_CONTROLS_UNAVAILABLE: Self = Self(9);
+    /// The loaded bridge lacks the optional Carousel control sizes setter.
+    pub const CAROUSEL_CONTROL_SIZES_UNAVAILABLE: Self = Self(9);
     /// The loaded bridge lacks the optional Carousel content-slot factory.
     pub const CAROUSEL_SLOTS_UNAVAILABLE: Self = Self(9);
 }
@@ -228,6 +263,29 @@ impl App {
     /// Whether the loaded bridge supports retained Carousel arrows and slide markers.
     pub fn supports_carousel_controls(&self) -> bool {
         controls_setter().is_some()
+    }
+
+    /// Whether the loaded bridge supports named sizes for Carousel controls.
+    pub fn supports_carousel_control_sizes(&self) -> bool {
+        control_sizes_setter().is_some()
+    }
+
+    /// Set both control group sizes together. Inherit restores each default.
+    pub fn carousel_control_sizes(
+        &mut self,
+        carousel: Node,
+        arrows: DesignSize,
+        pagination: DesignSize,
+    ) -> Result<&mut Self> {
+        let carousel = self.valid(carousel)?;
+        match control_sizes_setter() {
+            Some(set) => {
+                check(unsafe { set(self.raw, carousel, arrows as u32, pagination as u32) })?
+            }
+            None if arrows == DesignSize::Inherit && pagination == DesignSize::Inherit => {}
+            None => return Err(Error::CAROUSEL_CONTROL_SIZES_UNAVAILABLE),
+        }
+        Ok(self)
     }
 
     /// Whether the loaded bridge can customize Carousel control content.
@@ -299,6 +357,17 @@ impl Builder<'_> {
     /// Configure the built-in controls on the Carousel being built.
     pub fn carousel_controls(self, options: CarouselControls) -> Result<Self> {
         self.app.carousel_controls(self.node, options)?;
+        Ok(self)
+    }
+
+    /// Set the independent arrow and marker sizes on the retained Carousel.
+    pub fn carousel_control_sizes(
+        self,
+        arrows: DesignSize,
+        pagination: DesignSize,
+    ) -> Result<Self> {
+        self.app
+            .carousel_control_sizes(self.node, arrows, pagination)?;
         Ok(self)
     }
 

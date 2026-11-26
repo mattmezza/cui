@@ -260,7 +260,7 @@ cui_virtual_widget_result draw_virtual_inbox(cui_context *ui, cui_id id, const c
 
 // These are complete C translation units. The application owns their state
 // and calls draw only between begin_frame and end_frame.
-export function carouselBasisUsage(visible, vertical = false, looping = false) {
+export function carouselBasisUsage(visible, vertical = false, looping = false, size = 3) {
     const basis = visible === 2 ? '.5f' : visible === 3 ? '1.f / 3' : null;
     const frame = basis
         ? `const float basis[] = {${Array(4).fill(basis).join(', ')}};
@@ -269,6 +269,7 @@ export function carouselBasisUsage(visible, vertical = false, looping = false) {
     const axis = vertical ? '\n    cui_carousel_set_axis(&rail->state, CUI_ORIENTATION_VERTICAL);' : '';
     const loop = looping ? '\n    cui_carousel_set_looping(&rail->state, true);' : '';
     return `#include <cui/cui_carousel.h>
+#include <math.h>
 
 typedef struct {
     cui_carousel_state state;
@@ -288,25 +289,46 @@ static void workflow_slide(cui_context *ui, const cui_theme *theme, size_t index
     cui_text(ui, cui_string(stages[index]), theme->font_size, theme->text);
 }
 
+static cui_carousel_control_options workflow_control(float width, float fallback,
+    const cui_theme *theme) {
+    cui_design_metrics metrics;
+    const float size = cui_design_measure(${sizes[size] || 'CUI_DESIGN_BASE'}, theme->font_size / 16, &metrics)
+        ? metrics.control_height : fallback;
+    return (cui_carousel_control_options){
+        .size = CUI_CAROUSEL_CONTROL_CUSTOM, .custom_size = fminf(size, width)};
+}
+
 static void workflow_arrows(cui_context *ui, const cui_theme *theme,
     cui_carousel_state *state, cui_id root, void *user) {
     (void)user;
-    cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true, .gap = 8, .align_x = CUI_ALIGN_CENTER});
+    cui_carousel_control_options options = workflow_control(state->frame_width, 32, theme);
+    cui_begin_box(ui, 0, (cui_box){.width = -1,
+        .row = state->frame_width >= 2 * options.custom_size + 8,
+        .gap = 8, .align_x = CUI_ALIGN_CENTER});
     cui_carousel_control_inline(ui, cui_id_from(ui, "prev"), theme, state, root,
-        false, (cui_carousel_control_options){0});
+        false, options);
     cui_carousel_control_inline(ui, cui_id_from(ui, "next"), theme, state, root,
-        true, (cui_carousel_control_options){0});
+        true, options);
     cui_end_box(ui);
 }
 
 static void workflow_pages(cui_context *ui, const cui_theme *theme,
     cui_carousel_state *state, cui_id root, void *user) {
     (void)user;
-    if (!cui_carousel_pagination_begin(ui, cui_id_from(ui, "pages"), cui_string("Stages"), NULL))
+    cui_carousel_control_options options = workflow_control(state->frame_width, 20, theme);
+    const size_t columns = (size_t)fmaxf(1, floorf((state->frame_width + 4) / (options.custom_size + 4)));
+    cui_box layout = {.width = -1, .gap = 4, .align_x = CUI_ALIGN_CENTER};
+    if (!cui_carousel_pagination_begin(ui, cui_id_from(ui, "pages"), cui_string("Stages"), &layout))
         return;
-    for (size_t i = 0; i < state->count; ++i)
-        cui_carousel_pagination_item(ui, cui_id_from(ui, stages[i]), theme, state, root, i,
-            (cui_carousel_control_options){.label = cui_string(stages[i])});
+    for (size_t first = 0; first < state->count; first += columns) {
+        const size_t end = first + columns < state->count ? first + columns : state->count;
+        cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true, .gap = 4, .align_x = CUI_ALIGN_CENTER});
+        for (size_t i = first; i < end; ++i) {
+            options.label = cui_string(stages[i]);
+            cui_carousel_pagination_item(ui, cui_id_from(ui, stages[i]), theme, state, root, i, options);
+        }
+        cui_end_box(ui);
+    }
     cui_carousel_pagination_end(ui);
 }
 

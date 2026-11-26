@@ -1069,6 +1069,14 @@ function render(){
   const wrappedRoom=styledDisclosureHeadings?(largeDisclosureHeadings?5:2)*designHeights[designScale]+120:0;
   height=Math.max(height,rows*(designHeights[designScale]+gaps[designScale])+panelRoom+wrappedRoom);
  }
+ if(selected.name==='Carousel'){
+  const innerWidth=Math.max(1,width-144),named=designHeights[designScale];
+  const arrow=Math.min(innerWidth,named||32),marker=Math.min(innerWidth,named||20);
+  const arrowHeight=innerWidth>=2*arrow+8?arrow:2*arrow+8;
+  const columns=Math.max(1,Math.floor((innerWidth+4)/(marker+4)));
+  const markerRows=Math.ceil(4/columns);
+  height=Math.max(height,360+arrowHeight+markerRows*marker+(markerRows-1)*4);
+ }
  if(orderedTime)height=Math.max(360,2*timeFieldHeight+224);
  if(pagination){
   const controlHeight=paginationHeight,gap=paginationCustom?6*paginationCustom/32:gaps[designScale];
@@ -1252,7 +1260,7 @@ function render(){
  if(selected.name==='Spinner')$('snippet').textContent=spinnerUsage(...['size','icon','color','easing','sizing','rem'].map(k=>Number($('spinner-'+k).value)));
  if(timeField)$('snippet').textContent=timeFieldUsage(designScale,orderedTime);
  if(selected.name==='HoverCard')$('snippet').textContent=hoverCardUsage(Number($('hover-policy').value),Number($('hover-preview').value));
- if(selected.name==='Carousel')$('snippet').textContent=carouselBasisUsage(carouselVisible,carouselVertical,carouselLooping);
+ if(selected.name==='Carousel')$('snippet').textContent=carouselBasisUsage(carouselVisible,carouselVertical,carouselLooping,designScale);
  if(selected.name==='Resizable')$('snippet').textContent=resizableUsage($('resizable-nested').checked);
  if(selected.name==='VirtualList')$('snippet').textContent=
   $('virtual-axis').value==='2'?virtualInboxUsage:snippets.VirtualList;
@@ -1595,7 +1603,7 @@ function selectComponent(){
  $('pagination-language').hidden=selected.name!=='Pagination';$('pagination-language').value='en';
  $('time-field-tab-mode').hidden=selected.name!=='TimeField';$('time-field-tab-mode').value='segments';
  for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control','text-paint'])$(id).hidden=selected.name!=='Theme';textPaintControl.value='0';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
- $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Pagination','Rating','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar','TimeField','Accordion','Collapsible'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
+ $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Pagination','Rating','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar','TimeField','Accordion','Collapsible','Carousel'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
  $('design-radius').value='-1';$('design-spacing').value='-1';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);

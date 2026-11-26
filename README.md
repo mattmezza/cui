@@ -12,7 +12,7 @@ An experimental C11 native UI framework: Clay layout, unstyled interaction primi
 
 The current [composed application](docs/COMPOSED_APPS.md) uses CUI navigation, account menus, cards, forms and pricing actions. This capture shows the real C/WASM draw list rendered by the browser adapter; it is not a mockup.
 
-Download the alpha.6 native starter kit with CUI source, fonts and editable native examples. [Native starter archive](https://github.com/mattmezza/cui/releases/download/v0.1.0-alpha.6/cui-0.1.0-alpha.6-native-starter.tar.gz)
+Download the alpha.7 native starter kit with CUI source, fonts and editable native examples. [Native starter archive](https://github.com/mattmezza/cui/releases/download/v0.1.0-alpha.7/cui-0.1.0-alpha.7-native-starter.tar.gz)
 
 Build a real window with the [native app starter guide](docs/NATIVE_APP_STARTER.md): dependencies, CMake/Make/linker flags, sidebar pages and a bottom account menu.
 
@@ -132,4 +132,4 @@ features, evidence and limitations directly from the manifest.
 
 Original CUI source is MIT. Vendored Clay and Sokol are zlib-licensed. GPUI Kit 0.7.1 is a pinned functional reference, not linked or copied into the C runtime; see [upstream baseline](docs/upstream-baseline.md) and [dependency inventory](third_party/dependencies.json).
 
-For macOS development, see [native Mac builds and `.app` packaging](docs/MACOS.md) and [Linux-to-macOS cross compilation](docs/MACOS_CROSS.md). These workflows still require Mac runtime acceptance.
+For macOS development, see [native Mac builds and `.app` packaging](docs/MACOS.md) and [Linux-to-macOS cross compilation](docs/MACOS_CROSS.md). Hosted Apple Silicon validates the dummy/software adapter and development bundle. Cocoa window, Retina and hardware acceptance remains open.

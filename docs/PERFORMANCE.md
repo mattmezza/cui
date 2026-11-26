@@ -166,7 +166,9 @@ Branch pushes and pull requests continue to qualify source. The build,
 native binding and optional Speech workflows now filter push events to branches.
 Speech keeps its existing path filter, and bindings and Speech remain available
 through manual dispatch. Pages already builds and deploys on main pushes.
-Tag scheduling still needs confirmation on the next publication.
+Both alpha.7 tags resolved to the verified main revision. GitHub reported zero
+tag-triggered push runs when checked 68 seconds after the push.
+[Alpha.7 scheduling receipt](validation/alpha7-release.json)
 
 ## Browser probe transport
 

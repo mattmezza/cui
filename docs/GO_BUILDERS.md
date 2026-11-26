@@ -183,6 +183,27 @@ The option remains selectable and the group's usual callback reports it.
 See the allowed decorative kinds in the
 [bridge composition guide](BRIDGE_COMPONENTS.md#compose-retained-radio-option-content).
 
+## Add Radio tooltips from Go
+
+Attach a short hint to a standalone Radio or a direct RadioGroup Item. The
+default opening delay is 350 milliseconds. An optional second argument sets
+the delay. Check the provider before enabling hints.
+
+```go
+supported, err := app.SupportsRadioTooltip()
+if err != nil {
+    return err
+}
+priority := cui.Item("priority", "Priority")
+if supported {
+    priority.RadioTooltip("Track your parcel online")
+}
+```
+
+Use `priority.SetRadioTooltip("")` to clear the hint, or pass new text and an
+optional delay to edit it on a mounted option. The option and its selection
+callback stay available on older providers. [Run the delivery form](#animate-radio-selection-from-go)
+
 ## Configure Pagination from Go
 
 `ConfiguredPagination` records copied layout options on a detached node. Set `AvailableWidth` to the current inner width in logical pixels to wrap, or use zero for a single row. Send committed pages to your results view through `OnChange`. For a dynamic provider, check `app.SupportsPaginationOptions()` before opting in. Ordinary `Pagination(key)` and its change callback also work with earlier providers.

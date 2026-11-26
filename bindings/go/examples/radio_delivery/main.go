@@ -26,10 +26,16 @@ func main() {
 	must(err)
 	motion, err := app.SupportsRadioMotion()
 	must(err)
+	tooltip, err := app.SupportsRadioTooltip()
+	must(err)
 	standard := cui.Item("standard", "Standard")
 	decoration := cui.Tag("recommended", "Recommended")
 	priority := cui.Item("priority", "Priority").Detail("Tracked delivery. Recommended.").
 		DecorateContent(content).Children(decoration)
+	if tooltip {
+		standard.RadioTooltip("Arrives Friday with standard shipping")
+		priority.RadioTooltip("Arrives Wednesday with tracking", 350)
+	}
 	summary := cui.Label("Estimated arrival: Friday")
 	delivery := cui.RadioGroup("delivery").Children(standard, priority).Selected(standard).
 		AnimateSelection(motion).OnChange(func(event cui.Event) {

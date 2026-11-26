@@ -81,7 +81,8 @@ Check for the symbol with dynamically loaded providers. In Python and
 JS/TS, check `app.supports_radio_tooltip()` before calling
 `option.radio_tooltip(text)`. Rust uses the same probe and
 `Builder::radio_tooltip(text, delay_ms)`, with `Some(text)` to set a hint
-and `None` to clear. Go does not expose it yet.
+and `None` to clear. In Go, use `app.SupportsRadioTooltip()` and
+`option.RadioTooltip(text)`, with empty text to clear.
 The same guide covers passive children inside one RadioGroup Item through
 `cui_bridge_radio_item_set_content_v1`, `item.decorate_content()` in Python and
 JS/TS, `item.DecorateContent(enabled)` in Go, or

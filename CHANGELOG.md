@@ -20,7 +20,8 @@
   selection target for the row.
 - Standalone Radio and RadioGroup options can show delayed hover and focus
   tooltips in immediate C, the retained C bridge, Python, JavaScript and
-  TypeScript and Rust. The WASM gallery and delivery forms show a hint on Priority.
+  TypeScript, Go and Rust. The WASM gallery and delivery forms show a hint on
+  Priority.
 
 ## 0.1.0-alpha.7
 

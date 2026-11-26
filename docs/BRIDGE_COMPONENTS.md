@@ -321,7 +321,10 @@ Rust exposes `Builder::radio_tooltip(text, delay_ms)` and
 hint and `None` to clear it. Probe `app.supports_radio_tooltip()` before
 opt-in for older providers. [Rust delivery form](RUST_BUILDERS.md#add-radio-tooltips-from-rust)
 
-Go does not yet expose this setter.
+Go offers `option.RadioTooltip(text, delayMS...)` with a 350 ms default.
+Use `option.SetRadioTooltip(text, delayMS...)` to handle a mounted update
+error, and pass an empty string to clear. Check `app.SupportsRadioTooltip()`
+before opting in. [Go delivery form](GO_BUILDERS.md#add-radio-tooltips-from-go)
 
 ### Configure a retained pager from C
 

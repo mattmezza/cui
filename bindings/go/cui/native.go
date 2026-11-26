@@ -378,6 +378,23 @@ static void go_load_optional_symbol(void *destination, size_t size, const char *
 
 #include "pagination_ffi.h"
 
+static cui_bridge_status (*radio_tooltip_set)(cui_bridge_app *, cui_bridge_node, const char *, uint32_t);
+static void go_radio_tooltip_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&radio_tooltip_set, sizeof radio_tooltip_set,
+                          "cui_bridge_radio_set_tooltip_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else { radio_tooltip_set = cui_bridge_radio_set_tooltip_v1; }
+#endif
+}
+static int go_radio_tooltip_supported(void) { return radio_tooltip_set != NULL; }
+static cui_bridge_status go_set_radio_tooltip(cui_bridge_app *app, cui_bridge_node node,
+                                               const char *text, uint32_t delay) {
+ return radio_tooltip_set ? radio_tooltip_set(app, node, text, delay)
+                         : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+
 static cui_bridge_status (*radio_motion_set)(cui_bridge_app *, cui_bridge_node, uint32_t);
 
 static cui_bridge_status (*radio_content_set)(cui_bridge_app *, cui_bridge_node, uint32_t);
@@ -497,6 +514,7 @@ static int bridge_open(const char *path) {
  go_pagination_initialize();
  go_radio_motion_initialize();
  go_radio_content_initialize();
+ go_radio_tooltip_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -528,6 +546,7 @@ static int bridge_open(const char *path) {
  go_pagination_initialize();
  go_radio_motion_initialize();
  go_radio_content_initialize();
+ go_radio_tooltip_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -618,6 +637,8 @@ type Node struct {
 	hasHover                             bool
 	click                                func(Event)
 	change                               func(Event)
+	radioTooltipText                     string
+	radioTooltipDelay                    int
 	checked, radioMotion, radioContent   bool
 	value, min, max, step                float64
 	hasRange, hasValue, hasChecked       bool
@@ -1709,6 +1730,14 @@ func (a *App) Mount(root *Node) error {
 		if content && !radioContentKind(n.kind) {
 			return errors.New("RadioGroup Item decorations require passive content")
 		}
+		if n.radioTooltipText != "" {
+			if n.kind == int(C.CUI_BRIDGE_ITEM) && (parent == nil || parent.kind != int(C.CUI_BRIDGE_RADIO_GROUP)) {
+				return errors.New("Radio tooltip requires a direct RadioGroup Item")
+			}
+			if C.go_radio_tooltip_supported() == 0 {
+				return ErrRadioTooltipUnavailable
+			}
+		}
 		if n.radioContent {
 			if parent == nil || parent.kind != int(C.CUI_BRIDGE_RADIO_GROUP) {
 				return errors.New("decorative content requires a direct RadioGroup Item")
@@ -1879,6 +1908,11 @@ func (a *App) Mount(root *Node) error {
 		n.app = a
 		n.handle = h
 		a.nodes[keyID(h)] = n
+		if n.radioTooltipText != "" {
+			if err := n.SetRadioTooltip(n.radioTooltipText, n.radioTooltipDelay); err != nil {
+				return err
+			}
+		}
 		if n.radioContent {
 			if err := n.SetRadioItemContent(true); err != nil {
 				return err
@@ -2701,6 +2735,67 @@ func radioContentKind(kind int) bool {
 		return true
 	}
 	return false
+}
+
+// ErrRadioTooltipUnavailable indicates the selected bridge lacks retained Radio hints.
+var ErrRadioTooltipUnavailable = errors.New("Radio tooltip is unavailable in this bridge")
+
+// SupportsRadioTooltip reports support for retained standalone Radio and group Item hints.
+func (a *App) SupportsRadioTooltip() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_radio_tooltip_supported() != 0, nil
+}
+
+// RadioTooltip configures a copied hover/focus hint. Delay defaults to 350 milliseconds.
+// Use SetRadioTooltip to handle mounted update errors directly.
+func (n *Node) RadioTooltip(text string, delayMS ...int) *Node {
+	if n != nil && n.err == nil {
+		n.err = n.SetRadioTooltip(text, delayMS...)
+	}
+	return n
+}
+
+// SetRadioTooltip replaces a hint atomically. Text is at most 256 valid UTF-8 bytes,
+// without NUL; delay is 0..10000 milliseconds (default 350). Empty text clears
+// and ignores the numeric delay.
+// Only standalone Radio and direct RadioGroup Item nodes support hints. Detached
+// Item ownership is checked at Mount. Clearing works with older providers.
+func (n *Node) SetRadioTooltip(text string, delayMS ...int) error {
+	if n == nil || n.removed || (n.kind != int(C.CUI_BRIDGE_RADIO) && n.kind != int(C.CUI_BRIDGE_ITEM)) {
+		return errors.New("Radio tooltip requires a live Radio or RadioGroup Item")
+	}
+	delay := 350
+	if len(delayMS) > 1 {
+		return errors.New("Radio tooltip accepts one delay")
+	}
+	if len(delayMS) == 1 {
+		delay = delayMS[0]
+	}
+	if !utf8.ValidString(text) || strings.IndexByte(text, 0) >= 0 || len(text) > 256 || (text != "" && (delay < 0 || delay > 10000)) {
+		return errors.New("invalid Radio tooltip text or delay")
+	}
+	if text == "" {
+		delay = 350
+	}
+	if n.app != nil {
+		supported, err := n.app.SupportsRadioTooltip()
+		if err != nil {
+			return err
+		}
+		if supported {
+			value := C.CString(text)
+			defer C.free(unsafe.Pointer(value))
+			if err := result(C.go_set_radio_tooltip(n.app.ptr, n.handle, value, C.uint32_t(delay))); err != nil {
+				return err
+			}
+		} else if text != "" {
+			return ErrRadioTooltipUnavailable
+		}
+	}
+	n.radioTooltipText, n.radioTooltipDelay = text, delay
+	return nil
 }
 
 // ErrRadioMotionUnavailable indicates the selected bridge lacks retained Radio motion.

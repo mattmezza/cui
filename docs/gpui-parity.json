@@ -2623,7 +2623,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. RadioGroup supports descriptions and decorative callbacks in immediate C. The retained C bridge, Python, JavaScript, TypeScript, Go and Rust support Item descriptions and opt-in passive children. Optional tooltips are available for standalone and grouped options in immediate C, the retained C bridge, Python, JavaScript, TypeScript and Rust. Go tooltip authoring, full styling and OS accessibility acceptance remain open."
+        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. RadioGroup supports descriptions and decorative callbacks in immediate C. The retained C bridge, Python, JavaScript, TypeScript, Go and Rust support Item descriptions and opt-in passive children. Optional tooltips are available for standalone and grouped options in immediate C, the retained C bridge, Python, JavaScript, TypeScript, Go and Rust. Full styling and OS accessibility acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2731,13 +2731,15 @@
             "bindings/node/test/radio-motion.test.cjs",
             "bindings/node/examples/radio-delivery.cjs",
             "bindings/typescript/examples/radio_delivery.ts",
+            "bindings/go/cui/radio_tooltip_test.go",
+            "bindings/go/examples/radio_delivery/main.go",
             "bindings/rust/tests/radio_motion.rs:optional_tooltips_preserve_selection_events",
             "bindings/rust/examples/radio_delivery.rs",
             "docs/RADIO_GROUP.md",
             "docs/BRIDGE_COMPONENTS.md"
           ],
           "limitations": [
-            "Immediate C tooltips follow the existing hover and focus lifecycle. The application owns persistent per-option state. The gallery exercises grouped hints. The C bridge copies text and owns state for standalone Radio and direct RadioGroup Items. Python, JavaScript, TypeScript and Rust provide a builder method with a capability check. Go tooltip authoring and native accessibility acceptance remain open."
+            "Immediate C tooltips follow the existing hover and focus lifecycle. The application owns persistent per-option state. The gallery exercises grouped hints. The C bridge copies text and owns state for standalone Radio and direct RadioGroup Items. Python, JavaScript, TypeScript, Go and Rust provide a builder method with a capability check. Native accessibility acceptance remains open."
           ]
         },
         {

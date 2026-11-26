@@ -2630,6 +2630,11 @@ target_link_libraries(test_bridge_stepper_visual PRIVATE cui_software)
 cui_warnings(test_bridge_stepper_visual)
 add_test(NAME bridge_stepper_visual COMMAND test_bridge_stepper_visual)
 
+add_executable(test_bridge_rating tests/unit/test_bridge_rating.c)
+target_link_libraries(test_bridge_rating PRIVATE cui)
+cui_warnings(test_bridge_rating)
+add_test(NAME bridge_rating COMMAND test_bridge_rating)
+
 # Current-frame named box decoration; no component/input ownership changes.
 add_executable(test_compound_shadow_parts tests/unit/test_compound_shadow_parts.c)
 target_link_libraries(test_compound_shadow_parts PRIVATE cui)

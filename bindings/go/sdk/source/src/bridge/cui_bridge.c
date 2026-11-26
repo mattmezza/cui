@@ -1090,6 +1090,7 @@ static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *no
 #include "cui_bridge_icon_internal.h"
 #include "cui_bridge_icon_presentation_internal.h"
 #include "cui_bridge_badge_internal.h"
+#include "cui_bridge_rating_internal.h"
 #include "cui_bridge_skeleton_internal.h"
 #include "cui_bridge_pagination_internal.h"
 // clang-format on
@@ -1222,6 +1223,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     bridge_pagination_remove(node->owner, node->own_slot);
     bridge_icon_presentation_remove(node->owner, node->own_slot);
     bridge_badge_remove(node->owner, node->own_slot);
+    bridge_rating_remove(node);
     if (node->owner && node->owner->radio_motions) {
         free(node->owner->radio_motions[node->own_slot]);
         node->owner->radio_motions[node->own_slot] = NULL;
@@ -5683,8 +5685,7 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         }
     } else if (node->kind == CUI_BRIDGE_RATING) {
         float value = (float)node->value;
-        if (cui_rating(app->ui, node->id, &app->theme, cui_string(node->text), &value,
-                       (cui_rating_options){.maximum = node->total, .disabled = node->disabled})) {
+        if (bridge_rating_draw(app, node, &value)) {
             node->value = value;
             bridge_change(app, slot);
         }

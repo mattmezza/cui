@@ -2875,6 +2875,7 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_numeric.c",
+        "tests/unit/test_bridge_rating.c",
         "tests/web/test_browser.py",
         "tests/web/test_rating_gallery.py"
       ],
@@ -2884,7 +2885,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Immediate C and WASM support whole or half steps, shared design sizes, outline-only hover preview, SVG masks and color overrides. The distinct step-down policy is opt-in. Native host accessibility acceptance, arbitrary inherited styling, and retained builder presentation remain open."
+        "Immediate C, retained C and WASM support whole or half steps, shared design sizes, outline-only hover preview, SVG masks and color overrides. The distinct step-down policy is opt-in. Native host accessibility acceptance, arbitrary inherited styling and retained language builder presentation remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2925,6 +2926,15 @@
           "evidence": [
             "tests/unit/test_numeric_selection_events.c",
             "tests/web/test_rating_gallery.py"
+          ]
+        },
+        {
+          "name": "Retained C Rating configuration and owned SVG mask references",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_rating.c",
+            "include/cui/cui_bridge.h",
+            "docs/BRIDGE_COMPONENTS.md"
           ]
         }
       ],

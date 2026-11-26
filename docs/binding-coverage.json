@@ -362,7 +362,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The retained bridge and Python, JavaScript, TypeScript, Go and Rust builders keep the existing integer Rating subset. Shared presenter sizes, half-step authoring, hover preview, custom masks/colors and the opt-in step-down policy are available in immediate C."
+        "The C bridge optionally configures shared Rating sizes, half steps, hover preview, step-down, read-only, Clear, custom colors and Icon resource masks. Python, JavaScript, TypeScript, Go and Rust builders still use their integer presenter. The C bridge retains the existing scalar notification queue."
       ]
     },
     {

@@ -38,6 +38,7 @@ typedef struct bridge_radio_paints bridge_radio_paints;
 typedef struct bridge_dock_owned bridge_dock_owned;
 typedef struct bridge_settings_owned bridge_settings_owned;
 typedef struct bridge_data_table_owned bridge_data_table_owned;
+typedef struct bridge_rating_configured bridge_rating_configured;
 typedef enum {
     BRIDGE_STEPPER_BUTTONS,
     BRIDGE_STEPPER_FIXED,
@@ -87,6 +88,7 @@ typedef struct {
     cui_shimmer_state shimmer_state;
     float visual_width, visual_height;
     cui_list_state list_state;
+    bridge_rating_configured *rating;
     uint32_t total;
     uint32_t step_status;
     cui_scroll_state scroll_state;

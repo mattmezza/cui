@@ -830,19 +830,24 @@
         "cui_rating_events",
         "cui_rating_present",
         "cui_rating_present_events",
-        "cui_base_rating_ex"
+        "cui_base_rating_ex",
+        "cui_bridge_rating_configure_v1",
+        "cui_bridge_rating_get_config_v1",
+        "cui_bridge_rating_config_size_v1"
       ],
       "state_types": [
         "cui_rating_options",
         "cui_rating_presentation",
-        "cui_rating_selection"
+        "cui_rating_selection",
+        "cui_bridge_rating_config_v1"
       ],
       "state_ownership": "Caller retains float rating.",
       "interaction": "Returns true when the committed rating changes. Use the typed change callback or the bool result for side effects. Hover preview affects paint only.",
-      "usage": "Pass the application-owned rating by pointer. Use the styled presenter for shared sizes, custom SVG masks, tint and optional step-down behavior.",
+      "usage": "Pass the application-owned rating by pointer. Use the styled presenter for shared sizes, custom SVG masks, tint and optional step-down behavior. Configure a retained C Rating node with cui_bridge_rating_configure_v1.",
       "docs": [
         "docs/NUMERIC.md",
-        "docs/NUMERIC_SELECTION_EVENTS.md"
+        "docs/NUMERIC_SELECTION_EVENTS.md",
+        "docs/BRIDGE_COMPONENTS.md"
       ],
       "callback_symbols": [
         "cui_rating_change_fn"
@@ -852,7 +857,8 @@
       "public_header": "include/cui/cui_numeric.h",
       "composition": "immediate frame submission",
       "additional_public_headers": [
-        "include/cui/cui_numeric_selection_events.h"
+        "include/cui/cui_numeric_selection_events.h",
+        "include/cui/cui_bridge.h"
       ]
     },
     {

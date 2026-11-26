@@ -83,8 +83,9 @@ See `docs/STEPPER_NAVIGATION.md`.
 Use `cui_rating_present` for shared Rating sizes, custom SVG masks, colors and
 outline-only preview. The app owns the numeric value. Set
 `CUI_RATING_STEP_DOWN_FILLED` for opt-in step-down and choose the bool or the
-typed callback for side effects. Foreign builders keep the integer subset.
-See `docs/NUMERIC.md#rating`.
+typed callback for side effects. Retained C uses `cui_bridge_rating_configure_v1`
+and queued scalar changes. Foreign builders keep the integer presenter.
+See Rating in `docs/NUMERIC.md` and `docs/BRIDGE_COMPONENTS.md`.
 
 For RadioGroup descriptions, decorative content, tooltips, signed tab order
 and C-only paint callbacks, read `docs/RADIO_GROUP.md`. For a controlled

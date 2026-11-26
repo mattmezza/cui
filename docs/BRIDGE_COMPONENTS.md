@@ -47,7 +47,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | List | `cui_list` | selected Item, change, disabled | Up to 64 Items |
 | Menu | `cui_menu` | menu Item action, change, disabled | Up to 64 leaf actions |
 | Pagination | `cui_pagination` | current page, total, change, disabled | One-based page, total <= 1,000,000. The retained bridge and language bindings add sizing, wrapping, page budgets, jump menus and localized navigation. [C](#configure-a-retained-pager-from-c) · [Python](BINDING_BUILDERS.md#configure-pagination-from-python) · [JS/TS](BINDING_BUILDERS.md#configure-pagination-from-javascript-and-typescript) · [Go](GO_BUILDERS.md#configure-pagination-from-go) · [Rust](RUST_BUILDERS.md#configure-pagination-from-rust). |
-| Rating | `cui_rating` | value, maximum, change, disabled | Maximum <= 10 |
+| Rating | `cui_rating`, `cui_rating_present` | Value, maximum, queued change and disabled. Opt in to half steps, shared sizing, color and SVG masks. | Maximum 10. [Retained C example](#configure-a-retained-rating-from-c). |
 | Stepper | `cui_stepper`, `cui_stepper_visual_navigation`, `cui_stepper_present` | Selected Item, status, aggregate change, disabled, shared size and copied RGBA Item icons. Choose fixed connectors or fill with an explicit axis. | Up to 64 Items. Visual selection paints on the next submission. Synchronous controlled requests and custom indicator palettes use the immediate C API. |
 | DescriptionList | `cui_description_list` | Item label/value pairs | Up to 64 Items, default columns |
 | Scrollable | `cui_scrollable_begin/end_ex` | child tree, viewport/extents, wheel change | Vertical viewport |
@@ -523,6 +523,52 @@ Run each example from the repository root. Use the setup commands under
 [Animate retained Radio selection from C](#animate-retained-radio-selection-from-c)
 to build the matching provider. Omit the font argument to run headlessly.
 The TypeScript example uses Node's TypeScript execution support.
+
+### Configure a retained Rating from C
+
+Create a `CUI_BRIDGE_RATING` node and set its label with `cui_bridge_set_text`.
+Use the existing value and total setters. The default maximum is five, and
+retained Rating accepts at most ten marks.
+
+```c
+#include <cui/cui_bridge.h>
+
+cui_bridge_status configure_delivery_rating(cui_bridge_app *app, cui_bridge_node rating) {
+    const cui_bridge_rating_config_v1 options = {
+        .struct_size = sizeof options,
+        .schema_version = 1,
+        .flags = CUI_BRIDGE_RATING_HALF_STEPS_V1 |
+                 CUI_BRIDGE_RATING_HOVER_PREVIEW_V1 |
+                 CUI_BRIDGE_RATING_CLEARABLE_V1 |
+                 CUI_BRIDGE_RATING_CUSTOM_FILL_V1,
+        .design_size = CUI_BRIDGE_SIZE_SM,
+        .width = 280,
+        .fill_rgba = 0xbe3155ffu
+    };
+    cui_bridge_status status = cui_bridge_rating_configure_v1(app, rating, &options);
+    return status == CUI_BRIDGE_OK ? cui_bridge_set_value(app, rating, 2.5) : status;
+}
+```
+
+Width 0 uses the natural size. Set `outline_icon` and `fill_icon` to existing Icon
+resource handles from the same app to replace either star mask. Use white
+artwork for a monochrome tint. The bridge retains one reference per handle field and releases
+it on option replacement, reset or node removal. Shared resources may be
+updated between frames. An empty or unpreparable resource uses the default star
+for that mask. The Icon resource budget and provider requirements still apply.
+[Icon resource API](BRIDGE_ICON_RESOURCES.md)
+
+The setter copies the configuration and leaves any queued change intact.
+`cui_bridge_rating_get_config_v1` fills a size- and version-initialized record.
+Pass NULL to the setter to restore the legacy presenter. The next step
+normalizes the current numeric value to the active grid. Normalization can
+queue a change as before. Hover preview leaves the value and event queue
+untouched. Read-only and disabled prevent user changes.
+
+When loading a shared provider, require the configure, get and size symbols and
+verify that the reported size equals your record size before offering these
+options. Python, JavaScript, TypeScript, Go and Rust builders currently keep
+their original integer presenter.
 
 ### Configure a retained pager from C
 

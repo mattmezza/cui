@@ -1232,6 +1232,7 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_numeric_part_bounds(cui_bridge_app *
 typedef struct {
     uint32_t slot, generation;
 } cui_bridge_icon_handle_v1;
+
 typedef struct {
     uint32_t struct_size, schema_version, reserved[2];
     uint64_t max_svg_bytes, max_pixels, max_cache_bytes, max_versions;
@@ -1322,6 +1323,40 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_bitmap_copy_v1(cui_bridge_app *
                                                                 cui_bridge_icon_bitmap_v1 *,
                                                                 unsigned char *, uint32_t capacity,
                                                                 uint32_t *required);
+
+enum {
+    CUI_BRIDGE_RATING_HALF_STEPS_V1 = 1u << 0,
+    CUI_BRIDGE_RATING_HOVER_PREVIEW_V1 = 1u << 1,
+    CUI_BRIDGE_RATING_STEP_DOWN_FILLED_V1 = 1u << 2,
+    CUI_BRIDGE_RATING_CLEARABLE_V1 = 1u << 3,
+    CUI_BRIDGE_RATING_READONLY_V1 = 1u << 4,
+    CUI_BRIDGE_RATING_CUSTOM_FILL_V1 = 1u << 5,
+    CUI_BRIDGE_RATING_CUSTOM_OUTLINE_V1 = 1u << 6,
+    CUI_BRIDGE_RATING_CUSTOM_PREVIEW_V1 = 1u << 7
+};
+typedef struct {
+    uint32_t struct_size, schema_version, flags, design_size;
+    float width;
+    uint32_t fill_rgba, outline_rgba, preview_rgba;
+    cui_bridge_icon_handle_v1 outline_icon, fill_icon;
+} cui_bridge_rating_config_v1;
+/* Optional retained Rating presenter. Exact size and schema 1. Use the
+ * shared design size values (0 inherits). Width 0 uses natural layout;
+ * explicit widths are finite logical pixels in [1,4096].
+ * Color words use 0xRRGGBBAA. Absent overrides require zero words.
+ * {0,0} selects the built-in star for that mask. Each nonzero handle must
+ * belong to this app and pins one resource reference until changed or reset.
+ * Unpreparable masks fall back independently to stars.
+ * Copy configuration between steps on the owner thread. NULL resets to the
+ * legacy integer presenter. The existing value/maximum and queued aggregate
+ * CHANGE rules apply, including normalization on the next step.
+ * Get requires an initialized size/version and returns EMPTY when unconfigured.
+ * Errors preserve config, references and outputs. */
+CUI_BRIDGE_API uint32_t cui_bridge_rating_config_size_v1(void);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_rating_configure_v1(
+    cui_bridge_app *, cui_bridge_node, const cui_bridge_rating_config_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_rating_get_config_v1(cui_bridge_app *, cui_bridge_node,
+                                                                 cui_bridge_rating_config_v1 *);
 
 /* Optional configured presentation for a retained Icon. Fixed-width,
  * native-endian records use exact size and schema_version=1. RGBA numbers

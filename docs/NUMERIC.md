@@ -141,8 +141,9 @@ option includes copyable setup. [Icon resource guide](ICON.md)
 
 Use `cui_base_rating_ex` or `cui_base_rating_events_ex` for the selection
 policy with custom layout. Existing Rating entry points keep their value
-selection and paint defaults. The retained bridge and language builders keep
-the existing integer Rating subset.
+selection and paint defaults. Retained C nodes can opt into the presenter with
+`cui_bridge_rating_configure_v1`. The language builders still use the original
+integer presenter. [Retained C setup and resource lifetimes](BRIDGE_COMPONENTS.md#configure-a-retained-rating-from-c)
 
 ## Stepper
 

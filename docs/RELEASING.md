@@ -1,3 +1,26 @@
+# Published prerelease v0.1.0-alpha.8
+
+CUI v0.1.0-alpha.8 was published on 2026-11-26 from
+`363bdb7dc55ec94bd6210e9e4b659cb0ce69b350`. It includes the native starter, source
+archive, static Linux C bundle and Python, npm, Go and Rust packages. The
+WASM gallery and bindings include the new Radio motion, option descriptions
+and decoration, tooltips and signed keyboard ordering. The website and GitHub
+served identical starter bytes at publication.
+[GitHub release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.8)
+
+All 16 hosted CI jobs, the native binding callback job and all three headless
+browser shards passed. Six installed checks covered the starter, C, native
+bindings, real-font text and paging. The installed Radio examples passed in
+Python, JavaScript, TypeScript, Go and Rust. All 11 draft assets matched
+local staging and all 680 public Go module files matched the tested package.
+The root and Go tags point to the validated revision and produced zero observed
+extra push runs. [Release validation record](validation/alpha8-release.json)
+
+Rebuild C consumers with matching headers and libraries. The Python wheel uses
+`0.1.0a8`. Linux binary assets target x86_64 and require system dependencies.
+Physical device checks, full-family verification and PyPI, npm and crates.io
+publication remain open.
+
 # Published prerelease v0.1.0-alpha.7
 
 CUI v0.1.0-alpha.7 was published on 2026-11-26 from

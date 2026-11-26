@@ -549,5 +549,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_test(NAME node_radio_motion_legacy COMMAND ${CMAKE_COMMAND} -E env
    CUI_NODE_ADDON=$<TARGET_FILE:cui_node_radio_legacy> CUI_EXPECT_RADIO_LEGACY=1
    ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/radio-motion.test.cjs)
+  add_test(NAME node_radio_motion_legacy_example COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_radio_legacy> ${NODE_EXECUTABLE}
+   ${CMAKE_CURRENT_SOURCE_DIR}/examples/radio-delivery.cjs)
  endif()
 endif()

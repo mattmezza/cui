@@ -1403,6 +1403,42 @@ static napi_value set_radio_item_content(napi_env env, napi_callback_info info) 
                           "Radio decoration requires cui_bridge_radio_item_set_content_v1");
 }
 
+typedef cui_bridge_status (*radio_tooltip_fn)(cui_bridge_app *, cui_bridge_node, const char *,
+                                              uint32_t);
+
+static radio_tooltip_fn radio_tooltip_symbol(void) {
+    radio_tooltip_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_radio_set_tooltip_v1");
+    return set;
+}
+
+static napi_value supports_radio_tooltip(napi_env env, napi_callback_info info) {
+    (void)info;
+    napi_value result;
+    if (napi_get_boolean(env, radio_tooltip_symbol() != NULL, &result) != napi_ok)
+        return NULL;
+    return result;
+}
+
+static napi_value set_radio_tooltip(napi_env env, napi_callback_info info) {
+    napi_value v[4];
+    js_app *app;
+    js_node *node;
+    uint32_t delay_ms;
+    if (!args(env, info, 4, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[3], &delay_ms))
+        return NULL;
+    radio_tooltip_fn set = radio_tooltip_symbol();
+    if (!set)
+        return fail(env, "Radio tooltips require cui_bridge_radio_set_tooltip_v1");
+    char *text;
+    if (!string_arg(env, v[2], &text))
+        return NULL;
+    cui_bridge_status code = set(app->bridge, node->node, text, delay_ms);
+    free(text);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 typedef cui_bridge_status (*data_table_set_keyed_fn)(cui_bridge_app *, cui_bridge_node,
                                                      const char *const *, uint32_t,
                                                      const char *const *, const uint32_t *,
@@ -2367,6 +2403,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("supportsRadioItemContent", supports_radio_item_content, 0);
     EXPORT("setRadioItemContent", set_radio_item_content, 0);
     EXPORT("setRadioMotion", set_radio_motion, 0);
+    EXPORT("supportsRadioTooltip", supports_radio_tooltip, 0);
+    EXPORT("setRadioTooltip", set_radio_tooltip, 0);
     EXPORT("setValue", set_num, 7);
     EXPORT("setRange", set_range, 0);
     EXPORT("getChecked", get_state, 1);

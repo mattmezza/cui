@@ -39,6 +39,8 @@ export class App {
   supports_radio_motion(): boolean;
   /** Whether this app's native bridge can paint passive children inside RadioGroup Items. */
   supports_radio_item_content(): boolean;
+  /** Whether this app's native bridge can attach hints to retained radio options. */
+  supports_radio_tooltip(): boolean;
   pointer(phase: PointerPhase, x: number, y: number): this;
   key(phase: KeyPhase, key: Key, modifiers?: number, repeat?: boolean): this;
   text_input(text: string): this;
@@ -59,7 +61,11 @@ export interface Input extends Label {current_text(): string; disabled(value?: b
 export interface NumberInput extends Input, Slider {}
 export function checkbox(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|2>;
 export interface RadioSelectionMotion { animate_selection(enabled?: boolean): this }
-export function radio(key?: string, text?: string): BooleanControl & RadioSelectionMotion & PartShadowStyled<0|1|2>;
+export interface RadioTooltip {
+  /** For standalone Radio or direct RadioGroup Items. null or empty clears the hint. */
+  radio_tooltip(text: string | null, delayMs?: number): this;
+}
+export function radio(key?: string, text?: string): BooleanControl & RadioSelectionMotion & RadioTooltip & PartShadowStyled<0|1|2>;
 export function switch_control(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|3|4>;
 export function toggle(key?: string, text?: string): BooleanControl;
 export function slider(key?: string): Slider & PartShadowStyled<0|1|3>;
@@ -72,7 +78,7 @@ export function number_input(key?: string): NumberInput;
 export interface Composite extends Node {children(...items: (Node | Node[])[]): this}
 export interface Disclosure extends Label, Composite {open(value?: boolean): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Group extends Composite {select(item: Item): this; selected(): Item | undefined; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
-export interface Item extends Disclosure {
+export interface Item extends Disclosure, RadioTooltip {
   /** Enable or hide passive children of a direct RadioGroup Item. */
   decorate_content(enabled?: boolean): this;
 }

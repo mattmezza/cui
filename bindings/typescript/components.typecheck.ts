@@ -7,12 +7,18 @@ const dialog=c.dialog('dialog','Edit').detail('Edit details').children(c.input('
 const picker=c.date_picker('birthday').date_value(1980,1,1).open();
 const app=new c.App({backend:'headless'}).mount(c.column().children(calendar,tree,dialog,picker,c.image('photo').image_rgba(new Uint8Array(16),2,2)));
 app.scroll(5,5,0,-80).step();
-c.radio('option', 'Option').animate_selection(app.supports_radio_motion()).checked();
+const radio = c.radio('option', 'Option').animate_selection(app.supports_radio_motion()).checked();
+if (app.supports_radio_tooltip()) radio.radio_tooltip('Save a copy', 350).checked();
+radio.radio_tooltip(null);
 c.radio_group('choices').animate_selection().children(c.item('option', 'Option'));
 c.radio_group('choices').children(
   c.item('priority', 'Priority').children(c.tag('recommended', 'Recommended'))
-    .decorate_content(app.supports_radio_item_content()),
+    .decorate_content(app.supports_radio_item_content()).radio_tooltip('Track shipment', 0),
 );
+// @ts-expect-error RadioGroup itself cannot have an option tooltip.
+c.radio_group('choices').radio_tooltip('Group hint');
+// @ts-expect-error The tooltip delay is numeric.
+c.radio('option').radio_tooltip('Hint', '350');
 // @ts-expect-error Only Items expose RadioGroup decorations.
 c.button('action').decorate_content();
 // @ts-expect-error Decoration opt-in takes a boolean.

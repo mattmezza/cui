@@ -23,20 +23,26 @@ const groups = new Set([17,18,19,21,22,23,40,41,44,45,47,48,49,54,60,61,64,65,66
 const containers = new Set([1,2,15,17,18,19,20,21,22,23,24,26,27,29,33,40,41,44,45,46,47,48,49,54,60,61,63,64,65,66,70,73,74,75,76,78,79,80]);
 const radioMotionUnavailable = 'Radio motion is unavailable in this bridge';
 const radioContentUnavailable = 'Radio decoration is unavailable in this bridge';
+const radioTooltipUnavailable = 'Radio tooltips are unavailable in this bridge';
 // Row, Column, Label, plain Badge, Avatar, Kbd, Tag, Icon and Image.
 const radioContentKinds = new Set([1, 2, 3, 11, 30, 34, 37, 50, 53]);
 function requestsRadioMotion(node) {
   return node.radioMotionValue || node.childrenValue.some(requestsRadioMotion);
 }
-function preflightRadioContent(app, node, insideDecoration = false) {
+function preflightRadioOptions(app, node, insideDecoration = false) {
   if (insideDecoration && !radioContentKinds.has(node.kind))
     throw new TypeError('RadioGroup Item decoration requires passive children');
   if (node.radioContentValue) {
     if (node.parent?.kind !== 17) throw new TypeError('decorate_content requires a direct RadioGroup Item');
     if (!app.supports_radio_item_content()) throw new Error(radioContentUnavailable);
   }
+  if (node.radioTooltipValue) {
+    if (node.kind === 20 && node.parent?.kind !== 17)
+      throw new TypeError('radio_tooltip requires a direct RadioGroup Item');
+    if (!app.supports_radio_tooltip()) throw new Error(radioTooltipUnavailable);
+  }
   for (const child of node.childrenValue)
-    preflightRadioContent(app, child, insideDecoration || node.radioContentValue);
+    preflightRadioOptions(app, child, insideDecoration || node.radioContentValue);
 }
 function keyFor(node) { return `${node.slot}:${node.generation}`; }
 function positive(value, name) {
@@ -100,6 +106,7 @@ class Node {
     this.extentValue=null; this.anchorValue=null; this.visualValue=null; this.closeValue=null; this.totalValue=kind===43?5:kind===59?6:10; this.attachmentValue=0; this.imageValue=null;this.chartDataValue=[];this.chartKindValue=0;this.plotPointsValue=[];this.matrixValue=null;this.selectionModeValue=0;this.textFormatValue=0;this.panelValue=null; this.timeValue=[0,0,0];this.dateValue=[2026,1,1];this.colorValue=0x000000ff; this.statusValue=null; this.openValue = false;this.openSet=false;this.checkedSet=false; this.detailValue = ""; this.selectedValue = null; this.checkedValue = false; this.numericValue = kind===42?1:0; this.rangeValue = kind===42?[1,10,1]:kind===43?[0,5,1]:[0,1,.01]; this.changeValue = undefined;
     this.radioMotionValue = false;
     this.radioContentValue = false;
+    this.radioTooltipValue = null;
     this.partShadowStyles=new Map(); this.shadowStyleValue = null; this.hoverValue = undefined; this.clickValue = undefined;
   }
   box_shadows(layers=[],radii=new CornerRadii()) {
@@ -222,6 +229,26 @@ class Node {
       else if (enabled) throw new Error(radioContentUnavailable);
     }
     this.radioContentValue = enabled;
+    return this;
+  }
+  radio_tooltip(text, delayMs = 350) {
+    if (this.kind !== 6 && this.kind !== 20)
+      throw new TypeError('radio_tooltip requires Radio or a direct RadioGroup Item');
+    if (text !== null && typeof text !== 'string') throw new TypeError('expected tooltip text or null');
+    let config = null;
+    if (text) {
+      if (text.includes('\0') || Buffer.byteLength(text, 'utf8') > 256)
+        throw new RangeError('Radio tooltip text must fit in 256 UTF-8 bytes without NUL');
+      if (!Number.isInteger(delayMs) || delayMs < 0 || delayMs > 10000)
+        throw new RangeError('Radio tooltip delay must be an integer from 0 to 10000');
+      config = [text, delayMs];
+    }
+    if (this.owner) {
+      if (this.owner.supports_radio_tooltip())
+        native.setRadioTooltip(this.owner.handle, this[NODE], ...(config ?? ['', 0]));
+      else if (config) throw new Error(radioTooltipUnavailable);
+    }
+    this.radioTooltipValue = config;
     return this;
   }
   is_checked() { if(!booleans.has(this.kind)) throw new Error('no checked state'); return this.owner ? native.getChecked(this.owner.handle,this[NODE]) : this.checkedValue; }
@@ -529,7 +556,7 @@ class App {
     if (this.root) throw new Error('app already has a root');
     if (!(root instanceof Node) || root.parent || root.owner || ![1,2,76].includes(root.kind)) throw new TypeError('root must be an unattached row, column or root_view');
     if (!this.supports_radio_motion() && requestsRadioMotion(root)) throw new Error(radioMotionUnavailable);
-    preflightRadioContent(this, root);
+    preflightRadioOptions(this, root);
     preflightDataTables(this, root);
     skeletons.preflight(this, root);
     paginationOptions.preflight(this, root);
@@ -550,6 +577,7 @@ class App {
       if ([5,6,7,8].includes(node.kind) || (node.kind===20 && node.checkedSet)) native.setChecked(this.handle,node[NODE],node.checkedValue ? 1 : 0);
       if (node.radioMotionValue) native.setRadioMotion(this.handle, node[NODE], true);
       if (node.radioContentValue) native.setRadioItemContent(this.handle, node[NODE], true);
+      if (node.radioTooltipValue) native.setRadioTooltip(this.handle, node[NODE], ...node.radioTooltipValue);
       if ([9,14].includes(node.kind)) native.setRange(this.handle,node[NODE],...node.rangeValue);
       if([42,43].includes(node.kind))native.setTotal(this.handle,node[NODE],node.totalValue);
       if (numerics.has(node.kind)) native.setValue(this.handle,node[NODE],node.numericValue);
@@ -734,6 +762,11 @@ class App {
     this._alive();
     return typeof native.supportsRadioItemContent === 'function' &&
       typeof native.setRadioItemContent === 'function' && native.supportsRadioItemContent();
+  }
+  supports_radio_tooltip() {
+    this._alive();
+    return typeof native.supportsRadioTooltip === 'function' &&
+      typeof native.setRadioTooltip === 'function' && native.supportsRadioTooltip();
   }
   supports_pagination_options() { return paginationOptions.supports(this); }
   supports_skeleton_presentation() { return skeletons.supports(this); }

@@ -10,6 +10,7 @@ try {
   const recommendation = tag('recommended', 'Recommended');
   const priority = item('priority', 'Priority').detail('Tracked delivery. Recommended.')
     .children(recommendation).decorate_content(decorated);
+  if (app.supports_radio_tooltip()) priority.radio_tooltip('Track your parcel online');
   const delivery = radio_group('delivery').children(standard, priority).select(standard)
     .animate_selection(app.supports_radio_motion())
     .on_change(() => {

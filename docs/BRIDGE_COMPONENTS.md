@@ -303,7 +303,20 @@ empty string to clear it. On earlier providers, skip the optional hint so the
 same form mounts normally. The runnable delivery example uses this pattern.
 [Python delivery form](../bindings/python/examples/radio_delivery.py)
 
-JavaScript, TypeScript, Go and Rust do not yet expose this setter.
+JavaScript and TypeScript use the same capability probe and take the optional
+delay as the second positional argument. Pass `null` or an empty string to
+clear the hint.
+
+```js
+if (app.supports_radio_tooltip()) {
+  priority.radio_tooltip('Track your parcel online', 350);
+}
+```
+
+[JavaScript delivery form](../bindings/node/examples/radio-delivery.cjs) ·
+[TypeScript delivery form](../bindings/typescript/examples/radio_delivery.ts)
+
+Go and Rust do not yet expose this setter.
 
 ### Configure a retained pager from C
 

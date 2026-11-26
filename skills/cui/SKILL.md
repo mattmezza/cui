@@ -77,9 +77,9 @@ per option. Retained applications can use the Item detail setter
 in `docs/BRIDGE_COMPONENTS.md` for copied accessible descriptions.
 Retained C can add an optional copied hint through
 `cui_bridge_radio_set_tooltip_v1` on Radio or a direct RadioGroup Item.
-Check for the symbol with dynamically loaded providers. Foreign bindings
-other than Python do not expose it yet. In Python, check
-`app.supports_radio_tooltip()` before calling `option.radio_tooltip(text)`.
+Check for the symbol with dynamically loaded providers. In Python and
+JS/TS, check `app.supports_radio_tooltip()` before calling
+`option.radio_tooltip(text)`. Go and Rust do not expose it yet.
 The same guide covers passive children inside one RadioGroup Item through
 `cui_bridge_radio_item_set_content_v1`, `item.decorate_content()` in Python and
 JS/TS, `item.DecorateContent(enabled)` in Go, or

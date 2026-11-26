@@ -7,6 +7,14 @@ const dialog=c.dialog('dialog','Edit').detail('Edit details').children(c.input('
 const picker=c.date_picker('birthday').date_value(1980,1,1).open();
 const app=new c.App({backend:'headless'}).mount(c.column().children(calendar,tree,dialog,picker,c.image('photo').image_rgba(new Uint8Array(16),2,2)));
 app.scroll(5,5,0,-80).step();
+c.radio('option', 'Option').animate_selection(app.supports_radio_motion()).checked();
+c.radio_group('choices').animate_selection().children(c.item('option', 'Option'));
+// @ts-expect-error Selection motion is specific to the Radio family.
+c.checkbox('check').animate_selection();
+// @ts-expect-error Tabs do not animate Radio marks.
+c.tabs('tabs').animate_selection();
+// @ts-expect-error The motion setting takes a boolean.
+c.radio('option').animate_selection('yes');
 // @ts-expect-error Static badges do not accept button-only styling.
 c.badge('status','Ready').primary();
 // @ts-expect-error AlertDialog uses its native actions rather than arbitrary children.

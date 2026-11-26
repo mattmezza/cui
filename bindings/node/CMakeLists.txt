@@ -510,3 +510,44 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   endif()
  endforeach()
 endif()
+
+add_test(NAME node_radio_motion COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/radio-motion.test.cjs)
+add_test(NAME node_radio_motion_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/radio-delivery.cjs)
+if(CUI_BRIDGE_NATIVE_TESTS)
+ add_test(NAME node_radio_motion_native COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> SDL_RENDER_DRIVER=software ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/radio-delivery.cjs "${CUI_TEST_FONT}" --smoke)
+endif()
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_radio_motion_types COMMAND "${CUI_NODE_TSC_EXECUTABLE}" --noEmit --strict
+  --target ES2022 --module NodeNext --moduleResolution NodeNext
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/components.typecheck.ts
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/radio_delivery.ts)
+endif()
+execute_process(COMMAND "${NODE_EXECUTABLE}" -p "process.versions.node"
+ OUTPUT_VARIABLE CUI_NODE_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(CUI_NODE_VERSION VERSION_GREATER_EQUAL "22.18")
+ add_test(NAME node_radio_motion_types_example COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/radio_delivery.ts)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ set(CUI_NODE_RADIO_LEGACY_LIBRARY "" CACHE FILEPATH "Existing bridge without retained Radio motion")
+ if(CUI_NODE_RADIO_LEGACY_LIBRARY)
+  if(NOT EXISTS "${CUI_NODE_RADIO_LEGACY_LIBRARY}")
+   message(FATAL_ERROR "CUI_NODE_RADIO_LEGACY_LIBRARY must name an existing bridge library")
+  endif()
+  add_library(cui_node_radio_legacy MODULE addon.c)
+  target_include_directories(cui_node_radio_legacy PRIVATE ${NODE_API_INCLUDE_DIR} ../../include)
+  target_link_libraries(cui_node_radio_legacy PRIVATE "${CUI_NODE_RADIO_LEGACY_LIBRARY}" m ${CMAKE_DL_LIBS})
+  target_compile_options(cui_node_radio_legacy PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  set_target_properties(cui_node_radio_legacy PROPERTIES PREFIX "" SUFFIX ".node")
+  add_test(NAME node_radio_motion_legacy COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_radio_legacy> CUI_EXPECT_RADIO_LEGACY=1
+   ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/radio-motion.test.cjs)
+ endif()
+endif()

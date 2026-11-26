@@ -802,7 +802,8 @@
         "docs/CONTROLS.md",
         "docs/SELECTION_EVENTS.md",
         "docs/NAMED_SELECTION_INDICATORS.md",
-        "docs/CONTROL_SURFACE_SHADOW_GALLERY.md"
+        "docs/CONTROL_SURFACE_SHADOW_GALLERY.md",
+        "docs/BRIDGE_COMPONENTS.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",

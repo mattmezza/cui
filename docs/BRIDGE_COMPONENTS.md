@@ -141,16 +141,35 @@ passing elapsed time on successive frames. A dynamically loaded provider must
 export this optional symbol for the setting. Native hosts can pass `0` when
 their own preference handling calls for reduced motion.
 
-In Python, call `.animate_selection()` on `radio()` or `radio_group()` before or
-after mounting. Query `app.supports_radio_motion()` before opting in if the app
-supports older library releases. The [delivery example](../bindings/python/examples/radio_delivery.py)
-changes the arrival estimate in its existing `on_change` callback. From an installed
-Python environment with a matching bridge, run it without arguments to verify the
-callback headlessly, or pass a font path to open the native checkout window.
+Python, JavaScript and TypeScript expose `.animate_selection()` on `radio()` and
+`radio_group()` before or after mounting. If your app supports older bridge
+releases, pass `app.supports_radio_motion()` as the argument to opt in only
+when supported. Pass false to honor your app's reduced-motion setting. Trying
+to enable motion against an older provider fails before mounting any nodes,
+and the same tree can be mounted after turning the option off.
+
+The delivery form updates the estimated arrival in its existing `on_change`
+callback. The Python example runs with an installed binding and matching bridge.
+Omit the font argument for a headless check.
+[Python delivery form](../bindings/python/examples/radio_delivery.py)
 
 ```sh
 python bindings/python/examples/radio_delivery.py
 python bindings/python/examples/radio_delivery.py --font third_party/inter/Inter-Regular.otf
+```
+
+The JavaScript checkout example uses the SDL3-backed Node addon to open the same
+form. Build with CMake, Ninja, Node development headers and the native SDL3/text
+dependencies in the [native starter](NATIVE_STARTER.md). Omit the font argument
+for a headless check. Node 25 also runs the TypeScript version headlessly.
+[JavaScript delivery form](../bindings/node/examples/radio-delivery.cjs) ·
+[TypeScript delivery form](../bindings/typescript/examples/radio_delivery.ts)
+
+```sh
+cmake -S bindings/node -B build-node -G Ninja -DCUI_BUILD_NATIVE=ON
+cmake --build build-node --target cui_node_bindings
+node bindings/node/examples/radio-delivery.cjs third_party/inter/Inter-Regular.otf
+node bindings/typescript/examples/radio_delivery.ts
 ```
 
 ### Configure a retained pager from C

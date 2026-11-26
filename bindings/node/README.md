@@ -71,6 +71,11 @@ DataTable can request another page near the end of its viewport. Use
 `table.poll_load_more()` with your app's request state.
 [JavaScript and TypeScript paged inboxes](../../docs/BINDING_BUILDERS.md#page-a-javascript-or-typescript-datatable)
 
+Radio and RadioGroup can animate their selection marks when the bridge supports
+the optional motion setting. The delivery form runs headlessly or opens a native
+window and updates an arrival estimate in its existing selection callback.
+[Radio motion and delivery examples](../../docs/BRIDGE_COMPONENTS.md#animate-retained-radio-selection-from-c)
+
 ## Controlled Single/Range Slider (unreleased)
 
 Read [the Node/TypeScript controlled guide](../../docs/NODE_SLIDER_MODEL.md)

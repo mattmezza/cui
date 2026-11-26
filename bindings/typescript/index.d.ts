@@ -35,6 +35,8 @@ export class App {
   set_window_visible(visible: boolean): this;
   window_visible(): boolean;
   mount(root: Row | Column | RootView): this;
+  /** Whether this app's native bridge can animate retained Radio selection. */
+  supports_radio_motion(): boolean;
   pointer(phase: PointerPhase, x: number, y: number): this;
   key(phase: KeyPhase, key: Key, modifiers?: number, repeat?: boolean): this;
   text_input(text: string): this;
@@ -54,7 +56,8 @@ export interface Slider extends NumericControl {range(minimum: number, maximum: 
 export interface Input extends Label {current_text(): string; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface NumberInput extends Input, Slider {}
 export function checkbox(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|2>;
-export function radio(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|2>;
+export interface RadioSelectionMotion { animate_selection(enabled?: boolean): this }
+export function radio(key?: string, text?: string): BooleanControl & RadioSelectionMotion & PartShadowStyled<0|1|2>;
 export function switch_control(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|3|4>;
 export function toggle(key?: string, text?: string): BooleanControl;
 export function slider(key?: string): Slider & PartShadowStyled<0|1|3>;
@@ -71,7 +74,7 @@ export interface Item extends Disclosure {}
 export interface Alert extends Label {detail(text: string): this}
 export function collapsible(key?: string, text?: string): Disclosure;
 export function alert(key?: string, text?: string): Alert;
-export function radio_group(key?: string): Group & PartShadowStyled<0>;
+export function radio_group(key?: string): Group & RadioSelectionMotion & PartShadowStyled<0>;
 export function tabs(key?: string): Group;
 export function accordion(key?: string): Composite;
 export function item(key?: string, text?: string): Item;

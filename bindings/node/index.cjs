@@ -21,6 +21,10 @@ const numerics = new Set([9,10,14,42,43,52]);
 const editable = new Set([12,13,14,22,59,61,67,68,73]);
 const groups = new Set([17,18,19,21,22,23,40,41,44,45,47,48,49,54,60,61,64,65,66,70,73,74,75,78,79,80]);
 const containers = new Set([1,2,15,17,18,19,20,21,22,23,24,26,27,29,33,40,41,44,45,46,47,48,49,54,60,61,63,64,65,66,70,73,74,75,76,78,79,80]);
+const radioMotionUnavailable = 'Radio motion is unavailable in this bridge';
+function requestsRadioMotion(node) {
+  return node.radioMotionValue || node.childrenValue.some(requestsRadioMotion);
+}
 function keyFor(node) { return `${node.slot}:${node.generation}`; }
 function positive(value, name) {
   if (!Number.isFinite(value) || value <= 0) throw new TypeError(`${name} must be positive and finite`);
@@ -81,6 +85,7 @@ class Node {
     this.questionFlags=null;this.rootPaddingValue=0;this.gapValue = undefined; this.variantValue = 0; this.sizeValue = 3;
     this.roundingValue = 0; this.radiusValue = 0; this.disabledValue = false;
     this.extentValue=null; this.anchorValue=null; this.visualValue=null; this.closeValue=null; this.totalValue=kind===43?5:kind===59?6:10; this.attachmentValue=0; this.imageValue=null;this.chartDataValue=[];this.chartKindValue=0;this.plotPointsValue=[];this.matrixValue=null;this.selectionModeValue=0;this.textFormatValue=0;this.panelValue=null; this.timeValue=[0,0,0];this.dateValue=[2026,1,1];this.colorValue=0x000000ff; this.statusValue=null; this.openValue = false;this.openSet=false;this.checkedSet=false; this.detailValue = ""; this.selectedValue = null; this.checkedValue = false; this.numericValue = kind===42?1:0; this.rangeValue = kind===42?[1,10,1]:kind===43?[0,5,1]:[0,1,.01]; this.changeValue = undefined;
+    this.radioMotionValue = false;
     this.partShadowStyles=new Map(); this.shadowStyleValue = null; this.hoverValue = undefined; this.clickValue = undefined;
   }
   box_shadows(layers=[],radii=new CornerRadii()) {
@@ -183,6 +188,16 @@ class Node {
     if (!booleans.has(this.kind) || typeof value !== 'boolean') throw new TypeError('checked requires a boolean component and value');
     if(this.owner) native.setChecked(this.owner.handle,this[NODE],value ? 1 : 0);
     this.checkedValue=value;this.checkedSet=true; return this;
+  }
+  animate_selection(enabled = true) {
+    if (this.kind !== 6 && this.kind !== 17) throw new TypeError('selection motion requires a Radio or RadioGroup');
+    if (typeof enabled !== 'boolean') throw new TypeError('selection motion requires a boolean');
+    if (this.owner) {
+      if (this.owner.supports_radio_motion()) native.setRadioMotion(this.owner.handle, this[NODE], enabled);
+      else if (enabled) throw new Error(radioMotionUnavailable);
+    }
+    this.radioMotionValue = enabled;
+    return this;
   }
   is_checked() { if(!booleans.has(this.kind)) throw new Error('no checked state'); return this.owner ? native.getChecked(this.owner.handle,this[NODE]) : this.checkedValue; }
   value(value) {
@@ -488,6 +503,7 @@ class App {
     this._alive();
     if (this.root) throw new Error('app already has a root');
     if (!(root instanceof Node) || root.parent || root.owner || ![1,2,76].includes(root.kind)) throw new TypeError('root must be an unattached row, column or root_view');
+    if (!this.supports_radio_motion() && requestsRadioMotion(root)) throw new Error(radioMotionUnavailable);
     preflightDataTables(this, root);
     skeletons.preflight(this, root);
     paginationOptions.preflight(this, root);
@@ -506,6 +522,7 @@ class App {
       if (node.textValue !== undefined) native.setText(this.handle, node[NODE], node.textValue);
       if (node.gapValue !== undefined) native.setGap(this.handle, node[NODE], node.gapValue);
       if ([5,6,7,8].includes(node.kind) || (node.kind===20 && node.checkedSet)) native.setChecked(this.handle,node[NODE],node.checkedValue ? 1 : 0);
+      if (node.radioMotionValue) native.setRadioMotion(this.handle, node[NODE], true);
       if ([9,14].includes(node.kind)) native.setRange(this.handle,node[NODE],...node.rangeValue);
       if([42,43].includes(node.kind))native.setTotal(this.handle,node[NODE],node.totalValue);
       if (numerics.has(node.kind)) native.setValue(this.handle,node[NODE],node.numericValue);
@@ -681,6 +698,11 @@ class App {
       typeof native.pollDataTableLoadMore === 'function' && native.supportsDataTablePaging();
   }
   supports_pagination_custom_size() { return paginationOptions.supportsCustom(this); }
+  supports_radio_motion() {
+    this._alive();
+    return typeof native.supportsRadioMotion === 'function' &&
+      typeof native.setRadioMotion === 'function' && native.supportsRadioMotion();
+  }
   supports_pagination_options() { return paginationOptions.supports(this); }
   supports_skeleton_presentation() { return skeletons.supports(this); }
   supports_localized_time_field(){return localizedTimes.supports(this);}

@@ -71,6 +71,10 @@ function declarations produce matching paths only. `api SYMBOL --full` restores
 complete matching headers. `--declaration` explicitly selects the concise API view.
 No output is clipped or filtered by safety keywords.
 
+For retained Radio selection animation, read the Radio section of
+`docs/BRIDGE_COMPONENTS.md`. Python and JS/TS apps can query
+`app.supports_radio_motion()` before enabling the optional animation.
+
 For HoverCard, read the fit section of `docs/CONTENT.md`. Zero height fits
 children and may request one follow-up for edge placement. A child height
 change remeasures automatically. Tap dismissal and its host limits are in

@@ -1347,6 +1347,38 @@ static napi_value get_plot(napi_env env, napi_callback_info info) {
     return result;
 }
 static int optional_bridge_symbol(void *target, size_t size, const char *name);
+typedef cui_bridge_status (*radio_motion_fn)(cui_bridge_app *, cui_bridge_node, uint32_t);
+
+static radio_motion_fn radio_motion_symbol(void) {
+    radio_motion_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_radio_set_motion_v1");
+    return set;
+}
+
+static napi_value supports_radio_motion(napi_env env, napi_callback_info info) {
+    (void)info;
+    napi_value result;
+    if (napi_get_boolean(env, radio_motion_symbol() != NULL, &result) != napi_ok)
+        return NULL;
+    return result;
+}
+
+static napi_value set_radio_motion(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *node;
+    bool enabled;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
+        return NULL;
+    if (napi_get_value_bool(env, v[2], &enabled) != napi_ok)
+        return fail(env, "Radio motion requires a boolean");
+    radio_motion_fn set = radio_motion_symbol();
+    if (!set)
+        return fail(env, "Radio motion requires cui_bridge_radio_set_motion_v1");
+    cui_bridge_status code = set(app->bridge, node->node, enabled ? 1u : 0u);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 typedef cui_bridge_status (*data_table_set_keyed_fn)(cui_bridge_app *, cui_bridge_node,
                                                      const char *const *, uint32_t,
                                                      const char *const *, const uint32_t *,
@@ -2307,6 +2339,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setSelected", set_selected, 0);
     EXPORT("getSelected", get_selected, 0);
     EXPORT("setChecked", set_num, 6);
+    EXPORT("supportsRadioMotion", supports_radio_motion, 0);
+    EXPORT("setRadioMotion", set_radio_motion, 0);
     EXPORT("setValue", set_num, 7);
     EXPORT("setRange", set_range, 0);
     EXPORT("getChecked", get_state, 1);

@@ -36,14 +36,12 @@ def main():
               }throw Error('Missing target '+name);}'''
             def target(name):
                 return page.evaluate(target_js, name)
-            hints = [target(name) for name in ('Ctrl+Shift+K', 'Esc', 'Enter')]
+            hints = [target(name) for name in ('Ctrl+Shift+SS', 'Esc', 'Enter')]
             assert all(h['width'] > 0 and h['height'] > 0 for h in hints)
             assert hints[0]['x'] < hints[1]['x'] < hints[2]['x']
             assert abs(hints[0]['y']-hints[1]['y']) < 2
             assert 'cui_kbd_ex' in page.locator('#snippet').inner_text()
             assert page.locator('#component-guides a').filter(has_text='Keyboard').count() >= 1
-            page.goto(f'http://127.0.0.1:{server.server_port}/#Stepper')
-            page.wait_for_function('window.cuiGallery?.renderedComponent==="Stepper"')
             def painted(text):
                 expression = """()=>{const w=cuiGallery.exports,d=new TextDecoder();
                   return Array.from({length:w.gallery_count()},(_,i)=>d.decode(new Uint8Array(w.memory.buffer,w.gallery_command_text(i),w.gallery_command_length(i)))).join('');}"""
@@ -52,6 +50,9 @@ def main():
                 except Exception:
                     print('Missing paint:', text, 'Actual:', page.evaluate(expression)[:1200], 'Errors:', errors, flush=True)
                     raise
+            painted('Ctrl+Shift+SS')
+            page.goto(f'http://127.0.0.1:{server.server_port}/#Stepper')
+            page.wait_for_function('window.cuiGallery?.renderedComponent==="Stepper"')
             def click(name):
                 t = target(name)
                 b = page.locator('#preview').bounding_box()
@@ -97,7 +98,7 @@ def main():
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
             assert not errors, errors
             browser.close()
-            print('PASS: typed Kbd row and actual pointer/key Stepper validation, same-item requests, disabled suppression and mobile containment')
+            print('PASS: Unicode Kbd label and pointer/key Stepper validation, same-item requests, disabled suppression and mobile containment')
     finally:
         server.shutdown()
         server.server_close()

@@ -19,7 +19,7 @@ bool draw_shortcut_hints(cui_context *ui, const cui_theme *theme,
     cui_begin_box(ui, 100, (cui_box){.row = true, .gap = 8});
     bool palette = cui_kbd_ex(ui, 101, theme,
         (cui_kbd_stroke){.modifiers = CUI_MOD_META | CUI_MOD_SHIFT,
-                         .key = CUI_STR("p")},
+                         .key = CUI_STR("ß")},
         (cui_kbd_options){.mac_symbols = mac_symbols});
     bool escape = cui_kbd_ex(ui, 102, theme,
         (cui_kbd_stroke){.key = CUI_STR("escape")},
@@ -34,9 +34,12 @@ Call inside an active frame. The host selects platform convention explicitly:
 CTRL/ALT/SHIFT/META display in that order, as text with `+` or macOS symbols
 without separators. `META` is Win or Command. Host parser aliases such as
 `secondary` must be resolved by the host; the component does not guess a keymap.
-ASCII first letters become uppercase; known lower-case key names map to source
-labels, including Esc, Enter/⏎, Backspace/⌫, Delete/⌫, arrow names/symbols and
-Page Up/Page Down. Function keys and literal `+`/`-` work without a parser.
+Known lower-case key names have platform labels including Esc, Enter/⏎,
+Backspace/⌫, Delete/⌫, arrow names or symbols and Page Up/Page Down. Other keys
+apply Unicode 17.0 default uppercase to the first scalar. For example, `éclair`
+becomes `Éclair` and `ßeta` becomes `SSeta`. The remainder of the key stays
+byte-for-byte as supplied. Locale and surrounding text do not affect the
+mapping. Function keys and literal `+`/`-` work without a parser.
 
 `cui_kbd_format_stroke` returns required bytes **excluding NUL**. It accepts
 NULL output for size queries and capacity0 without writing; positive capacity
@@ -44,10 +47,11 @@ always NUL-terminates valid output within that capacity, truncating only complet
 UTF-8 scalars. Invalid input returns SIZE_MAX and leaves the output unchanged.
 Input key must be nonempty strict single-line UTF-8, at most128 bytes, with no
 embedded NUL or ASCII control characters. Unknown modifier bits are invalid.
-The four existing portable flags are the only accepted mask. The longest result
-is147 bytes, so internal required-count arithmetic cannot overflow. The output
-buffer may overlap the input key. Non-ASCII casing is preserved: full Unicode
-uppercase conversion from the Rust source is not implemented.
+The maximum result is 151 bytes excluding NUL, including four modifiers
+and up to four extra bytes for the first scalar. Allocate
+`CUI_KBD_TEXT_CAPACITY` bytes for a complete label, including the terminator.
+The output buffer may overlap the input key. Use `cui_kbd_format` when you
+need the legacy byte-preserving behavior.
 
 Zero options draw the source-shaped muted pill: muted foreground/background,
 12-unit text at16-unit rem, horizontal padding4, vertical padding2, minimum
@@ -55,7 +59,7 @@ width20 and half theme radius. Outline adds a1-unit border and uses the theme
 background. `plain=true` wins over outline and renders text at the theme font
 and color without pill padding/border/minimum. CUI maps rem to
 `theme.font_size/16`; the font must be finite(0,512], radius finite/nonnegative.
-It does not provide arbitrary GPUI Styled modifiers or a general inherited
+The hint has a fixed set of appearance options and uses no general inherited
 parent text-style stack. CUI solid theme tokens are the supported palette;
 this is not proof of every upstream theme/background representation.
 
@@ -74,18 +78,10 @@ strokes into one sequence or looking up host Action/context/focus/global
 bindings remains outside this API. Do not promote full Kbd parity from these
 formatting and presentation additions.
 
-The standalone worker fixture compiles the exact example and tests named-key
-formatting, all output capacities, UTF-8/control rejection and overlap, normal/
-outline/plain geometry, theme scaling, actual software fill pixels, text draw
-colors, semantics and ordinary sibling composition. It checks legacy helpers
-remain unchanged. Text rasterization is not claimed by portable pixel tests.
-New sources require root-owned canonical source/test registration and matching
-SDK/consumer-resource regeneration before distribution.
-
-Worker validation used strict C11 Release (`-Wall -Wextra -Wpedantic -Werror`):
-`kbd_source` and the existing `content` regression passed through the private
-headless wrapper. The exact guide example compiled against the real header,
-and strict C++11 header syntax passed. No native windows or browser were opened.
+The C and WASI fixtures exercise all 1,580 changed Unicode 17 uppercase
+mappings, scalar-safe truncation, overlap, untouched suffixes, the legacy
+helper, geometry and accessible labels. The headless gallery test inspects
+both the semantic label and the draw command for `Ctrl+Shift+SS`.
 
 ```sh
 cmake -S tests/fixtures/kbd -B /path/to/private-build -G Ninja \

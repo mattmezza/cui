@@ -359,7 +359,7 @@ API: `cui_image`. [Public header](../include/cui/cui_media.h); [guide](MEDIA.md)
 
 **Interaction:** Presentation only; shortcut dispatch belongs to the application.
 
-**Usage:** Submit typed single-stroke hints; compose several as ordinary row children. Host shortcut registration remains separate.
+**Usage:** Submit typed single-stroke hints with Unicode first-scalar uppercase. Compose several as ordinary row children. The host owns shortcut registration.
 
 API: `cui_kbd`, `cui_kbd_format`, `cui_kbd_ex`, `cui_kbd_format_stroke`. [Public header](../include/cui/cui_content.h); [typed hints](../include/cui/cui_kbd.h); [guide](KBD.md).
 

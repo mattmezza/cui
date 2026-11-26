@@ -16,10 +16,10 @@ typedef struct {
  * key must be strict single-line UTF-8 <=128 bytes, without ASCII controls.
  * Invalid input leaves output untouched. NULL output queries required bytes.
  * Partial output ends on a complete scalar and is NUL terminated when capacity>0.
- * Common special names and first ASCII letter uppercase match frozen source;
- * non-ASCII case conversion is not implemented. Required count is bounded147
- * bytes, so arithmetic cannot overflow; writes never exceed capacity. Legacy
- * cui_kbd_format is unchanged. Output may overlap the input key buffer. */
+ * Common special names use platform labels. Other keys apply Unicode 17.0
+ * default uppercase to the first scalar and preserve the remaining bytes.
+ * This can expand a scalar to several. Required count is at most 151 bytes.
+ * Legacy cui_kbd_format preserves the key bytes. Output may overlap the input. */
 size_t cui_kbd_format_stroke(cui_kbd_stroke, bool mac_symbols, char *output, size_t capacity);
 typedef struct {
     bool plain, outline, mac_symbols; /* plain ignores outline; zero is normal pill. */

@@ -1984,7 +1984,8 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_content.c",
-        "tests/unit/test_kbd.c"
+        "tests/unit/test_kbd.c",
+        "tests/web/test_kbd_stepper_gallery.py"
       ],
       "status": "tested",
       "platforms": {
@@ -1992,7 +1993,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Typed single-stroke normal, outline and plain hints, platform labels and ordinary sibling composition tested. Host Action/keybinding lookup, non-ASCII case conversion and arbitrary source Styled properties remain unsupported; see docs/KBD.md."
+        "Typed single-stroke normal, outline and plain hints, platform labels, Unicode 17 first-scalar uppercase and ordinary sibling composition tested. Host Action/keybinding lookup and arbitrary source Styled properties remain open; see docs/KBD.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2001,7 +2002,17 @@
           "name": "platform key labels",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_content.c"
+            "tests/unit/test_content.c",
+            "tests/unit/test_kbd.c"
+          ]
+        },
+        {
+          "name": "Unicode first-scalar uppercase including expansions",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_kbd.c",
+            "tests/web/test_kbd_stepper_gallery.py",
+            "docs/KBD.md"
           ]
         },
         {

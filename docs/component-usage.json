@@ -594,7 +594,7 @@
       ],
       "state_ownership": "Caller owns shortcut text and optional formatting buffer.",
       "interaction": "Presentation only; shortcut dispatch belongs to the application.",
-      "usage": "Submit typed single-stroke hints; compose several as ordinary row children. Host shortcut registration remains separate.",
+      "usage": "Submit typed single-stroke hints with Unicode first-scalar uppercase. Compose several as ordinary row children. The host owns shortcut registration.",
       "docs": [
         "docs/CONTENT.md",
         "docs/KBD.md"

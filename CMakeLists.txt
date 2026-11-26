@@ -1311,6 +1311,7 @@ add_test(NAME component_status_cli COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT
 add_test(NAME licenses COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_licenses.py)
 add_test(NAME grapheme_generated COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_grapheme.py --check)
 add_test(NAME word_generated COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_word.py --check)
+add_test(NAME kbd_uppercase_generated COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_kbd_uppercase.py --check)
 add_test(NAME distribution COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/amalgamate.py --check)
 add_test(NAME content_distribution_contract COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_content_distribution.py)
 add_test(NAME binding_sdk_freshness COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_go_sdk.py --check)

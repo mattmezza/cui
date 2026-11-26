@@ -307,6 +307,10 @@ For a Command palette inside a dialog, set `cui_command_options.width = -1` to f
 the body. Rows and hit targets fill the current allocation. Width-dependent
 custom row heights settle on a follow-up frame and preserve a fully visible
 selection. See `docs/COMMAND.md`.
+For shortcut hints, `cui_kbd_format_stroke` uppercases the first Unicode scalar,
+including expansions. Use `CUI_KBD_TEXT_CAPACITY` for a complete result. Hosts
+own shortcut bindings, and retained builders accept a formatted label.
+See `docs/KBD.md`.
 For loading placeholders, see `docs/SKELETON_RESPONSIVE.md`. Keep motion per
 shape, schedule the earliest wake and attach busy state to the application region.
 

@@ -5928,7 +5928,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string("Shortcut hints"));
         cui_begin_box(ui, cui_id_from(ui, "shortcut-hints"), (cui_box){.row = true, .gap = t.gap});
         cui_kbd_ex(ui, cui_id_from(ui, "kbd"), &t,
-                   (cui_kbd_stroke){.modifiers = CUI_MOD_CTRL | CUI_MOD_SHIFT, .key = CUI_STR("k")},
+                   (cui_kbd_stroke){.modifiers = CUI_MOD_CTRL | CUI_MOD_SHIFT, .key = CUI_STR("ß")},
                    (cui_kbd_options){0});
         cui_kbd_ex(ui, cui_id_from(ui, "kbd-outline"), &t,
                    (cui_kbd_stroke){.key = CUI_STR("escape")}, (cui_kbd_options){.outline = true});

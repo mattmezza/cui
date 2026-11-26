@@ -267,7 +267,16 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        {
+          "header": "include/cui/cui_kbd.h",
+          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "types": ["cui_kbd_stroke", "cui_kbd_options"],
+          "symbols": ["cui_kbd_ex", "cui_kbd_format_stroke"],
+          "note": "Retained builders accept a formatted hint label. Typed C-only options and first-scalar Unicode formatting are not exposed by their Kbd builders."
+        }
+      ]
     },
     {
       "name": "Label",

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_kbd.h"
 #include "cui/cui_software.h"
+#include "cui_kbd_uppercase_cases.inc"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,7 +35,11 @@ static void formats(void) {
                  {"down", "Down", "↓"},
                  {"-", "-", "-"},
                  {"+", "+", "+"},
-                 {"é", "é", "é"}};
+                 {"éclair", "Éclair", "Éclair"},
+                 {"ßeta", "SSeta", "SSeta"},
+                 {"ΐé", "Ϊ́é", "Ϊ́é"},
+                 {"𐐨z", "𐐀z", "𐐀z"},
+                 {"😀é", "😀é", "😀é"}};
     for (size_t i = 0; i < sizeof names / sizeof names[0]; i++)
         for (unsigned mac = 0; mac < 2; mac++) {
             char output[160];
@@ -65,6 +70,24 @@ static void formats(void) {
             } else
                 CHECK(storage[1] == 0xa5);
         }
+        stroke.key = (cui_str)CUI_STR("ΐé");
+        expected = mac ? "⌃⌥⇧⌘Ϊ́é" : "Ctrl+Alt+Shift+Win+Ϊ́é";
+        required = strlen(expected);
+        CHECK(cui_kbd_format_stroke(stroke, mac != 0, NULL, 10) == required);
+        for (size_t capacity = 1; capacity <= required + 1; ++capacity) {
+            char storage[40];
+            memset(storage, '!', sizeof storage);
+            memcpy(storage, stroke.key.data, stroke.key.length);
+            cui_kbd_stroke borrowed = {.modifiers = stroke.modifiers,
+                                       .key = {storage, stroke.key.length}};
+            CHECK(cui_kbd_format_stroke(borrowed, mac != 0, storage, capacity) == required);
+            size_t written = capacity - 1;
+            while (((unsigned char)expected[written] & 0xc0) == 0x80)
+                --written;
+            CHECK(strlen(storage) == written && !memcmp(storage, expected, written));
+            if (capacity >= stroke.key.length)
+                CHECK(storage[capacity] == '!');
+        }
     }
     char invalid[160] = "untouched", long_key[129];
     memset(long_key, 'x', sizeof long_key);
@@ -89,9 +112,27 @@ static void formats(void) {
     memset(longest, 'x', sizeof longest);
     CHECK(cui_kbd_format_stroke((cui_kbd_stroke){.modifiers = 15, .key = {longest, 128}}, false,
                                 invalid, sizeof invalid) == 147);
+    memcpy(longest, "ΐ", 2);
+    CHECK(cui_kbd_format_stroke((cui_kbd_stroke){.modifiers = 15, .key = {longest, 128}}, false,
+                                invalid, sizeof invalid) == 151);
+    CHECK(strlen(invalid) == 151 && !memcmp(invalid + 19, "Ϊ́", 6));
     char legacy[160];
     CHECK(cui_kbd_format(0, cui_string("escape"), false, legacy, sizeof legacy) == 6);
     CHECK(!strcmp(legacy, "escape")); /* additive formatting, old helper unchanged */
+    CHECK(cui_kbd_format(0, cui_string("ßé"), false, legacy, sizeof legacy) == 4);
+    CHECK(!strcmp(legacy, "ßé"));
+}
+
+static void unicode_mappings(void) {
+    for (size_t i = 0; i < sizeof kbd_uppercase_cases / sizeof kbd_uppercase_cases[0]; ++i) {
+        char key[8], expected[8], output[8];
+        /* A lowercase suffix catches accidental uppercasing of the entire key. */
+        snprintf(key, sizeof key, "%sx", kbd_uppercase_cases[i].key);
+        snprintf(expected, sizeof expected, "%sx", kbd_uppercase_cases[i].upper);
+        cui_kbd_stroke stroke = {.key = cui_string(key)};
+        CHECK(cui_kbd_format_stroke(stroke, false, output, sizeof output) == strlen(expected));
+        CHECK(!strcmp(output, expected));
+    }
 }
 static const cui_draw_command *find(cui_draw_list d, cui_draw_type type) {
     for (size_t i = 0; i < d.count; i++)
@@ -227,6 +268,7 @@ static void failures(void) {
 }
 int main(void) {
     formats();
+    unicode_mappings();
     render();
     failures();
     puts("Kbd source slice: ok");

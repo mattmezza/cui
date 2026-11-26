@@ -8,6 +8,9 @@ checkout `/tmp/cui-gpui-reference` was verified at
 stores exactly one `Keystroke` (lines 12–17). Constructors accept one stroke.
 `from_binding` explicitly selects `binding.keystrokes().first()` (105–108).
 There is no grouped/multi-step shortcut rendering method in this component.
+The fallback at lines 191–205 uppercases the first Unicode scalar and appends
+the remainder unchanged. CUI subsequently implemented this with its pinned
+Unicode 17 data and tests for both single-scalar mappings and expansions.
 The [story](https://github.com/longbridge/gpui-kit/blob/87d10ae5e1299d1be18670a37570c5402f952e34/crates/story/src/stories/kbd_story.rs)
 composes independent hints in an ordinary horizontal flex container with gap
 and wrap. The [frozen guide](https://github.com/longbridge/gpui-kit/blob/87d10ae5e1299d1be18670a37570c5402f952e34/website/component/kbd.md)

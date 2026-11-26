@@ -562,6 +562,112 @@ static void stepper_visible_selection(void) {
     cui_destroy(ui);
 }
 
+typedef struct {
+    unsigned outlines, filled, previewed;
+    float height;
+    uint64_t outline_revision, fill_revision;
+} rating_paint_probe;
+static rating_paint_probe rating_paint_frame(cui_context *ui, float *value, cui_rating_options o,
+                                             cui_rating_presentation p) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 440, 400, .016f));
+    assert(!cui_rating_present(ui, 102, &theme, cui_string("Rating"), value, o, p));
+    cui_draw_list list = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    rating_paint_probe seen = {0};
+    uint64_t revisions[2] = {0};
+    unsigned mask_uses[2] = {0};
+    for (size_t i = 0; i < list.count; ++i) {
+        const cui_draw_command *draw = &list.commands[i];
+        if (draw->type != CUI_DRAW_IMAGE)
+            continue;
+        uint64_t revision = draw->bitmap.bitmap.revision;
+        assert(revision);
+        unsigned mask = revisions[0] && revisions[0] != revision ? 1 : 0;
+        assert(!revisions[mask] || revisions[mask] == revision);
+        revisions[mask] = revision;
+        ++mask_uses[mask];
+    }
+    unsigned outline = mask_uses[1] > mask_uses[0] ? 1 : 0;
+    seen.outlines = mask_uses[outline];
+    seen.filled = mask_uses[1 - outline];
+    seen.outline_revision = revisions[outline];
+    seen.fill_revision = revisions[1 - outline];
+    for (size_t i = 0; i < list.count; ++i) {
+        const cui_draw_command *draw = &list.commands[i];
+        if (draw->type != CUI_DRAW_IMAGE)
+            continue;
+        if (draw->bitmap.bitmap.revision == seen.outline_revision) {
+            if (draw->bitmap.tint.r == p.preview.r && draw->bitmap.tint.g == p.preview.g)
+                ++seen.previewed;
+        } else if (!o.disabled)
+            assert(draw->bitmap.tint.r == p.fill.r && draw->bitmap.tint.g == p.fill.g);
+        seen.height = draw->bounds.h;
+    }
+    return seen;
+}
+static void rating_custom_paint(void) {
+    cui_context *ui = cui_create((cui_config){.width = 440, .height = 400});
+    assert(ui);
+    cui_icon_state outline = {0}, fill = {0};
+    assert(cui_icon_set_data(&outline,
+                             cui_string("<svg width='24' height='24'><circle cx='12' cy='12' "
+                                        "r='10' fill='none' stroke='white'/></svg>")));
+    assert(cui_icon_set_data(
+        &fill,
+        cui_string(
+            "<svg width='24' height='24'><circle cx='12' cy='12' r='10' fill='white'/></svg>")));
+    float value = 1.5f;
+    cui_rating_options o = {.width = 300, .half_steps = true};
+    cui_rating_presentation p = {.design_size = CUI_DESIGN_XS,
+                                 .selection = CUI_RATING_STEP_DOWN_FILLED,
+                                 .hover_preview = true,
+                                 .custom_fill = true,
+                                 .fill = {10, 130, 218, 255},
+                                 .custom_outline = true,
+                                 .outline = {80, 80, 80, 255},
+                                 .custom_preview = true,
+                                 .preview = {190, 30, 120, 255}};
+    rating_paint_probe defaults = rating_paint_frame(ui, &value, o, p);
+    assert(defaults.outlines == 5 && defaults.filled == 2 && !defaults.previewed);
+    p.outline_icon = &outline;
+    p.fill_icon = &fill;
+    rating_paint_probe custom = rating_paint_frame(ui, &value, o, p);
+    assert(custom.outline_revision != defaults.outline_revision &&
+           custom.fill_revision != defaults.fill_revision);
+    assert(outline.raster_count == 1 && fill.raster_count == 1);
+    assert(cui_icon_set_empty(&fill));
+    custom = rating_paint_frame(ui, &value, o, p);
+    assert(custom.outline_revision != defaults.outline_revision &&
+           custom.fill_revision == defaults.fill_revision);
+    p.design_size = CUI_DESIGN_LG;
+    custom = rating_paint_frame(ui, &value, o, p);
+    assert(custom.height > defaults.height);
+    cui_rect b = cui_bounds(ui, cui_numeric_part_id(102, 13));
+    cui_event motion = {.type = CUI_EVENT_POINTER_MOVE, .x = b.x + b.w * .5f, .y = b.y + b.h * .5f};
+    assert(cui_queue_event(ui, motion));
+    custom = rating_paint_frame(ui, &value, o, p);
+    assert(custom.previewed == 3 && custom.filled == 2 && value == 1.5f);
+    assert(cui_pointer_cursor(ui) == CUI_CURSOR_POINTER);
+    assert(rating_paint_frame(ui, &value, o, p).previewed == 3);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_LEAVE}));
+    assert(!rating_paint_frame(ui, &value, o, p).previewed);
+    motion.pointer_type = CUI_POINTER_TOUCH;
+    assert(cui_queue_event(ui, motion));
+    assert(!rating_paint_frame(ui, &value, o, p).previewed);
+    assert(!rating_paint_frame(ui, &value, o, p).previewed);
+    motion.pointer_type = CUI_POINTER_PEN;
+    assert(cui_queue_event(ui, motion));
+    assert(rating_paint_frame(ui, &value, o, p).previewed == 3);
+    o.readonly = true;
+    assert(!rating_paint_frame(ui, &value, o, p).previewed);
+    o.readonly = false;
+    o.disabled = true;
+    assert(!rating_paint_frame(ui, &value, o, p).previewed && value == 1.5f);
+    cui_icon_state_destroy(&outline);
+    cui_icon_state_destroy(&fill);
+    cui_destroy(ui);
+}
 static void rating_star_graphics(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
     cui_theme theme = cui_theme_light();
@@ -845,6 +951,7 @@ int main(void) {
     design_number_sizes();
     number_sizes_and_icons();
     rating_star_graphics();
+    rating_custom_paint();
     stepper_visible_selection();
 #endif
     decimal_locale();

@@ -62,14 +62,18 @@ cui_numeric_selection_event_result cui_base_stepper_events(cui_context *ui, cui_
     }
     return result;
 }
-cui_numeric_selection_event_result cui_base_rating_events(cui_context *ui, cui_id id, cui_str name,
-                                                          float *value, cui_rating_options options,
-                                                          cui_rating_event_handler handler) {
+cui_numeric_selection_event_result cui_base_rating_events_ex(cui_context *ui, cui_id id,
+                                                             cui_str name, float *value,
+                                                             cui_rating_options options,
+                                                             cui_rating_selection selection,
+                                                             cui_rating_event_handler handler) {
+    if (selection != CUI_RATING_SELECT_VALUE && selection != CUI_RATING_STEP_DOWN_FILLED)
+        return (cui_numeric_selection_event_result){0};
     uint64_t frame = cui_frame_sequence(ui);
     bool observe = handler.change && frame && id && value && !options.disabled && !options.readonly;
     float before = observe ? *value : 0;
     cui_numeric_selection_event_result result = {0};
-    result.control = cui_base_rating(ui, id, name, value, options);
+    result.control = cui_base_rating_ex(ui, id, name, value, options, selection);
     if (observe && cui_frame_sequence(ui) == frame && isfinite(*value) &&
         (!isfinite(before) || before != *value)) {
         cui_rating_change_event event = {0};
@@ -87,4 +91,10 @@ cui_numeric_selection_event_result cui_base_rating_events(cui_context *ui, cui_i
         handler.change(handler.user, &event);
     }
     return result;
+}
+cui_numeric_selection_event_result cui_base_rating_events(cui_context *ui, cui_id id, cui_str name,
+                                                          float *value, cui_rating_options options,
+                                                          cui_rating_event_handler handler) {
+    return cui_base_rating_events_ex(ui, id, name, value, options, CUI_RATING_SELECT_VALUE,
+                                     handler);
 }

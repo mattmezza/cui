@@ -97,7 +97,52 @@ cui_pagination_ex(ui, id, theme, &page, total, options);
 
 ## Rating
 
-Rating accepts a controlled floating value, clamps to the configured maximum and quantizes to integer or half steps. The default maximum is five; the bounded renderer caps it at one hundred. Pointer activation selects a star; left/right halves select half/integer values when enabled. Keyboard arrows change by one step and Home/End select zero/maximum. Optional Clear supports both a pointer button and Delete/Backspace. Individual stars use pointer focus with no extra Tab stops; choosing a star returns keyboard focus to the rating group. Disabled and readonly suppress activation; readonly remains identified by semantic details. Full, half and empty indicators use antialiased SVG star masks, tinted by the theme. Half values crop the filled star mask. Custom icon/color slots and hover previews remain pending.
+Rating accepts a controlled floating value, clamps to the configured maximum and quantizes to integer or half steps. The default maximum is five; the bounded renderer caps it at one hundred. Pointer activation selects a star; left/right halves select half/integer values when enabled. Keyboard arrows change by one step and Home/End select zero/maximum. Optional Clear supports both a pointer button and Delete/Backspace. Individual stars use pointer focus with no extra Tab stops; choosing a star returns keyboard focus to the rating group. Disabled and readonly suppress activation; readonly remains identified by semantic details. Full, half and empty indicators use antialiased SVG star masks, tinted by the theme. Half values crop the filled star mask.
+
+Use the styled presenter to set a shared design size, custom colors and a hover
+preview. Pass the available content width when drawing in a constrained column.
+The preview tints outlines through the hovered mark while the committed fill and
+accessible value stay visible. Mouse and pen motion preview. Touch taps select
+directly.
+
+```c
+/* Application state keeps rating between frames. */
+if (cui_rating_present(ui, id, theme, cui_string("Rate your experience"), &rating,
+                       (cui_rating_options){.maximum = 5, .width = 280},
+                       (cui_rating_presentation){
+                           .design_size = CUI_DESIGN_SM,
+                           .selection = CUI_RATING_STEP_DOWN_FILLED,
+                           .hover_preview = true,
+                           .custom_fill = true,
+                           .fill = {190, 49, 85, 255}})) {
+    save_rating(rating);
+}
+```
+
+`CUI_RATING_SELECT_VALUE` is the default. With
+`CUI_RATING_STEP_DOWN_FILLED`, activating a mark at or below the current rating
+selects one step below that mark. From three stars, clicking the third sets
+two and clicking the first sets zero. Half steps use the same rule at each
+pointer half. Keyboard arrows retain range behavior, and accessibility
+activation of a named mark uses its whole value. Choose either the bool result
+or `cui_rating_present_events` for side effects. The event callback runs
+synchronously after reduction and reports the final change once.
+
+The presenter uses the theme's warning color for committed fill, muted for
+unfilled outlines, and the fill tint for hover. Each has an explicit color
+override. Disabled paint uses muted. Use `outline_icon` and `fill_icon` for
+custom SVG masks. Initialize each `cui_icon_state` with `cui_icon_set_data` or
+`cui_icon_set_name`, preferably using a square SVG viewport. The presenter
+fits each mask into the same square and crops the filled mask from the left
+for half values. It uses a separate built-in star fallback if either mask is
+missing, empty, or cannot prepare. Keep custom states alive through the last
+render and use the Icon collection and teardown rules. The gallery's Hearts
+option includes copyable setup. [Icon resource guide](ICON.md)
+
+Use `cui_base_rating_ex` or `cui_base_rating_events_ex` for the selection
+policy with custom layout. Existing Rating entry points keep their value
+selection and paint defaults. The retained bridge and language builders keep
+the existing integer Rating subset.
 
 ## Stepper
 

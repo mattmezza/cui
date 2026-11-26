@@ -3,6 +3,7 @@
 #ifndef CUI_NUMERIC_H
 #define CUI_NUMERIC_H
 #include "cui_base.h"
+#include "cui_icon.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
@@ -128,6 +129,26 @@ typedef struct {
 bool cui_base_rating(cui_context *, cui_id, cui_str, float *, cui_rating_options);
 bool cui_rating(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, float *value,
                 cui_rating_options options);
+typedef enum { CUI_RATING_SELECT_VALUE, CUI_RATING_STEP_DOWN_FILLED } cui_rating_selection;
+/* Step down by one mark (or a half step) when activating a mark at or below
+ * the committed value. Keyboard range commands retain their own behavior. */
+bool cui_base_rating_ex(cui_context *, cui_id, cui_str, float *, cui_rating_options,
+                        cui_rating_selection);
+typedef struct {
+    cui_design_size design_size;
+    cui_rating_selection selection;
+    bool hover_preview;
+    bool custom_fill, custom_outline, custom_preview;
+    cui_color fill, outline, preview;
+    /* Optional caller-owned SVG masks. Each prepares at the resolved square
+     * size, with a built-in star fallback if missing, empty or unpreparable.
+     * Keep masks alive until rendering completes. They are not retained by Rating. */
+    cui_icon_state *outline_icon, *fill_icon;
+} cui_rating_presentation;
+/* Styled value change, with the same ownership as cui_rating. Preview only
+ * tints outlines. It never changes the owner or accessibility value. */
+bool cui_rating_present(cui_context *, cui_id, const cui_theme *, cui_str, float *,
+                        cui_rating_options, cui_rating_presentation);
 typedef enum {
     CUI_STEP_PENDING,
     CUI_STEP_ACTIVE,
@@ -778,8 +799,10 @@ bool cui_base_pagination_reduce_internal(cui_context *ui, cui_id id, size_t *pag
         cui_invalidate(ui);
     return *page != original;
 }
-bool cui_base_rating(cui_context *ui, cui_id id, cui_str name, float *value, cui_rating_options o) {
-    if (!ui || !value)
+bool cui_base_rating_ex(cui_context *ui, cui_id id, cui_str name, float *value,
+                        cui_rating_options o, cui_rating_selection selection) {
+    if (!ui || !value ||
+        (selection != CUI_RATING_SELECT_VALUE && selection != CUI_RATING_STEP_DOWN_FILLED))
         return false;
     unsigned maximum = o.maximum ? o.maximum : 5;
     if (maximum > 100)
@@ -798,11 +821,14 @@ bool cui_base_rating(cui_context *ui, cui_id id, cui_str name, float *value, cui
         }
         for (unsigned i = 0; i < maximum; ++i)
             if (activation == cui_numeric_part_id(id, 10 + i)) {
-                *value = (float)i + 1;
+                float picked = (float)i + 1;
                 cui_rect bounds = cui_bounds(ui, activation);
                 if (o.half_steps && events[e].type == CUI_EVENT_POINTER_UP &&
                     events[e].x < bounds.x + bounds.w / 2)
-                    *value -= .5f;
+                    picked -= .5f;
+                if (selection == CUI_RATING_STEP_DOWN_FILLED && picked <= *value)
+                    picked -= step;
+                *value = picked;
                 cui_focus(ui, id);
             }
         if (target == id && events[e].type == CUI_EVENT_KEY_DOWN) {
@@ -841,6 +867,9 @@ bool cui_base_rating(cui_context *ui, cui_id id, cui_str name, float *value, cui
     if (changed)
         cui_invalidate(ui);
     return changed;
+}
+bool cui_base_rating(cui_context *ui, cui_id id, cui_str name, float *value, cui_rating_options o) {
+    return cui_base_rating_ex(ui, id, name, value, o, CUI_RATING_SELECT_VALUE);
 }
 bool cui_base_stepper(cui_context *ui, cui_id id, const cui_step *steps, size_t count,
                       size_t *current, bool disabled) {
@@ -1665,6 +1694,7 @@ cui_numeric_selection_event_result cui_pagination_events_ex(cui_context *ui, cui
 }
 typedef struct {
     cui_icon_state outline, fill;
+    unsigned hovered_slot;
     bool initialized;
 } cui_rating_icons;
 static void cui_rating_icons_collect(void *payload) {
@@ -1677,15 +1707,12 @@ static void cui_rating_icons_destroy(void *payload) {
     cui_icon_state_destroy(&icons->outline);
     cui_icon_state_destroy(&icons->fill);
 }
-static cui_rating_icons *cui_rating_icons_get(cui_context *ui, cui_id id, float size) {
+static cui_rating_icons *cui_rating_icons_get(cui_context *ui, cui_id id) {
     cui_rating_icons *icons = cui_resource_get(ui, id, UINT64_C(0x929f4a4758cf0103), sizeof(*icons),
                                                cui_rating_icons_collect, cui_rating_icons_destroy);
     if (!icons)
         return NULL;
     if (!icons->initialized) {
-        cui_icon_state_init(&icons->outline);
-        cui_icon_state_init(&icons->fill);
-        icons->initialized = true;
         const char *outline = "<svg width='24' height='24' viewBox='0 0 24 24' "
                               "xmlns='http://www.w3.org/2000/svg'><path d='M12 2 L15 8.2 L22 9.2 "
                               "L17 14 L18.2 21 L12 17.7 L5.8 21 L7 14 L2 9.2 L9 8.2 Z' fill='none' "
@@ -1697,70 +1724,150 @@ static cui_rating_icons *cui_rating_icons_get(cui_context *ui, cui_id id, float 
         if (!cui_icon_set_data(&icons->outline, cui_string(outline)) ||
             !cui_icon_set_data(&icons->fill, cui_string(fill)))
             return NULL;
+        icons->initialized = true;
     }
-    if (cui_icon_prepare(&icons->outline, size, size, cui_icon_identity()) != CUI_ICON_OK ||
-        cui_icon_prepare(&icons->fill, size, size, cui_icon_identity()) != CUI_ICON_OK)
-        return NULL;
     return icons;
+}
+static cui_bitmap cui_rating_mask(cui_icon_state *custom, cui_icon_state *fallback, float size) {
+    if (custom && cui_icon_prepare(custom, size, size, cui_icon_identity()) == CUI_ICON_OK) {
+        cui_bitmap mask = cui_icon_state_bitmap(custom);
+        if (cui_bitmap_valid(mask))
+            return mask;
+    }
+    if (cui_icon_prepare(fallback, size, size, cui_icon_identity()) == CUI_ICON_OK)
+        return cui_icon_state_bitmap(fallback);
+    return (cui_bitmap){0};
+}
+static unsigned cui_rating_hover_slot(cui_context *ui, cui_id id, unsigned maximum,
+                                      unsigned previous) {
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = count; i > 0; --i) {
+        const cui_event *event = &events[i - 1];
+        switch (event->type) {
+        case CUI_EVENT_POINTER_MOVE:
+            if (event->pointer_type == CUI_POINTER_TOUCH || !cui_hovered(ui, id))
+                return 0;
+            for (unsigned slot = 1; slot <= maximum; ++slot) {
+                cui_id part = cui_numeric_part_id(id, 9 + slot);
+                if (cui_hovered(ui, part) && cui_event_hovered(ui, i - 1, part))
+                    return slot;
+            }
+            return 0;
+        case CUI_EVENT_POINTER_DOWN:
+        case CUI_EVENT_POINTER_UP:
+        case CUI_EVENT_POINTER_LEAVE:
+        case CUI_EVENT_CANCEL:
+        case CUI_EVENT_SCROLL:
+        case CUI_EVENT_GESTURE:
+        case CUI_EVENT_KEY_DOWN:
+        case CUI_EVENT_ACCESSIBILITY_ACTION:
+            return 0;
+        default:
+            break;
+        }
+    }
+    return previous && previous <= maximum && cui_hovered(ui, cui_numeric_part_id(id, 9 + previous))
+               ? previous
+               : 0;
 }
 static bool cui_rating_common(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                               float *value, cui_rating_options o,
+                              const cui_rating_presentation *presentation,
                               const cui_rating_event_handler *handler, size_t *change_count) {
-    if (!t || !value)
+    if (!ui || !t || !value)
+        return false;
+    cui_rating_selection selection =
+        presentation ? presentation->selection : CUI_RATING_SELECT_VALUE;
+    cui_design_metrics metrics = {.control_height = t->control_height,
+                                  .padding_x = t->padding,
+                                  .gap = t->gap,
+                                  .indicator_size = t->font_size * 1.3f};
+    if (presentation &&
+        ((selection != CUI_RATING_SELECT_VALUE && selection != CUI_RATING_STEP_DOWN_FILLED) ||
+         (presentation->design_size != CUI_DESIGN_INHERIT &&
+          !cui_design_measure(presentation->design_size, t->font_size / 16, &metrics))))
         return false;
     bool changed;
     if (handler) {
         cui_numeric_selection_event_result result =
-            cui_base_rating_events(ui, id, name, value, o, *handler);
+            cui_base_rating_events_ex(ui, id, name, value, o, selection, *handler);
         changed = result.control;
         *change_count = result.change_count;
     } else
-        changed = cui_base_rating(ui, id, name, value, o);
+        changed = cui_base_rating_ex(ui, id, name, value, o, selection);
     unsigned maximum = o.maximum ? o.maximum : 5;
     if (maximum > 100)
         maximum = 100;
-    float width = isfinite(o.width) && o.width > 0 ? o.width : maximum * 36;
-    float slot = fmaxf(1, (width - t->padding * 2 - t->gap * (maximum - 1)) / maximum);
+    float default_slot = presentation && presentation->design_size != CUI_DESIGN_INHERIT
+                             ? metrics.control_height
+                             : 36;
+    float width = isfinite(o.width) && o.width > 0 ? o.width : maximum * default_slot;
+    if (presentation) {
+        metrics.padding_x = fminf(metrics.padding_x, width / 8);
+        metrics.gap = fminf(metrics.gap, width / (3 * maximum));
+    }
+    float slot = fmaxf(1, (width - metrics.padding_x * 2 - metrics.gap * (maximum - 1)) / maximum);
+    bool focus = presentation && !o.disabled && cui_interaction_state(ui, id).focus_visible;
     cui_begin_box(ui, cui_numeric_part_id(id, 0), (cui_box){.row = true, .gap = t->gap});
     cui_begin_box(ui, id,
                   (cui_box){.row = true,
                             .width = width,
-                            .padding = t->padding,
-                            .gap = t->gap,
+                            .padding = metrics.padding_x,
+                            .gap = metrics.gap,
                             .radius = t->radius,
-                            .background = t->surface});
-    float side = fminf(slot, fminf(t->control_height, t->font_size * 1.3f));
-    cui_rating_icons *icons = side > 0 ? cui_rating_icons_get(ui, id, side) : NULL;
-    cui_color color = o.disabled ? t->muted : t->primary;
+                            .background = t->surface,
+                            .border = focus ? t->focus : (cui_color){0},
+                            .border_width = focus ? 1 : 0});
+    float side = fminf(slot, fminf(metrics.control_height, metrics.indicator_size));
+    cui_rating_icons *icons = side > 0 ? cui_rating_icons_get(ui, id) : NULL;
+    cui_bitmap outline = {0}, fill = {0};
+    cui_color active = o.disabled ? t->muted : t->primary;
+    cui_color inactive = active, preview = active;
+    bool interactive = presentation && !o.disabled && !o.readonly;
+    if (presentation && !o.disabled) {
+        active = presentation->custom_fill ? presentation->fill : t->warning;
+        inactive = presentation->custom_outline ? presentation->outline : t->muted;
+        preview = presentation->custom_preview ? presentation->preview : active;
+    }
+    unsigned hovered = 0;
+    if (icons) {
+        outline = cui_rating_mask(presentation ? presentation->outline_icon : NULL, &icons->outline,
+                                  side);
+        fill = cui_rating_mask(presentation ? presentation->fill_icon : NULL, &icons->fill, side);
+        if (interactive && presentation->hover_preview)
+            hovered = cui_rating_hover_slot(ui, id, maximum, icons->hovered_slot);
+        icons->hovered_slot = hovered;
+    }
     for (unsigned i = 0; i < maximum; ++i) {
-        cui_begin_box(ui, cui_numeric_part_id(id, 10 + i),
+        cui_id part = cui_numeric_part_id(id, 10 + i);
+        if (interactive)
+            cui_set_cursor(ui, part, CUI_CURSOR_POINTER);
+        cui_begin_box(ui, part,
                       (cui_box){.width = slot,
-                                .height = t->control_height,
+                                .height = metrics.control_height,
                                 .align_x = CUI_ALIGN_CENTER,
                                 .align_y = CUI_ALIGN_CENTER});
         cui_begin_box(ui, 0, (cui_box){.width = side, .height = side});
-        if (icons) {
-            cui_bitmap outline = cui_icon_state_bitmap(&icons->outline);
-            cui_bitmap fill = cui_icon_state_bitmap(&icons->fill);
+        float fraction = fmaxf(0, fminf(1, *value - (float)i));
+        cui_color outline_tint = fraction >= 1 ? active : i < hovered ? preview : inactive;
+        if (cui_bitmap_valid(outline))
             cui_set_bitmap_underlay(
                 ui, (cui_underlay_layout){.bounds = {0, 0, side, side}},
                 (cui_bitmap_paint){
-                    .bitmap = outline, .opacity = 1, .custom_tint = true, .tint = color},
+                    .bitmap = outline, .opacity = 1, .custom_tint = true, .tint = outline_tint},
                 (cui_corner_radii){0});
-            float fraction = fmaxf(0, fminf(1, *value - (float)i));
-            if (fraction > 0) {
-                cui_begin_absolute_box(ui, 0, (cui_box){0},
-                                       (cui_rect){0, 0, side * fraction, side});
-                cui_paint_bitmap(
-                    ui, 0,
-                    (cui_bitmap_paint){.bitmap = fill,
-                                       .source = {0, 0, fill.width * fraction, fill.height},
-                                       .opacity = 1,
-                                       .custom_tint = true,
-                                       .tint = color},
-                    (cui_box){.width = side * fraction, .height = side});
-                cui_end_box(ui);
-            }
+        if (fraction > 0 && cui_bitmap_valid(fill)) {
+            cui_begin_absolute_box(ui, 0, (cui_box){0}, (cui_rect){0, 0, side * fraction, side});
+            cui_paint_bitmap(
+                ui, 0,
+                (cui_bitmap_paint){.bitmap = fill,
+                                   .source = {0, 0, fill.width * fraction, fill.height},
+                                   .opacity = 1,
+                                   .custom_tint = true,
+                                   .tint = active},
+                (cui_box){.width = side * fraction, .height = side});
+            cui_end_box(ui);
         }
         cui_end_box(ui);
         cui_end_box(ui);
@@ -1774,15 +1881,29 @@ static bool cui_rating_common(cui_context *ui, cui_id id, const cui_theme *t, cu
 }
 bool cui_rating(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, float *value,
                 cui_rating_options options) {
-    return cui_rating_common(ui, id, theme, name, value, options, NULL, NULL);
+    return cui_rating_common(ui, id, theme, name, value, options, NULL, NULL, NULL);
+}
+bool cui_rating_present(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
+                        float *value, cui_rating_options options,
+                        cui_rating_presentation presentation) {
+    return cui_rating_common(ui, id, theme, name, value, options, &presentation, NULL, NULL);
 }
 cui_numeric_selection_event_result cui_rating_events(cui_context *ui, cui_id id,
                                                      const cui_theme *theme, cui_str name,
                                                      float *value, cui_rating_options options,
                                                      cui_rating_event_handler handler) {
     cui_numeric_selection_event_result result = {0};
-    result.control =
-        cui_rating_common(ui, id, theme, name, value, options, &handler, &result.change_count);
+    result.control = cui_rating_common(ui, id, theme, name, value, options, NULL, &handler,
+                                       &result.change_count);
+    return result;
+}
+cui_numeric_selection_event_result
+cui_rating_present_events(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
+                          float *value, cui_rating_options options,
+                          cui_rating_presentation presentation, cui_rating_event_handler handler) {
+    cui_numeric_selection_event_result result = {0};
+    result.control = cui_rating_common(ui, id, theme, name, value, options, &presentation, &handler,
+                                       &result.change_count);
     return result;
 }
 /* Private shared paint seam; not part of the public API. */

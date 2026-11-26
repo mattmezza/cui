@@ -827,19 +827,26 @@
     {
       "api_symbols": [
         "cui_rating",
-        "cui_rating_events"
+        "cui_rating_events",
+        "cui_rating_present",
+        "cui_rating_present_events",
+        "cui_base_rating_ex"
       ],
       "state_types": [
-        "cui_rating_options"
+        "cui_rating_options",
+        "cui_rating_presentation",
+        "cui_rating_selection"
       ],
       "state_ownership": "Caller retains float rating.",
-      "interaction": "Returns true when rating changes.",
-      "usage": "Pass the current rating by pointer and save it in the change branch.",
+      "interaction": "Returns true when the committed rating changes. Use the typed change callback or the bool result for side effects. Hover preview affects paint only.",
+      "usage": "Pass the application-owned rating by pointer. Use the styled presenter for shared sizes, custom SVG masks, tint and optional step-down behavior.",
       "docs": [
         "docs/NUMERIC.md",
         "docs/NUMERIC_SELECTION_EVENTS.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_rating_change_fn"
+      ],
       "scope": "styled frame component",
       "name": "Rating",
       "public_header": "include/cui/cui_numeric.h",

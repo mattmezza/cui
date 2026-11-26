@@ -71,6 +71,12 @@ function declarations produce matching paths only. `api SYMBOL --full` restores
 complete matching headers. `--declaration` explicitly selects the concise API view.
 No output is clipped or filtered by safety keywords.
 
+Use `cui_rating_present` for shared Rating sizes, custom SVG masks, colors and
+outline-only preview. The app owns the numeric value. Set
+`CUI_RATING_STEP_DOWN_FILLED` for opt-in step-down and choose the bool or the
+typed callback for side effects. Foreign builders keep the integer subset.
+See `docs/NUMERIC.md#rating`.
+
 For RadioGroup descriptions, decorative content, tooltips, signed tab order
 and C-only paint callbacks, read `docs/RADIO_GROUP.md`. For a controlled
 standalone Radio, use `cui_radio_events` or `cui_base_radio_events` in C.

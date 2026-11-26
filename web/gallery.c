@@ -2053,6 +2053,25 @@ static void gallery_stepper_request(void *user, const cui_stepper_navigation_req
     cui_invalidate(ui);
 }
 static float rating = 3;
+static bool rating_hearts, rating_half_steps, rating_hover_preview;
+static cui_icon_state rating_heart_outline, rating_heart_fill;
+void gallery_rating_options(bool hearts, bool half_steps, bool hover_preview) {
+    rating_hearts = hearts;
+    rating_half_steps = half_steps;
+    rating_hover_preview = hover_preview;
+    if (!hearts || rating_heart_outline.internal)
+        return;
+    cui_icon_set_data(
+        &rating_heart_outline,
+        cui_string("<svg width='24' height='24' xmlns='http://www.w3.org/2000/svg'>"
+                   "<path d='M12 21 Q2 15 2 8 Q2 3 7 3 Q10 3 12 6 Q14 3 17 3 Q22 3 22 8 "
+                   "Q22 15 12 21 Z' fill='none' stroke='white' stroke-width='1.6'/></svg>"));
+    cui_icon_set_data(
+        &rating_heart_fill,
+        cui_string("<svg width='24' height='24' xmlns='http://www.w3.org/2000/svg'>"
+                   "<path d='M12 21 Q2 15 2 8 Q2 3 7 3 Q10 3 12 6 Q14 3 17 3 Q22 3 22 8 "
+                   "Q22 15 12 21 Z' fill='white'/></svg>"));
+}
 static cui_id dock_serial = 3;
 static uint64_t dock_active_panel = 1;
 static void gallery_dock_reset(void) {
@@ -6907,14 +6926,26 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string(text));
         break;
     }
-    case 35:
-        cui_rating(ui, cui_id_from(ui, "rating"), &t, cui_string("Rate your experience"), &rating,
-                   (cui_rating_options){.maximum = 5,
-                                        .half_steps = true,
-                                        .clearable = true,
-                                        .disabled = disabled,
-                                        .width = width > 360 ? 280 : width - 128});
+    case 35: {
+        cui_rating_present(
+            ui, cui_id_from(ui, "rating"), &t, cui_string("Rate your experience"), &rating,
+            (cui_rating_options){.maximum = 5,
+                                 .half_steps = rating_half_steps,
+                                 .disabled = disabled,
+                                 .width = fmaxf(1, fminf(width - 48, 360))},
+            (cui_rating_presentation){.design_size = design_size,
+                                      .selection = CUI_RATING_STEP_DOWN_FILLED,
+                                      .hover_preview = rating_hover_preview,
+                                      .custom_fill = rating_hearts,
+                                      .fill = theme == 1 ? (cui_color){251, 113, 145, 255}
+                                                         : (cui_color){190, 49, 85, 255},
+                                      .outline_icon = rating_hearts ? &rating_heart_outline : NULL,
+                                      .fill_icon = rating_hearts ? &rating_heart_fill : NULL});
+        char message[48];
+        snprintf(message, sizeof(message), "Your rating: %g / 5", (double)rating);
+        cui_label(ui, &t, cui_string(message));
         break;
+    }
     case 36: {
         if (cui_checkbox(ui, cui_id_from(ui, "stepper-details"), &t,
                          cui_string("Details confirmed"), &stepper_details_confirmed, disabled))

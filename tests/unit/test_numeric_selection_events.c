@@ -1014,6 +1014,46 @@ static void paired_input(bool styled) {
     cui_destroy(a.ui);
     cui_destroy(b.ui);
 }
+static cui_numeric_selection_event_result rating_step_down_frame(fixture *f, bool styled,
+                                                                 cui_rating_selection selection) {
+    assert(cui_begin_frame(f->ui, 1400, 800, .016f));
+    cui_theme theme = cui_theme_light();
+    cui_rating_event_handler handler = {rating_changed, f};
+    cui_rating_options options = {.half_steps = true};
+    cui_str name = cui_string("Stars");
+    cui_numeric_selection_event_result result =
+        styled
+            ? cui_rating_present_events(f->ui, 2, &theme, name, &f->rating, options,
+                                        (cui_rating_presentation){.selection = selection}, handler)
+            : cui_base_rating_events_ex(f->ui, 2, name, &f->rating, options, selection, handler);
+    cui_end_frame(f->ui);
+    assert(cui_last_error(f->ui) == CUI_OK);
+    return result;
+}
+static void rating_step_down(bool styled) {
+    fixture f = make();
+    f.rating = 3;
+    const cui_rating_selection selection = CUI_RATING_STEP_DOWN_FILLED;
+    assert(!rating_step_down_frame(&f, styled, selection).change_count);
+    activate(&f, 12);
+    assert(rating_step_down_frame(&f, styled, selection).change_count == 1);
+    assert(f.rating_event.before == 3 && f.rating_event.after == 2.5f);
+    if (styled) {
+        click(&f, 12, .25f);
+        assert(rating_step_down_frame(&f, styled, selection).change_count == 1);
+        assert(f.rating_event.after == 2);
+    }
+    activate(&f, 10);
+    activate(&f, 14);
+    assert(rating_step_down_frame(&f, styled, selection).change_count == 1);
+    assert(f.rating_event.after == 5);
+    key(&f, 2, CUI_KEY_HOME);
+    assert(rating_step_down_frame(&f, styled, selection).change_count == 1 && !f.rating);
+    const unsigned calls = f.calls;
+    assert(!rating_step_down_frame(&f, styled, (cui_rating_selection)42).change_count);
+    assert(f.calls == calls && f.rating == 0);
+    cui_destroy(f.ui);
+}
 int main(void) {
     sized_pagination();
     custom_sized_pagination();
@@ -1026,6 +1066,7 @@ int main(void) {
         pagination(styled != 0);
         stepper(styled != 0);
         rating(styled != 0);
+        rating_step_down(styled != 0);
         paired_input(styled != 0);
     }
     return 0;

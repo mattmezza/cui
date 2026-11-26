@@ -2875,7 +2875,8 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_numeric.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/web/test_rating_gallery.py"
       ],
       "status": "tested",
       "platforms": {
@@ -2883,7 +2884,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Independent keyboard/pointer half-step values, controlled clearing, readonly/disabled and range semantics tested. SVG masks/custom icons/color and hover preview pending."
+        "Immediate C and WASM support whole or half steps, shared design sizes, outline-only hover preview, SVG masks and color overrides. The distinct step-down policy is opt-in. Native host accessibility acceptance, arbitrary inherited styling, and retained builder presentation remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2907,6 +2908,23 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_numeric.c"
+          ]
+        },
+        {
+          "name": "Shared design sizes, custom tinted SVG masks and mouse/pen hover previews",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c",
+            "tests/web/test_rating_gallery.py",
+            "docs/NUMERIC.md"
+          ]
+        },
+        {
+          "name": "Opt-in step-down from a filled mark with typed aggregate change",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric_selection_events.c",
+            "tests/web/test_rating_gallery.py"
           ]
         }
       ],

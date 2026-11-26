@@ -70,6 +70,10 @@ existing differences; Home still clears regardless of `clearable`, while
 Delete/Backspace clearing requires it. Rating is a float API, unlike NumberInput's
 double API. Failed later icon preparation does not undo a committed change.
 
+`cui_base_rating_events_ex` accepts an explicit selection policy.
+`cui_rating_present_events` adds the styled presentation to the same event
+contract. Hover preview changes paint only and never produces CHANGE.
+
 Legacy entrypoints remain unchanged. These facades do not expose per-event
 REQUEST, COMMIT or SUBMIT, and add no bridge notification tags or binding wrappers.
 The native `size_t` payload is not a guarantee about legacy bridge float transport.

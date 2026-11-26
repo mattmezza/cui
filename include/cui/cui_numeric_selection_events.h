@@ -83,6 +83,13 @@ cui_numeric_selection_event_result cui_base_rating_events(cui_context *, cui_id,
 cui_numeric_selection_event_result cui_rating_events(cui_context *, cui_id, const cui_theme *,
                                                      cui_str, float *, cui_rating_options,
                                                      cui_rating_event_handler);
+cui_numeric_selection_event_result cui_base_rating_events_ex(cui_context *, cui_id, cui_str,
+                                                             float *, cui_rating_options,
+                                                             cui_rating_selection,
+                                                             cui_rating_event_handler);
+cui_numeric_selection_event_result
+cui_rating_present_events(cui_context *, cui_id, const cui_theme *, cui_str, float *,
+                          cui_rating_options, cui_rating_presentation, cui_rating_event_handler);
 #ifdef __cplusplus
 }
 #endif

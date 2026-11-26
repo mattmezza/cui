@@ -469,11 +469,12 @@ The primary calls are `cui_radio_group` and `cui_radio_events`. See the [group a
 
 **State:** Caller retains float rating.
 
-**Interaction:** Returns true when rating changes.
+**Interaction:** Returns true when the committed rating changes. Use the typed change callback or the bool result for side effects. Hover preview affects paint only.
 
-**Usage:** Pass the current rating by pointer and save it in the change branch.
+**Usage:** Pass the application-owned rating by pointer. Use the styled presenter for shared sizes, custom SVG masks, tint and optional step-down behavior.
 
-API: `cui_rating`. [Public header](../include/cui/cui_numeric.h); [guide](NUMERIC.md).
+See `cui_rating`, `cui_rating_present`, the [public header](../include/cui/cui_numeric.h)
+and the [Rating guide](NUMERIC.md#rating).
 
 Additional event includes: `cui/cui_numeric_selection_events.h`.
 

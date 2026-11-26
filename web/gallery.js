@@ -3,7 +3,7 @@ import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
 import {createCuiMeshRenderer} from "./modules/cui_mesh.js";
 import {paintGradientText} from "./modules/cui_text_paint.js";
-import {selectedUsage,paginationUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage,radioStyledUsage,radioControlledUsage} from "./modules/cui_usage.js";
+import {selectedUsage,paginationUsage,ratingUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage,radioStyledUsage,radioControlledUsage} from "./modules/cui_usage.js";
 import {resizableUsage} from "./modules/cui_resizable_usage.js";
 import {stepperUsage} from "./modules/cui_stepper_usage.js";
 import {spinnerUsage} from "./modules/cui_spinner_usage.js";
@@ -640,7 +640,7 @@ cui_plot_viewport_bind(ui, id, &viewport, navigation);`,
  Combobox:'cui_combobox(ui, id, &theme, label, query,\n    items, 4, scratch, 4, &selection,\n    &popup, options);',
  NumberInput:'cui_number_input(ui, id, &theme, label,\n    &state, &value, (cui_number_options){\n        .size = CUI_NUMBER_SMALL, .step = 1});',
  Pagination:paginationUsage(3),
- Rating:'cui_rating(ui, id, &theme, label,\n    &rating, options);',
+ Rating:ratingUsage(3,false,false,false,true),
  Stepper:'/* The callback validates and updates your owner model for next submission. */\nvoid on_step_request(void *, const cui_stepper_navigation_request *);\ncui_stepper_navigation(ui, id, &theme, steps, 3,\n    current_step, true, false,\n    (cui_stepper_navigation_handler){on_step_request, user});',
  List:'cui_list(ui, id, &theme, items, 3,\n    &selection, &state, options);',
  Select:'cui_select(ui, id, &theme, label, placeholder,\n    items, 3, &selection, &popup, options);',
@@ -1063,6 +1063,10 @@ function render(){
   $('pagination-visible-pages').hidden=!paginationNumbered;
   wasm.gallery_pagination_options(paginationMode,paginationPages,paginationFrench,paginationCustom);
  }
+ if(selected.name==='Rating'){
+  height=Math.max(height,designHeights[designScale]*2+70);
+  wasm.gallery_rating_options($('rating-shape').value==='1',$('rating-half').checked,$('rating-preview').checked);
+ }
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1209,6 +1213,8 @@ function render(){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
  }
+ if(selected.name==='Rating')$('snippet').textContent=ratingUsage(designScale,$('disabled').checked,
+     $('rating-shape').value==='1',$('rating-half').checked,$('rating-preview').checked);
  if(pagination)$('snippet').textContent=paginationUsage(designScale,$('disabled').checked,paginationMode,paginationPages,paginationFrench,paginationCustom);
  if(controlShadowsEnabled()&&['Button','Checkbox','Switch','Slider'].includes(selected.name))$('snippet').textContent=controlShadowUsage(selected.name,Number($('control-size').value),Number($('design-size').value));
  if(selected.name==='Radio') {
@@ -1552,12 +1558,14 @@ function selectComponent(){
  $('virtual-axis').hidden=selected.name!=='VirtualList';$('virtual-axis').value='0';
  $('pagination-custom-control').hidden=selected.name!=='Pagination';$('pagination-custom').checked=false;
  $('pagination-height-control').hidden=true;$('pagination-height').value='52';$('pagination-height').disabled=true;
+ for(const id of ['rating-shape','rating-half-control','rating-preview-control'])$(id).hidden=selected.name!=='Rating';
+ $('rating-shape').value='0';$('rating-half').checked=false;$('rating-preview').checked=true;
  $('pagination-mode').hidden=selected.name!=='Pagination';$('pagination-mode').value='0';
  $('pagination-visible-pages').hidden=true;$('pagination-visible-pages').value='5';
  $('pagination-language').hidden=selected.name!=='Pagination';$('pagination-language').value='en';
  $('time-field-tab-mode').hidden=selected.name!=='TimeField';$('time-field-tab-mode').value='segments';
  for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control','text-paint'])$(id).hidden=selected.name!=='Theme';textPaintControl.value='0';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
- $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Pagination','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar','TimeField'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
+ $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Pagination','Rating','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar','TimeField'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
  $('design-radius').value='-1';$('design-spacing').value='-1';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);
@@ -1858,7 +1866,7 @@ $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(N
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);
 $('input-mode').addEventListener('change',requestFrame);
-for(const id of ['time-field-tab-mode','pagination-mode','pagination-visible-pages','pagination-language'])$(id).addEventListener('change',requestFrame);
+for(const id of ['time-field-tab-mode','pagination-mode','pagination-visible-pages','pagination-language','rating-shape','rating-half','rating-preview'])$(id).addEventListener('change',requestFrame);
 for(const id of ['avatar-source','avatar-palette','avatar-hue','avatar-placeholder','avatar-rem','message-alignment','message-variant','message-inset','message-avatar','message-scrollbar','dropdown-names','dropdown-order','dropdown-skip','dropdown-toggle','dropdown-paint','dropdown-shadow','dropdown-variant','dropdown-size','dropdown-halves','dropdown-action','dropdown-anchor','dropdown-outline','dropdown-selected','tabs-mode','tabs-size','tabs-variant','tabs-manual','progress-shape','progress-mode','shimmer-mode','disclosure-mode','disclosure-multiple','notification-anchor','notification-kind','notification-autohide','tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
 $('otp-groups').addEventListener('change',requestFrame);
 $('otp-mask').addEventListener('change',requestFrame);

@@ -593,8 +593,10 @@ bool cui_base_pagination_reduce_internal(cui_context *ui, cui_id id, size_t *pag
         cui_invalidate(ui);
     return *page != original;
 }
-bool cui_base_rating(cui_context *ui, cui_id id, cui_str name, float *value, cui_rating_options o) {
-    if (!ui || !value)
+bool cui_base_rating_ex(cui_context *ui, cui_id id, cui_str name, float *value,
+                        cui_rating_options o, cui_rating_selection selection) {
+    if (!ui || !value ||
+        (selection != CUI_RATING_SELECT_VALUE && selection != CUI_RATING_STEP_DOWN_FILLED))
         return false;
     unsigned maximum = o.maximum ? o.maximum : 5;
     if (maximum > 100)
@@ -613,11 +615,14 @@ bool cui_base_rating(cui_context *ui, cui_id id, cui_str name, float *value, cui
         }
         for (unsigned i = 0; i < maximum; ++i)
             if (activation == cui_numeric_part_id(id, 10 + i)) {
-                *value = (float)i + 1;
+                float picked = (float)i + 1;
                 cui_rect bounds = cui_bounds(ui, activation);
                 if (o.half_steps && events[e].type == CUI_EVENT_POINTER_UP &&
                     events[e].x < bounds.x + bounds.w / 2)
-                    *value -= .5f;
+                    picked -= .5f;
+                if (selection == CUI_RATING_STEP_DOWN_FILLED && picked <= *value)
+                    picked -= step;
+                *value = picked;
                 cui_focus(ui, id);
             }
         if (target == id && events[e].type == CUI_EVENT_KEY_DOWN) {
@@ -656,6 +661,9 @@ bool cui_base_rating(cui_context *ui, cui_id id, cui_str name, float *value, cui
     if (changed)
         cui_invalidate(ui);
     return changed;
+}
+bool cui_base_rating(cui_context *ui, cui_id id, cui_str name, float *value, cui_rating_options o) {
+    return cui_base_rating_ex(ui, id, name, value, o, CUI_RATING_SELECT_VALUE);
 }
 bool cui_base_stepper(cui_context *ui, cui_id id, const cui_step *steps, size_t count,
                       size_t *current, bool disabled) {

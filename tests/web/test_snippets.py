@@ -15,14 +15,14 @@ import {runInNewContext} from 'node:vm';
 const source=readFileSync(process.argv[1],'utf8');
 const load = name => import('data:text/javascript;base64,' +
     readFileSync(join(process.argv[2], name)).toString('base64'));
-const {paginationUsage, timeFieldUsage, virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage,
+const {paginationUsage, ratingUsage, timeFieldUsage, virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage,
        radioStyledUsage, radioControlledUsage} =
     await load('cui_usage.js');
 const {hoverCardUsage} = await load('cui_hover_card_usage.js');
 const pick=(name)=>{const start=source.indexOf('const '+name+' = {');
  if(start<0)throw Error(name+' missing');
  return source.slice(start,name==='stories'?source.indexOf('};',start)+2:source.indexOf('\n};\nlet wasm',start)+3);};
-const context={paginationUsage,timeFieldUsage};
+const context={paginationUsage,ratingUsage,timeFieldUsage};
 runInNewContext(pick('stories')+'\n'+pick('snippets')+'\nglobalThis.data={stories,snippets};',context);
 const {stories, snippets} = context.data;
 const standalone = {
@@ -30,12 +30,14 @@ const standalone = {
     Radio: [radioStyledUsage, radioControlledUsage],
     DataTable: [liveDataTableUsage, pagedDataTableUsage],
     HoverCard: [0, 1, 2].flatMap(mode => [0, 1, 2].map(preview => hoverCardUsage(mode, preview))),
+    Rating: [snippets.Rating, ratingUsage(14, false, true, true, false)],
     TimeField: [snippets.TimeField, timeFieldUsage(3, true)],
     Pagination: [snippets.Pagination, paginationUsage(14, true, 2), paginationUsage(3, false, 1, 10),
                  paginationUsage(7, false, 3, 5, true), paginationUsage(3, false, 0, 5, false, 52),
                  paginationUsage(14, false, 2, 5, true, 512)],
 };
 delete snippets.TimeField; // Compile complete sources as separate translation units.
+delete snippets.Rating;
 delete snippets.Pagination;
 process.stdout.write(JSON.stringify({stories, snippets, standalone}));
 '''
@@ -132,7 +134,6 @@ def main():
         'DatePicker': 'cui_str label = {0}; cui_date_picker_state state = {0}; cui_date_selection selection = {0}; cui_date_picker_options options = {0};',
         'ColorPicker': 'cui_color_state state = {0}; cui_color color = {0}; cui_color_picker_options options = {0};',
         'Combobox': 'cui_str label = {0}; cui_edit *query = 0; cui_choice_item items[4] = {0}, scratch[4] = {0}; cui_id selection = 0; cui_choice_popup popup = {0}; cui_choice_popup_options options = {0};',
-        'Rating': 'cui_str label = {0}; float rating = 0; cui_rating_options options = {0};',
         'Stepper': 'cui_step steps[3] = {0}; size_t current_step = 0;',
         'List': 'cui_choice_item items[3] = {0}; cui_id selection = 0; cui_list_state state = {0}; cui_list_options options = {0};',
         'Select': 'cui_str label = {0}, placeholder = {0}; cui_choice_item items[3] = {0}; cui_id selection = 0; cui_choice_popup popup = {0}; cui_choice_popup_options options = {0};',

@@ -360,7 +360,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "The retained bridge and Python, JavaScript, TypeScript, Go and Rust builders keep the existing integer Rating subset. Shared presenter sizes, half-step authoring, hover preview, custom masks/colors and the opt-in step-down policy are available in immediate C."
+      ]
     },
     {
       "name": "Shimmer",

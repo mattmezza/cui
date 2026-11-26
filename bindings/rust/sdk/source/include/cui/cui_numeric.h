@@ -2,6 +2,7 @@
 #ifndef CUI_NUMERIC_H
 #define CUI_NUMERIC_H
 #include "cui_base.h"
+#include "cui_icon.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
@@ -127,6 +128,26 @@ typedef struct {
 bool cui_base_rating(cui_context *, cui_id, cui_str, float *, cui_rating_options);
 bool cui_rating(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, float *value,
                 cui_rating_options options);
+typedef enum { CUI_RATING_SELECT_VALUE, CUI_RATING_STEP_DOWN_FILLED } cui_rating_selection;
+/* Step down by one mark (or a half step) when activating a mark at or below
+ * the committed value. Keyboard range commands retain their own behavior. */
+bool cui_base_rating_ex(cui_context *, cui_id, cui_str, float *, cui_rating_options,
+                        cui_rating_selection);
+typedef struct {
+    cui_design_size design_size;
+    cui_rating_selection selection;
+    bool hover_preview;
+    bool custom_fill, custom_outline, custom_preview;
+    cui_color fill, outline, preview;
+    /* Optional caller-owned SVG masks. Each prepares at the resolved square
+     * size, with a built-in star fallback if missing, empty or unpreparable.
+     * Keep masks alive until rendering completes. They are not retained by Rating. */
+    cui_icon_state *outline_icon, *fill_icon;
+} cui_rating_presentation;
+/* Styled value change, with the same ownership as cui_rating. Preview only
+ * tints outlines. It never changes the owner or accessibility value. */
+bool cui_rating_present(cui_context *, cui_id, const cui_theme *, cui_str, float *,
+                        cui_rating_options, cui_rating_presentation);
 typedef enum {
     CUI_STEP_PENDING,
     CUI_STEP_ACTIVE,

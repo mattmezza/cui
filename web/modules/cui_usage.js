@@ -32,6 +32,36 @@ bool draw_results_pages(cui_context *ui, cui_id id, const cui_theme *theme,
 }`;
 }
 
+export function ratingUsage(size, disabled = false, hearts = false, half = false, preview = true) {
+ const path = "M12 21 Q2 15 2 8 Q2 3 7 3 Q10 3 12 6 Q14 3 17 3 Q22 3 22 8 Q22 15 12 21 Z";
+ const svg = "<svg width='24' height='24' xmlns='http://www.w3.org/2000/svg'>";
+ const shapes = hearts ? `/* Start with two zeroed icon states. Call once before drawing. */
+bool prepare_heart_rating(cui_icon_state *outline, cui_icon_state *fill) {
+    return cui_icon_set_data(outline, cui_string(
+        "${svg}"
+        "<path d='${path}' fill='none' stroke='white' stroke-width='1.6'/></svg>")) &&
+           cui_icon_set_data(fill, cui_string(
+        "${svg}"
+        "<path d='${path}' fill='white'/></svg>"));
+}
+/* Destroy both states with cui_icon_state_destroy after their last draw is rendered. */
+
+` : '';
+ return `#include <cui/cui_numeric.h>
+
+${shapes}/* The application retains the rating and calls this inside each frame. */
+bool draw_rating(cui_context *ui, cui_id id, const cui_theme *theme, float *rating,
+                 float content_width${hearts?', cui_icon_state *outline, cui_icon_state *fill':''}) {
+    return cui_rating_present(ui, id, theme, cui_string("Rate your experience"), rating,
+        (cui_rating_options){.maximum = 5, .half_steps = ${half}, .disabled = ${disabled},
+                             .width = content_width},
+        (cui_rating_presentation){.design_size = ${sizes[size] || 'CUI_DESIGN_BASE'},
+            .selection = CUI_RATING_STEP_DOWN_FILLED, .hover_preview = ${preview}${hearts?`,
+            .outline_icon = outline, .fill_icon = fill,
+            .custom_fill = true, .fill = {190, 49, 85, 255}`:''}});
+}`;
+}
+
 export function timeFieldUsage(size, ordered = false) {
  if(ordered)return `#include <cui/cui_components.h>
 #include <cui/cui_time_field_v1.h>

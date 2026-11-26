@@ -16,7 +16,7 @@ const source=readFileSync(process.argv[1],'utf8');
 const load = name => import('data:text/javascript;base64,' +
     readFileSync(join(process.argv[2], name)).toString('base64'));
 const {paginationUsage, ratingUsage, timeFieldUsage, virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage,
-       radioStyledUsage, radioControlledUsage} =
+       radioStyledUsage, radioControlledUsage, disclosureHeadingUsage} =
     await load('cui_usage.js');
 const {hoverCardUsage} = await load('cui_hover_card_usage.js');
 const pick=(name)=>{const start=source.indexOf('const '+name+' = {');
@@ -25,6 +25,7 @@ const pick=(name)=>{const start=source.indexOf('const '+name+' = {');
 const context={paginationUsage,ratingUsage,timeFieldUsage};
 runInNewContext(pick('stories')+'\n'+pick('snippets')+'\nglobalThis.data={stories,snippets};',context);
 const {stories, snippets} = context.data;
+const inline = {Accordion: disclosureHeadingUsage(true), Collapsible: disclosureHeadingUsage(false)};
 const standalone = {
     VirtualList: [virtualInboxUsage],
     Radio: [radioStyledUsage, radioControlledUsage],
@@ -39,7 +40,7 @@ const standalone = {
 delete snippets.TimeField; // Compile complete sources as separate translation units.
 delete snippets.Rating;
 delete snippets.Pagination;
-process.stdout.write(JSON.stringify({stories, snippets, standalone}));
+process.stdout.write(JSON.stringify({stories, snippets, standalone, inline}));
 '''
 
 
@@ -77,7 +78,8 @@ def main():
     assert set(stories) == baseline | extensions
     headers = '\n'.join(path.read_text() for path in (ROOT / 'include/cui').glob('*.h'))
     declarations = re.sub(r'/\*.*?\*/|//[^\n]*', '', headers, flags=re.S)
-    excerpts = list(snippets.items()) + [
+    inline = data['inline']
+    excerpts = list(snippets.items()) + list(inline.items()) + [
         (story, snippet) for story, examples in standalone.items() for snippet in examples
     ]
     for story, snippet in excerpts:
@@ -93,7 +95,8 @@ def main():
             assert actual == expected, (story, symbol, actual, expected)
         for token in set(re.findall(r'\b(CUI_[A-Z_0-9]+)\b', snippet)):
             assert token in headers, (story, token)
-    compiled = tuple(story for story in stories if story in snippets)
+    compiled = [(story, '', snippets[story]) for story in stories if story in snippets]
+    compiled += [(story, '_heading', snippet) for story, snippet in inline.items()]
     extra = {
         'Video': 'cui_video_view confirmed_view = {0}; const cui_video_player_frame *decoded_frame = 0;',
         'VideoPlayer': 'cui_video_view confirmed_view = {0}; cui_video_audio_view confirmed_audio = {0}; const cui_video_player_frame *decoded_frame = 0; cui_video_request_fn queue_video_request = 0; void *video_host = 0;',
@@ -184,10 +187,10 @@ static void draw_profile(cui_context *ui) { (void)ui; }
     void *user = 0;
 '''
     code = includes + '\n' + setup + '\n'.join(
-        f'void check_{story.replace(" ", "_")}(void) {{\n'
+        f'void check_{story.replace(" ", "_")}{suffix}(void) {{\n'
         f'{common.replace("cui_theme theme = {0};", "" ) if story == "Theme" else common}'
-        f'{extra.get(story, "")}\n{snippets[story]}\n}}'
-        for story in compiled) + '\n'
+        f'{extra.get(story, "")}\n{snippet}\n}}'
+        for story, suffix, snippet in compiled) + '\n'
     with tempfile.TemporaryDirectory() as directory:
         source = Path(directory) / 'snippets.c'
         source.write_text(code)

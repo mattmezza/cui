@@ -657,8 +657,8 @@ Add `--features native` before the Cargo example name when building the
 bundled native provider. [Python, JS and TS setup](BINDING_BUILDERS.md) ·
 [Go setup](GO_BUILDERS.md) · [Rust setup](RUST_BUILDERS.md)
 
-Custom headers, measured reveal and synchronous observers are available in
-the immediate C presenters. [Immediate C guide](DISCLOSURE.md)
+Custom headers, measured reveal, synchronous observers, inherited title
+typography, state-specific boxes and dividers are available in the immediate C presenters. [Immediate C guide](DISCLOSURE.md)
 
 ### Configure a retained Rating from C
 

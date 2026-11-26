@@ -155,6 +155,70 @@ the theme focus color and border width; explicitly masked border edges remain
 a caller style decision. Tests assert distinct overridden header/panel bounds
 and colors, fallback styles beyond the array and pointer toggling in both APIs.
 
+### Style headings and dividers
+
+Use `cui_disclosure_appearance` for shared heading and trigger box styles.
+Supply `items` and `item_count` to override individual fields. Collapsible
+uses the shared fields and, when supplied, the first item.
+
+```c
+cui_typography_token title = {
+    .size = 16, .line_height = 22, .wrap = true,
+    .style = {.weight = CUI_TEXT_WEIGHT_MEDIUM},
+};
+cui_typography_token expanded_title = title;
+expanded_title.style.weight = CUI_TEXT_WEIGHT_BOLD;
+cui_box expanded_box = {
+    .width = -1, .padding = 12, .row = true, .align_y = CUI_ALIGN_CENTER,
+};
+cui_disclosure_separator_style divider = {
+    .thickness = 2, .inset_left = 12, .inset_right = 12, .color = theme.border,
+};
+cui_disclosure_appearance appearance = {
+    .trigger = {
+        .normal = {.typography = &title},
+        .expanded = {.typography = &expanded_title, .box = &expanded_box,
+                     .custom_color = true, .color = theme.accent},
+    },
+    .separator = &divider,
+};
+cui_accordion_present(
+    ui, id, &theme, items, count, expanded,
+    (cui_accordion_options){.bordered = true, .collapsible = true},
+    (cui_disclosure_presentation){.width = -1, .joined = true, .appearance = &appearance},
+    draw_panel, user, (cui_disclosure_handler){0});
+```
+
+Each field inherits independently. Apply shared normal and item normal
+first, then shared and item expanded when open, then shared and item
+disabled when the trigger is disabled. A box replaces the preceding trigger box,
+including any box supplied through the component options. Hover, pressed
+and focus still use the existing paint styles without changing layout.
+A title color can be transparent and the full accessible name stays
+available. Custom header callbacks still own their title and indicator.
+
+With no explicit trigger box, a custom typography token fits the row
+height to the title, indicator and padding. `wrap = true` uses the width
+left by the indicator on the first frame, so the row grows when the title
+wraps. Horizontal alignment uses the title lane on bounded rows. Reuse
+the app's body or heading token to select a font family, weight, size and
+line height. Letter spacing requires the host's Core text capability.
+[Typography tokens and host setup](TYPOGRAPHY.md)
+
+Joined dividers appear after full sections, including the expanded
+body. Omit `separator` for the theme's one-pixel line, or set thickness
+to zero to omit the divider. Insets and thickness accept 0 to 65,535 logical pixels.
+Excessive insets reduce the remaining paint width to zero. Collapsible
+and separate Accordion panels ignore the divider option. The settings
+are read during submission. Invalid typography or joined divider
+measurements reject the presentation before it changes expansion.
+
+The WASM gallery's **Styled headings** option demonstrates wrapping,
+active title typography and inset dividers. These title and divider
+settings are available in immediate C. The retained bridge and its
+language builders support the sizing, box and trigger feedback options
+in the bridge guide. [Retained disclosure](BRIDGE_COMPONENTS.md#style-retained-accordion-and-collapsible-from-c)
+
 ### Measured reveal
 
 Opt into measured reveal with a zero-initialized `cui_disclosure_motion` kept in

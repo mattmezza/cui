@@ -4,6 +4,33 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
  'CUI_DESIGN_2XL', 'CUI_DESIGN_3XL', 'CUI_DESIGN_4XL', 'CUI_DESIGN_5XL',
  'CUI_DESIGN_6XL', 'CUI_DESIGN_7XL', 'CUI_DESIGN_8XL', 'CUI_DESIGN_9XL'];
 
+export function disclosureHeadingUsage(accordion){
+ const separator=accordion?(`cui_disclosure_separator_style divider = {
+    .thickness = 2, .inset_left = 12, .inset_right = 12,
+    .color = theme.border,
+};
+`):'';
+ const call=accordion?(`cui_accordion_present(ui, id, &theme, items, 3, expanded,
+    (cui_accordion_options){.collapsible = true, .bordered = true},
+    presentation, draw_panel, user, (cui_disclosure_handler){0});`):(`cui_collapsible_present(ui, id, &theme, label, &open,
+    (cui_collapsible_options){0}, presentation, draw_panel, user,
+    (cui_disclosure_handler){0});`);
+ return `cui_typography_token title = {.size = 16, .line_height = 22, .wrap = true};
+cui_typography_token open_title = title;
+open_title.style.weight = CUI_TEXT_WEIGHT_BOLD;
+${separator}cui_disclosure_appearance appearance = {
+    .trigger = {
+        .normal = {.typography = &title},
+        .expanded = {.typography = &open_title, .custom_color = true,
+                     .color = theme.accent},
+    },${accordion?'\n    .separator = &divider,':''}
+};
+cui_disclosure_presentation presentation = {
+    .width = -1, ${accordion?'.joined = true, ':''}.appearance = &appearance,
+};
+${call}`;
+}
+
 export function paginationUsage(size, disabled = false, mode = 0, visiblePages = 5, french = false, customSize = 0) {
  const custom = customSize ? `,\n                                 .custom_size = ${Number.isInteger(customSize) ? customSize.toFixed(1) : customSize}f` : '';
  const numbered = mode === 1 || mode === 3;

@@ -1626,6 +1626,34 @@ static cui_disclosure_presentation disclosure_presentation(void) {
     return result;
 }
 
+static cui_disclosure_appearance disclosure_heading_style(const cui_theme *theme,
+                                                          cui_typography_token titles[3],
+                                                          cui_disclosure_separator_style *divider) {
+    cui_design_metrics m = {.font_size = theme->font_size, .line_height = theme->font_size * 1.4f};
+    if (design_size)
+        (void)cui_design_measure(design_size, theme->font_size / 16, &m);
+    titles[0] = (cui_typography_token){.size = m.font_size,
+                                       .line_height = m.line_height,
+                                       .style = {.weight = CUI_TEXT_WEIGHT_MEDIUM},
+                                       .wrap = true};
+    titles[1] = titles[0];
+    titles[1].size *= 1.16f;
+    titles[1].line_height *= 1.16f;
+    titles[1].style.weight = CUI_TEXT_WEIGHT_BOLD;
+    titles[2] = titles[0];
+    titles[2].style.italic = true;
+    *divider = (cui_disclosure_separator_style){.thickness = 2,
+                                                .inset_left = theme->padding,
+                                                .inset_right = theme->padding,
+                                                .color = theme->border};
+    return (cui_disclosure_appearance){
+        .trigger =
+            {.normal = {.typography = &titles[0]},
+             .expanded = {.typography = &titles[1], .custom_color = true, .color = theme->accent},
+             .disabled = {.typography = &titles[2], .custom_color = true, .color = theme->muted}},
+        .separator = divider};
+}
+
 static unsigned char avatar_mask_pixels[3][96 * 96 * 4];
 static cui_avatar_image avatar_images[3];
 static bool avatar_images_ready;
@@ -5891,6 +5919,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                        .cursor = CUI_CURSOR_POINTER};
         }
         cui_disclosure_presentation presentation = disclosure_presentation();
+        cui_typography_token titles[3];
+        cui_disclosure_separator_style divider;
+        cui_disclosure_appearance appearance;
+        if (disclosure_mode == 5) {
+            items[0].label = cui_string("Getting started with workspace access and sharing");
+            appearance = disclosure_heading_style(&t, titles, &divider);
+            presentation.appearance = &appearance;
+        }
         presentation.joined = true;
         presentation.trigger_styles = styles;
         presentation.trigger_style_count = 3;
@@ -5923,6 +5959,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                              .border = t.border,
                              .border_width = 1};
         bool animated = disclosure_mode == 1 || disclosure_mode == 2;
+        cui_disclosure_presentation presentation = disclosure_presentation();
+        cui_typography_token titles[3];
+        cui_disclosure_separator_style divider;
+        cui_disclosure_appearance appearance;
+        if (disclosure_mode == 5) {
+            appearance = disclosure_heading_style(&t, titles, &divider);
+            presentation.appearance = &appearance;
+        }
         cui_collapsible_present(
             ui, cui_id_from(ui, "collapsible"), &t, cui_string("Show details"), &collapsed,
             (cui_collapsible_options){.disabled = disabled,
@@ -5932,8 +5976,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                       .dt = host_dt,
                                       .response = .45f,
                                       .reduced_motion = reduced_motion},
-            disclosure_presentation(), animated ? disclosure_panel : panel, NULL,
-            (cui_disclosure_handler){0});
+            presentation, animated ? disclosure_panel : panel, NULL, (cui_disclosure_handler){0});
         break;
     }
     case 22: {
@@ -7924,7 +7967,7 @@ void gallery_table_appearance(int custom_header, int striped) {
     table_striped = striped != 0;
 }
 void gallery_disclosure_options(int mode, int multiple) {
-    if (mode >= 0 && mode <= 4 && mode != disclosure_mode) {
+    if (mode >= 0 && mode <= 5 && mode != disclosure_mode) {
         disclosure_mode = mode;
         memset(accordion_motion, 0, sizeof(accordion_motion));
         memset(accordion_nested_open, 0, sizeof(accordion_nested_open));

@@ -594,10 +594,139 @@ static void test_joined_disclosure_styles(void) {
     cui_destroy(ui);
 }
 
+static size_t check_disclosure_title(cui_draw_list list, cui_rect row, cui_typography_token type,
+                                     cui_color color) {
+    size_t lines = 0;
+    for (size_t i = 0; i < list.count; ++i) {
+        const cui_draw_command *c = &list.commands[i];
+        if (c->type != CUI_DRAW_TEXT || c->bounds.y < row.y || c->bounds.y >= row.y + row.h)
+            continue;
+        assert(c->font_size == type.size && c->text_style.family == type.style.family &&
+               c->text_style.weight == type.style.weight &&
+               c->text_style.italic == type.style.italic);
+        assert(c->color.r == color.r && c->color.g == color.g && c->color.b == color.b &&
+               c->color.a == color.a);
+        ++lines;
+    }
+    return lines;
+}
+
+static void test_disclosure_inherited_appearance(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 480});
+    const cui_theme theme = cui_theme_light();
+    const cui_color shared_color = {100, 30, 120, 255}, expanded_color = {23, 99, 53, 255};
+    const cui_color disabled_color = {80, 80, 80, 255}, item_color = {20, 40, 130, 255};
+    const cui_typography_token ordinary = {
+        .size = 17, .line_height = 24, .style = {.weight = CUI_TEXT_WEIGHT_SEMIBOLD, .family = 7}};
+    const cui_typography_token expanded_title = {
+        .size = 21, .line_height = 28, .style = {.weight = CUI_TEXT_WEIGHT_BOLD}};
+    const cui_typography_token disabled_title = {
+        .size = 13, .line_height = 20, .style = {.italic = true}};
+    const cui_box open_box = {
+        .width = -1, .height = 62, .row = true, .align_y = CUI_ALIGN_CENTER, .padding = 10};
+    const cui_disclosure_trigger_appearance styles[3] = {
+        {.normal = {.custom_color = true, .color = item_color}},
+        {.disabled = {.typography = &disabled_title}},
+        {.expanded = {.custom_color = true, .color = {0}}},
+    };
+    cui_disclosure_separator_style divider = {
+        .thickness = 3, .inset_left = 9, .inset_right = 13, .color = {8, 109, 181, 255}};
+    cui_disclosure_appearance appearance = {
+        .trigger = {.normal = {.typography = &ordinary,
+                               .custom_color = true,
+                               .color = shared_color},
+                    .expanded = {.box = &open_box,
+                                 .typography = &expanded_title,
+                                 .custom_color = true,
+                                 .color = expanded_color},
+                    .disabled = {.custom_color = true, .color = disabled_color}},
+        .items = styles,
+        .item_count = 3,
+        .separator = &divider};
+    cui_disclosure_presentation p = {.width = 200, .joined = true, .appearance = &appearance};
+    bool expanded[3] = {false, true, true};
+    assert(ui);
+    cui_draw_list list = joined_scene(ui, &theme, p, false, expanded);
+    cui_rect first = cui_bounds(ui, 10), second = cui_bounds(ui, 20), third = cui_bounds(ui, 30);
+    assert(first.w == second.w && first.w == 200 &&
+           first.h == ordinary.line_height + 2 * theme.padding);
+    assert(second.h == open_box.height && third.h == open_box.height);
+    assert(check_disclosure_title(list, first, ordinary, item_color) == 1);
+    assert(check_disclosure_title(list, second, disabled_title, disabled_color) == 1);
+    assert(check_disclosure_title(list, third, expanded_title, (cui_color){0}) == 1);
+    cui_rect after_first = {first.x + 9, first.y + first.h, first.w - 22, 3};
+    assert(count_paint(list, CUI_DRAW_RECT, after_first, divider.color) == 1);
+    assert(second.y == after_first.y + after_first.h);
+    cui_rect body = cui_bounds(ui, 20 ^ UINT64_C(0x1d8f322539deca61));
+    assert(body.h > 0 && third.y == body.y + body.h + 3);
+    assert(count_paint(list, CUI_DRAW_RECT,
+                       (cui_rect){second.x + 9, body.y + body.h, second.w - 22, 3},
+                       divider.color) == 1);
+
+    click(ui, 10);
+    divider.thickness = 0;
+    list = joined_scene(ui, &theme, p, false, expanded);
+    first = cui_bounds(ui, 10);
+    body = cui_bounds(ui, 10 ^ UINT64_C(0x1d8f322539deca61));
+    assert(expanded[0] && !expanded[1] && !expanded[2]);
+    assert(first.h == open_box.height &&
+           check_disclosure_title(list, first, expanded_title, expanded_color) == 1);
+    assert(cui_bounds(ui, 20).y == body.y + body.h);
+
+    divider.thickness = NAN;
+    click(ui, 10);
+    assert(cui_begin_frame(ui, 400, 480, .016f));
+    const cui_disclosure_event_result invalid = cui_accordion_present(
+        ui, 2003, &theme, items, 3, expanded, (cui_accordion_options){.collapsible = true}, p,
+        panel, NULL, (cui_disclosure_handler){0});
+    assert(!invalid.changed && expanded[0] && cui_end_frame(ui).count == 0);
+
+    const cui_typography_token wrapped = {.size = 16,
+                                          .line_height = 23,
+                                          .align = CUI_TEXT_ALIGN_RIGHT,
+                                          .wrap = true,
+                                          .style = {.weight = CUI_TEXT_WEIGHT_MEDIUM}};
+    appearance = (cui_disclosure_appearance){.trigger.normal = {.typography = &wrapped}};
+    p.width = 150;
+    bool open = false;
+    assert(cui_begin_frame(ui, 400, 480, .016f));
+    (void)cui_collapsible_present(
+        ui, 2500, &theme, cui_string("A heading with enough words to wrap across multiple lines"),
+        &open, (cui_collapsible_options){0}, p, NULL, NULL, (cui_disclosure_handler){0});
+    list = cui_end_frame(ui);
+    cui_rect row = cui_bounds(ui, 2500);
+    assert(cui_last_error(ui) == CUI_OK &&
+           check_disclosure_title(list, row, wrapped, theme.text) > 1);
+    assert(row.w == 150 && row.h > 2 * wrapped.line_height);
+    cui_rect icon = {0};
+    for (size_t i = 0; i < list.count; ++i)
+        if (list.commands[i].type == CUI_DRAW_IMAGE)
+            icon = list.commands[i].bounds;
+    assert(icon.w > 0 && fabsf(icon.y + icon.h / 2 - row.y - row.h / 2) < .6f);
+    for (size_t i = 0; i < list.count; ++i)
+        if (list.commands[i].type == CUI_DRAW_TEXT)
+            assert(fabsf(list.commands[i].bounds.x + list.commands[i].bounds.w - icon.x +
+                         theme.gap) < .6f);
+
+    // An unsupported typography token fails before handling queued input.
+    cui_typography_token tracking = wrapped;
+    tracking.style.letter_spacing = 2;
+    appearance.trigger.normal.typography = &tracking;
+    click(ui, 2500);
+    assert(cui_begin_frame(ui, 400, 480, .016f));
+    assert(!cui_collapsible_present(ui, 2500, &theme, cui_string("Tracked title"), &open,
+                                    (cui_collapsible_options){0}, p, NULL, NULL,
+                                    (cui_disclosure_handler){0})
+                .changed);
+    assert(!open && cui_end_frame(ui).count == 0);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_disclosure_chevron();
     test_disclosure_presentation();
     test_joined_disclosure_styles();
+    test_disclosure_inherited_appearance();
     test_measured_reveal();
     test_configured_disclosure_springs();
     test_accordion_reveal_storage();

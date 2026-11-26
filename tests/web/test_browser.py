@@ -93,6 +93,100 @@ def verify_joined_accordion(page):
     assert '.joined = true' in page.locator('#snippet').text_content()
 
 
+def verify_disclosure_heading_appearance(page):
+    name = 'Getting started with workspace access and sharing'
+    page.evaluate('location.hash="Accordion"')
+    page.wait_for_function('window.cuiGallery?.renderedComponent==="Accordion"')
+    page.locator('#disabled').uncheck()
+    page.locator('#density').select_option('0')
+    page.locator('#disclosure-mode').select_option('5')
+    sample = '''name => {
+        const e = cuiGallery.exports, decode = new TextDecoder();
+        const semantic = term => {
+            for (let i = 0; i < e.gallery_semantic_count(); i++) {
+                const text = decode.decode(new Uint8Array(e.memory.buffer,
+                    e.gallery_semantic_name(i), e.gallery_semantic_length(i)));
+                if (e.gallery_semantic(i,0) === 1 && text === term)
+                    return [1,2,3,4].map(f => e.gallery_semantic(i,f));
+            }
+        };
+        const row = semantic(name);
+        if (!row) return null;
+        const [x,y,w,h] = row;
+        const next = semantic('Configuration');
+        const commands = Array.from({length:e.gallery_count()},(_,i) =>
+            [0,1,2,3,4,11,22,23].map(f => e.gallery_command(i,f)));
+        const inside = c => c[2] >= y && c[2] < y+h;
+        const titles = commands.filter(c => c[0] === 2 && inside(c));
+        const icon = commands.find(c => c[0] === 5 && inside(c));
+        const divided = next && commands.some(c => c[0] === 0 && c[1] > x &&
+            c[1]+c[3] < x+w && c[4] === 2 && Math.abs(c[2]+2-next[1]) < .02);
+        const last = semantic('More details');
+        const textBottom = Math.max(0, ...commands.filter(c => c[0] === 2).map(c => c[2]+c[4]));
+        return {row, titles, icon, divided, last, textBottom};
+    }'''
+    initial_viewport = page.viewport_size
+    page.set_viewport_size({'width': 1280, 'height': 900})
+    row = page.locator(f'#accessible button[aria-label="{name}"]')
+    activate = '''name => document.querySelector(`#accessible button[aria-label="${name}"]`).click()'''
+    if row.get_attribute('aria-expanded') == 'true':
+        page.evaluate(activate, name)
+        row.wait_for(state='attached')
+        page.wait_for_function('name => document.querySelector('
+                               '`#accessible button[aria-label="${name}"]`).'
+                               'getAttribute("aria-expanded") === "false"', arg=name)
+    desktop = page.wait_for_function(f'name=>{{const s=({sample})(name);'
+                                     'return s?.divided&&s?.titles.length===1?s:null}', arg=name).json_value()
+    assert desktop['titles'][0][6] == 1  # Medium
+    page.set_viewport_size({'width': 390, 'height': 840})
+    mobile = page.wait_for_function(f'name=>{{const s=({sample})(name);'
+                                    'return s?.divided&&s?.titles.length>1?s:null}', arg=name).json_value()
+    assert mobile['row'][3] > desktop['row'][3]
+    assert abs(mobile['icon'][2] + mobile['icon'][4] / 2 -
+               mobile['row'][1] - mobile['row'][3] / 2) < .65
+    page.evaluate(activate, name)
+    page.wait_for_function(f'name=>{{const s=({sample})(name);'
+                           'return s?.divided&&s?.titles.length&&s.titles.every(t=>t[6]===3)}', arg=name)
+    page.locator('#disabled').check()
+    page.wait_for_function(f'name=>{{const s=({sample})(name);'
+                           'return s?.titles.length&&s.titles.every(t=>t[7]===1&&t[6]===1)}', arg=name)
+    snippet = page.locator('#snippet').text_content()
+    assert 'cui_disclosure_appearance appearance' in snippet and '.separator = &divider' in snippet
+    page.locator('#disabled').uncheck()
+    page.locator('#design-size').select_option('14')
+    fits_preview = f'''name => {{
+        const s = ({sample})(name);
+        const canvas = document.querySelector('#preview'), wrap = canvas.parentElement;
+        return s?.last && s.row[3] > 264 &&
+            Math.max(s.last[1]+s.last[3], s.textBottom) <= canvas.clientHeight &&
+            wrap.scrollWidth > wrap.clientWidth && canvas.style.touchAction === 'pan-x';
+    }}'''
+    page.wait_for_function(fits_preview, arg=name)
+    page.locator('#disclosure-multiple').check()
+    for title in (name, 'Configuration', 'More details'):
+        trigger = page.locator(f'#accessible button[aria-label="{title}"]')
+        if trigger.get_attribute('aria-expanded') == 'false':
+            page.evaluate(activate, title)
+            page.wait_for_function('title => document.querySelector('
+                                   '`#accessible button[aria-label="${title}"]`).'
+                                   'getAttribute("aria-expanded") === "true"', arg=title)
+    page.wait_for_function(fits_preview, arg=name)
+    page.locator('#design-size').select_option('3')
+    page.set_viewport_size(initial_viewport)
+
+    page.evaluate('location.hash="Collapsible"')
+    page.wait_for_function('window.cuiGallery?.renderedComponent==="Collapsible"')
+    page.locator('#disclosure-mode').select_option('5')
+    name = 'Show details'
+    row = page.locator(f'#accessible button[aria-label="{name}"]')
+    expected_weight = 1 if row.get_attribute('aria-expanded') == 'true' else 3
+    page.evaluate(activate, name)
+    page.wait_for_function(f'([name,weight])=>{{const s=({sample})(name);'
+                           'return s?.titles.length&&s.titles.every(t=>t[6]===weight)}',
+                           arg=[name, expected_weight])
+    assert '.appearance = &appearance' in page.locator('#snippet').text_content()
+
+
 def verify_pagination_tooltips(page):
     """Real mouse movement and Escape exercise the C tooltip in WASM."""
     semantic_bounds = """({name, role}) => {
@@ -594,7 +688,8 @@ def main():
                 verify_joined_accordion(page)
                 verify_disclosure_accessibility(page, 'Accordion')
                 verify_disclosure_accessibility(page, 'Collapsible')
-                print('Joined Accordion paint and both disclosure semantic activation tests passed.')
+                verify_disclosure_heading_appearance(page)
+                print('Disclosure composition, styling and semantic activation passed.')
                 browser.close()
                 return
             if args.attachment_only:
@@ -2270,6 +2365,7 @@ def main():
             verify_joined_accordion(page)
             verify_disclosure_accessibility(page, 'Accordion')
             verify_disclosure_accessibility(page, 'Collapsible')
+            verify_disclosure_heading_appearance(page)
             control_change('theme', '0')
             page.evaluate('location.hash="Tag"')
             page.wait_for_function('cuiGallery.renderedComponent==="Tag"')

@@ -3,6 +3,7 @@
 #define CUI_DISCLOSURE_H
 #include "cui.h"
 #include "cui_theme.h"
+#include "cui_typography.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -61,6 +62,35 @@ typedef struct {
     bool custom_cursor;
     cui_cursor cursor;
 } cui_disclosure_trigger_style;
+/* Optional complete box and title typography. NULL fields inherit. Title
+ * color also inherits unless custom_color is set, including explicit zero. */
+typedef struct {
+    const cui_box *box;
+    const cui_typography_token *typography;
+    bool custom_color;
+    cui_color color;
+} cui_disclosure_trigger_part;
+typedef struct {
+    cui_disclosure_trigger_part normal, expanded, disabled;
+} cui_disclosure_trigger_appearance;
+/* Joined Accordion only. An explicit zero thickness omits the divider. */
+typedef struct {
+    float thickness, inset_left, inset_right;
+    cui_color color;
+} cui_disclosure_separator_style;
+/* Shared trigger defaults plus optional per-item overrides. For each field,
+ * apply normal, then expanded when open, then disabled when disabled. At
+ * each step, an item field overrides the shared field. The resolved box
+ * replaces options.trigger_box(es); the existing background/focus/cursor
+ * styles still apply. Typography/color apply to the built-in title. Custom
+ * headers keep control over their own styling. Optional data is read during
+ * submission. Collapsible uses item zero. */
+typedef struct {
+    cui_disclosure_trigger_appearance trigger;
+    const cui_disclosure_trigger_appearance *items;
+    size_t item_count;
+    const cui_disclosure_separator_style *separator;
+} cui_disclosure_appearance;
 /* Optional presentation for the styled _present entry points. Width zero fits
  * content, -1 fills the parent, and a positive width uses logical pixels.
  * Per-trigger/panel box overrides replace their default boxes. A custom header
@@ -83,6 +113,7 @@ typedef struct {
     const cui_box *container_box;
     const cui_disclosure_trigger_style *trigger_styles;
     size_t trigger_style_count;
+    const cui_disclosure_appearance *appearance;
 } cui_disclosure_presentation;
 typedef void (*cui_disclosure_panel_fn)(cui_context *, size_t index, void *user);
 /* Applied transition observers: see cui_disclosure_events.h. */

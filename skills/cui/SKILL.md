@@ -81,6 +81,8 @@ intrinsic height. See the Stepper layouts in `docs/BINDING_BUILDERS.md`.
 See `docs/STEPPER_NAVIGATION.md`.
 
 Use `cui_accordion_present` or `cui_collapsible_present` for immediate C.
+Pass `cui_disclosure_appearance` for inherited title tokens, state boxes and
+joined divider styles. See `docs/DISCLOSURE.md`.
 For retained Accordion and Collapsible sizes, SVG indicators and trigger
 styles, probe `supports_disclosure_presentation` (`SupportsDisclosurePresentation`
 in Go), then copy a `DisclosureConfig`. Read queued `checked` events after

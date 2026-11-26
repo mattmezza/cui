@@ -26,7 +26,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The immediate and retained C presenters have shared sizes, SVG indicators, joined cards and per-trigger styles. Python, JS/TS, Go and Rust expose the copied retained presentation and queued checked changes. Custom headers, measured reveal and synchronous observers remain immediate C APIs. Inherited typography and physical accessibility still need validation."
+        "The immediate and retained C presenters have shared sizes, SVG indicators, joined cards and per-trigger styles. Python, JS/TS, Go and Rust expose the copied retained presentation and queued checked changes. Custom headers, measured reveal, synchronous observers, inherited typography and state-specific boxes remain immediate C APIs. Joined divider styling is immediate C only. Physical accessibility still needs validation."
       ]
     },
     {
@@ -135,7 +135,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The immediate and retained C presenters have shared sizes, SVG indicators, outer styles and per-trigger styles. Python, JS/TS, Go and Rust expose the copied retained presentation and queued checked changes. Custom headers, measured reveal and synchronous observers remain immediate C APIs. Inherited typography and physical accessibility still need validation."
+        "The immediate and retained C presenters have shared sizes, SVG indicators, outer styles and per-trigger styles. Python, JS/TS, Go and Rust expose the copied retained presentation and queued checked changes. Custom headers, measured reveal, synchronous observers, inherited typography and state-specific boxes remain immediate C APIs. Joined divider styling is immediate C only. Physical accessibility still needs validation."
       ]
     },
     {

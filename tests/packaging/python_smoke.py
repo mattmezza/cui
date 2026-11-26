@@ -26,9 +26,12 @@ with App(**kwargs) as app:
     assert app.supports_disclosure_heading(), "installed bridge lacks disclosure headings"
     assert app.supports_disclosure_divider(), "installed bridge lacks disclosure dividers"
     assert app.supports_carousel_basis(), "installed bridge lacks fractional Carousel slides"
+    assert app.supports_carousel_navigation(), "installed bridge lacks Carousel navigation"
+    changes = []
     overview = item("overview", "Overview").carousel_basis(0.5)
     activity = item("activity", "Activity").carousel_basis(0.5)
     slides = carousel("slides").visual_size(240, 100).children(overview, activity)
+    slides.on_change(changes.append)
     app.mount(column().children(widget, slides))
     app.step()
     assert app.bounds(activity)[0] - app.bounds(overview)[0] == 128
@@ -48,6 +51,10 @@ with App(**kwargs) as app:
     app.queue_pointer("up", x + w/2, y + h/2)
     app.step()
     assert app.dispatch() == 1 and len(seen) == 1
+    assert slides.carousel_adjacent() is activity and slides.selected() is overview
+    assert slides.carousel_step() is activity and changes == []
+    assert app.dispatch() == 1 and changes[0].frame_sequence > 0
+    assert slides.selected() is activity
 library = Path(cui_bridge.__file__).parent / "_native/libcui_bridge.so"
 os.environ["CUI_BRIDGE_LIBRARY"] = str(library)
 with App() as app:

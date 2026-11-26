@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.11**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.11) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
 | Public website | Interactive WASM gallery and docs at alpha.11. The Pages deployment from `85df489c` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45888310574) |
-| Latest integrated work | Retained Carousel supports both orientations, optional edge wrapping, custom arrow and marker content, and independent control sizes in C, Python, JavaScript, TypeScript, Go and Rust. Content-sized slides work on both axes in C, the gallery, and all five language builders. Retained apps can place custom navigation buttons anywhere. Included in the next release batch. |
+| Latest integrated work | Retained Carousel supports both orientations, optional edge wrapping, custom arrow and marker content, and independent control sizes in C, Python, JavaScript, TypeScript, Go and Rust. Content-sized slides work on both axes in C, the gallery, and all five language builders. Retained apps can place custom navigation buttons anywhere. Queued in the alpha.12 candidate. |
 | Packages | Alpha.11 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green

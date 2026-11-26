@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/mattmezza/cui/bindings/go/cui"
 	"os"
+
+	"github.com/mattmezza/cui/bindings/go/cui"
 )
 
 func main() {
@@ -40,11 +41,16 @@ func main() {
 	if supported, err := app.SupportsCarouselBasis(); err != nil || !supported {
 		panic(fmt.Sprintf("installed bridge lacks fractional Carousel slides: %v", err))
 	}
+	if supported, err := app.SupportsCarouselNavigation(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Carousel navigation: %v", err))
+	}
 	clicks := 0
 	button := cui.Button("save").Text("Save ✓").OnClick(func(cui.Event) { clicks++ })
 	overview := cui.Item("overview", "Overview").CarouselBasis(0.5)
 	activity := cui.Item("activity", "Activity").CarouselBasis(0.5)
-	slides := cui.Carousel("slides").VisualSize(240, 100).Children(overview, activity)
+	var changes []cui.Event
+	slides := cui.Carousel("slides").VisualSize(240, 100).Children(overview, activity).
+		OnChange(func(event cui.Event) { changes = append(changes, event) })
 	if err := app.Mount(cui.Column("root").Children(button, slides)); err != nil {
 		panic(err)
 	}
@@ -72,6 +78,16 @@ func main() {
 	delivered, err := app.Dispatch()
 	if err != nil || delivered != 1 || clicks != 1 {
 		panic("installed callback failed")
+	}
+	if next, err := app.CarouselAdjacent(slides, true); err != nil || next != activity || len(changes) != 0 {
+		panic(fmt.Sprintf("installed Carousel did not find the next slide: %v", err))
+	}
+	if next, err := app.CarouselStep(slides, true); err != nil || next != activity || len(changes) != 0 {
+		panic(fmt.Sprintf("installed Carousel did not queue the next slide: %v", err))
+	}
+	delivered, err = app.Dispatch()
+	if err != nil || delivered != 1 || len(changes) != 1 || changes[0].Selected != activity {
+		panic("installed Carousel change did not carry the next slide")
 	}
 	fmt.Println("installed Go bridge smoke passed")
 }

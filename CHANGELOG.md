@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.12
+
+- Carousel can size slides to their content on either axis. Immediate C, the
+  interactive gallery, and retained C, Python, JavaScript, TypeScript, Go and
+  Rust support the new sizing mode.
+- Retained Carousel supports vertical layout, looping, inline arrows and
+  pagination, custom arrow and marker content, and independent control sizes.
+  Apps can place their own buttons and use the same snap navigation and
+  selection events.
+- Retained Carousel dragging preserves a gesture across frames. Copyable
+  gallery examples and the Carousel guide cover sizing and navigation.
+
 ## 0.1.0-alpha.11
 
 - Accordion and Collapsible built-in titles can use separate hover,

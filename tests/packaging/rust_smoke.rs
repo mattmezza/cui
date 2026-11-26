@@ -13,6 +13,7 @@ fn main() -> Result<()> {
     assert!(app.supports_disclosure_heading(), "installed bridge lacks disclosure headings");
     assert!(app.supports_disclosure_divider(), "installed bridge lacks disclosure dividers");
     assert!(app.supports_carousel_basis(), "installed bridge lacks fractional Carousel slides");
+    assert!(app.supports_carousel_navigation(), "installed bridge lacks Carousel navigation");
     let root = app.build_root(Kind::Column,"root")?.finish();
     let clicked = Rc::new(Cell::new(0));
     let callback = clicked.clone();
@@ -32,6 +33,15 @@ fn main() -> Result<()> {
     app.step(0.016)?;
     assert_eq!(app.dispatch()?,1);
     assert_eq!(clicked.get(),1);
+    let changes = Rc::new(Cell::new(None));
+    let observed = changes.clone();
+    app.on_change_event(slides, move |event| observed.set(event.selected))?;
+    assert_eq!(app.carousel_adjacent(slides, true)?, Some(activity));
+    assert_eq!(app.selected(slides)?, Some(overview));
+    assert_eq!(app.carousel_step(slides, true)?, Some(activity));
+    assert_eq!(changes.get(), None);
+    assert_eq!(app.dispatch()?, 1);
+    assert_eq!(changes.get(), Some(activity));
     println!("installed Rust bridge smoke passed");
     Ok(())
 }

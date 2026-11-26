@@ -20,16 +20,27 @@ assert.equal(app.supports_disclosure_heading(), true, 'installed bridge lacks di
 assert.equal(app.supports_disclosure_divider(), true, 'installed bridge lacks disclosure dividers');
 assert.equal(app.supportsVirtualListRows(), true, 'installed bridge lacks VirtualList live rows');
 assert.equal(app.supports_carousel_basis(), true, 'installed bridge lacks fractional Carousel slides');
+assert.equal(app.supports_carousel_navigation(), true, 'installed bridge lacks Carousel navigation');
+const changes = [];
 const overview = cui.item('overview', 'Overview').carousel_basis(0.5);
 const activity = cui.item('activity', 'Activity').carousel_basis(0.5);
-const slides = cui.carousel('slides').visual_size(240, 100).children(overview, activity);
+const slides = cui.carousel('slides').visual_size(240, 100).children(overview, activity)
+  .on_change(event => changes.push(event.node));
 app.mount(cui.column().children(widget, slides)); app.step();
 assert.equal(activity.bounds().x - overview.bounds().x, 128);
 const bounds = widget.bounds();
 assert(bounds.width > 0 && bounds.height > 0);
 app.pointer('down', bounds.x + bounds.width/2, bounds.y + bounds.height/2);
 app.pointer('up', bounds.x + bounds.width/2, bounds.y + bounds.height/2);
-app.step(); assert.equal(clicks, 1); app.dispose();
+app.step(); assert.equal(clicks, 1);
+assert.equal(slides.carousel_adjacent(), activity);
+assert.equal(slides.selected(), overview);
+assert.equal(slides.carousel_step(), activity);
+assert.equal(changes.length, 0);
+app.step();
+assert.deepEqual(changes, [slides]);
+assert.equal(slides.selected(), activity);
+app.dispose();
 const root = path.dirname(require.resolve('@cui/native'));
 for (const [file, success] of [[path.join(root,'native/cui.node'),true], ['/missing-cui-artifact.node',false]]) {
   const result = spawnSync(process.execPath,['-e',"const {App}=require('@cui/native');const a=new App();a.dispose()"],

@@ -10,5 +10,9 @@ const width: number = save.bounds().width;
 if (!app.supports_carousel_basis() || activity.bounds().x - overview.bounds().x !== 128) {
   throw new Error('installed Carousel did not lay out fractional slides');
 }
+if (!app.supports_carousel_navigation() || slides.carousel_adjacent() !== activity ||
+    slides.carousel_step() !== activity || slides.selected() !== activity) {
+  throw new Error('installed Carousel did not navigate to the next slide');
+}
 void delivered; void width;
 app.dispose();

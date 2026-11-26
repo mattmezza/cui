@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 'use strict';
 const assert = require('node:assert/strict');
-const {App, column, item, label, radio_group, tag} = require('../index.cjs');
+const {App, button, column, item, label, radio_group, tag} = require('../index.cjs');
 
 const [fontPath, mode] = process.argv.slice(2);
 const app = new App({
@@ -23,7 +23,14 @@ try {
       arrival = delivery.selected() === priority ? 'Wednesday' : 'Friday';
       summary.label(`Estimated arrival: ${arrival}`);
     });
-  app.mount(column().gap(12).children(label('Delivery service'), delivery, summary));
+  const ordered = app.supports_radio_tab_index();
+  if (ordered) delivery.tab_index(-2);
+  const reset = button('reset').label('Reset selection').on_click(() => {
+    delivery.select(standard);
+    arrival = 'Friday';
+    summary.label('Estimated arrival: Friday');
+  });
+  app.mount(column().gap(12).children(label('Delivery service'), reset, delivery, summary));
 
   if (fontPath) {
     if (mode === '--smoke') app.run(window => window.close());
@@ -36,6 +43,13 @@ try {
     assert.equal(events, 1);
     assert.equal(delivery.selected(), priority);
     assert.equal(arrival, 'Wednesday');
+    if (ordered) {
+      app.key('down', 'tab').key('up', 'tab').step();
+      const resetEvents = app.key('down', 'enter').key('up', 'enter').step();
+      assert.equal(resetEvents, 1);
+      assert.equal(delivery.selected(), standard);
+      assert.equal(arrival, 'Friday');
+    }
   }
 } finally {
   app.dispose();

@@ -10,7 +10,15 @@ app.scroll(5,5,0,-80).step();
 const radio = c.radio('option', 'Option').animate_selection(app.supports_radio_motion()).checked();
 if (app.supports_radio_tooltip()) radio.radio_tooltip('Save a copy', 350).checked();
 radio.radio_tooltip(null);
-c.radio_group('choices').animate_selection().children(c.item('option', 'Option'));
+c.radio_group('choices').animate_selection().tab_index(-2).children(c.item('option', 'Option'));
+if (app.supports_radio_tab_index()) radio.tab_index(0).checked();
+radio.tab_index(null);
+// @ts-expect-error Tab order may be authored only on Radio and RadioGroup.
+c.item('priority').tab_index(-2);
+// @ts-expect-error Tab order may be authored only on Radio and RadioGroup.
+c.checkbox('check').tab_index(-2);
+// @ts-expect-error A tab index is numeric or null.
+c.radio('option').tab_index('0');
 c.radio_group('choices').children(
   c.item('priority', 'Priority').children(c.tag('recommended', 'Recommended'))
     .decorate_content(app.supports_radio_item_content()).radio_tooltip('Track shipment', 0),

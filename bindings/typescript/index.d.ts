@@ -37,6 +37,8 @@ export class App {
   mount(root: Row | Column | RootView): this;
   /** Whether this app's native bridge can animate retained Radio selection. */
   supports_radio_motion(): boolean;
+  /** Whether this app's bridge supports signed Radio and RadioGroup Tab order. */
+  supports_radio_tab_index(): boolean;
   /** Whether this app's native bridge can paint passive children inside RadioGroup Items. */
   supports_radio_item_content(): boolean;
   /** Whether this app's native bridge can attach hints to retained radio options. */
@@ -61,11 +63,15 @@ export interface Input extends Label {current_text(): string; disabled(value?: b
 export interface NumberInput extends Input, Slider {}
 export function checkbox(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|2>;
 export interface RadioSelectionMotion { animate_selection(enabled?: boolean): this }
+export interface RadioTabOrder {
+  /** Lower signed indices come first. null restores default order. */
+  tab_index(index: number | null): this;
+}
 export interface RadioTooltip {
   /** For standalone Radio or direct RadioGroup Items. null or empty clears the hint. */
   radio_tooltip(text: string | null, delayMs?: number): this;
 }
-export function radio(key?: string, text?: string): BooleanControl & RadioSelectionMotion & RadioTooltip & PartShadowStyled<0|1|2>;
+export function radio(key?: string, text?: string): BooleanControl & RadioSelectionMotion & RadioTabOrder & RadioTooltip & PartShadowStyled<0|1|2>;
 export function switch_control(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|3|4>;
 export function toggle(key?: string, text?: string): BooleanControl;
 export function slider(key?: string): Slider & PartShadowStyled<0|1|3>;
@@ -85,7 +91,7 @@ export interface Item extends Disclosure, RadioTooltip {
 export interface Alert extends Label {detail(text: string): this}
 export function collapsible(key?: string, text?: string): Disclosure;
 export function alert(key?: string, text?: string): Alert;
-export function radio_group(key?: string): Group & RadioSelectionMotion & PartShadowStyled<0>;
+export function radio_group(key?: string): Group & RadioSelectionMotion & RadioTabOrder & PartShadowStyled<0>;
 export function tabs(key?: string): Group;
 export function accordion(key?: string): Composite;
 export function item(key?: string, text?: string): Item;

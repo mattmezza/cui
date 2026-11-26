@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import {App, column, item, label, radio_group, tag} from '../../node/index.cjs';
+import {App, button, column, item, label, radio_group, tag} from '../../node/index.cjs';
 
 const app = new App({backend: 'headless', title: 'Delivery options', width: 320, height: 200});
 try {
@@ -17,12 +17,27 @@ try {
       estimate.arrival = delivery.selected() === priority ? 'Wednesday' : 'Friday';
       summary.label(`Estimated arrival: ${estimate.arrival}`);
     });
-  app.mount(column().gap(12).children(label('Delivery service'), delivery, summary)).step();
+  const ordered = app.supports_radio_tab_index();
+  if (ordered) delivery.tab_index(-2);
+  const reset = button('reset').label('Reset selection').on_click(() => {
+    delivery.select(standard);
+    estimate.arrival = 'Friday';
+    summary.label('Estimated arrival: Friday');
+  });
+  app.mount(column().gap(12).children(label('Delivery service'), reset, delivery, summary)).step();
   const {x, y, width, height} = (decorated ? recommendation : priority).bounds();
+  function verifyDelivery(events: number, item: typeof standard, arrival: string) {
+    if (events !== 1 || delivery.selected() !== item || estimate.arrival !== arrival)
+      throw new Error(`Expected one action and arrival on ${arrival}`);
+  }
   const events = app.pointer('down', x + width / 2, y + height / 2)
     .pointer('up', x + width / 2, y + height / 2).step();
-  if (events !== 1 || delivery.selected() !== priority || estimate.arrival !== 'Wednesday')
-    throw new Error('Expected a single delivery callback and an updated arrival estimate');
+  verifyDelivery(events, priority, 'Wednesday');
+  if (ordered) {
+    app.key('down', 'tab').key('up', 'tab').step();
+    const resetEvents = app.key('down', 'enter').key('up', 'enter').step();
+    verifyDelivery(resetEvents, standard, 'Friday');
+  }
 } finally {
   app.dispose();
 }

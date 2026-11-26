@@ -222,3 +222,110 @@ fn optional_tooltips_preserve_selection_events() {
     app.remove(group).unwrap();
     assert_eq!(app.radio_tooltip(priority, None, 0).err(), Some(Error(4)));
 }
+fn press(app: &mut App, key: Key, modifiers: u32) {
+    app.key(true, key, modifiers, false).unwrap();
+    app.key(false, key, modifiers, false).unwrap();
+    app.step(0.016).unwrap();
+}
+#[test]
+fn signed_order_preserves_roving_stop_and_queued_events() {
+    let mut app = App::headless(320., 240.).unwrap();
+    let supported = std::env::var("CUI_TEST_RADIO_MOTION").as_deref() != Ok("0");
+    assert_eq!(app.supports_radio_tab_index(), supported);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let review = app
+        .build_child(root, Kind::Button, "review")
+        .unwrap()
+        .text("Review")
+        .unwrap()
+        .finish();
+    let single = app
+        .build_child(root, Kind::Radio, "single")
+        .unwrap()
+        .tab_index(supported.then_some(i32::MAX))
+        .unwrap()
+        .text("Alternate")
+        .unwrap()
+        .finish();
+    let group = app
+        .build_child(root, Kind::RadioGroup, "group")
+        .unwrap()
+        .tab_index(supported.then_some(i32::MIN))
+        .unwrap()
+        .finish();
+    let one = app
+        .build_child(group, Kind::Item, "one")
+        .unwrap()
+        .text("Standard")
+        .unwrap()
+        .finish();
+    let two = app
+        .build_child(group, Kind::Item, "two")
+        .unwrap()
+        .text("Priority")
+        .unwrap()
+        .finish();
+    app.select(group, one).unwrap();
+    for node in [root, review, one] {
+        assert_eq!(app.radio_tab_index(node, None).err(), Some(Error(8)));
+    }
+    let events = Rc::new(RefCell::new(Vec::new()));
+    for node in [single, group] {
+        let events = events.clone();
+        app.on_change_event(node, move |e| {
+            events.borrow_mut().push((e.node, e.selected, e.checked))
+        })
+        .unwrap();
+    }
+    let clicks = Rc::new(std::cell::Cell::new(0));
+    let count = clicks.clone();
+    app.on_click(review, move || count.set(count.get() + 1))
+        .unwrap();
+    app.step(0.016).unwrap();
+    if !supported {
+        for node in [single, group] {
+            for index in [i32::MIN, 0, i32::MAX] {
+                assert_eq!(app.radio_tab_index(node, Some(index)).err(), Some(Error(9)));
+            }
+            app.radio_tab_index(node, None).unwrap();
+        }
+        // Default composition order still puts the button before either radio.
+        press(&mut app, Key::Tab, 0);
+        press(&mut app, Key::Tab, 0);
+        press(&mut app, Key::Enter, 0);
+        assert!(app.is_checked(single).unwrap());
+        assert_eq!(app.dispatch().unwrap(), 1);
+    } else {
+        press(&mut app, Key::Tab, 0);
+        press(&mut app, Key::Down, 0);
+        assert_eq!(app.selected(group).unwrap(), Some(two));
+        assert!(events.borrow().is_empty());
+        assert_eq!(app.dispatch().unwrap(), 1);
+        assert_eq!(&*events.borrow(), &[(group, Some(two), false)]);
+        press(&mut app, Key::Tab, 0);
+        press(&mut app, Key::Enter, 0);
+        assert_eq!(app.dispatch().unwrap(), 1);
+        assert_eq!(clicks.get(), 1);
+        press(&mut app, Key::Tab, 1);
+        press(&mut app, Key::Up, 0);
+        assert_eq!(app.selected(group).unwrap(), Some(one));
+        assert_eq!(app.dispatch().unwrap(), 1);
+        press(&mut app, Key::Tab, 0);
+        press(&mut app, Key::Tab, 0);
+        press(&mut app, Key::Enter, 0);
+        assert!(app.is_checked(single).unwrap());
+        assert_eq!(app.dispatch().unwrap(), 1);
+        app.radio_tab_index(group, None).unwrap();
+        app.radio_tab_index(single, Some(0)).unwrap();
+        app.step(0.016).unwrap();
+        assert_eq!(app.dispatch().unwrap(), 0);
+        press(&mut app, Key::Tab, 0);
+        press(&mut app, Key::Down, 0);
+        assert_eq!(app.selected(group).unwrap(), Some(two));
+        assert_eq!(app.dispatch().unwrap(), 1);
+    }
+    let mut other = App::headless(100., 100.).unwrap();
+    assert_eq!(other.radio_tab_index(group, None).err(), Some(Error(3)));
+    app.remove(group).unwrap();
+    assert_eq!(app.radio_tab_index(group, None).err(), Some(Error(4)));
+}

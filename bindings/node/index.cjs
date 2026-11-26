@@ -24,6 +24,7 @@ const containers = new Set([1,2,15,17,18,19,20,21,22,23,24,26,27,29,33,40,41,44,
 const radioMotionUnavailable = 'Radio motion is unavailable in this bridge';
 const radioContentUnavailable = 'Radio decoration is unavailable in this bridge';
 const radioTooltipUnavailable = 'Radio tooltips are unavailable in this bridge';
+const radioTabIndexUnavailable = 'Radio tab order is unavailable in this bridge';
 // Row, Column, Label, plain Badge, Avatar, Kbd, Tag, Icon and Image.
 const radioContentKinds = new Set([1, 2, 3, 11, 30, 34, 37, 50, 53]);
 function requestsRadioMotion(node) {
@@ -41,6 +42,8 @@ function preflightRadioOptions(app, node, insideDecoration = false) {
       throw new TypeError('radio_tooltip requires a direct RadioGroup Item');
     if (!app.supports_radio_tooltip()) throw new Error(radioTooltipUnavailable);
   }
+  if (node.radioTabIndexValue !== null && !app.supports_radio_tab_index())
+    throw new Error(radioTabIndexUnavailable);
   for (const child of node.childrenValue)
     preflightRadioOptions(app, child, insideDecoration || node.radioContentValue);
 }
@@ -105,6 +108,7 @@ class Node {
     this.roundingValue = 0; this.radiusValue = 0; this.disabledValue = false;
     this.extentValue=null; this.anchorValue=null; this.visualValue=null; this.closeValue=null; this.totalValue=kind===43?5:kind===59?6:10; this.attachmentValue=0; this.imageValue=null;this.chartDataValue=[];this.chartKindValue=0;this.plotPointsValue=[];this.matrixValue=null;this.selectionModeValue=0;this.textFormatValue=0;this.panelValue=null; this.timeValue=[0,0,0];this.dateValue=[2026,1,1];this.colorValue=0x000000ff; this.statusValue=null; this.openValue = false;this.openSet=false;this.checkedSet=false; this.detailValue = ""; this.selectedValue = null; this.checkedValue = false; this.numericValue = kind===42?1:0; this.rangeValue = kind===42?[1,10,1]:kind===43?[0,5,1]:[0,1,.01]; this.changeValue = undefined;
     this.radioMotionValue = false;
+    this.radioTabIndexValue = null;
     this.radioContentValue = false;
     this.radioTooltipValue = null;
     this.partShadowStyles=new Map(); this.shadowStyleValue = null; this.hoverValue = undefined; this.clickValue = undefined;
@@ -218,6 +222,19 @@ class Node {
       else if (enabled) throw new Error(radioMotionUnavailable);
     }
     this.radioMotionValue = enabled;
+    return this;
+  }
+  tab_index(index) {
+    if (this.kind !== 6 && this.kind !== 17) throw new TypeError('tab_index requires Radio or RadioGroup');
+    if (index !== null && typeof index !== 'number') throw new TypeError('expected a tab index or null');
+    if (index !== null && (!Number.isInteger(index) || index < -0x80000000 || index > 0x7fffffff))
+      throw new RangeError('tab index must fit a signed 32-bit integer');
+    if (this.owner) {
+      if (this.owner.supports_radio_tab_index())
+        native.setRadioTabIndex(this.owner.handle, this[NODE], index !== null, index ?? 0);
+      else if (index !== null) throw new Error(radioTabIndexUnavailable);
+    }
+    this.radioTabIndexValue = index;
     return this;
   }
   decorate_content(enabled = true) {
@@ -576,6 +593,8 @@ class App {
       if (node.gapValue !== undefined) native.setGap(this.handle, node[NODE], node.gapValue);
       if ([5,6,7,8].includes(node.kind) || (node.kind===20 && node.checkedSet)) native.setChecked(this.handle,node[NODE],node.checkedValue ? 1 : 0);
       if (node.radioMotionValue) native.setRadioMotion(this.handle, node[NODE], true);
+      if (node.radioTabIndexValue !== null)
+        native.setRadioTabIndex(this.handle, node[NODE], true, node.radioTabIndexValue);
       if (node.radioContentValue) native.setRadioItemContent(this.handle, node[NODE], true);
       if (node.radioTooltipValue) native.setRadioTooltip(this.handle, node[NODE], ...node.radioTooltipValue);
       if ([9,14].includes(node.kind)) native.setRange(this.handle,node[NODE],...node.rangeValue);
@@ -757,6 +776,11 @@ class App {
     this._alive();
     return typeof native.supportsRadioMotion === 'function' &&
       typeof native.setRadioMotion === 'function' && native.supportsRadioMotion();
+  }
+  supports_radio_tab_index() {
+    this._alive();
+    return typeof native.supportsRadioTabIndex === 'function' &&
+      typeof native.setRadioTabIndex === 'function' && native.supportsRadioTabIndex();
   }
   supports_radio_item_content() {
     this._alive();

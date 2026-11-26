@@ -164,6 +164,24 @@ The mounted setter can also replace the text or delay between frames.
 The complete delivery example enables the hint and updates an arrival estimate
 in the regular selection callback. [Run the delivery form](#animate-radio-selection-from-rust)
 
+## Set Radio tab order from Rust
+
+Pass `Some(index)` to `Builder::tab_index` for a standalone Radio or
+RadioGroup. Lower signed indices come first and a group keeps one Tab stop.
+Probe the provider before building a child when supporting earlier releases.
+
+```rust
+let order = app.supports_radio_tab_index().then_some(-2);
+let delivery = app.build_child(root, Kind::RadioGroup, "delivery")?
+    .tab_index(order)?
+    .finish();
+```
+
+An explicit index requires provider support. This builder creates its node in
+`build_child` before applying options. Use `app.radio_tab_index(delivery, None)?`
+to restore default order on a mounted node. Keyboard ordering preserves
+selection and queued callbacks. [Run the delivery form](#animate-radio-selection-from-rust)
+
 ## Configure Pagination from Rust
 
 Build a detached `PaginationOptions` when you want the bridge capability and record size checked before creating a retained child. Ordinary `Kind::Pagination` still works with earlier providers. `app.supports_pagination_options()` reports whether the extended API is available.

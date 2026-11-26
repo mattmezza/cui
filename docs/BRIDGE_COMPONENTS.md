@@ -356,10 +356,17 @@ if app.supports_radio_tab_index():
     delivery.tab_index(-2)
 ```
 
+JavaScript and TypeScript use the same probe and `delivery.tab_index(-2)`.
+Pass `null` to restore default order. All three builders validate the
+signed 32-bit range and check support before attaching an opted-in tree.
+
 The delivery forms put **Reset selection** above the group. With the opt-in,
 Tab enters the group first, the arrows choose a service, and the next Tab
-reaches Reset. [Python delivery form](../bindings/python/examples/radio_delivery.py) ·
-[Go builders and delivery form](GO_BUILDERS.md#set-radio-tab-order-from-go)
+reaches Reset. [Python](../bindings/python/examples/radio_delivery.py) ·
+[JavaScript](../bindings/node/examples/radio-delivery.cjs) ·
+[TypeScript](../bindings/typescript/examples/radio_delivery.ts) ·
+[Go](GO_BUILDERS.md#set-radio-tab-order-from-go) ·
+[Rust](RUST_BUILDERS.md#set-radio-tab-order-from-rust)
 
 ### Configure a retained pager from C
 

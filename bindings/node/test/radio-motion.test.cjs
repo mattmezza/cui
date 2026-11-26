@@ -103,3 +103,72 @@ try {
 } finally {
   app.dispose();
 }
+
+
+function checkRadioTabOrder(legacy) {
+  const app = new App({backend: 'headless', maxNodes: 6});
+  try {
+    assert.equal(app.supports_radio_tab_index(), !legacy);
+    assert.throws(() => checkbox('invalid').tab_index(0), TypeError);
+    assert.throws(() => item('invalid').tab_index(-2), TypeError);
+    for (const value of [true, '0', undefined])
+      assert.throws(() => radio().tab_index(value), TypeError);
+    for (const value of [NaN, Infinity, 0.5, -0x80000001, 0x80000000])
+      assert.throws(() => radio_group().tab_index(value), RangeError);
+
+    const events = [];
+    const review = button('review').label('Review').on_click(() => events.push('review'));
+    const single = radio('alternate', 'Alternate').on_change(event => events.push(event.checked));
+    const standard = item('standard', 'Standard');
+    const priority = item('priority', 'Priority');
+    const group = radio_group('delivery').children(standard, priority).select(standard)
+      .on_change(event => {
+        assert.ok(event.selectedHandle.generation > 0);
+        events.push(group.selected());
+      });
+    const root = column().children(review, single, group);
+    const pressKey = (key, mods = 0) => app.key('down', key, mods).key('up', key, mods).step();
+
+    if (legacy) {
+      group.tab_index(0);
+      assert.throws(() => app.mount(root), /Radio tab order is unavailable/);
+      assert.equal(app.root, null);
+      group.tab_index(null);
+      app.mount(root).step();
+      assert.throws(() => single.tab_index(-2), /Radio tab order is unavailable/);
+      single.tab_index(null);
+      assert.equal(pressKey('tab'), 0);
+      assert.equal(pressKey('enter'), 1);
+      assert.equal(pressKey('tab'), 0);
+      assert.equal(pressKey('tab'), 0);
+      assert.equal(pressKey('down'), 1);
+      assert.deepEqual(events, ['review', priority]);
+      return;
+    }
+
+    group.tab_index(-0x80000000);
+    single.tab_index(0x7fffffff);
+    assert.equal(app.mount(root).step(), 0);
+    assert.equal(pressKey('tab'), 0);
+    assert.equal(pressKey('down'), 1);
+    assert.equal(pressKey('tab'), 0);
+    assert.equal(pressKey('enter'), 1);
+    assert.equal(pressKey('tab', 1), 0);
+    assert.equal(pressKey('up'), 1);
+    assert.equal(pressKey('tab'), 0);
+    assert.equal(pressKey('tab'), 0);
+    assert.equal(pressKey('enter'), 1);
+    assert.deepEqual(events, [priority, 'review', standard, true]);
+
+    assert.equal(group.tab_index(null), group);
+    assert.equal(single.tab_index(0), single);
+    assert.equal(app.step(), 0);
+    assert.equal(pressKey('tab'), 0);
+    assert.equal(pressKey('down'), 1);
+    assert.deepEqual(events, [priority, 'review', standard, true, priority]);
+  } finally {
+    app.dispose();
+  }
+}
+
+checkRadioTabOrder(process.env.CUI_EXPECT_RADIO_LEGACY === '1');

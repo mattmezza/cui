@@ -32,6 +32,11 @@ fn main() -> Result<()> {
     app.build_child(root, Kind::Label, "title")?
         .text("Delivery service")?
         .finish();
+    let tab_index = app.supports_radio_tab_index().then_some(-2);
+    let reset = app
+        .build_child(root, Kind::Button, "reset")?
+        .text("Reset selection")?
+        .finish();
     let motion = app.supports_radio_motion();
     let decorate = app.supports_radio_item_content();
     let hint = app
@@ -40,6 +45,7 @@ fn main() -> Result<()> {
     let group = app
         .build_child(root, Kind::RadioGroup, "delivery")?
         .animate_selection(motion)?
+        .tab_index(tab_index)?
         .finish();
     let standard = app
         .build_child(group, Kind::Item, "standard")?
@@ -69,8 +75,13 @@ fn main() -> Result<()> {
         captured.set(event.selected);
         count.set(count.get() + 1);
     })?;
+    let reset_selection = selected.clone();
+    app.on_click(reset, move || reset_selection.set(Some(standard)))?;
     let apply_selection = |app: &mut App| -> Result<()> {
         if let Some(item) = selected.take() {
+            if app.selected(group)? != Some(item) {
+                app.select(group, item)?;
+            }
             let arrival = if item == priority {
                 "Wednesday"
             } else {
@@ -90,6 +101,19 @@ fn main() -> Result<()> {
         assert_eq!(app.selected(group)?, Some(priority));
         apply_selection(&mut app)?;
         assert_eq!(app.editable_text(summary)?, "Estimated arrival: Wednesday");
+        if tab_index.is_some() {
+            let mut actions = 0;
+            for key in [Key::Tab, Key::Enter] {
+                app.key(true, key, 0, false)?;
+                app.key(false, key, 0, false)?;
+                actions += app.frame(0.016)?;
+            }
+            assert_eq!(actions, 1);
+            apply_selection(&mut app)?;
+            assert_eq!(app.selected(group)?, Some(standard));
+            assert_eq!(app.editable_text(summary)?, "Estimated arrival: Friday");
+            assert_eq!(changes.get(), 1);
+        }
     } else {
         app.run_with(apply_selection)?;
     }

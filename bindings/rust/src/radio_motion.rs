@@ -79,7 +79,63 @@ fn tooltip_setter() -> Option<SetTooltip> {
     None
 }
 
+type SetTabIndex = unsafe extern "C" fn(*mut c_void, RawNode, u32, i32) -> u32;
+#[cfg(cui_bridge_static)]
+fn tab_index_setter() -> Option<SetTabIndex> {
+    extern "C" {
+        fn cui_bridge_radio_set_tab_index_v1(
+            a: *mut c_void,
+            n: RawNode,
+            enabled: u32,
+            index: i32,
+        ) -> u32;
+    }
+    Some(cui_bridge_radio_set_tab_index_v1)
+}
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn tab_index_setter() -> Option<SetTabIndex> {
+    unsafe {
+        let p =
+            super::notification_symbol_v1(b"cui_bridge_radio_set_tab_index_v1\0".as_ptr().cast());
+        if p.is_null() {
+            None
+        } else {
+            Some(std::mem::transmute::<*mut c_void, SetTabIndex>(p))
+        }
+    }
+}
+#[cfg(all(not(cui_bridge_static), not(any(unix, windows))))]
+fn tab_index_setter() -> Option<SetTabIndex> {
+    None
+}
+
 impl App {
+    /// Whether the provider supports signed Radio/RadioGroup traversal order.
+    pub fn supports_radio_tab_index(&self) -> bool {
+        tab_index_setter().is_some()
+    }
+
+    /// Set Radio or RadioGroup traversal order. None restores composition order;
+    /// Some(0) is explicit, negative values come earlier. Groups keep one roving stop.
+    /// Older providers accept clearing and return Error(9) for explicit indices.
+    pub fn radio_tab_index(&mut self, node: Node, index: Option<i32>) -> Result<&mut Self> {
+        let raw = self.valid(node)?;
+        if let Some(set) = tab_index_setter() {
+            check(unsafe { set(self.raw, raw, index.is_some() as u32, index.unwrap_or(0)) })?;
+        } else {
+            if !matches!(
+                self.legacy_radio_node(raw)?,
+                Some(LegacyRadioNode::Standalone | LegacyRadioNode::Group)
+            ) {
+                return Err(Error(8));
+            }
+            if index.is_some() {
+                return Err(Error(9));
+            }
+        }
+        Ok(self)
+    }
+
     /// Whether this provider offers retained Radio and RadioGroup motion.
     pub fn supports_radio_motion(&self) -> bool {
         setter(Setting::Motion).is_some()
@@ -94,11 +150,16 @@ impl App {
     }
     pub(super) fn track_legacy_radio_node(&mut self, raw: RawNode, parent: RawNode, kind: Kind) {
         let legacy = match kind {
-            Kind::Radio if !self.supports_radio_motion() || !self.supports_radio_tooltip() => {
+            Kind::Radio
+                if !self.supports_radio_motion()
+                    || !self.supports_radio_tooltip()
+                    || !self.supports_radio_tab_index() =>
+            {
                 LegacyRadioNode::Standalone
             }
             Kind::RadioGroup
-                if !self.supports_radio_motion()
+                if !self.supports_radio_tab_index()
+                    || !self.supports_radio_motion()
                     || !self.supports_radio_item_content()
                     || !self.supports_radio_tooltip() =>
             {
@@ -196,6 +257,12 @@ impl App {
     }
 }
 impl<'a> Builder<'a> {
+    /// Set signed traversal order on a Radio or RadioGroup builder.
+    pub fn tab_index(self, index: Option<i32>) -> Result<Self> {
+        self.app.radio_tab_index(self.node, index)?;
+        Ok(self)
+    }
+
     pub fn animate_selection(self, enabled: bool) -> Result<Self> {
         self.app.animate_selection(self.node, enabled)?;
         Ok(self)

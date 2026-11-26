@@ -181,11 +181,87 @@ def verify_pagination_paint(browser, url):
             page.close()
 
 
+def verify_notification_close(browser, url):
+    """Exercise actual WASM focus and touch; Close must exist without hover."""
+    context = browser.new_context(has_touch=True, viewport={'width':390,'height':844})
+    page = context.new_page()
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    try:
+        page.goto(url + '#Notification')
+        page.wait_for_function('window.cuiGallery && cuiGallery.renderedComponent === "Notification"')
+        canvas = page.locator('canvas')
+        canvas.scroll_into_view_if_needed()
+        metric = """name => {
+            const e = cuiGallery.exports, d = new TextDecoder();
+            for (let i = 0; i < e.gallery_semantic_count(); i++) {
+                if (e.gallery_semantic(i, 0) !== 1) continue;
+                if (d.decode(new Uint8Array(e.memory.buffer, e.gallery_semantic_name(i),
+                    e.gallery_semantic_length(i))) === name)
+                    return {index:i, bounds:[1,2,3,4].map(f=>e.gallery_semantic(i,f)),
+                            focused:e.gallery_semantic(i,7)};
+            }
+            return null;
+        }"""
+        def tap(name):
+            value = page.wait_for_function(metric, arg=name).json_value()
+            x, y, w, h = value['bounds']
+            canvas.tap(position={'x':x+w/2,'y':y+h/2})
+        tap('Add persistent notice')
+        page.wait_for_function('cuiGallery.exports.gallery_notification_stats(0)===1 && cuiGallery.exports.gallery_notification_entry(0,0)===1')
+        page.wait_for_function(metric, arg='Close')
+        assert page.evaluate(metric, 'Review') is None
+        assert page.locator('#accessible [aria-label="Pin alert"]').count() == 0
+        assert page.evaluate("""() => {
+            const e = cuiGallery.exports, y = e.gallery_notification_entry(0, 3);
+            const lines = Array.from({length:e.gallery_count()}, (_, i) => i).filter(i =>
+                e.gallery_command(i, 0) === 2 && e.gallery_command(i, 2) >= y &&
+                e.gallery_command(i, 22) === 2);
+            return lines.length >= 2;
+        }""")
+        canvas.focus()
+        # Only real Tab events choose Close; do not set C focus or hover the toast.
+        for _ in range(12):
+            page.keyboard.press('Tab')
+            if page.evaluate(metric, 'Close')['focused']:
+                break
+        else:
+            raise AssertionError('Actionless persistent notice Close is not keyboard reachable')
+        page.keyboard.press('Enter')
+        page.wait_for_function('cuiGallery.exports.gallery_notification_stats(0)===0 && cuiGallery.exports.gallery_notification_stats(3)===1')
+        assert page.evaluate('cuiGallery.exports.gallery_notification_stats(1)') == 0
+        page.set_viewport_size({'width': 274, 'height': 844})
+        page.wait_for_function("document.querySelector('canvas').clientWidth < 274")
+        page.locator('#notification-autohide').uncheck()
+        canvas.scroll_into_view_if_needed()
+        tap('Add notification')
+        page.wait_for_function('cuiGallery.exports.gallery_notification_entry(0,0)===1')
+        action = page.wait_for_function(metric, arg='Review').json_value()['bounds']
+        close = page.wait_for_function(metric, arg='Close').json_value()['bounds']
+        ax, ay, aw, ah = action
+        cx, cy, cw, ch = close
+        assert cy+ch < ay, (action, close)
+        assert 0 < ax < ax + aw < canvas.evaluate('(c) => c.clientWidth')
+        assert 0 < cx < cx + cw < canvas.evaluate('(c) => c.clientWidth')
+        tap('Review')
+        page.wait_for_function('cuiGallery.exports.gallery_notification_stats(2)===1')
+        assert page.evaluate('cuiGallery.exports.gallery_notification_stats(0)') == 1
+        assert page.evaluate('cuiGallery.exports.gallery_notification_stats(3)') == 1
+        tap('Close')
+        page.wait_for_function('cuiGallery.exports.gallery_notification_stats(0)===0 && cuiGallery.exports.gallery_notification_stats(3)===2')
+        assert page.evaluate('cuiGallery.exports.gallery_notification_stats(2)') == 1
+        assert page.evaluate('cuiGallery.exports.gallery_notification_stats(1)') == 0
+        assert not errors, errors
+    finally:
+        context.close()
+
+
 def main():
     subprocess.run([sys.executable, str(Path(__file__).with_name('test_snippets.py'))], check=True)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=Path('build/web'))
     parser.add_argument('--chromium', help='Optional installed Chromium executable')
+    parser.add_argument('--notification-only', action='store_true', help='Run focused Notification checks only')
     parser.add_argument('--pagination-only', action='store_true', help='Run focused Pagination checks only')
     args = parser.parse_args()
     root = args.directory.resolve()
@@ -206,11 +282,16 @@ def main():
             if args.chromium:
                 options['executable_path'] = args.chromium
             browser = p.chromium.launch(**options)
+            if args.notification_only:
+                verify_notification_close(browser, f'http://127.0.0.1:{server.server_port}/cui/')
+                browser.close()
+                return
             if args.pagination_only:
                 verify_pagination_custom_size(browser, f'http://127.0.0.1:{server.server_port}/cui/')
                 verify_pagination_paint(browser, f'http://127.0.0.1:{server.server_port}/cui/')
                 browser.close()
                 return
+            verify_notification_close(browser, f'http://127.0.0.1:{server.server_port}/cui/')
             page = browser.new_page(viewport={'width': 1280, 'height': 900}, device_scale_factor=2, permissions=['clipboard-read', 'clipboard-write'])
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))

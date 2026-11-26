@@ -304,6 +304,12 @@ cui_notification_advance cui_notifications(cui_context *, cui_id, const cui_them
 bool cui_notifications_checked(cui_context *, cui_id, const cui_theme *, cui_notification_state *,
                                cui_rect viewport, double now_seconds,
                                cui_notification_advance *out);
+/* Same checked frame and scheduling contract with responsive card layout.
+ * Text wraps, titled cards use semibold, and the top card always offers Close.
+ * Built-in actions and custom action slots stack below when inline space is tight. */
+bool cui_notifications_responsive(cui_context *, cui_id, const cui_theme *,
+                                  cui_notification_state *, cui_rect viewport, double now_seconds,
+                                  cui_notification_advance *out);
 
 #ifdef __cplusplus
 }
@@ -1331,11 +1337,165 @@ static void cui_status_notification_shadow(cui_context *ui, cui_id id, cui_rect 
             cui_end_box(ui);
         }
 }
+enum {
+    CUI_STATUS_NOTIFICATION_PADDING = 14,
+    CUI_STATUS_NOTIFICATION_GAP = 12,
+    CUI_STATUS_NOTIFICATION_CLOSE_INSET = 4,
+    CUI_STATUS_NOTIFICATION_CLOSE_SIZE = 28,
+    CUI_STATUS_NOTIFICATION_CLOSE_LANE = 24
+};
+static void cui_status_notification_icon(cui_context *ui, cui_id id, const cui_theme *t,
+                                         const cui_notification *n, float alpha, float size) {
+    cui_color color = n->kind == CUI_NOTIFICATION_SUCCESS   ? t->success
+                      : n->kind == CUI_NOTIFICATION_WARNING ? t->warning
+                      : n->kind == CUI_NOTIFICATION_ERROR   ? t->danger
+                      : n->kind == CUI_NOTIFICATION_INFO    ? t->info
+                                                            : t->muted;
+    color = cui_status_notification_color(color, alpha);
+    if (n->kind == CUI_NOTIFICATION_UNTYPED) {
+        cui_begin_box(ui, id, (cui_box){.width = size, .fixed_width = true, .clip = true});
+        cui_text_line(ui, n->icon, t->font_size, color, 0, (cui_text_style){0});
+        cui_end_box(ui);
+        return;
+    }
+    const char *icon = n->kind == CUI_NOTIFICATION_SUCCESS   ? "circle-check"
+                       : n->kind == CUI_NOTIFICATION_WARNING ? "triangle-alert"
+                       : n->kind == CUI_NOTIFICATION_ERROR   ? "circle-x"
+                                                             : "info";
+    (void)cui_icon_named(
+        ui, id, t, cui_string(icon),
+        (cui_icon_options){
+            .size = CUI_ICON_CUSTOM, .custom_size = size, .custom_color = true, .color = color});
+}
+static void cui_status_notification_body(cui_context *ui, cui_id card, const cui_theme *t,
+                                         const cui_theme *theme, const cui_notification *n,
+                                         float alpha, float card_width) {
+    float row_width = fmaxf(1, card_width - 2 * CUI_STATUS_NOTIFICATION_PADDING -
+                                   CUI_STATUS_NOTIFICATION_CLOSE_LANE);
+    bool has_icon = n->kind != CUI_NOTIFICATION_UNTYPED || n->icon.length;
+    float icon_width = n->kind == CUI_NOTIFICATION_UNTYPED && has_icon
+                           ? cui_measure_text(ui, n->icon, t->font_size).width
+                           : t->font_size;
+    float icon_size = has_icon ? fminf(icon_width, row_width / 3) : 0;
+    float icon_gap = has_icon ? fminf(CUI_STATUS_NOTIFICATION_GAP, row_width / 6) : 0;
+    float body_width = row_width - icon_size - icon_gap;
+    float action_width = n->action ? 80
+                         : n->action_label.length
+                             ? cui_measure_text(ui, n->action_label, t->font_size * .8f).width +
+                                   2 * t->padding * .8f + 12
+                             : 0;
+    float inline_width = body_width - action_width - CUI_STATUS_NOTIFICATION_GAP;
+    bool action_below = action_width > 0 && inline_width < 6 * t->font_size;
+    float content_width = !action_below && action_width > 0 ? inline_width : body_width;
+    cui_begin_box(ui, cui_status_child_id(card, 311), (cui_box){.row = true, .gap = icon_gap});
+    if (has_icon)
+        cui_status_notification_icon(ui, cui_status_child_id(card, 314), t, n, alpha, icon_size);
+    cui_begin_box(ui, cui_status_child_id(card, 316),
+                  (cui_box){.row = !action_below,
+                            .width = body_width,
+                            .fixed_width = true,
+                            .gap = action_below ? 8 : CUI_STATUS_NOTIFICATION_GAP});
+    cui_begin_box(ui, cui_status_child_id(card, 302),
+                  (cui_box){.width = content_width, .fixed_width = true, .gap = 4, .clip = true});
+    if (n->title.length || n->message.length) {
+        /* Clay's clip viewport leaves its contents unconstrained. Give built-in
+         * paragraphs a fixed-width inner box so they wrap inside that viewport. */
+        cui_begin_box(ui, cui_status_child_id(card, 318),
+                      (cui_box){.width = content_width, .fixed_width = true, .gap = 4});
+        if (n->title.length)
+            cui_text_paragraph_colored(ui, n->title, t->font_size, theme->text, 0,
+                                       (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD}, true,
+                                       NULL, 0);
+        if (n->message.length)
+            cui_text_paragraph_colored(ui, n->message, t->font_size, theme->text, 0,
+                                       (cui_text_style){0}, true, NULL, 0);
+        cui_end_box(ui);
+    }
+    if (n->content)
+        n->content(ui, cui_status_child_id(card, 303), n->content_user, t->font_size, theme->text,
+                   alpha);
+    cui_end_box(ui);
+    if (action_width > 0) {
+        action_width = action_below && n->action ? body_width : fminf(action_width, body_width);
+        cui_begin_box(ui, cui_status_child_id(card, 317),
+                      (cui_box){.width = action_width, .fixed_width = true, .clip = true});
+        if (n->action)
+            n->action(ui, cui_status_child_id(card, 301), n->action_user, t->font_size, theme->text,
+                      alpha);
+        else if (cui_button_ex(ui, cui_status_child_id(card, 301), theme, n->action_label,
+                               (cui_button_options){.size = CUI_CONTROL_SMALL,
+                                                    .variant = CUI_BUTTON_PRIMARY,
+                                                    .width = action_width}) &&
+                 n->on_action)
+            n->on_action(n->user, n->id);
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    cui_end_box(ui);
+}
+
+static void cui_status_notification_legacy_body(cui_context *ui, cui_id card, const cui_theme *t,
+                                                const cui_theme *theme, cui_notification n,
+                                                float alpha, float card_width) {
+    cui_status_spacer(ui, cui_status_child_id(card, 310), 2);
+    cui_begin_box(ui, cui_status_child_id(card, 311), (cui_box){.row = true, .gap = 12});
+    bool has_icon = n.kind != CUI_NOTIFICATION_UNTYPED || n.icon.length;
+    if (has_icon) {
+        cui_color color = n.kind == CUI_NOTIFICATION_SUCCESS   ? t->success
+                          : n.kind == CUI_NOTIFICATION_WARNING ? t->warning
+                          : n.kind == CUI_NOTIFICATION_ERROR   ? t->danger
+                          : n.kind == CUI_NOTIFICATION_INFO    ? t->info
+                                                               : t->muted;
+        const char *icon = n.kind == CUI_NOTIFICATION_SUCCESS   ? "circle-check"
+                           : n.kind == CUI_NOTIFICATION_WARNING ? "triangle-alert"
+                           : n.kind == CUI_NOTIFICATION_ERROR   ? "circle-x"
+                                                                : "info";
+        if (n.kind == CUI_NOTIFICATION_UNTYPED)
+            cui_text(ui, n.icon, t->font_size, cui_status_notification_color(color, alpha));
+        else
+            (void)cui_icon_named(
+                ui, cui_status_child_id(card, 314), t, cui_string(icon),
+                (cui_icon_options){.custom_color = true,
+                                   .color = cui_status_notification_color(color, alpha)});
+    }
+    float action_width = n.action ? 80
+                         : n.action_label.length
+                             ? cui_measure_text(ui, n.action_label, t->font_size * .8f).width +
+                                   2 * t->padding * .8f + 12
+                             : 0;
+    float content_width = fmaxf(1, card_width - 32 - (has_icon ? 28 : 0) - action_width - 24);
+    cui_begin_box(ui, cui_status_child_id(card, 302),
+                  (cui_box){.width = content_width, .gap = 4, .clip = true});
+    if (n.title.length)
+        cui_text(ui, n.title, t->font_size, theme->text);
+    if (n.message.length)
+        cui_text(ui, n.message, t->font_size, theme->text);
+    if (n.content)
+        n.content(ui, cui_status_child_id(card, 303), n.content_user, t->font_size, theme->text,
+                  alpha);
+    cui_end_box(ui);
+    if (n.action)
+        n.action(ui, cui_status_child_id(card, 301), n.action_user, t->font_size, theme->text,
+                 alpha);
+    else if (n.action_label.length &&
+             cui_button_ex(
+                 ui, cui_status_child_id(card, 301), theme, n.action_label,
+                 (cui_button_options){.size = CUI_CONTROL_SMALL, .variant = CUI_BUTTON_PRIMARY}) &&
+             n.on_action)
+        n.on_action(n.user, n.id);
+    /* Keep action content clear of the independent close hit target.
+     * Reserve this lane even when Close is hidden to avoid hover reflow. */
+    cui_begin_box(ui, cui_status_child_id(card, 316), (cui_box){.width = 24, .height = 1});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_status_spacer(ui, cui_status_child_id(card, 312), 2);
+}
+
 static cui_notification_advance cui_status_notifications_render(cui_context *ui, cui_id id,
                                                                 const cui_theme *t,
                                                                 cui_notification_state *s,
                                                                 cui_rect viewport, double now,
-                                                                bool *submitted) {
+                                                                bool responsive, bool *submitted) {
     cui_notification_advance result = {0};
     if (!ui || !t || !s || !isfinite(now) || now < 0 || !isfinite(viewport.x) ||
         !isfinite(viewport.y) || !isfinite(viewport.w) || viewport.w <= 0 ||
@@ -1511,20 +1671,22 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
                     (cui_rect){x + (width - e->motion_width) / 2, y + e->motion_y + slide,
                                e->motion_width, heights[position]},
                     t->radius_lg, alpha * alpha * alpha, (int16_t)(21 + position));
+            float card_width = e->motion_width;
+            float card_x = x + (width - card_width) / 2;
+            float card_y = y + e->motion_y + slide;
+            bool ending = e->phase == CUI_NOTIFICATION_ENDING;
             cui_begin_portal(ui, card,
-                             (cui_box){.width = e->motion_width,
+                             (cui_box){.width = card_width,
                                        .height = n.height,
-                                       .padding = 14,
-                                       .gap = 0,
-                                       .row = true,
+                                       .padding = CUI_STATUS_NOTIFICATION_PADDING,
+                                       .row = !responsive,
                                        .radius = t->radius_lg,
                                        .background = theme.popover,
                                        .border = theme.border,
                                        .border_width = 1,
                                        .layout_only = hidden && e->visibility == 0,
-                                       .inert = hidden || e->phase == CUI_NOTIFICATION_ENDING},
-                             (cui_rect){x + (width - e->motion_width) / 2, y + e->motion_y + slide,
-                                        e->motion_width, n.height},
+                                       .inert = hidden || ending},
+                             (cui_rect){card_x, card_y, card_width, n.height},
                              (int16_t)(21 + position));
             if (!hidden && s->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_SOURCE) {
                 /* Source strength is alpha^3; source element opacity contributes
@@ -1548,73 +1710,44 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
             cui_set_tab_stop(ui, card, n.on_click != NULL);
             if (n.title.length)
                 cui_set_semantic_details(ui, card, (cui_semantic_details){.description = n.title});
-            cui_status_spacer(ui, cui_status_child_id(card, 310), 2);
-            cui_begin_box(ui, cui_status_child_id(card, 311), (cui_box){.row = true, .gap = 12});
-            bool has_icon = n.kind != CUI_NOTIFICATION_UNTYPED || n.icon.length;
-            if (has_icon) {
-                cui_color color = n.kind == CUI_NOTIFICATION_SUCCESS   ? t->success
-                                  : n.kind == CUI_NOTIFICATION_WARNING ? t->warning
-                                  : n.kind == CUI_NOTIFICATION_ERROR   ? t->danger
-                                  : n.kind == CUI_NOTIFICATION_INFO    ? t->info
-                                                                       : t->muted;
-                const char *icon = n.kind == CUI_NOTIFICATION_SUCCESS   ? "circle-check"
-                                   : n.kind == CUI_NOTIFICATION_WARNING ? "triangle-alert"
-                                   : n.kind == CUI_NOTIFICATION_ERROR   ? "circle-x"
-                                                                        : "info";
-                if (n.kind == CUI_NOTIFICATION_UNTYPED)
-                    cui_text(ui, n.icon, t->font_size, cui_status_notification_color(color, alpha));
-                else
-                    (void)cui_icon_named(
-                        ui, cui_status_child_id(card, 314), t, cui_string(icon),
-                        (cui_icon_options){.custom_color = true,
-                                           .color = cui_status_notification_color(color, alpha)});
-            }
-            float action_width =
-                n.action ? 80
-                : n.action_label.length
-                    ? cui_measure_text(ui, n.action_label, t->font_size * .8f).width +
-                          2 * t->padding * .8f + 12
-                    : 0;
-            float content_width =
-                fmaxf(1, e->motion_width - 32 - (has_icon ? 28 : 0) - action_width - 24);
-            cui_begin_box(ui, cui_status_child_id(card, 302),
-                          (cui_box){.width = content_width, .gap = 4, .clip = true});
-            if (n.title.length)
-                cui_text(ui, n.title, t->font_size, theme.text);
-            if (n.message.length)
-                cui_text(ui, n.message, t->font_size, theme.text);
-            if (n.content)
-                n.content(ui, cui_status_child_id(card, 303), n.content_user, t->font_size,
-                          theme.text, alpha);
-            cui_end_box(ui);
-            if (n.action)
-                n.action(ui, cui_status_child_id(card, 301), n.action_user, t->font_size,
-                         theme.text, alpha);
-            else if (n.action_label.length &&
-                     cui_button_ex(ui, cui_status_child_id(card, 301), &theme, n.action_label,
-                                   (cui_button_options){.size = CUI_CONTROL_SMALL,
-                                                        .variant = CUI_BUTTON_PRIMARY}) &&
-                     n.on_action)
-                n.on_action(n.user, n.id);
-            /* Keep action content clear of the independent close hit target.
-             * Reserve this lane even when Close is hidden to avoid hover reflow. */
-            cui_begin_box(ui, cui_status_child_id(card, 316), (cui_box){.width = 24, .height = 1});
-            cui_end_box(ui);
-            cui_end_box(ui);
-            cui_status_spacer(ui, cui_status_child_id(card, 312), 2);
+            if (responsive)
+                cui_status_notification_body(ui, card, t, &theme, &n, alpha, card_width);
+            else
+                cui_status_notification_legacy_body(ui, card, t, &theme, n, alpha, card_width);
             bool close = false;
-            if (cui_hovered(ui, card) || expanded[anchor]) {
-                cui_begin_portal(
-                    ui, cui_status_child_id(card, 313), (cui_box){.width = 20, .height = 20},
-                    (cui_rect){x + (width - e->motion_width) / 2 + e->motion_width - 24,
-                               y + e->motion_y + slide + 4, 20, 20},
-                    (int16_t)(21 + position));
+            /* The top card is independently dismissible before hover, including
+             * for a passive alert with no other keyboard or touch target. */
+            bool show_close = responsive ? !hidden && (geometry.rank == 0 || expanded[anchor])
+                                         : cui_hovered(ui, card) || expanded[anchor];
+            if (show_close) {
+                cui_rect close_bounds = {card_x + card_width - 24, card_y + 4, 20, 20};
+                float button_height = 0;
+                if (responsive) {
+                    float close_width = fminf(CUI_STATUS_NOTIFICATION_CLOSE_SIZE, card_width);
+                    float close_height = n.height > 0
+                                             ? fminf(CUI_STATUS_NOTIFICATION_CLOSE_SIZE, n.height)
+                                             : CUI_STATUS_NOTIFICATION_CLOSE_SIZE;
+                    float inset_x =
+                        fminf(CUI_STATUS_NOTIFICATION_CLOSE_INSET, card_width - close_width);
+                    float inset_y = n.height > 0 ? fminf(CUI_STATUS_NOTIFICATION_CLOSE_INSET,
+                                                         n.height - close_height)
+                                                 : CUI_STATUS_NOTIFICATION_CLOSE_INSET;
+                    close_bounds = (cui_rect){card_x + card_width - close_width - inset_x,
+                                              card_y + inset_y, close_width, close_height};
+                    button_height = close_height;
+                }
+                cui_begin_portal(ui, cui_status_child_id(card, 313),
+                                 (cui_box){.width = close_bounds.w,
+                                           .height = close_bounds.h,
+                                           .inert = responsive && ending},
+                                 close_bounds, (int16_t)(21 + position));
                 cui_status_close_icon close_icon = {&theme, cui_status_child_id(card, 315)};
                 close = cui_button_ex(
                     ui, cui_status_child_id(card, 300), &theme, cui_string("Close"),
                     (cui_button_options){.variant = CUI_BUTTON_GHOST,
                                          .size = CUI_CONTROL_XSMALL,
-                                         .width = 20,
+                                         .width = close_bounds.w,
+                                         .height = button_height,
                                          .content = cui_status_notification_close_content,
                                          .content_user = &close_icon});
                 cui_end_box(ui);
@@ -1656,9 +1789,9 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
     return result;
 }
 
-bool cui_notifications_checked(cui_context *ui, cui_id id, const cui_theme *theme,
-                               cui_notification_state *state, cui_rect viewport, double now,
-                               cui_notification_advance *out) {
+static bool cui_notifications_dispatch(cui_context *ui, cui_id id, const cui_theme *theme,
+                                       cui_notification_state *state, cui_rect viewport, double now,
+                                       bool responsive, cui_notification_advance *out) {
     if (!ui || !theme || !state || !out || !state->entries || !state->capacity ||
         state->capacity > CUI_NOTIFICATION_MAX_ITEMS || state->count > state->capacity ||
         state->system_count > 100 || !cui_notification_settings_valid(state->settings) ||
@@ -1683,12 +1816,22 @@ bool cui_notifications_checked(cui_context *ui, cui_id id, const cui_theme *them
         }
     }
     bool submitted = true;
-    cui_notification_advance next =
-        cui_status_notifications_render(ui, id, theme, state, viewport, now, &submitted);
+    cui_notification_advance next = cui_status_notifications_render(ui, id, theme, state, viewport,
+                                                                    now, responsive, &submitted);
     if (!submitted)
         return false;
     *out = next;
     return true;
+}
+bool cui_notifications_checked(cui_context *ui, cui_id id, const cui_theme *theme,
+                               cui_notification_state *state, cui_rect viewport, double now,
+                               cui_notification_advance *out) {
+    return cui_notifications_dispatch(ui, id, theme, state, viewport, now, false, out);
+}
+bool cui_notifications_responsive(cui_context *ui, cui_id id, const cui_theme *theme,
+                                  cui_notification_state *state, cui_rect viewport, double now,
+                                  cui_notification_advance *out) {
+    return cui_notifications_dispatch(ui, id, theme, state, viewport, now, true, out);
 }
 cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui_theme *theme,
                                            cui_notification_state *state, cui_rect viewport,

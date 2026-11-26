@@ -2408,7 +2408,7 @@ static cui_notification_entry notification_entries[8];
 static char notification_titles[8][40];
 static bool notification_pins[8], notification_autohide = true;
 static int notification_kind = CUI_NOTIFICATION_INFO, notification_pushes;
-static bool notification_clear;
+static bool notification_clear, notification_plain;
 static unsigned notification_serial, notification_clicks, notification_actions, notification_closes;
 static void notification_clicked(void *user, cui_notification_id id) {
     (void)user;
@@ -2436,7 +2436,7 @@ static void notification_content(cui_context *context, cui_id id, void *user, fl
         colors[i]->a = (uint8_t)(colors[i]->a * opacity);
     cui_checkbox(context, id, &theme, cui_string("Pin alert"), user, false);
 }
-static void notification_push(void) {
+static void notification_push(bool plain) {
     size_t slot = 8;
     for (size_t candidate = 0; candidate < 8; candidate++) {
         bool used = false;
@@ -2457,7 +2457,8 @@ static void notification_push(void) {
     cui_notification descriptor = cui_notification_default();
     descriptor.id = (cui_notification_id){1, notification_serial};
     descriptor.title = cui_string(notification_titles[slot]);
-    descriptor.message = cui_string("Tasks are ready.");
+    descriptor.message = cui_string("Your workspace tasks are ready to review. Check the latest "
+                                    "changes before sharing the update with your team.");
     descriptor.action_label = cui_string("Review");
     descriptor.kind = (cui_notification_kind)notification_kind;
     descriptor.autohide = notification_autohide;
@@ -2466,6 +2467,16 @@ static void notification_push(void) {
     descriptor.on_click = notification_clicked;
     descriptor.on_action = notification_action;
     descriptor.on_close = notification_closed;
+    if (plain) {
+        descriptor.title =
+            cui_string("Your workspace changes have been saved and are ready for your team");
+        descriptor.autohide = false;
+        descriptor.action_label = cui_string("");
+        descriptor.content = NULL;
+        descriptor.content_user = NULL;
+        descriptor.on_click = NULL;
+        descriptor.on_action = NULL;
+    }
     cui_notification_push(&notification_state, descriptor, host_seconds);
 }
 static void marker_content(cui_context *context, cui_id id, void *user, float font, cui_color color,
@@ -5123,11 +5134,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         if (cui_button(ui, cui_id_from(ui, "notification-clear"), &t, cui_string("Dismiss alerts"),
                        disabled || notification_state.count == 0))
             notification_clear = true;
+        if (cui_button(ui, cui_id_from(ui, "notification-plain"), &t,
+                       cui_string("Add persistent notice"),
+                       disabled || notification_state.count >= 8)) {
+            notification_plain = true;
+        }
         notification_state.settings.reduced_motion = reduced_motion;
-        cui_notification_advance result =
-            cui_notifications(ui, cui_id_from(ui, "notifications"), &t, &notification_state,
-                              (cui_rect){0, 0, width, height}, host_seconds);
-        next_wake = result.next_wake_seconds;
+        cui_notification_advance result;
+        if (cui_notifications_responsive(ui, cui_id_from(ui, "notifications"), &t,
+                                         &notification_state, (cui_rect){0, 0, width, height},
+                                         host_seconds, &result))
+            next_wake = result.next_wake_seconds;
         break;
     }
     case 56: {
@@ -7191,8 +7208,13 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         redraw = true;
     }
     while (notification_pushes > 0) {
-        notification_push();
+        notification_push(false);
         notification_pushes--;
+        redraw = true;
+    }
+    if (notification_plain) {
+        notification_push(true);
+        notification_plain = false;
         redraw = true;
     }
     if (conversation_mutation) {

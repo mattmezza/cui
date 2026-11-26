@@ -111,7 +111,33 @@ hover or expanded keyboard focus. Middle clicks require matching down/up inside
 the card; cancelled captures do not dismiss. Built-in action buttons keep their
 own focus and do not automatically dismiss. Titles, messages, custom content,
 custom action controls, typed intent icons and custom icon text compose together.
-Typed intent overrides custom icon, as in the reference.
+A typed intent selects its corresponding decorative SVG and theme color.
+An untyped notice can use the borrowed `icon` text.
+
+Use `cui_notifications_responsive` for wrapping and keyboard or touch Close.
+The newest toast at each placement always offers Close, including a passive
+notice with no action or clickable body. Expanding the stack reveals the
+remaining Close controls. An exiting card is inert. Close normally occupies a
+28 px square in its own corner lane, with the lane reserved throughout the
+transition. Body text wraps at the allocated width and the title uses semibold.
+The action moves below the body when its inline position would leave less than
+six em for the text. Keep a custom action within its available slot and use auto
+height for notices that can reflow. Fixed-height cards can clip long content.
+
+```c
+cui_notification_advance next;
+if (cui_notifications_responsive(ui, scope, theme, &notifications,
+                                 viewport, now_seconds, &next)) {
+    /* Schedule next.next_wake_seconds using the application's event loop. */
+}
+```
+
+Submit one renderer per stack and frame. `cui_notifications`,
+`cui_notifications_checked` and the automatic Root layer use the original
+presentation, including hover or focus to reveal Close. Both presentations use
+the same manager, callbacks, logical IDs, shadow policies and scheduling contract.
+The responsive presenter is a direct C API. Retained language builders do not
+expose this presenter.
 
 To use OS delivery, explicitly configure portable host `send`, `retract`, and
 `activate` callbacks and select System or Both delivery. No native OS adapters are
@@ -126,11 +152,10 @@ the host window, retracts, closes any in-app toast, and calls the click handler.
 Base status links only math; styled Notification additionally uses core,
 existing components buttons, content spinner, and status base. No allocation,
 platform, renderer, or default-theme implementation is required by the base.
-Renderer limits remain explicit: shadows are two bounded eight-layer rounded
-rect approximations of the reference blur/spread/offset, intent icons use portable
-text symbols and title font weight uses the current core font. Custom content can supply more
-specific icons/typography. Core text wrapping refinements remain limitations described above; this does not establish full native
-platform or renderer parity.
+The default shadow uses bounded rounded layers. The opt-in shadow policy
+submits two geometrically blurred drop shadows to supported renderers.
+Custom content can supply its own icons and typography.
+[Notification shadow settings](NOTIFICATION_SHADOWS.md)
 
 Notification cards consume independent `theme.popover` and `theme.radius_lg` tokens for card fill, corners and shadow shape. Marker default highlight now uses the frozen perceptual blend and lightness fallback; exact custom highlight remains supported.
 

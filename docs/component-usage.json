@@ -690,6 +690,7 @@
         "cui_notification_init",
         "cui_notification_push",
         "cui_notifications",
+        "cui_notifications_responsive",
         "cui_notification_part_id"
       ],
       "state_types": [
@@ -698,7 +699,7 @@
       ],
       "state_ownership": "Caller retains cui_notification_state, entry storage, notification content/user pointers and host binding.",
       "interaction": "cui_notification_callback handles click/close/action; cui_notification_send_fn delegates system delivery to host.",
-      "usage": "Push on an application event, render the stack once after content each frame, and honor returned scheduling deadlines.",
+      "usage": "Push on an application event, render the stack once after content and honor its wake deadline. Use cui_notifications_responsive for a wrapped card with Close available before hover.",
       "docs": [
         "docs/STATUS_COMPONENTS.md",
         "docs/COMPOUND_SHADOW_PARTS.md"

@@ -450,7 +450,9 @@ component's authoritative header. Bubble, Message/MessageScroller, Notification
 and Attachment have typed part-ID getters. A valid identity is not a presence
 check: submit first, then check the current-frame shadow setter before end_frame.
 Notification logical keys and stack scopes are not card paint IDs; custom callback
-namespaces may have no box. Scroller row IDs follow retained keys, not stable
+namespaces may have no box. For a responsive toast and keyboard/touch Close
+before hover, use direct C `cui_notifications_responsive`; honor its wake deadline.
+See `docs/STATUS_COMPONENTS.md#notification`. Scroller row IDs follow retained keys, not stable
 indices. Language-builder MAIN/ROOT/subpart targets remain pending.
 
 For opt-in C control shadow examples, read `docs/CONTROL_SURFACE_SHADOW_GALLERY.md`.

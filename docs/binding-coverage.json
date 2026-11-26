@@ -308,7 +308,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "The responsive presenter, automatic first Close target and stacked action layout are direct C frame APIs. Retained builders and automatic Root submission do not expose this presentation."
+      ]
     },
     {
       "name": "Pagination",

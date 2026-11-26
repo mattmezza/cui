@@ -303,6 +303,12 @@ cui_notification_advance cui_notifications(cui_context *, cui_id, const cui_them
 bool cui_notifications_checked(cui_context *, cui_id, const cui_theme *, cui_notification_state *,
                                cui_rect viewport, double now_seconds,
                                cui_notification_advance *out);
+/* Same checked frame and scheduling contract with responsive card layout.
+ * Text wraps, titled cards use semibold, and the top card always offers Close.
+ * Built-in actions and custom action slots stack below when inline space is tight. */
+bool cui_notifications_responsive(cui_context *, cui_id, const cui_theme *,
+                                  cui_notification_state *, cui_rect viewport, double now_seconds,
+                                  cui_notification_advance *out);
 
 #ifdef __cplusplus
 }

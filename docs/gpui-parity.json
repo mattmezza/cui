@@ -2225,7 +2225,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Native OS delivery adapters remain absent; portable host callbacks are opt-in. Shadows approximate blur with bounded rounded layers; intent icons are text symbols and title font weight is not independently styled. Custom content and action descriptors remain borrowed through lifecycle callbacks."
+        "Portable host callbacks are opt-in; built-in OS adapters and physical assistive technology acceptance remain open. Severity icons use themed SVG assets. Legacy presentation uses the original typography and supports an opt-in drop-shadow policy. The responsive C presenter wraps and uses semibold titles, keeps Close reachable before hover, and protects its lane on narrow cards. Root and retained language builders currently use the existing presentation. Custom content and action descriptors remain borrowed through lifecycle callbacks."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2253,6 +2253,16 @@
             "tests/unit/test_status.c",
             "tests/web/test_browser.py"
           ]
+        },
+        {
+          "name": "responsive presentation with a wrapped body and independent dismiss target",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/unit/test_compound_shadow_legacy.c",
+            "tests/web/test_browser.py"
+          ],
+          "scope": "Explicit C frame presenter and gallery. Headless pointer, keyboard, touch and semantic activation. Preserves prior submission through legacy entry points."
         },
         {
           "name": "portable transactional system delivery hooks and bounded registry",

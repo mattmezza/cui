@@ -420,9 +420,9 @@ Additional event includes: `cui/cui_message_events.h`; [observer guide](MESSAGE_
 
 **Interaction:** cui_notification_callback handles click/close/action; cui_notification_send_fn delegates system delivery to host.
 
-**Usage:** Push on an application event, render the stack once after content each frame, and honor returned scheduling deadlines.
+**Usage:** Push on an application event, render the stack once after content and honor its wake deadline. Use cui_notifications_responsive for a wrapped card with Close available before hover.
 
-API: `cui_notification_init`, `cui_notification_push`, `cui_notifications`. [Public header](../include/cui/cui_status.h); [guide](STATUS_COMPONENTS.md).
+API: `cui_notification_init`, `cui_notification_push`, `cui_notifications`, `cui_notifications_responsive`. [Public header](../include/cui/cui_status.h); [guide](STATUS_COMPONENTS.md).
 
 ## Pagination
 

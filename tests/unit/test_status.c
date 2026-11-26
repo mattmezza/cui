@@ -742,9 +742,87 @@ static void notification_intent_artwork(void) {
 }
 #endif
 #ifndef CUI_STATUS_BASE_ONLY
-static void notification_separate_actions(void) {
-    float widths[] = {260, 320, 390};
-    for (size_t width = 0; width < 3; width++) {
+static const cui_semantic *notification_semantic(cui_context *ui, cui_id id) {
+    size_t count;
+    const cui_semantic *items = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if (items[i].id == id)
+            return &items[i];
+    return NULL;
+}
+static cui_draw_list notification_presentation_frame(cui_context *ui, cui_notification_state *state,
+                                                     double now, bool responsive) {
+    cui_theme theme = cui_theme_light();
+    cui_notification_advance next;
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    cui_rect viewport = {0, 0, 600, 400};
+    if (responsive)
+        assert(cui_notifications_responsive(ui, 900, &theme, state, viewport, now, &next));
+    else
+        assert(cui_notifications_checked(ui, 900, &theme, state, viewport, now, &next));
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static void notification_close_without_hover(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    cui_notification_entry entries[1];
+    cui_notification_state state;
+    cui_notification_settings settings = cui_notification_settings_default();
+    settings.reduced_motion = true;
+    notification_counts counts = {0};
+    assert(ui && cui_notification_init(&state, entries, 1, settings, (cui_notification_host){0}));
+    for (int path = 0; path < 3; path++) {
+        double now = 2 * path;
+        cui_notification n = cui_notification_default();
+        n.id = (cui_notification_id){71, path + 1};
+        n.message = cui_string("Changes saved");
+        n.autohide = false;
+        n.on_close = close_notification;
+        n.user = &counts;
+        assert(cui_notification_push(&state, n, now));
+        notification_presentation_frame(ui, &state, now + .5, true);
+        cui_id id = cui_notification_part_id(900, n.id, CUI_NOTIFICATION_PART_CLOSE);
+        const cui_semantic *close = notification_semantic(ui, id);
+        assert(close && close->role == CUI_ROLE_BUTTON && !close->disabled &&
+               !close->tab_stop_disabled);
+        assert(close->bounds.w == 28 && close->bounds.h == 28);
+        if (path == 0) {
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_TAB}));
+            notification_presentation_frame(ui, &state, now + .6, true);
+            assert(cui_focused(ui) == id);
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+        } else if (path == 1) {
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
+                                .accessibility_target = id,
+                                .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
+        } else {
+            cui_event e = {.type = CUI_EVENT_POINTER_DOWN,
+                           .pointer_type = CUI_POINTER_TOUCH,
+                           .pointer_id = 17,
+                           .x = close->bounds.x + close->bounds.w / 2,
+                           .y = close->bounds.y + close->bounds.h / 2};
+            assert(cui_queue_event(ui, e));
+            e.type = CUI_EVENT_POINTER_UP;
+            assert(cui_queue_event(ui, e));
+        }
+        notification_presentation_frame(ui, &state, now + .7, true);
+        assert(state.count == 1 && entries[0].phase == CUI_NOTIFICATION_ENDING &&
+               counts.closed == path);
+        notification_presentation_frame(ui, &state, now + .8, true);
+        close = notification_semantic(ui, id);
+        assert(!close || close->disabled);
+        notification_presentation_frame(ui, &state, now + 1, true);
+        assert(state.count == 0 && counts.closed == path + 1);
+    }
+    cui_destroy(ui);
+}
+static void notification_separate_actions(bool responsive) {
+    float widths[] = {164, 260, 320, 390};
+    for (size_t width = responsive ? 0 : 1; width < sizeof(widths) / sizeof(widths[0]); width++) {
         cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
         assert(ui);
         cui_notification_entry entries[1];
@@ -758,20 +836,38 @@ static void notification_separate_actions(void) {
         n.id = (cui_notification_id){99, 1};
         n.kind = CUI_NOTIFICATION_WARNING;
         n.title = cui_string("A longer workspace update title");
-        n.message = cui_string("Tasks are ready for review.");
+        n.message = cui_string(responsive ? "Tasks are ready for review on this workspace. "
+                                            "Open the list to see the changes."
+                                          : "Tasks are ready for review.");
         n.action_label = cui_string("Review");
         n.on_action = activate_notification;
         n.on_close = close_notification;
         n.user = &counts;
         n.autohide = false;
         assert(cui_notification_push(&state, n, 0));
-        notification_frame(ui, &state, .4);
-        notification_frame(ui, &state, .5);
+        notification_presentation_frame(ui, &state, .4, responsive);
+        notification_presentation_frame(ui, &state, .5, responsive);
         cui_rect card = entries[0].bounds;
         assert(cui_queue_event(
             ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = card.x + 30, .y = card.y + 30}));
-        notification_frame(ui, &state, .6);
-        notification_frame(ui, &state, .7);
+        notification_presentation_frame(ui, &state, .6, responsive);
+        cui_theme theme = cui_theme_light();
+        cui_draw_list draw = notification_presentation_frame(ui, &state, .7, responsive);
+        float last_body_line = 0;
+        size_t title_lines = 0, message_lines = 0;
+        for (size_t i = 0; i < draw.count; i++) {
+            const cui_draw_command *c = &draw.commands[i];
+            if (c->type != CUI_DRAW_TEXT || c->font_size != theme.font_size)
+                continue;
+            if (c->text_style.weight == CUI_TEXT_WEIGHT_SEMIBOLD)
+                title_lines++;
+            else
+                message_lines++;
+            if (c->bounds.y + c->bounds.h > last_body_line)
+                last_body_line = c->bounds.y + c->bounds.h;
+        }
+        if (responsive)
+            assert(title_lines > 0 && message_lines > 1);
         size_t count;
         const cui_semantic *sem = cui_semantics(ui, &count);
         cui_rect action = {0}, close = {0};
@@ -781,15 +877,21 @@ static void notification_separate_actions(void) {
             if (sem[i].name.length == 5 && !memcmp(sem[i].name.data, "Close", 5))
                 close = sem[i].bounds;
         }
-        assert(action.w > 0 && close.w > 0);
+        assert(action.w > 0 && close.w >= (responsive ? 24 : 20));
+        assert(action.x >= card.x && action.x + action.w <= card.x + card.w);
+        assert(close.x >= card.x && close.x + close.w <= card.x + card.w);
+        if (responsive && width == 0)
+            assert(title_lines > 1 && action.y >= last_body_line);
+        else if (responsive && width == 3)
+            assert(action.y < last_body_line);
         assert(action.x + action.w <= close.x || close.x + close.w <= action.x ||
                action.y + action.h <= close.y || close.y + close.h <= action.y);
         pointer_notification(ui, action, CUI_POINTER_PRIMARY);
-        notification_frame(ui, &state, .8);
+        notification_presentation_frame(ui, &state, .8, responsive);
         assert(counts.activated == 1 && counts.closed == 0);
         pointer_notification(ui, close, CUI_POINTER_PRIMARY);
-        notification_frame(ui, &state, .9);
-        notification_frame(ui, &state, 1.1);
+        notification_presentation_frame(ui, &state, .9, responsive);
+        notification_presentation_frame(ui, &state, 1.1, responsive);
         assert(counts.activated == 1 && counts.closed == 1);
         cui_destroy(ui);
     }
@@ -797,7 +899,9 @@ static void notification_separate_actions(void) {
 #endif
 int main(void) {
 #ifndef CUI_STATUS_BASE_ONLY
-    notification_separate_actions();
+    notification_close_without_hover();
+    notification_separate_actions(false);
+    notification_separate_actions(true);
     notification_intent_artwork();
 #endif
     marker_models();

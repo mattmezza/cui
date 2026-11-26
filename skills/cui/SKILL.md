@@ -71,6 +71,12 @@ function declarations produce matching paths only. `api SYMBOL --full` restores
 complete matching headers. `--declaration` explicitly selects the concise API view.
 No output is clipped or filtered by safety keywords.
 
+Use `cui_stepper_present` for fill connectors. Choose direction from the
+container width with `cui_responsive_query`. The request callback validates
+the next selection. Keep it in owner state and resubmit on the next frame.
+Foreign builders provide fixed connectors and queued changes.
+See `docs/STEPPER_NAVIGATION.md`.
+
 Use `cui_rating_present` for shared Rating sizes, custom SVG masks, colors and
 outline-only preview. The app owns the numeric value. Set
 `CUI_RATING_STEP_DOWN_FILLED` for opt-in step-down and choose the bool or the

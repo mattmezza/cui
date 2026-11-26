@@ -41,7 +41,8 @@ def main():
             browser = p.chromium.launch(headless=True, **({'executable_path': args.chromium} if args.chromium else {}))
             for width, dpr, touch in ((1440, 1, False), (1440, 2, False), (390, 2, True)):
                 context = browser.new_context(viewport={'width': width, 'height': 1000 if not touch else 844},
-                                              device_scale_factor=dpr, has_touch=touch, is_mobile=touch)
+                                              device_scale_factor=dpr, has_touch=touch, is_mobile=touch,
+                                              color_scheme='dark' if not touch and dpr == 2 else 'light')
                 page = context.new_page()
                 errors = []
                 page.on('pageerror', lambda error: errors.append(str(error)))
@@ -105,11 +106,86 @@ def main():
                         assert all(abs(solid[i]-tint[i]) <= 8 for i in range(4)), (solid, tint)
                         assert sum(abs(solid[i]-empty[i]) for i in range(3)) > 60, (solid, empty)
                     return separators, indicators
-                # Default legacy story and validation behavior stay available.
-                assert page.locator('#stepper-mode').input_value() == '0'
-                assert not page.locator('#stepper-density').is_visible()
-                snippets.append(page.locator('#snippet').inner_text())
+                def fit_axis(vertical):
+                    details = page.evaluate(TARGET, 'Details')
+                    finish = page.evaluate(TARGET, 'Finish')
+                    canvas_width = page.locator('#preview').evaluate('e=>e.clientWidth')
+                    assert finish['x'] + finish['w'] <= canvas_width + .01, (details, finish)
+                    if vertical:
+                        assert abs(finish['x'] - details['x']) < .01 and finish['y'] > details['y']
+                    else:
+                        assert finish['x'] > details['x'] and abs(finish['y'] - details['y']) < .01
+
+                def fill_geometry(vertical):
+                    fit_axis(vertical)
+                    cs = commands()
+                    stroke, length = ('w', 'h') if vertical else ('h', 'w')
+                    connectors = [c for c in cs if c['type'] == 0 and
+                                  abs(c[stroke] - 2) < .01 and c[length] > 40]
+                    assert len(connectors) == 2, connectors
+                    for connector in connectors:
+                        assert sample(connector) == connector['color']
+                    indicators = [c for c in cs if c['type'] == 0 and
+                                  abs(c['w'] - 24) < .01 and abs(c['h'] - 24) < .01 and
+                                  abs(c['radius'] - 12) < .01]
+                    assert len(indicators) == 3, indicators
+                    return sorted(indicators, key=lambda c: c['y' if vertical else 'x'])
+
+                def mouse_on(command, fraction, press=None):
+                    canvas = page.locator('#preview')
+                    canvas.scroll_into_view_if_needed()
+                    canvas_box = canvas.bounding_box()
+                    before = page.evaluate('cuiGallery.frame')
+                    page.mouse.move(canvas_box['x'] + command['x'] + command['w'] * fraction,
+                                    canvas_box['y'] + command['y'] + command['h'] / 2)
+                    if press == 'down':
+                        page.mouse.down()
+                    page.wait_for_function('previous=>cuiGallery.frame>previous', arg=before)
+
+                assert page.locator('#stepper-mode').input_value() == '2'
+                assert page.locator('#stepper-axis').input_value() == '2'
                 painted('Step 1 of 3')
+                snippets.append(page.locator('#snippet').inner_text())
+                assert 'cui_stepper_present(' in snippets[-1]
+                indicators = fill_geometry(touch)
+                if not touch:
+                    # The unchecked indicator has independent paint for hover and capture.
+                    review = indicators[1]
+                    mouse_on(review, .28)
+                    hovered = fill_geometry(False)[1]
+                    assert hovered['color'] != review['color'], (review, hovered)
+                    assert sample(hovered, .28) == hovered['color']
+                    mouse_on(review, .28, 'down')
+                    pressed = fill_geometry(False)[1]
+                    assert pressed['color'] != hovered['color'], (pressed, hovered)
+                    assert sample(pressed, .28) == pressed['color']
+                    frame = page.evaluate('cuiGallery.frame')
+                    canvas_box = page.locator('#preview').bounding_box()
+                    page.mouse.move(canvas_box['x'] + 5, canvas_box['y'] + 5)
+                    page.mouse.up()
+                    page.wait_for_function('previous=>cuiGallery.frame>previous', arg=frame)
+                    painted('Navigation requests: 0')
+
+                    # Use the same mounted controls through both viewport widths.
+                    frame = page.evaluate('cuiGallery.frame')
+                    page.set_viewport_size({'width': 720, 'height': 1000})
+                    page.wait_for_function('previous=>cuiGallery.frame>previous', arg=frame)
+                    fill_geometry(True)
+                    frame = page.evaluate('cuiGallery.frame')
+                    page.set_viewport_size({'width': width, 'height': 1000})
+                    page.wait_for_function('previous=>cuiGallery.frame>previous', arg=frame)
+                    fill_geometry(False)
+                    change('stepper-design', 9)
+                    fit_axis(True)
+                    change('stepper-design', 0)
+                    fill_geometry(False)
+
+                # Keep legacy and fixed connectors under the existing input/pixel tests.
+                change('stepper-mode', 0)
+                change('stepper-axis', 1)
+                assert not page.locator('#stepper-density').is_visible()
+                painted('Current')
+                snippets.append(page.locator('#snippet').inner_text())
                 change('stepper-mode', 1)
                 assert page.locator('#stepper-density').is_visible()
                 geometry(True)
@@ -156,9 +232,30 @@ def main():
                     change('stepper-axis', 0)
                     geometry(False, span=36, icons=3)
                     snippets.append(page.locator('#snippet').inner_text())
-                # Narrow source layout is not represented as completed responsive flex.
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+                change('stepper-mode', 2)
+                change('stepper-axis', 2)
+                click('Details')
+                painted('Step 1 of 3')
+                painted('Navigation requests: 6')
+                click('Details confirmed')
+                click('Review')
+                painted('Confirm details to continue.')
+                painted('Navigation requests: 7')
+                painted('Step 1 of 3')
+                click('Details confirmed')
+                if touch:
+                    click('Review')
+                else:
+                    target = page.evaluate(TARGET, 'Review')
+                    page.evaluate('(i)=>{cuiGallery.exports.gallery_focus(i);cuiGallery.render();}', target['i'])
+                    page.locator('#preview').focus()
+                    page.keyboard.press('Enter')
+                painted('Navigation requests: 8')
+                painted('Step 2 of 3')
+                snippets.append(page.locator('#snippet').inner_text())
                 # Leave every route-owned choice nondefault before SPA navigation.
+                change('stepper-mode', 1)
                 change('stepper-axis', 0)
                 change('stepper-density', 3)
                 change('stepper-design', 5)
@@ -167,9 +264,9 @@ def main():
                 assert not page.locator('#stepper-controls').is_visible()
                 page.evaluate("location.hash='Stepper'")
                 page.wait_for_function('window.cuiGallery?.renderedComponent==="Stepper"')
-                painted('Step 3 of 3')  # SPA route keeps owner data, resets only controls.
-                assert page.locator('#stepper-mode').input_value() == '0'
-                assert page.locator('#stepper-axis').input_value() == '1'
+                painted('Step 2 of 3')  # SPA route keeps owner data, resets only controls.
+                assert page.locator('#stepper-mode').input_value() == '2'
+                assert page.locator('#stepper-axis').input_value() == '2'
                 assert page.locator('#stepper-density').input_value() == '0'
                 assert page.locator('#stepper-icons').input_value() == '0'
                 assert page.locator('#stepper-design').input_value() == '0'
@@ -184,7 +281,7 @@ def main():
                 subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
                                 '-I'+str(args.source_root.resolve()/'include'), '-c', str(source),
                                 '-o', str(source.with_suffix('.o'))], check=True)
-        print('PASS: desktop DPR1/2 + touch390 DPR2 WASM requests, validation, disabled, connector/icon Canvas pixels, source/shared sizes, route reset and compiled snippets')
+        print('PASS: desktop DPR1/2 + touch390 DPR2 WASM Fill reflow, hover/capture pixels, validation, keyboard and touch, legacy layouts, route reset and compiled snippets')
     finally:
         server.shutdown()
         server.server_close()

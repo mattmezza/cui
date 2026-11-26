@@ -966,28 +966,33 @@
         "cui_stepper",
         "cui_stepper_events",
         "cui_stepper_navigation",
-        "cui_base_stepper_navigation"
+        "cui_base_stepper_navigation",
+        "cui_stepper_present"
       ],
       "state_types": [
-        "cui_step"
+        "cui_step",
+        "cui_stepper_presentation_options"
       ],
       "state_ownership": "Caller owns step descriptors and size_t active step.",
       "interaction": "Legacy reducer updates the active index; additive navigation requests let the application validate and choose the next submitted index.",
-      "usage": "Submit step descriptors and the current step; validate application data before progressing elsewhere.",
+      "usage": "Submit step descriptors and the current step; validate application data before progressing elsewhere. Use the presentation facade for fill connectors with caller-chosen orientation.",
       "docs": [
         "docs/NUMERIC.md",
         "docs/NUMERIC_SELECTION_EVENTS.md",
         "docs/STEPPER_NAVIGATION.md",
         "docs/BINDING_BUILDERS.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_stepper_navigation_fn"
+      ],
       "scope": "styled frame component",
       "name": "Stepper",
       "public_header": "include/cui/cui_numeric.h",
       "composition": "immediate frame submission",
       "additional_public_headers": [
         "include/cui/cui_numeric_selection_events.h",
-        "include/cui/cui_stepper_navigation.h"
+        "include/cui/cui_stepper_navigation.h",
+        "include/cui/cui_stepper_presentation.h"
       ]
     },
     {

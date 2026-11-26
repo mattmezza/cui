@@ -43,6 +43,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_questionnaire_progress.h"
 #include "cui/cui_radio_group.h"
 #include "cui/cui_resizable.h"
+#include "cui/cui_responsive.h"
 #include "cui/cui_root.h"
 #include "cui/cui_scroll.h"
 #include "cui/cui_settings.h"
@@ -51,7 +52,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_speech.h"
 #include "cui/cui_status.h"
 #include "cui/cui_stepper_navigation.h"
-#include "cui/cui_stepper_visual.h"
+#include "cui/cui_stepper_presentation.h"
 #include "cui/cui_styled_slider_model.h"
 #include "cui/cui_surface.h"
 #include "cui/cui_table.h"
@@ -2015,13 +2016,16 @@ static const cui_pagination_labels pagination_labels_fr = {
 };
 static bool stepper_details_confirmed, stepper_validation_failed;
 static unsigned stepper_request_count;
-static bool stepper_visual, stepper_vertical = true, stepper_icons;
+enum { STEPPER_BUTTONS, STEPPER_FIXED_CONNECTORS, STEPPER_FILL };
+enum { STEPPER_HORIZONTAL, STEPPER_VERTICAL, STEPPER_AUTO };
+static int stepper_mode = STEPPER_FILL, stepper_axis = STEPPER_AUTO;
+static bool stepper_icons;
 static cui_stepper_density stepper_density;
 static cui_design_size stepper_design_size;
 static unsigned char stepper_icon_pixels[3][8 * 8 * 4];
-void gallery_stepper_options(int visual, int vertical, int density, int icons, int size) {
-    stepper_visual = visual != 0;
-    stepper_vertical = vertical != 0;
+void gallery_stepper_options(int mode, int axis, int density, int icons, int size) {
+    stepper_mode = mode >= STEPPER_BUTTONS && mode <= STEPPER_FILL ? mode : STEPPER_FILL;
+    stepper_axis = axis >= STEPPER_HORIZONTAL && axis <= STEPPER_AUTO ? axis : STEPPER_AUTO;
     stepper_density = density >= CUI_STEPPER_DENSITY_MD && density <= CUI_STEPPER_DENSITY_LG
                           ? (cui_stepper_density)density
                           : CUI_STEPPER_DENSITY_MD;
@@ -6947,6 +6951,15 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 36: {
+        float available_width = fmaxf(0, width - 48);
+        cui_design_metrics metrics;
+        if (stepper_mode != STEPPER_BUTTONS &&
+            cui_design_measure(stepper_design_size, t.font_size / 16, &metrics))
+            available_width /= fmaxf(1, metrics.font_size / t.font_size);
+        bool vertical = stepper_axis == STEPPER_VERTICAL ||
+                        (stepper_axis == STEPPER_AUTO &&
+                         !cui_responsive_at_least(cui_responsive_query(available_width, NULL),
+                                                  CUI_BREAKPOINT_SM));
         if (cui_checkbox(ui, cui_id_from(ui, "stepper-details"), &t,
                          cui_string("Details confirmed"), &stepper_details_confirmed, disabled))
             stepper_validation_failed = false;
@@ -6959,25 +6972,41 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             {cui_string("Review"), cui_string("Review application"),
              current_step > 1 ? CUI_STEP_COMPLETE : CUI_STEP_PENDING, false},
             {cui_string("Finish"), cui_string("Ready to submit"), CUI_STEP_PENDING, false}};
-        if (stepper_visual) {
-            gallery_stepper_icon_data();
-            cui_stepper_icon icons[3];
-            for (unsigned i = 0; i < 3; ++i)
-                icons[i] = (cui_stepper_icon){.present = true,
-                                              .bitmap = {stepper_icon_pixels[i], 8, 8, 32, 1}};
-            cui_stepper_visual_navigation(
-                ui, cui_id_from(ui, "stepper"), &t, steps, 3, current_step,
-                (cui_stepper_visual_options){.vertical = stepper_vertical,
-                                             .disabled = disabled,
-                                             .density = stepper_density,
-                                             .design_size = stepper_design_size,
-                                             .icons = stepper_icons ? icons : NULL,
-                                             .icon_count = stepper_icons ? 3 : 0},
-                (cui_stepper_navigation_handler){gallery_stepper_request, NULL});
-        } else
-            cui_stepper_navigation(ui, cui_id_from(ui, "stepper"), &t, steps, 3, current_step,
-                                   stepper_vertical, disabled,
-                                   (cui_stepper_navigation_handler){gallery_stepper_request, NULL});
+        cui_id stepper = cui_id_from(ui, "stepper");
+        cui_stepper_navigation_handler handler = {gallery_stepper_request, NULL};
+        if (stepper_mode == STEPPER_BUTTONS)
+            cui_stepper_navigation(ui, stepper, &t, steps, 3, current_step, vertical, disabled,
+                                   handler);
+        else {
+            cui_stepper_icon icons[3] = {0};
+            if (stepper_icons) {
+                gallery_stepper_icon_data();
+                for (unsigned i = 0; i < 3; ++i)
+                    icons[i] = (cui_stepper_icon){.present = true,
+                                                  .bitmap = {stepper_icon_pixels[i], 8, 8, 32, 1}};
+            }
+            cui_stepper_visual_options options = {.vertical = vertical,
+                                                  .disabled = disabled,
+                                                  .density = stepper_density,
+                                                  .design_size = stepper_design_size,
+                                                  .icons = stepper_icons ? icons : NULL,
+                                                  .icon_count = stepper_icons ? 3 : 0};
+            if (stepper_mode == STEPPER_FILL) {
+                cui_stepper_presentation_options presentation = {
+                    .layout = CUI_STEPPER_LAYOUT_FILL,
+                    .height = vertical ? height * .6f : 0,
+                    .custom_palette = true,
+                    .palette = {
+                        .normal = t.secondary,
+                        .hover = cui_color_mix_oklab(t.secondary, t.secondary_foreground, .12f),
+                        .pressed = cui_color_mix_oklab(t.secondary, t.secondary_foreground, .22f),
+                        .foreground = t.secondary_foreground}};
+                cui_stepper_present(ui, stepper, &t, steps, 3, current_step, options, presentation,
+                                    handler);
+            } else
+                cui_stepper_visual_navigation(ui, stepper, &t, steps, 3, current_step, options,
+                                              handler);
+        }
         char status[160];
         snprintf(status, sizeof status, "Step %zu of 3", current_step + 1);
         cui_label(ui, &t, cui_string(status));
@@ -6985,9 +7014,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string(status));
         if (stepper_validation_failed)
             cui_label(ui, &t, cui_string("Confirm details to continue."));
-        cui_label(ui, &t, cui_string("Your app validates each request."));
-        if (stepper_visual)
-            cui_label(ui, &t, cui_string("Centered/responsive styling is partial."));
+
         break;
     }
     case 37: {

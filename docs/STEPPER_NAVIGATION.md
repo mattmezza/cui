@@ -134,29 +134,30 @@ do not claim frozen GPUI pixel fidelity or responsive/centered layout completion
 
 ## WASM gallery
 
-The Stepper story defaults to its original legacy button rendering and controlled
-validation demo. "Rendering" opts into indicators/connectors. Orientation applies
-to both renderers; source density, optional application-owned RGBA bitmap icons
-and shared design scale appear only for visual rendering. "Source density" in
-the design control keeps INHERIT; other choices use the public shared XS..9XL
-metrics. These are independent from the source-density proportions. Leaving the
-story hides and resets its controls; selection/validation remain application-owned.
+The Stepper gallery defaults to **Fill available space** and **Auto** orientation.
+It lays out steps horizontally at the shared SM breakpoint and vertically
+below it. Larger design text increases the width needed for horizontal layout.
+Auto uses the current preview content width, so resizing keeps the active step
+and changes only layout. Choose Vertical or Horizontal to set the axis
+explicitly. Choose Fixed connectors for fixed spacers or Buttons for the
+original rendering. Connector and icon settings appear only in the visual
+layouts. The design scale starts at Inherit. Leaving the story resets the
+controls and keeps the application-owned selection and validation.
 
-The Details confirmed checkbox gates later steps. Rejected requests still count;
-the current step stays unchanged. Same-index requests count too. Disabling the
-story suppresses interaction without erasing progress. The displayed module snippet
-tracks the chosen API/options and includes the controlled owner callback; the icon
-variant includes real static RGBA bytes with renderer-safe lifetime. The application
-must set `owner.confirmed` from its form before submission.
+The **Details confirmed** checkbox gates later steps. Rejected requests and
+requests for the active step both count. A rejected request leaves the active
+step unchanged. Disabling the story suppresses interaction and preserves progress.
+Each displayed C snippet uses the selected API and includes the validation
+callback. In Auto mode, pass your content width each frame. In vertical Fill
+mode, also pass the logical height you want to allocate for the steps. Custom
+icons use static RGBA bytes kept alive through renderer completion.
 
-`tests/web/test_stepper_visual_gallery.py` verifies actual WASM mouse, touch and
-keyboard requests, rejection/disabled behavior, connector geometry and Canvas
-pixel composites at DPR1/2 (including fractional strokes), image alpha/tint,
-source-density glyph suppression, one explicit shared design token and route
-reset. It compiles the exact displayed C snippets with strict C11 warnings.
-Desktop checks include both axes; touch390 uses vertical composition. Centered
-layout, automatic responsive flex growth, arbitrary styling and exact source
-pixel fidelity remain unfinished. The gallery does not establish live AT parity.
+Headless Chromium exercises Fill at desktop DPR1/2 and mobile DPR2. The checks
+cover reflow on resize and larger type, actual connector and hover/press pixels,
+request rejection, keyboard and touch selection, the fixed-layout variants and
+route reset. They compile the displayed snippets with strict C11 warnings.
+Centered crossing connectors, intrinsic text compression and native
+assistive-technology acceptance remain open.
 
 ## Foreign builder visual authoring
 

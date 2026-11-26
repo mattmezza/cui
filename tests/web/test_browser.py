@@ -3007,7 +3007,7 @@ def main():
             page.keyboard.press('Escape')
             page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
             assert page.evaluate('cuiGallery.exports.gallery_semantic(0,7)') == 1
-            for name, initial, key, expected in [('NumberInput', 42, 'ArrowUp', 43), ('Rating', 3, 'ArrowRight', 3.5)]:
+            for name, initial, key, expected in [('NumberInput', 42, 'ArrowUp', 43), ('Rating', 3, 'ArrowRight', 4)]:
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>document.querySelector("#name").textContent===name && cuiGallery.renderedComponent===name', arg=name)
                 page.wait_for_timeout(80)
@@ -3018,7 +3018,12 @@ def main():
                 page.wait_for_function('(expected)=>cuiGallery.exports.gallery_semantic(0,8)===expected', arg=expected)
             page.evaluate('location.hash="Stepper"')
             page.wait_for_function('cuiGallery.renderedComponent==="Stepper"')
-            page.wait_for_timeout(80)
+            # This assertion exercises the legacy Current label. The Fill layout
+            # has its own geometry, state and input checks.
+            frame = page.evaluate('cuiGallery.frame')
+            page.locator('#stepper-mode').select_option('0')
+            page.locator('#stepper-axis').select_option('1')
+            page.wait_for_function('frame=>cuiGallery.frame>frame', arg=frame)
             # This demo now asks the owner to validate navigation. Confirm through
             # the real checkbox before exercising accepted navigation geometry.
             details_index = semantic_index('Details confirmed')

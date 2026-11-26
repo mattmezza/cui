@@ -522,9 +522,10 @@ API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loadin
 
 **Interaction:** Legacy reducer updates the active index; additive navigation requests let the application validate and choose the next submitted index.
 
-**Usage:** Submit step descriptors and the current step; validate application data before progressing elsewhere.
+**Usage:** Submit step descriptors and the current step; validate application data before progressing elsewhere. Use the presentation facade for fill connectors with caller-chosen orientation.
 
-API: `cui_stepper`, `cui_stepper_events`, `cui_stepper_navigation`, `cui_base_stepper_navigation`. [Public header](../include/cui/cui_numeric.h); [controlled requests](../include/cui/cui_stepper_navigation.h); [guide](STEPPER_NAVIGATION.md). Foreign visual authoring: [binding builders](BINDING_BUILDERS.md).
+Use `cui_stepper_present` for the Fill layout and `cui_stepper_navigation` for the
+original button rendering. [Stepper guide](STEPPER_NAVIGATION.md) · [binding builders](BINDING_BUILDERS.md)
 
 Additional event includes: `cui/cui_numeric_selection_events.h`.
 

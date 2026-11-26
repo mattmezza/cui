@@ -82,6 +82,10 @@ def desktop(page):
     wait_after(page, lambda: page.mouse.move(0, 0))
     assert probe(page)['paints'] == initial
 
+    canvas.focus()
+    page.keyboard.press('Tab')
+    page.keyboard.press('ArrowRight')
+    expect(slider).to_have_attribute('aria-valuenow', '4')
     wait_after(page, lambda: page.mouse.click(*point(page, canvas, 3)))
     expect(slider).to_have_attribute('aria-valuenow', '2')
     assert len(probe(page)['paints']) == 7

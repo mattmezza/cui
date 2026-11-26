@@ -50,6 +50,7 @@ SOURCES = ["src/theme/cui_skeleton_palette.c", "src/components/cui_skeleton_pres
            'src/base/cui_stepper_navigation.c',
            'src/components/cui_stepper_navigation.c',
            'src/components/cui_stepper_visual.c',
+           'src/components/cui_stepper_presentation.c',
            'src/base/cui_color_entry.c',
            'src/components/cui_color_entry.c',
            'src/base/cui_disclosure.c', 'src/components/cui_disclosure.c',

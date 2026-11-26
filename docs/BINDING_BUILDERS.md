@@ -299,6 +299,31 @@ The Icon and Badge inbox demonstrates shared SVG, nested controls and
 layout that stays in place as a callback clears a count.
 [JavaScript and TypeScript inbox](NODE_ICON_BADGE.md).
 
+## Configure Pagination from JavaScript and TypeScript
+
+Use `pagination(key)` with the options object below. TypeScript exports `PaginationConfig` and returns a read-only copy from `get_config()`. Check `app.supports_pagination_options()` if the provider can vary. An earlier provider can mount the ordinary pager and deliver its page-change events.
+
+```js
+const {pagination} = require('@cui/native');
+
+const pager = pagination('results').total(24).design_size('base').configure({
+  chevrons: true, jumpMenu: true, visiblePages: 5, availableWidth: 320,
+  group: 'Pages de résultats', previous: 'Précédente', next: 'Suivante',
+  earlierPages: 'Pages précédentes', laterPages: 'Pages suivantes',
+}).on_change(event => console.log(`Loading page ${event.value}`));
+```
+
+The bridge copies the strings. Provide a logical inner width for wrapping, or use zero for one row. A mounted pager can be reconfigured on its owner thread. Call `configure(null)` or `reset_config()` to clear presentation options. Use `design_size('inherit')` to reset the separate size. A page-change callback fires when navigation commits, including when a jump menu selects a page.
+
+Run either checked-in example from the repository root with `CUI_NODE_ADDON` pointing to the built addon:
+
+```sh
+node bindings/node/examples/pagination-options.cjs
+node bindings/typescript/examples/pagination_options.ts
+```
+
+Both examples exercise the result counter in headless mode. The JavaScript example accepts a font path as its first argument to open an SDL window. The TypeScript command uses Node's type-stripping support. [JavaScript source](../bindings/node/examples/pagination-options.cjs) · [TypeScript source](../bindings/typescript/examples/pagination_options.ts)
+
 ## Keep a JavaScript or TypeScript DataTable's scroll position during updates
 
 Pass the row keys as the third argument to `table_data`.

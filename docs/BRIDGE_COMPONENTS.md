@@ -46,7 +46,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Shimmer | `cui_shimmer_text` | copied text, retained state | Single line |
 | List | `cui_list` | selected Item, change, disabled | Up to 64 Items |
 | Menu | `cui_menu` | menu Item action, change, disabled | Up to 64 leaf actions |
-| Pagination | `cui_pagination` | current page, total, change, disabled | One-based page, total <= 1,000,000. The [C bridge](#configure-a-retained-pager-from-c) and [Python](BINDING_BUILDERS.md#configure-pagination-from-python) add sizing, wrapping, page budgets, jump menus and localized navigation. JS/TS, Go and Rust currently expose the numbered single-row layout. |
+| Pagination | `cui_pagination` | current page, total, change, disabled | One-based page, total <= 1,000,000. The [C bridge](#configure-a-retained-pager-from-c), [Python](BINDING_BUILDERS.md#configure-pagination-from-python) and [JS/TS](BINDING_BUILDERS.md#configure-pagination-from-javascript-and-typescript) add sizing, wrapping, page budgets, jump menus and localized navigation. Go and Rust currently expose the numbered single-row layout. |
 | Rating | `cui_rating` | value, maximum, change, disabled | Maximum <= 10 |
 | Stepper | `cui_stepper` / opt-in `cui_stepper_visual_navigation` | selected Item, status, aggregate change, disabled; opt-in density/orientation/shared size and copied RGBA Item icons | Up to 64 Items; visual selection paints on next submission; no foreign controlled REQUEST handlers |
 | DescriptionList | `cui_description_list` | Item label/value pairs | Up to 64 Items, default columns |
@@ -149,7 +149,7 @@ Run configuration on the bridge owner thread outside `cui_bridge_step`. Supply t
 
 The bridge copies each label, up to 127 UTF-8 bytes plus NUL. Empty fields use English defaults. Labels are single-line and control characters are rejected. Configuration storage is allocated only on use, with one 916-byte configuration per configured node plus a single pointer table bounded by the app's node capacity. Invalid updates and allocation failures preserve the prior configuration. Read it back with a size- and version-initialized `cui_bridge_pagination_get_config_v1` output. Passing NULL to the configure call clears the override. Size, value and total use their independent setters.
 
-The existing scalar `CUI_BRIDGE_EVENT_CHANGE` delivers the final page via the normal bridge queue. Configuring, opening or dismissing a jump menu does not add an event. A committed jump uses the same queue and value as a Next action. The frame API's synchronous typed callback remains available through [immediate C submission](NUMERIC_SELECTION_EVENTS.md). Python exposes these options through `PaginationConfig` and uses its existing page-change callback. JS/TS, Go and Rust currently expose their established retained pager and event APIs.
+The existing scalar `CUI_BRIDGE_EVENT_CHANGE` delivers the final page via the normal bridge queue. Configuring, opening or dismissing a jump menu does not add an event. A committed jump uses the same queue and value as a Next action. The frame API's synchronous typed callback remains available through [immediate C submission](NUMERIC_SELECTION_EVENTS.md). Python and JS/TS expose these options with their existing page-change callbacks. Go and Rust currently expose their established retained pager and event APIs.
 
 ### Replace DataTable rows without losing the viewport
 

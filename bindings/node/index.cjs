@@ -139,7 +139,9 @@ class Node {
   design_size(value) {
     if (this.kind === 4) return this.size(value);
     const names = designSizes;
-    if (![30,44].includes(this.kind) || typeof value !== 'string' || !Object.hasOwn(names,value)) throw new TypeError('design_size requires Button, Avatar or Stepper and a supported size');
+    if (![30,42,44].includes(this.kind) || typeof value !== 'string' || !Object.hasOwn(names,value)) throw new TypeError('design_size requires Button, Avatar, Pagination or Stepper and a supported size');
+    if (this.owner && this.kind === 42 && !paginationOptions.supports(this.owner))
+      throw new Error('Pagination V1 requires a complete, compatible bridge symbol group');
     if (this.owner) native.setDesignSize(this.owner.handle,this[NODE],names[value]);
     this.designSizeValue=names[value]; return this;
   }
@@ -466,6 +468,7 @@ const icons = require('./icon-resources.cjs')(native);
 const iconBadges = require('./icon-badge.cjs')(native, Node, NODE, icons, designSizes);
 containers.add(iconBadges.badgeKind);
 const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
+const paginationOptions = require('./pagination-options.cjs')(native, Node, NODE);
 class App {
   constructor(options = {}) {
     if (options.initiallyHidden !== undefined && typeof options.initiallyHidden !== "boolean") throw new TypeError("initiallyHidden must be boolean");
@@ -487,6 +490,7 @@ class App {
     if (!(root instanceof Node) || root.parent || root.owner || ![1,2,76].includes(root.kind)) throw new TypeError('root must be an unattached row, column or root_view');
     preflightDataTables(this, root);
     skeletons.preflight(this, root);
+    paginationOptions.preflight(this, root);
     sliderModels.preflight(this, root);
     localizedTimes.preflight(this, root);
     iconBadges.preflight(this, root);
@@ -513,6 +517,7 @@ class App {
       if(node.kind===55)native.setTime(this.handle,node[NODE],...node.timeValue);
       localizedTimes.mount(this,node);
       skeletons.mount(this, node);
+      paginationOptions.mount(this, node);
       iconBadges.mount(this, node);
       if([57,58].includes(node.kind))native.setDate(this.handle,node[NODE],...node.dateValue);
       if(node.kind===56)native.setColor(this.handle,node[NODE],node.colorValue);
@@ -675,6 +680,7 @@ class App {
       typeof native.configureDataTableLoadMore === 'function' &&
       typeof native.pollDataTableLoadMore === 'function' && native.supportsDataTablePaging();
   }
+  supports_pagination_options() { return paginationOptions.supports(this); }
   supports_skeleton_presentation() { return skeletons.supports(this); }
   supports_localized_time_field(){return localizedTimes.supports(this);}
   enable_localized_time_fields(capacity=4096){return localizedTimes.enable(this,capacity);}

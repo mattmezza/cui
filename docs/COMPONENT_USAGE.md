@@ -434,7 +434,7 @@ API: `cui_notification_init`, `cui_notification_push`, `cui_notifications`. [Pub
 
 **Usage:** Use cui_pagination_ex with cui_pagination_options for shared sizes, responsive rows, a numbered window with optional jump menus, localized navigation labels and labeled or icon-only chevrons. Load or select application data on a page change.
 
-API methods include `cui_pagination`, `cui_pagination_ex` and `cui_pagination_events_ex`. For a retained C node, use `cui_bridge_pagination_configure_v1` and the bridge's scalar event queue. [Public header](../include/cui/cui_numeric.h) · [frame guide](NUMERIC.md#pagination) · [retained C guide](BRIDGE_COMPONENTS.md#configure-a-retained-pager-from-c) · [Python results pager](BINDING_BUILDERS.md#configure-pagination-from-python).
+API methods include `cui_pagination`, `cui_pagination_ex` and `cui_pagination_events_ex`. For a retained C node, use `cui_bridge_pagination_configure_v1` and the bridge's scalar event queue. [Public header](../include/cui/cui_numeric.h) · [frame guide](NUMERIC.md#pagination) · [retained C guide](BRIDGE_COMPONENTS.md#configure-a-retained-pager-from-c) · [Python results pager](BINDING_BUILDERS.md#configure-pagination-from-python) · [JS/TS results pager](BINDING_BUILDERS.md#configure-pagination-from-javascript-and-typescript).
 
 Additional event includes: `cui/cui_numeric_selection_events.h`.
 

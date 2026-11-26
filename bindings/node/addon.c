@@ -2271,6 +2271,7 @@ static void wire_big_out(unsigned char *wire, const void *record, size_t at) {
 #include "slider_model_internal.h"
 #include "time_field_localized_internal.h"
 #include "skeleton_presentation_internal.h"
+#include "pagination_options_internal.h"
 #include "icon_resources_internal.h"
 #include "icon_badge_internal.h"
 // clang-format on
@@ -2401,6 +2402,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("sliderModel", slider_model, 0);
     EXPORT("timeFieldLocalized", time_field_localized, 0);
     EXPORT("skeletonPresentation", skeleton_presentation, 0);
+    EXPORT("paginationOptions", pagination_options, 0);
     EXPORT("iconResource", icon_resource, 0);
     EXPORT("iconNode", icon_node, 0);
     EXPORT("configuredBadge", configured_badge, 0);

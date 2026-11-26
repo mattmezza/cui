@@ -464,3 +464,45 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
    ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/data-table-paging.test.cjs)
  endif()
 endif()
+
+add_test(NAME node_pagination_options COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} --test
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/pagination-options.test.cjs)
+add_test(NAME node_pagination_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/pagination-options.cjs)
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_pagination_types_runtime COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-pagination-types.py
+  --tsc ${CUI_NODE_TSC_EXECUTABLE} --node ${NODE_EXECUTABLE}
+  --output ${CMAKE_CURRENT_BINARY_DIR}/pagination-types)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ add_library(cui_node_pagination_bad_size SHARED test/pagination-size-provider.c)
+ target_include_directories(cui_node_pagination_bad_size PRIVATE ../../include)
+ target_compile_options(cui_node_pagination_bad_size PRIVATE -Wall -Wextra -Wpedantic -Werror)
+ add_test(NAME node_pagination_bad_size COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> LD_PRELOAD=$<TARGET_FILE:cui_node_pagination_bad_size>
+  CUI_PAGINATION_UNSUPPORTED=1 ${NODE_EXECUTABLE} --test
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/pagination-options.test.cjs)
+ foreach(provider legacy partial)
+  string(TOUPPER "${provider}" kind)
+  set(provider_var CUI_NODE_PAGINATION_${kind}_LIBRARY)
+  set(${provider_var} "" CACHE FILEPATH "Existing ${provider} bridge for Pagination compatibility")
+  if(${provider_var})
+   if(NOT EXISTS "${${provider_var}}")
+    message(FATAL_ERROR "${provider_var} must name an existing bridge library")
+   endif()
+   set(target cui_node_pagination_${provider})
+   add_library(${target} MODULE addon.c)
+   target_include_directories(${target} PRIVATE ${NODE_API_INCLUDE_DIR} ../../include)
+   target_link_libraries(${target} PRIVATE "${${provider_var}}" m ${CMAKE_DL_LIBS})
+   target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+   set_target_properties(${target} PROPERTIES PREFIX "" SUFFIX ".node")
+   add_test(NAME node_pagination_${provider} COMMAND ${CMAKE_COMMAND} -E env
+    CUI_NODE_ADDON=$<TARGET_FILE:${target}> CUI_PAGINATION_UNSUPPORTED=1 ${NODE_EXECUTABLE} --test
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/pagination-options.test.cjs)
+  endif()
+ endforeach()
+endif()

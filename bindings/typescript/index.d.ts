@@ -120,8 +120,19 @@ export function icon(key?: string, name?: string): Visual;
 export function message(key?: string, text?: string): Message;
 
 export interface Item extends Label {detail(text: string): this; step_status(value: number): this; checked(value?: boolean): this; is_checked(): boolean}
-export interface Pagination extends NumericControl {total(value: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this; numeric_part_bounds(part: number): Bounds}
-export interface Rating extends Pagination {}
+export interface PagedNumericControl extends NumericControl {total(value: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this; numeric_part_bounds(part: number): Bounds}
+export interface PaginationConfig {
+  counter?: boolean; iconOnly?: boolean; chevrons?: boolean; jumpMenu?: boolean;
+  visiblePages?: number; availableWidth?: number;
+  group?: string; first?: string; previous?: string; next?: string; last?: string;
+  earlierPages?: string; laterPages?: string;
+}
+export interface Pagination extends PagedNumericControl, DesignSized {
+  configure(options: PaginationConfig | null): this;
+  reset_config(): this;
+  get_config(): Readonly<Required<PaginationConfig>> | undefined;
+}
+export interface Rating extends PagedNumericControl {}
 export function list_view(key?: string, text?: string): Group;
 export function menu(key?: string, text?: string): Group;
 export interface Stepper extends Group, DesignSized {stepper_visual(enabled?: boolean, vertical?: boolean, density?: "md" | "xs" | "sm" | "lg"): this; numeric_part_bounds(part: number): Bounds}
@@ -468,6 +479,7 @@ export const ResponsiveSkeleton: {new(key?: string, config?: SkeletonConfigInput
 export function responsive_skeleton(key?: string, config?: SkeletonConfigInput): ResponsiveSkeleton;
 export interface App {
   supports_skeleton_presentation(): boolean;
+  supports_pagination_options(): boolean;
 }
 
 /** Source values are copied into an app-owned Icon resource. */

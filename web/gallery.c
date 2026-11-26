@@ -5875,6 +5875,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             {cui_id_from(ui, "a2"), cui_string("Configuration"), false},
             {cui_id_from(ui, "a3"), cui_string("More details"), false}};
         cui_box panels[3];
+        cui_disclosure_trigger_style styles[3];
         for (size_t i = 0; i < 3; i++) {
             panels[i] = (cui_box){.width = -1,
                                   .padding = t.padding,
@@ -5882,7 +5883,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                   .background = t.surface,
                                   .border = t.border,
                                   .border_width = 1};
+            styles[i] = (cui_disclosure_trigger_style){.custom_hover = true,
+                                                       .hover = t.list_hover,
+                                                       .custom_pressed = true,
+                                                       .pressed = t.list_active,
+                                                       .custom_cursor = true,
+                                                       .cursor = CUI_CURSOR_POINTER};
         }
+        cui_disclosure_presentation presentation = disclosure_presentation();
+        presentation.joined = true;
+        presentation.trigger_styles = styles;
+        presentation.trigger_style_count = 3;
         bool animated = disclosure_mode == 1 || disclosure_mode == 2;
         cui_accordion_present(
             ui, cui_id_from(ui, "accordion"), &t, items, 3, open,
@@ -5897,8 +5908,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                     .dt = host_dt,
                                     .response = .45f,
                                     .reduced_motion = reduced_motion},
-            disclosure_presentation(),
-            disclosure_mode == 3 ? disclosure_nested_panel : animated ? disclosure_panel : panel,
+            presentation,
+            disclosure_mode == 3 ? disclosure_nested_panel
+            : animated           ? disclosure_panel
+                                 : panel,
             &t, (cui_disclosure_handler){0});
         break;
     }

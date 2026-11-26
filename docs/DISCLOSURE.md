@@ -1,8 +1,8 @@
 # Disclosure controls
 
 `cui_disclosure.h` provides unstyled trigger behavior and styled Accordion and
-Collapsible containers. The caller owns expanded booleans. No control allocates
-persistent state. Trigger IDs must remain unique and stable across frames.
+Collapsible containers. The caller owns expansion and motion state. Trigger IDs
+must remain unique and stable across frames.
 
 ```c
 cui_disclosure_item sections[] = {
@@ -82,7 +82,7 @@ and zero fits the content. At a bounded width, a single-line title clips within
 the available lane while its accessible name retains the entire label. Panel
 children choose their own typography. Try **Custom icons and panels** and
 **Nested panels** in the gallery to see alternate indicators and separate,
-caller-owned expansion arrays. **Borderless** removes the default outlines.
+caller-owned expansion arrays.
 
 Each icon name resolves through the same catalog and theme SVG loader as
 `cui_icon_named`. An empty name uses the default chevron for that state. Icons
@@ -91,6 +91,44 @@ Use a custom header callback to compose leading artwork, a badge, or an icon
 from a caller-owned SVG state. An optional `cui_disclosure_handler` observes the
 same [applied transitions](DISCLOSURE_EVENTS.md) as the older event entry points.
 Retained language builders currently expose their existing disclosure controls.
+
+### Joined groups and trigger styles
+
+Set `.joined = true` on the Accordion presenter to put all triggers and panels
+in one card. Dividers follow each section, including its expanded content,
+and the last section has no divider. `options.bordered` draws the rounded
+outline. The gallery's **Borderless** mode keeps the dividers and removes
+that outline. For a custom outer background, padding, radius or clipping,
+supply `container_box`. A nonzero presentation width overrides the box width.
+The default rounded card insets its rectangular child clips inside the corners.
+
+`trigger_styles` contains optional refinements indexed by item, bounded by
+`trigger_style_count`. Collapsible uses the first entry. If more than one custom
+background applies, disabled takes precedence, followed by pressed, hovered
+and expanded. The trigger box supplies the fallback color. Hover and press
+respond to the current layout. Focus independently uses the custom outline
+color, and a custom cursor applies to an enabled trigger. Set each
+`custom_*` flag to apply its value, including transparent colors.
+
+```c
+/* sections and expanded come from application state. */
+cui_disclosure_trigger_style styles[2] = {
+    {.custom_hover = true, .hover = theme.list_hover,
+     .custom_pressed = true, .pressed = theme.list_active,
+     .custom_cursor = true, .cursor = CUI_CURSOR_POINTER},
+    {0},
+};
+cui_accordion_present(ui, 10, &theme, sections, 2, expanded,
+    (cui_accordion_options){.bordered = true, .collapsible = true},
+    (cui_disclosure_presentation){.width = -1, .joined = true,
+        .trigger_styles = styles, .trigger_style_count = 2},
+    draw_section, application, (cui_disclosure_handler){0});
+```
+
+Presentation boxes and trigger styles are borrowed for the submission call.
+Motion state remains valid through `cui_end_frame`.
+
+### Custom headers and panel boxes
 
 Set Accordion `render_header` and `header_user` to compose a custom title, icon,
 badge or other header body. `cui_collapsible_ex` exposes the same callback and
@@ -111,6 +149,8 @@ without replacing base activation or accessible names. Header focus still uses
 the theme focus color and border width; explicitly masked border edges remain
 a caller style decision. Tests assert distinct overridden header/panel bounds
 and colors, fallback styles beyond the array and pointer toggling in both APIs.
+
+### Measured reveal
 
 Opt into measured reveal with a zero-initialized `cui_disclosure_motion` kept in
 application state. Collapsible accepts its pointer; Accordion accepts an array

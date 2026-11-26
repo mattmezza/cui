@@ -446,9 +446,158 @@ static void test_disclosure_presentation(void) {
     cui_destroy(ui);
 }
 
+static size_t count_paint(cui_draw_list list, cui_draw_type type, cui_rect bounds,
+                          cui_color color) {
+    size_t found = 0;
+    for (size_t i = 0; i < list.count; ++i) {
+        const cui_draw_command *cmd = &list.commands[i];
+        found += cmd->type == type && cmd->bounds.x == bounds.x && cmd->bounds.y == bounds.y &&
+                 cmd->bounds.w == bounds.w && cmd->bounds.h == bounds.h &&
+                 cmd->color.r == color.r && cmd->color.g == color.g && cmd->color.b == color.b &&
+                 cmd->color.a == color.a;
+    }
+    return found;
+}
+
+static cui_draw_list joined_scene(cui_context *ui, const cui_theme *theme,
+                                  cui_disclosure_presentation presentation, bool bordered,
+                                  bool expanded[3]) {
+    assert(cui_begin_frame(ui, 400, 480, .016f));
+    (void)cui_accordion_present(ui, 2003, theme, items, 3, expanded,
+                                (cui_accordion_options){.bordered = bordered, .collapsible = true},
+                                presentation, panel, NULL, (cui_disclosure_handler){0});
+    cui_draw_list list = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return list;
+}
+
+static void test_joined_disclosure_styles(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 480});
+    const cui_theme theme = cui_theme_light();
+    const cui_disclosure_trigger_style styles[] = {{.custom_hover = true,
+                                                    .hover = {1, 50, 200, 255},
+                                                    .custom_pressed = true,
+                                                    .pressed = {2, 50, 200, 255},
+                                                    .custom_expanded = true,
+                                                    .expanded = {3, 50, 200, 255},
+                                                    .custom_focus = true,
+                                                    .focus = {4, 50, 200, 255},
+                                                    .custom_cursor = true,
+                                                    .cursor = CUI_CURSOR_CROSSHAIR},
+                                                   {.custom_hover = true,
+                                                    .hover = {5, 50, 200, 255},
+                                                    .custom_disabled = true,
+                                                    .disabled = {6, 50, 200, 255},
+                                                    .custom_cursor = true,
+                                                    .cursor = CUI_CURSOR_CROSSHAIR}};
+    cui_disclosure_presentation p = {
+        .width = 240, .joined = true, .trigger_styles = styles, .trigger_style_count = 2};
+    bool expanded[] = {true, false, false};
+    assert(ui);
+    cui_draw_list list = joined_scene(ui, &theme, p, true, expanded);
+    cui_rect outer = cui_bounds(ui, 2003), first = cui_bounds(ui, 10), second = cui_bounds(ui, 20);
+    cui_rect third = cui_bounds(ui, 30);
+    cui_rect content = cui_bounds(ui, 10 ^ UINT64_C(0x1d8f322539deca61));
+    cui_rect divider = {first.x, content.y + content.h, first.w, 1};
+    assert(outer.w == 240 && first.w == second.w && second.w == third.w && first.w == content.w);
+    assert(content.y == first.y + first.h && second.y == divider.y + 1);
+    assert(third.y == second.y + second.h + 1);
+    assert(count_paint(list, CUI_DRAW_BORDER, outer, theme.border) == 1);
+    assert(count_paint(list, CUI_DRAW_BORDER, first, theme.border) == 0);
+    assert(count_paint(list, CUI_DRAW_RECT, divider, theme.border) == 1);
+    assert(count_paint(list, CUI_DRAW_RECT, (cui_rect){third.x, third.y + third.h, third.w, 1},
+                       theme.border) == 0);
+    assert(count_paint(list, CUI_DRAW_RECT, first, styles[0].expanded) == 1);
+    assert(count_paint(list, CUI_DRAW_RECT, second, styles[1].disabled) == 1);
+
+    // Use different frames to observe live hover, capture, and release.
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = first.x + 2, .y = first.y + 2}));
+    list = joined_scene(ui, &theme, p, true, expanded);
+    assert(count_paint(list, CUI_DRAW_RECT, first, styles[0].hover) == 1);
+    assert(cui_pointer_cursor(ui) == CUI_CURSOR_CROSSHAIR);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = first.x + 2, .y = first.y + 2}));
+    list = joined_scene(ui, &theme, p, true, expanded);
+    assert(count_paint(list, CUI_DRAW_RECT, first, styles[0].pressed) == 1);
+    assert(count_paint(list, CUI_DRAW_BORDER, first, styles[0].focus) == 1);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = second.x + 2, .y = second.y + 2}));
+    list = joined_scene(ui, &theme, p, true, expanded);
+    assert(count_paint(list, CUI_DRAW_RECT, first, styles[0].expanded) == 1);
+    assert(count_paint(list, CUI_DRAW_RECT, second, styles[1].disabled) == 1);
+    assert(count_paint(list, CUI_DRAW_RECT, second, styles[1].hover) == 0);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = second.x + 2, .y = second.y + 2}));
+    list = joined_scene(ui, &theme, p, true, expanded);
+    assert(expanded[0] && cui_pointer_cursor(ui) != CUI_CURSOR_CROSSHAIR);
+    key(ui, CUI_KEY_SPACE);
+    list = joined_scene(ui, &theme, p, true, expanded);
+    assert(count_paint(list, CUI_DRAW_RECT, first, styles[0].pressed) == 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+    joined_scene(ui, &theme, p, true, expanded);
+    assert(!expanded[0]);
+
+    // Intrinsic width fits the longest trigger, including its icon.
+    p.width = 0;
+    list = joined_scene(ui, &theme, p, false, expanded);
+    outer = cui_bounds(ui, 2003);
+    first = cui_bounds(ui, 10);
+    third = cui_bounds(ui, 30);
+    assert(first.w > 32 && first.w == third.w && third.w == outer.w);
+    assert(count_paint(list, CUI_DRAW_BORDER, outer, theme.border) == 0);
+    assert(count_paint(list, CUI_DRAW_RECT, (cui_rect){first.x, first.y + first.h, first.w, 1},
+                       theme.border) == 1);
+    cui_box container = {.width = 260, .padding = 6, .radius = 8, .background = {2, 19, 72, 255}};
+    p.container_box = &container;
+    list = joined_scene(ui, &theme, p, true, expanded);
+    outer = cui_bounds(ui, 2003);
+    first = cui_bounds(ui, 10);
+    assert(outer.w == 260 && first.w == 248 && first.x == outer.x + 6);
+    assert(count_paint(list, CUI_DRAW_RECT, outer, container.background) == 1);
+
+    assert(cui_begin_frame(ui, 400, 480, .016f));
+    bool open = true;
+    (void)cui_collapsible_present(ui, 2500, &theme, cui_string("Collapsible"), &open,
+                                  (cui_collapsible_options){0}, p, panel, NULL,
+                                  (cui_disclosure_handler){0});
+    list = cui_end_frame(ui);
+    cui_rect solo = cui_bounds(ui, 2500);
+    assert(cui_last_error(ui) == CUI_OK && solo.w == 248);
+    assert(count_paint(list, CUI_DRAW_RECT, solo, styles[0].expanded) == 1);
+    assert(count_paint(list, CUI_DRAW_BORDER, solo, theme.border) == 1);
+
+    // Hover paint uses the same corner normalization as the ordinary box fill.
+    const cui_box trigger = {.width = -1,
+                             .height = 36,
+                             .row = true,
+                             .radius = NAN,
+                             .custom_corners = true,
+                             .corner_radii = {-1, 4, INFINITY, 3}};
+    assert(cui_begin_frame(ui, 400, 480, .016f));
+    (void)cui_collapsible_present(ui, 2500, &theme, cui_string("Collapsible"), &open,
+                                  (cui_collapsible_options){.trigger_box = &trigger}, p, panel,
+                                  NULL, (cui_disclosure_handler){0});
+    list = cui_end_frame(ui);
+    solo = cui_bounds(ui, 2500);
+    assert(cui_last_error(ui) == CUI_OK);
+    assert(count_paint(list, CUI_DRAW_RECT, solo, styles[0].expanded) == 1);
+    for (size_t i = 0; i < list.count; ++i) {
+        const cui_draw_command *cmd = &list.commands[i];
+        if (cmd->type == CUI_DRAW_RECT && cmd->color.r == styles[0].expanded.r &&
+            cmd->color.b == styles[0].expanded.b) {
+            assert(cmd->custom_corners);
+            assert(cmd->corner_radii.top_left == 0 && cmd->corner_radii.top_right == 4 &&
+                   cmd->corner_radii.bottom_left == 0 && cmd->corner_radii.bottom_right == 3);
+        }
+    }
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_disclosure_chevron();
     test_disclosure_presentation();
+    test_joined_disclosure_styles();
     test_measured_reveal();
     test_configured_disclosure_springs();
     test_accordion_reveal_storage();

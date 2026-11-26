@@ -26,7 +26,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Shared-size and custom SVG disclosure presenters and their synchronous observer are immediate C APIs. Retained builders keep their existing disclosure presentation and event delivery."
+        "Shared sizes, named SVG icons, joined cards, per-trigger styles and synchronous observers are immediate C APIs. Retained builders keep their existing presentation and event delivery."
       ]
     },
     {
@@ -135,7 +135,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Shared-size and custom SVG disclosure presenters and their synchronous observer are immediate C APIs. Retained builders keep their existing disclosure presentation and event delivery."
+        "Shared sizes, named SVG icons, custom outer boxes, per-trigger styles and synchronous observers are immediate C APIs. Retained builders keep their existing presentation and event delivery."
       ]
     },
     {

@@ -51,17 +51,38 @@ typedef struct {
     float dt, response;
     bool reduced_motion;
 } cui_collapsible_options;
+/* Optional visual refinements for one trigger. Custom colors can be transparent.
+ * The first applicable custom background wins: disabled, pressed, hovered, then
+ * expanded. Otherwise use the normal trigger box background. Focus independently
+ * overrides the outline color. A custom cursor applies to enabled triggers. */
+typedef struct {
+    bool custom_hover, custom_pressed, custom_expanded, custom_disabled, custom_focus;
+    cui_color hover, pressed, expanded, disabled, focus;
+    bool custom_cursor;
+    cui_cursor cursor;
+} cui_disclosure_trigger_style;
 /* Optional presentation for the styled _present entry points. Width zero fits
  * content, -1 fills the parent, and a positive width uses logical pixels.
- * Per-trigger/panel box overrides and render_header still take precedence.
+ * Per-trigger/panel box overrides replace their default boxes. A custom header
+ * replaces the title and icon. Trigger state colors refine the resolved box.
  * The default trigger keeps the full accessible label and clips long visible
  * titles at bounded widths. Icons are decorative catalog names (or paths),
  * borrowed during submission and resolved using the theme's SVG loader.
- * Empty icon names use the built-in chevrons for their respective states. */
+ * Empty icon names use the built-in chevrons for their respective states.
+ * joined places Accordion rows in one continuous surface with separators.
+ * Accordion options.bordered selects the outer outline in that mode. An
+ * optional container box replaces the default outer box. A nonzero width above
+ * overrides the box width; items still stack vertically. Trigger styles are
+ * indexed by item, or index zero for Collapsible. Optional boxes and styles are
+ * read during submission. */
 typedef struct {
     cui_design_size design_size;
     float width;
     cui_str collapsed_icon, expanded_icon;
+    bool joined;
+    const cui_box *container_box;
+    const cui_disclosure_trigger_style *trigger_styles;
+    size_t trigger_style_count;
 } cui_disclosure_presentation;
 typedef void (*cui_disclosure_panel_fn)(cui_context *, size_t index, void *user);
 /* Applied transition observers: see cui_disclosure_events.h. */

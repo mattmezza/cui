@@ -35,6 +35,64 @@ def verify_disclosure_accessibility(page, component):
     assert page.evaluate('[2,3].map(f=>cuiGallery.exports.gallery_pointer_stats(f))') == current['before']
 
 
+def verify_joined_accordion(page):
+    page.evaluate('location.hash="Accordion"')
+    page.wait_for_function('window.cuiGallery?.renderedComponent==="Accordion"')
+    page.locator('#disclosure-mode').select_option('0')
+    page.locator('#disclosure-multiple').uncheck()
+    canvas = page.locator('canvas')
+    canvas.scroll_into_view_if_needed()
+    page.mouse.move(0, 0)
+    snapshot = """() => {
+        const e = cuiGallery.exports, decode = new TextDecoder();
+        const fields = (fn, i, a, b) => Array.from({length:b-a+1}, (_,k)=>fn(i,a+k));
+        const semantic = (name, role) => {
+            for (let i=0; i<e.gallery_semantic_count(); i++) {
+                if (e.gallery_semantic(i,0)!==role) continue;
+                const text = decode.decode(new Uint8Array(e.memory.buffer,
+                    e.gallery_semantic_name(i), e.gallery_semantic_length(i)));
+                if (text===name) return fields(e.gallery_semantic,i,1,4);
+            }
+            return null;
+        };
+        const commands = Array.from({length:e.gallery_count()}, (_,i)=>
+            fields(e.gallery_command,i,0,9));
+        const first = semantic('Getting started',1), next = semantic('Configuration',1);
+        if (!first || !next) return null;
+        const sameBounds = (c,b) => b.every((v,j)=>Math.abs(c[j+1]-v)<.01);
+        const divider = commands.some(c=>c[0]===0 &&
+            sameBounds(c,[next[0],next[1]-1,next[2],1]));
+        const outline = commands.find(c=>c[0]===1 && c[9]>0 &&
+            c[1]<=first[0] && c[2]<=first[1] && c[3]>=first[2] &&
+            c[2]+c[4]>=next[1]+next[3]);
+        const fill = commands.find(c=>c[0]===0 && sameBounds(c,first))?.slice(5,9)??null;
+        return {first,next,divider,outline,fill};
+    }"""
+    idle = page.wait_for_function(f'()=>{{const s=({snapshot})();'
+                                  'return s?.outline && s.divider && !s.fill ? s : null}').json_value()
+    x, y, width, height = idle['first']
+    box = canvas.bounding_box()
+    point = (box['x'] + x + width / 2, box['y'] + y + height / 2)
+    page.mouse.move(*point)
+    hovered = page.wait_for_function(f'()=>({snapshot})()?.fill').json_value()
+    assert canvas.evaluate("(node)=>getComputedStyle(node).cursor") == 'pointer'
+    page.mouse.down()
+    page.wait_for_function(f'(color)=>{{const s=({snapshot})(); '
+                           'return s?.fill && s.fill.join()!==color.join()}', arg=hovered)
+    row = page.locator('#accessible button[aria-label="Getting started"]')
+    expected = 'false' if row.get_attribute('aria-expanded') == 'true' else 'true'
+    page.mouse.up()
+    page.wait_for_function('value=>document.querySelector('
+                           '`#accessible button[aria-label="Getting started"]`).'
+                           'getAttribute("aria-expanded")===value', arg=expected)
+    after = page.evaluate(snapshot)
+    assert after['divider'] and after['outline']
+    page.mouse.move(0, 0)
+    page.locator('#disclosure-mode').select_option('4')
+    page.wait_for_function(f'()=>{{const s=({snapshot})();return s?.divider&&!s.outline}}')
+    assert '.joined = true' in page.locator('#snippet').text_content()
+
+
 def verify_pagination_tooltips(page):
     """Real mouse movement and Escape exercise the C tooltip in WASM."""
     semantic_bounds = """({name, role}) => {
@@ -533,9 +591,10 @@ def main():
             if args.disclosure_only:
                 page = browser.new_page()
                 page.goto(f'http://127.0.0.1:{server.server_port}/cui/#Accordion')
+                verify_joined_accordion(page)
                 verify_disclosure_accessibility(page, 'Accordion')
                 verify_disclosure_accessibility(page, 'Collapsible')
-                print('Accordion and Collapsible semantic activation passed without pointer input.')
+                print('Joined Accordion paint and both disclosure semantic activation tests passed.')
                 browser.close()
                 return
             if args.attachment_only:
@@ -2208,6 +2267,7 @@ def main():
             page.wait_for_function('document.querySelector(`#accessible button[aria-label="Getting started"]`)?.getAttribute("aria-expanded")==="true"&&document.querySelector(`#accessible button[aria-label="Configuration"]`)?.getAttribute("aria-expanded")==="true"')
             assert page.locator('#accessible [role=group][aria-label="Getting started"]').count() == 1
             assert page.locator('#accessible [role=group][aria-label="Configuration"]').count() == 1
+            verify_joined_accordion(page)
             verify_disclosure_accessibility(page, 'Accordion')
             verify_disclosure_accessibility(page, 'Collapsible')
             control_change('theme', '0')

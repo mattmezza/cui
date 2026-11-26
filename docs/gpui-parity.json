@@ -22,7 +22,7 @@
       },
       "limitations": [
         "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending.",
-        "The frozen styled source has a bordered outer card with separators and per-item hover/style refinement. CUI provides independent framed headers and per-item trigger/panel box overrides plus header composition. A group-root and per-state refinement audit, retained presentation and physical accessibility remain open."
+        "Joined mode provides one outer card, dividers after whole sections, custom outer box and per-trigger background, focus outline and cursor styles. Inherited and state-specific typography/layout and separator styling, retained presentation and physical accessibility remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -77,6 +77,14 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_disclosure_events.c",
+            "tests/web/test_browser.py"
+          ]
+        },
+        {
+          "name": "joined group border, section dividers and per-trigger state paint",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c",
             "tests/web/test_browser.py"
           ]
         }
@@ -1113,7 +1121,7 @@
       },
       "limitations": [
         "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending.",
-        "The sized, named SVG presentation and typed observer are immediate C APIs. Physical native accessibility and retained presentation remain open."
+        "The sized, named SVG presentation, optional container and trigger styles, and typed observer are immediate C APIs. Physical native accessibility and retained presentation remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

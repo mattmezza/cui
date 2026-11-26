@@ -433,6 +433,40 @@ def run_cases(a):
         assert '.ellipsis_viewport = viewport' in a.page.locator('#snippet').text_content()
     a.case('Pagination', 'touch opens and scrolls an ellipsis menu before jumping to a page',
            pagination_ellipsis)
+    def pagination_localized_chevrons():
+        viewport = a.page.viewport_size
+        try:
+            a.page.set_viewport_size({'width': 390, 'height': viewport['height']})
+            a.configure('pagination-mode', 0)
+            a.tap(a.target('First', 1))
+            a.configure('design-size', 7)  # 2xl
+            a.configure('pagination-mode', 3)
+            a.configure('pagination-language', 'fr')
+            assert a.page.locator('#pagination-visible-pages').is_visible()
+            names = [s['name'] for s in a.snapshot() if s['f'][0] == 1]
+            assert 'Première' not in names and 'Dernière' not in names
+            prev, next_page = a.target('Précédente', 1), a.target('Suivante', 1)
+            assert prev['f'][2] < next_page['f'][2] and next_page['f'][4] == 56
+            assert 'Précédente' in a.texts() and 'Suivante' in a.texts()
+            snippet = a.page.locator('#snippet').text_content()
+            assert 'CUI_PAGINATION_NAV_CHEVRONS' in snippet and '.labels = &labels' in snippet
+            a.tap(next_page)
+            assert a.target('Pages de résultats', 9)['f'][8] == 2
+            a.tap(a.target('Pages suivantes', 1))
+            assert a.target('Pages suivantes', 15)['f'][17] == 1
+            a.page.locator('canvas').press('Escape')
+            a.configure('design-size', 14)  # 9xl preserves the whole caption and chevron.
+            canvas = a.page.locator('canvas')
+            canvas_width = canvas.evaluate('e => e.clientWidth')
+            assert canvas.evaluate('e => e.parentElement.clientWidth') < canvas_width
+            for label in ('Précédente', 'Suivante'):
+                bounds = a.target(label, 1)['f']
+                assert bounds[1] + bounds[3] <= canvas_width - 24, label
+                assert label in a.texts()
+        finally:
+            a.page.set_viewport_size(viewport)
+    a.case('Pagination', 'translated chevrons and jump menus work at 390px',
+           pagination_localized_chevrons)
     def calendar():
         day = a.target(role=1, predicate=lambda s: s['name'].endswith('-25'))
         a.tap(day)

@@ -320,7 +320,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The retained builders use the numbered single-row layout. The C frame API adds the design-size scale, whole-item wrapping, page budgets, optional interactive ellipses, icon-only navigation and synchronous typed aggregate observation."
+        "The retained builders use the numbered single-row layout. The C frame API adds the design-size scale, whole-item wrapping, page budgets, optional interactive ellipses, localized labels, labeled or icon-only chevrons and synchronous typed aggregate observation."
       ]
     },
     {

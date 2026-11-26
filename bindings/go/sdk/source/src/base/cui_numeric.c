@@ -502,6 +502,22 @@ cui_number_result cui_base_number_input(cui_context *ui, cui_id id, cui_str name
         cui_invalidate(ui);
     return result;
 }
+static cui_str cui_pagination_label_or(cui_str label, cui_str fallback) {
+    return label.data && label.length ? label : fallback;
+}
+cui_pagination_labels cui_pagination_resolve_labels(const cui_pagination_labels *labels) {
+    cui_pagination_labels provided = labels ? *labels : (cui_pagination_labels){0};
+    return (cui_pagination_labels){
+        .group = cui_pagination_label_or(provided.group, (cui_str)CUI_STR("Pagination")),
+        .first = cui_pagination_label_or(provided.first, (cui_str)CUI_STR("First")),
+        .previous = cui_pagination_label_or(provided.previous, (cui_str)CUI_STR("Previous")),
+        .next = cui_pagination_label_or(provided.next, (cui_str)CUI_STR("Next")),
+        .last = cui_pagination_label_or(provided.last, (cui_str)CUI_STR("Last")),
+        .earlier_pages =
+            cui_pagination_label_or(provided.earlier_pages, (cui_str)CUI_STR("Earlier pages")),
+        .later_pages =
+            cui_pagination_label_or(provided.later_pages, (cui_str)CUI_STR("Later pages"))};
+}
 bool cui_base_pagination(cui_context *ui, cui_id id, size_t *page, size_t total, bool compact,
                          bool disabled) {
     return cui_base_pagination_ex(
@@ -524,6 +540,7 @@ bool cui_base_pagination_reduce_internal(cui_context *ui, cui_id id, size_t *pag
     else if (*page > total)
         *page = total;
     bool numbered = !options.compact && !options.icon_only;
+    bool ends = cui_pagination_has_end_buttons(options);
     bool disabled = options.disabled;
     cui_page_item old_items[CUI_PAGINATION_MAX_ITEMS];
     size_t old_count =
@@ -538,13 +555,13 @@ bool cui_base_pagination_reduce_internal(cui_context *ui, cui_id id, size_t *pag
         cui_id activation = cui_event_activation(ui, e);
         if (!activation)
             continue;
-        if (activation == cui_numeric_part_id(id, 1) && total && !options.icon_only)
+        if (activation == cui_numeric_part_id(id, 1) && total && ends)
             *page = 1;
         else if (activation == cui_numeric_part_id(id, 2) && *page > 1)
             --*page;
         else if (activation == cui_numeric_part_id(id, 3) && *page < total)
             ++*page;
-        else if (activation == cui_numeric_part_id(id, 4) && total && !options.icon_only)
+        else if (activation == cui_numeric_part_id(id, 4) && total && ends)
             *page = total;
         else
             for (size_t i = 0; i < old_count; ++i)
@@ -552,11 +569,12 @@ bool cui_base_pagination_reduce_internal(cui_context *ui, cui_id id, size_t *pag
                     activation == cui_numeric_part_id(id, 10 + (unsigned)i))
                     *page = old_items[i].page;
     }
-    cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Pagination"), disabled, false, (float)*page);
+    cui_pagination_labels labels = cui_pagination_resolve_labels(options.labels);
+    cui_interact(ui, id, CUI_ROLE_GROUP, labels.group, disabled, false, (float)*page);
     cui_set_tab_stop(ui, id, false);
-    const char *names[] = {"First", "Previous", "Next", "Last"};
-    for (unsigned i = options.icon_only ? 1 : 0; i < (options.icon_only ? 3u : 4u); ++i)
-        cui_interact(ui, cui_numeric_part_id(id, 1 + i), CUI_ROLE_BUTTON, cui_string(names[i]),
+    const cui_str names[] = {labels.first, labels.previous, labels.next, labels.last};
+    for (unsigned i = ends ? 0 : 1; i < (ends ? 4u : 3u); ++i)
+        cui_interact(ui, cui_numeric_part_id(id, 1 + i), CUI_ROLE_BUTTON, names[i],
                      disabled || !total || (i < 2 ? *page <= 1 : *page >= total), false, 0);
     size_t count =
         numbered ? cui_pagination_visible_items(*page, total, options.visible_pages, old_items) : 0;

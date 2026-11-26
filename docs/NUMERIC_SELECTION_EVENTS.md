@@ -36,10 +36,11 @@ and perform them after the outer call returns. Styled paint rereads the owner;
 owner mutation during observation has no supported rendering contract.
 
 The `cui_pagination_events_ex` and `cui_base_pagination_events_ex` entrypoints
-also accept the bounded numbered window and icon-only navigation options. They
-observe changes with the same synchronous timing and aggregation. Numbered
-destinations use the configured entry window, and omitted First and Last
-controls cannot activate in icon-only mode. The Styled ellipsis-menu opt-in
+also accept the bounded numbered window, localized labels, and labeled or
+icon-only chevrons. They observe changes with the same synchronous timing and
+aggregation. Numbered destinations use the configured entry window. Queued
+First and Last activations are ignored when the new layout omits those buttons.
+The Styled ellipsis-menu opt-in
 submits the chosen destination at the Menu activation's actual input index
 in the existing reduce loop. Opening, scrolling and dismissing the Menu
 produce zero Pagination changes. A selected page uses the same aggregate

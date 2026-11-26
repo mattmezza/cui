@@ -194,8 +194,17 @@ typedef struct {
     cui_id popup_trigger;
     bool row_open;
 } cui_pagination_layout;
+static void cui_pagination_paint_icon(cui_context *ui, cui_id id, const cui_theme *theme,
+                                      const char *icon, float size, cui_color color) {
+    cui_icon_named(ui, cui_numeric_part_id(id, 0), theme, cui_string(icon),
+                   (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                      .custom_size = size,
+                                      .custom_color = true,
+                                      .color = color});
+}
 static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *layout, cui_id id,
-                                      cui_str label, bool disabled, bool icon) {
+                                      cui_str label, bool disabled, const char *leading_icon,
+                                      const char *trailing_icon) {
     const cui_theme *t = layout->theme;
     const cui_design_metrics *m = layout->metrics;
     cui_color text = id ? (disabled ? t->muted : t->on_primary) : (disabled ? t->muted : t->text);
@@ -207,10 +216,14 @@ static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *la
         return;
     }
     float width = m->control_height;
-    if (!icon) {
+    float icon_size = fminf(m->indicator_size, m->control_height);
+    bool has_icon = leading_icon || trailing_icon;
+    if (label.length) {
         width = ceilf(cui_measure_text(ui, label, m->font_size).width);
         if (id)
             width += 2 * ceilf(m->padding_x);
+        if (has_icon)
+            width += ceilf(icon_size) + ceilf(m->gap);
     }
     if (layout->available_width > 0) {
         float occupied = layout->occupied + ceilf(m->gap) + width;
@@ -228,7 +241,9 @@ static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *la
     }
     if (id)
         cui_begin_box(ui, id,
-                      (cui_box){.width = width,
+                      (cui_box){.row = has_icon,
+                                .gap = has_icon ? m->gap : 0,
+                                .width = width,
                                 .height = m->control_height,
                                 .fixed_width = true,
                                 .fixed_height = true,
@@ -245,16 +260,13 @@ static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *la
                                                     .payload_bytes = sizeof(anchor),
                                                     .command_budget = 1});
     }
-    if (icon)
-        cui_icon_named(
-            ui, cui_numeric_part_id(id, 0), t, label,
-            (cui_icon_options){.size = CUI_ICON_CUSTOM,
-                               .custom_size = fminf(m->indicator_size, m->control_height),
-                               .custom_color = true,
-                               .color = text});
-    else
+    if (leading_icon)
+        cui_pagination_paint_icon(ui, id, t, leading_icon, icon_size, text);
+    if (label.length)
         /* Center the font's measured line box inside the fixed control height. */
         cui_text_line(ui, label, m->font_size, text, 0, (cui_text_style){0});
+    if (trailing_icon)
+        cui_pagination_paint_icon(ui, id, t, trailing_icon, icon_size, text);
     if (id)
         cui_end_box(ui);
 }
@@ -291,8 +303,8 @@ static cui_id cui_pagination_gap_id(cui_id id, unsigned side) {
 static cui_id cui_pagination_popup_id(cui_id id, unsigned side) {
     return cui_numeric_part_id(id, 7 + side);
 }
-static cui_str cui_pagination_gap_name(unsigned side) {
-    return cui_string(side ? "Later pages" : "Earlier pages");
+static cui_str cui_pagination_gap_name(const cui_pagination_labels *labels, unsigned side) {
+    return side ? labels->later_pages : labels->earlier_pages;
 }
 static void cui_pagination_open_menu(cui_context *ui, cui_pagination_menu *state, cui_id id,
                                      unsigned side, cui_pagination_gap gap, cui_rect anchor) {
@@ -322,6 +334,7 @@ static void cui_pagination_menu_activated(void *user, const cui_menu_command *ev
 }
 static cui_pagination_menu *cui_pagination_reduce_menu(cui_context *ui, cui_id id, size_t page,
                                                        size_t total, cui_pagination_options options,
+                                                       const cui_pagination_labels *labels,
                                                        cui_pagination_jump *jump) {
     if (!id || !cui_frame_sequence(ui))
         return NULL;
@@ -375,7 +388,7 @@ static cui_pagination_menu *cui_pagination_reduce_menu(cui_context *ui, cui_id i
         cui_id action = 0;
         cui_menu_command command = {0};
         cui_base_menu_tree_events(
-            ui, cui_pagination_gap_id(id, state->side), cui_pagination_gap_name(state->side),
+            ui, cui_pagination_gap_id(id, state->side), cui_pagination_gap_name(labels, state->side),
             state->entries, state->count, &action, &state->menu, false, cui_frame_delta(ui), false,
             (cui_menu_command_handler){cui_pagination_menu_activated, &command});
         if (action && command.command == action &&
@@ -389,7 +402,8 @@ static cui_pagination_menu *cui_pagination_reduce_menu(cui_context *ui, cui_id i
     return state;
 }
 static void cui_pagination_paint_menu(cui_context *ui, cui_id id, const cui_theme *theme,
-                                      cui_pagination_menu *state, cui_rect viewport) {
+                                      cui_pagination_menu *state, cui_rect viewport,
+                                      const cui_pagination_labels *labels) {
     if (!state || !state->menu.overlay.open)
         return;
     cui_id trigger = cui_pagination_gap_id(id, state->side);
@@ -399,7 +413,8 @@ static void cui_pagination_paint_menu(cui_context *ui, cui_id id, const cui_them
     cui_size label =
         cui_measure_text(ui, state->entries[state->count - 1].label, metrics.font_size);
     cui_menu_popup_paint(
-        ui, theme, cui_pagination_gap_name(state->side), state->entries, state->count, &state->menu,
+        ui, theme, cui_pagination_gap_name(labels, state->side), state->entries, state->count,
+        &state->menu,
         anchor,
         (cui_menu_tree_options){.popup = {.viewport = viewport,
                                           .side = CUI_POPUP_BELOW,
@@ -423,6 +438,9 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
         !cui_design_measure(options.design_size, t->font_size / 16, &metrics))
         return false;
     bool icon = options.icon_only, disabled = options.disabled;
+    bool ends = cui_pagination_has_end_buttons(options);
+    bool chevrons = icon || options.navigation == CUI_PAGINATION_NAV_CHEVRONS;
+    cui_pagination_labels labels = cui_pagination_resolve_labels(options.labels);
     cui_rect viewport = options.ellipsis_viewport;
     bool menus = !icon && !options.compact && (viewport.w != 0 || viewport.h != 0);
     if (menus && (!isfinite(viewport.x) || !isfinite(viewport.y) || !isfinite(viewport.w) ||
@@ -430,7 +448,7 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
         return false;
     cui_pagination_jump jump = {0};
     cui_pagination_menu *menu =
-        menus ? cui_pagination_reduce_menu(ui, id, *page, total, options, &jump) : NULL;
+        menus ? cui_pagination_reduce_menu(ui, id, *page, total, options, &labels, &jump) : NULL;
     bool changed;
     if (handler) {
         cui_numeric_selection_event_result result =
@@ -456,16 +474,16 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
                                                          ? cui_pagination_gap_id(id, menu->side)
                                                          : 0};
     cui_begin_box(ui, id, (cui_box){.row = !wrap, .gap = metrics.gap, .align_y = CUI_ALIGN_CENTER});
-    if (!icon)
-        cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 1), cui_string("First"),
-                                  disabled || *page <= 1, false);
+    if (ends)
+        cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 1), labels.first,
+                                  disabled || *page <= 1, NULL, NULL);
     cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 2),
-                              cui_string(icon ? "chevron-left" : "Previous"),
-                              disabled || *page <= 1, icon);
+                              icon ? (cui_str){0} : labels.previous, disabled || *page <= 1,
+                              chevrons ? "chevron-left" : NULL, NULL);
     if (!icon && options.compact) {
         char label[64];
         snprintf(label, sizeof(label), "%zu / %zu", *page, total);
-        cui_pagination_paint_item(ui, &layout, 0, cui_string(label), false, false);
+        cui_pagination_paint_item(ui, &layout, 0, cui_string(label), false, NULL, NULL);
     } else if (!icon) {
         cui_page_item items[CUI_PAGINATION_MAX_ITEMS];
         size_t n = cui_pagination_visible_items(*page, total, options.visible_pages, items);
@@ -474,37 +492,37 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
                 unsigned side = items[i + 1].page > *page;
                 cui_id trigger = cui_pagination_gap_id(id, side);
                 bool open = menu && menu->side == side && menu->menu.overlay.open;
-                cui_interact(ui, trigger, CUI_ROLE_BUTTON, cui_pagination_gap_name(side), disabled,
-                             open, 0);
+                cui_interact(ui, trigger, CUI_ROLE_BUTTON, cui_pagination_gap_name(&labels, side),
+                             disabled, open, 0);
                 cui_set_semantic_details(
                     ui, trigger,
                     (cui_semantic_details){.parent = id,
                                            .expanded = open,
                                            .controls = cui_pagination_popup_id(id, side),
                                            .cursor = CUI_CURSOR_POINTER});
-                cui_pagination_paint_item(ui, &layout, trigger, cui_string("ellipsis"), disabled,
-                                          true);
+                cui_pagination_paint_item(ui, &layout, trigger, (cui_str){0}, disabled, "ellipsis",
+                                          NULL);
             } else if (items[i].ellipsis)
-                cui_pagination_paint_item(ui, &layout, 0, cui_string("..."), true, false);
+                cui_pagination_paint_item(ui, &layout, 0, cui_string("..."), true, NULL, NULL);
             else {
                 char label[32];
                 snprintf(label, sizeof(label), "%zu", items[i].page);
                 cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 10 + (unsigned)i),
                                           cui_string(label), disabled || items[i].page == *page,
-                                          false);
+                                          NULL, NULL);
             }
         }
     }
     cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 3),
-                              cui_string(icon ? "chevron-right" : "Next"),
-                              disabled || !total || *page >= total, icon);
-    if (!icon)
-        cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 4), cui_string("Last"),
-                                  disabled || !total || *page >= total, false);
+                              icon ? (cui_str){0} : labels.next, disabled || !total || *page >= total,
+                              NULL, chevrons ? "chevron-right" : NULL);
+    if (ends)
+        cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 4), labels.last,
+                                  disabled || !total || *page >= total, NULL, NULL);
     if (layout.row_open)
         cui_end_box(ui);
     cui_end_box(ui);
-    cui_pagination_paint_menu(ui, id, t, menu, viewport);
+    cui_pagination_paint_menu(ui, id, t, menu, viewport, &labels);
     return changed;
 }
 bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page, size_t total,

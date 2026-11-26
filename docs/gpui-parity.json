@@ -2333,7 +2333,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. The optional C ellipsis menus expose up to 100 omitted pages per direction. Configurable label slots and foreign layout options remain open."
+        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. The optional C ellipsis menus expose up to 100 omitted pages per direction. Text and accessible names can be localized. Optional labeled chevrons omit separate First/Last controls. Foreign layout options and physical-host acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2378,6 +2378,14 @@
         },
         {
           "name": "bounded ellipsis jump menus and stale selection rejection",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric_selection_events.c",
+            "tests/web/test_touch_components.py"
+          ]
+        },
+        {
+          "name": "localized labels and labeled chevron navigation",
           "status": "tested",
           "evidence": [
             "tests/unit/test_numeric_selection_events.c",

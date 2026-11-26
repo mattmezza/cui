@@ -26,7 +26,7 @@ The original `cui_pagination` uses the theme's sizes in a single row. Its alloca
 
 Set `.visible_pages = 10` in `cui_pagination_options` to show ten numbered buttons, including the first and last pages. The contiguous middle window shifts near each end so it can use the whole budget. Positive budgets clamp to 5 through 32, and up to two extra ellipses label the gaps. Zero selects the existing radius-two window. Use `cui_pagination_visible_items` with `CUI_PAGINATION_MAX_ITEMS` caller slots when painting a custom view. The window arithmetic supports totals through `SIZE_MAX`.
 
-Set `.icon_only = true` to show just Previous and Next with SVG chevrons. Both buttons keep their accessible labels and boundary disabling. This takes priority over `.compact` and the numbered budget. The gallery offers **Page counter**, **Numbered pages** and **Arrows only**.
+Set `.icon_only = true` to show just Previous and Next with SVG chevrons. Both buttons keep their accessible labels and boundary disabling. This takes priority over `.compact`, the numbered budget and `.navigation`. Set `.navigation = CUI_PAGINATION_NAV_CHEVRONS` to keep the visible Previous and Next labels and add inline chevrons. This layout omits the separate First and Last controls and works with both numbered and counter layouts. The gallery offers **Page counter**, **Numbered pages**, **Arrows only** and **Numbered with chevrons**.
 
 Use `cui_pagination_ex` with `cui_pagination_options` for the shared XS through 9XL sizing and single-line labels. BASE and MD are equivalent. INHERIT uses theme metrics. A positive `available_width` wraps between whole items in navigation order. Supply the current container's inner width in logical pixels each frame. Zero keeps one row. An item wider than the available width keeps its natural width, so provide a sufficiently wide or horizontally scrollable parent for extreme sizes and long page counts. The counter aligns with the controls in its row.
 
@@ -61,7 +61,32 @@ bool draw_numbered_results(cui_context *ui, cui_id id, const cui_theme *theme,
 }
 ```
 
-Opening, scrolling and dismissing the menu leave the page unchanged. Select a row by pointer, touch, keyboard or accessibility activation to commit in that frame. Escape or a pointer press outside dismisses the menu. Focus returns to the ellipsis when it is still present, or to the corresponding Previous or Next control after a jump removes it. Use a stable pager ID across frames. Changing the owner page, total or budget closes the existing menu and rejects its queued row actions. The retained binding builders provide the numbered single-row presentation. Configurable labels and foreign exposure of the C layout options remain open.
+Opening, scrolling and dismissing the menu leave the page unchanged. Select a row by pointer, touch, keyboard or accessibility activation to commit in that frame. Escape or a pointer press outside dismisses the menu. Focus returns to the ellipsis when it is still present, or to the corresponding Previous or Next control after a jump removes it. Use a stable pager ID across frames. Changing the owner page, total or budget closes the existing menu and rejects its queued row actions. The retained binding builders provide the numbered single-row presentation. Foreign exposure of the extended C options remains open.
+
+### Translate the navigation
+
+Pass a `cui_pagination_labels` through `.labels` to name the group, navigation buttons and ellipsis menus in your application's language. Each empty field falls back to its English default. Supply single-line UTF-8 spans and keep both the descriptor and spans valid and unchanged through the call, including its synchronous callback. CUI copies the submitted text and accessible names into the frame. No application strings are held by persistent menu state. Icons keep these accessible names even when no caption is visible. The Base API uses the same labels for group and button semantics in custom layouts. Numbered pages keep their decimal labels.
+
+```c
+static const cui_pagination_labels french_pages = {
+    .group = CUI_STR("Pages de résultats"),
+    .previous = CUI_STR("Précédente"),
+    .next = CUI_STR("Suivante"),
+    .earlier_pages = CUI_STR("Pages précédentes"),
+    .later_pages = CUI_STR("Pages suivantes"),
+};
+
+/* Use these options inside the UI frame with the current available space. */
+cui_pagination_options options = {
+    .design_size = CUI_DESIGN_BASE,
+    .available_width = content_width,
+    .visible_pages = 5,
+    .ellipsis_viewport = viewport,
+    .navigation = CUI_PAGINATION_NAV_CHEVRONS,
+    .labels = &french_pages,
+};
+cui_pagination_ex(ui, id, theme, &page, total, options);
+```
 
 ## Rating
 

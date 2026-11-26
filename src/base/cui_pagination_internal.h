@@ -5,6 +5,10 @@
 typedef struct {
     size_t page, input_index; /* Zero page means no menu selection. */
 } cui_pagination_jump;
+static inline bool cui_pagination_has_end_buttons(cui_pagination_options options) {
+    return !options.icon_only && options.navigation != CUI_PAGINATION_NAV_CHEVRONS;
+}
+cui_pagination_labels cui_pagination_resolve_labels(const cui_pagination_labels *);
 bool cui_base_pagination_reduce_internal(cui_context *, cui_id, size_t *, size_t total,
                                          cui_pagination_options, cui_pagination_jump);
 cui_numeric_selection_event_result

@@ -1933,6 +1933,16 @@ static cui_number_state number_state;
 static double number = 42;
 static size_t page_number = 3, current_step;
 static unsigned pagination_mode, pagination_visible_pages = 5;
+static bool pagination_french;
+static const cui_pagination_labels pagination_labels_fr = {
+    .group = CUI_STR("Pages de résultats"),
+    .first = CUI_STR("Première"),
+    .previous = CUI_STR("Précédente"),
+    .next = CUI_STR("Suivante"),
+    .last = CUI_STR("Dernière"),
+    .earlier_pages = CUI_STR("Pages précédentes"),
+    .later_pages = CUI_STR("Pages suivantes"),
+};
 static bool stepper_details_confirmed, stepper_validation_failed;
 static unsigned stepper_request_count;
 static bool stepper_visual, stepper_vertical = true, stepper_icons;
@@ -6750,9 +6760,15 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                    .available_width = fmaxf(1, width - 48),
                                                    .visible_pages = pagination_visible_pages,
                                                    .icon_only = pagination_mode == 2,
-                                                   .ellipsis_viewport = {0, 0, width, height}});
+                                                   .ellipsis_viewport = {0, 0, width, height},
+                                                   .navigation = pagination_mode == 3
+                                                       ? CUI_PAGINATION_NAV_CHEVRONS
+                                                       : CUI_PAGINATION_NAV_DEFAULT,
+                                                   .labels = pagination_french
+                                                       ? &pagination_labels_fr : NULL});
         char text[64];
-        snprintf(text, sizeof(text), "Page %zu of 20", page_number);
+        snprintf(text, sizeof(text), pagination_french ? "Page %zu sur 20" : "Page %zu of 20",
+                 page_number);
         cui_label(ui, &t, cui_string(text));
         break;
     }
@@ -8067,9 +8083,10 @@ int gallery_checkbox_state(int state) {
         check_state = (cui_check_state)state;
     return check_state;
 }
-void gallery_pagination_options(unsigned mode, unsigned visible_pages) {
-    pagination_mode = mode <= 2 ? mode : 0;
+void gallery_pagination_options(unsigned mode, unsigned visible_pages, bool french) {
+    pagination_mode = mode <= 3 ? mode : 0;
     pagination_visible_pages = visible_pages;
+    pagination_french = french;
 }
 void gallery_design_options(int size, int radius, float spacing) {
     design_size = size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL ? (cui_design_size)size

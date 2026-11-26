@@ -77,6 +77,13 @@ bool cui_base_pagination(cui_context *, cui_id, size_t *, size_t total, bool com
                          bool disabled);
 bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page, size_t total,
                     bool compact, bool disabled);
+typedef enum {
+    CUI_PAGINATION_NAV_DEFAULT = 0,
+    CUI_PAGINATION_NAV_CHEVRONS /* Previous and Next with labels and chevrons, without First/Last. */
+} cui_pagination_navigation;
+typedef struct {
+    cui_str group, first, previous, next, last, earlier_pages, later_pages;
+} cui_pagination_labels;
 typedef struct {
     bool compact, disabled;
     cui_design_size design_size; /* INHERIT uses theme metrics. */
@@ -88,8 +95,14 @@ typedef struct {
     /* Styled numbered mode only. Set an absolute logical viewport to enable
      * ellipsis menus. Zero dimensions keep passive ellipses. */
     cui_rect ellipsis_viewport;
+    cui_pagination_navigation navigation; /* icon_only takes precedence. */
+    /* Optional UTF-8, single-line labels for controls and accessible names.
+     * Empty fields use English defaults. Keep the struct and text valid and
+     * unchanged through submission, including callbacks. Nothing is retained. */
+    const cui_pagination_labels *labels;
 } cui_pagination_options;
-/* Same owner and result as cui_base_pagination. Ignores presentation metrics. */
+/* Same owner and result as cui_base_pagination. Uses navigation and labels for
+ * button availability and semantics. Styled metrics and menus are ignored. */
 bool cui_base_pagination_ex(cui_context *, cui_id, size_t *, size_t total, cui_pagination_options);
 /* Same owner and result as cui_pagination. Invalid size or width does not submit. */
 bool cui_pagination_ex(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page,

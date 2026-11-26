@@ -204,6 +204,87 @@ ellipsis_frame(fixture *f, size_t total, cui_pagination_options options, bool pa
     assert(cui_last_error(f->ui) == CUI_OK);
     return result;
 }
+static void pagination_localized_navigation(void) {
+    fixture f = make();
+    f.value = 3;
+    char next[] = {'S', 'u', 'i', 'v', 'a', 'n', 't', 'e'};
+    const cui_pagination_labels labels = {
+        .group = CUI_STR("Pages de résultats"),
+        .first = CUI_STR("Première"),
+        .previous = CUI_STR("Précédente"),
+        .next = {next, sizeof(next)},
+        .last = CUI_STR("Dernière"),
+        .later_pages = CUI_STR("Pages suivantes"),
+    };
+    cui_pagination_options options = {.design_size = CUI_DESIGN_BASE,
+                                      .available_width = 352,
+                                      .visible_pages = 5,
+                                      .ellipsis_viewport = {0, 0, 400, 420},
+                                      .labels = &labels};
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    assert(pagination_node(&f, CUI_ROLE_GROUP, "Pages de résultats"));
+    assert(pagination_node(&f, CUI_ROLE_BUTTON, "Première"));
+    assert(pagination_node(&f, CUI_ROLE_BUTTON, "Dernière"));
+    assert(pagination_node(&f, CUI_ROLE_BUTTON, "Suivante"));
+    next[0] = 'X';
+    assert(pagination_node(&f, CUI_ROLE_BUTTON, "Suivante"));
+    bool copied_label = false;
+    for (size_t i = 0; i < f.draw.count; ++i) {
+        const cui_draw_command *c = &f.draw.commands[i];
+        copied_label |= c->type == CUI_DRAW_TEXT && c->text.length == sizeof(next) &&
+                        !memcmp(c->text.data, "Suivante", sizeof(next));
+    }
+    assert(copied_label);
+    next[0] = 'S';
+
+    activate(&f, 4); /* Queued while the old layout still offers Last. */
+    options.navigation = CUI_PAGINATION_NAV_CHEVRONS;
+    options.available_width = 195;
+    assert(!ellipsis_frame(&f, 20, options, false, false).control && f.value == 3 && !f.calls);
+    assert(!pagination_node(&f, CUI_ROLE_BUTTON, "Première"));
+    assert(!pagination_node(&f, CUI_ROLE_BUTTON, "Dernière"));
+    for (unsigned part = 2; part <= 3; ++part) {
+        const char *label = part == 2 ? "Précédente" : "Suivante";
+        const cui_semantic *button = pagination_node(&f, CUI_ROLE_BUTTON, label);
+        assert(button && button->id == cui_numeric_part_id(2, part));
+        cui_rect bounds = cui_bounds(f.ui, button->id);
+        cui_rect icon = {0}, title = {0};
+        for (size_t i = 0; i < f.draw.count; ++i) {
+            const cui_draw_command *c = &f.draw.commands[i];
+            cui_rect box = c->bounds;
+            if (box.x < bounds.x || box.x + box.w > bounds.x + bounds.w ||
+                box.y < bounds.y || box.y + box.h > bounds.y + bounds.h)
+                continue;
+            if (c->type == CUI_DRAW_IMAGE)
+                icon = box;
+            if (c->type == CUI_DRAW_TEXT && c->text.length == strlen(label) &&
+                !memcmp(c->text.data, label, c->text.length))
+                title = box;
+        }
+        assert(icon.w > 0 && title.w > 0);
+        assert(part == 2 ? icon.x + icon.w < title.x : title.x + title.w < icon.x);
+        assert(fabsf(icon.y + icon.h / 2 - (bounds.y + bounds.h / 2)) <= 1);
+        assert(fabsf(title.y + title.h / 2 - (bounds.y + bounds.h / 2)) <= 1);
+    }
+    click(&f, 3, .85f); /* Icon and label have one full-width hit target. */
+    assert(ellipsis_frame(&f, 20, options, false, false).change_count == 1 && f.value == 4);
+    const cui_semantic *gap = pagination_node(&f, CUI_ROLE_BUTTON, "Pages suivantes");
+    assert(gap);
+    pagination_action(&f, gap->id);
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    assert(pagination_node(&f, CUI_ROLE_MENU, "Pages suivantes"));
+    pagination_key(&f, CUI_KEY_ESCAPE);
+    ellipsis_frame(&f, 20, options, false, false);
+    assert(!pagination_node(&f, CUI_ROLE_MENU, "Pages suivantes"));
+
+    options.icon_only = true;
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    assert(pagination_node(&f, CUI_ROLE_BUTTON, "Précédente"));
+    assert(pagination_node(&f, CUI_ROLE_BUTTON, "Suivante"));
+    for (size_t i = 0; i < f.draw.count; ++i)
+        assert(f.draw.commands[i].type != CUI_DRAW_TEXT);
+    cui_destroy(f.ui);
+}
 static void pagination_ellipsis_menu(void) {
     fixture f = make();
     f.value = 205;
@@ -665,6 +746,7 @@ static void paired_input(bool styled) {
 int main(void) {
     sized_pagination();
     pagination_modes();
+    pagination_localized_navigation();
     pagination_ellipsis_menu();
     for (unsigned styled = 0; styled < 2; ++styled) {
         pagination(styled != 0);

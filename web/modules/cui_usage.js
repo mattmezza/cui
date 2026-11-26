@@ -4,18 +4,28 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
  'CUI_DESIGN_2XL', 'CUI_DESIGN_3XL', 'CUI_DESIGN_4XL', 'CUI_DESIGN_5XL',
  'CUI_DESIGN_6XL', 'CUI_DESIGN_7XL', 'CUI_DESIGN_8XL', 'CUI_DESIGN_9XL'];
 
-export function paginationUsage(size, disabled = false, mode = 0, visiblePages = 5) {
+export function paginationUsage(size, disabled = false, mode = 0, visiblePages = 5, french = false) {
+ const numbered = mode === 1 || mode === 3;
  const layout = mode === 2 ? '.icon_only = true' :
-                mode === 1 ? `.visible_pages = ${visiblePages}, .ellipsis_viewport = viewport` : '.compact = true';
+                numbered ? `.visible_pages = ${visiblePages}, .ellipsis_viewport = viewport` : '.compact = true';
+ const navigation = mode === 3 ? ',\n                                 .navigation = CUI_PAGINATION_NAV_CHEVRONS' : '';
+ const labels = french ? `static const cui_pagination_labels labels = {
+    .group = CUI_STR("Pages de résultats"),
+    .first = CUI_STR("Première"), .previous = CUI_STR("Précédente"),
+    .next = CUI_STR("Suivante"), .last = CUI_STR("Dernière"),
+    .earlier_pages = CUI_STR("Pages précédentes"), .later_pages = CUI_STR("Pages suivantes"),
+};
+
+` : '';
  return `#include <cui/cui_numeric.h>
 
-/* The application retains page and supplies the layout's current content width. */
+${labels}/* The application retains page and supplies the layout's current content width. */
 bool draw_results_pages(cui_context *ui, cui_id id, const cui_theme *theme,
-                        size_t *page, size_t total_pages, float content_width${mode === 1 ? ', cui_rect viewport' : ''}) {
+                        size_t *page, size_t total_pages, float content_width${numbered ? ', cui_rect viewport' : ''}) {
     return cui_pagination_ex(ui, id, theme, page, total_pages,
         (cui_pagination_options){${layout}, .disabled = ${disabled},
                                  .design_size = ${sizes[size] || 'CUI_DESIGN_BASE'},
-                                 .available_width = content_width});
+                                 .available_width = content_width${navigation}${french ? ',\n                                 .labels = &labels' : ''}});
 }`;
 }
 

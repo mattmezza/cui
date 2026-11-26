@@ -3,8 +3,9 @@
 ## Unreleased
 
 - Accordion and Collapsible built-in titles can use separate hover,
-  keyboard-focus and press typography and color in immediate and retained C.
-  The gallery demonstrates all three states with copyable examples.
+  keyboard-focus and press typography and color in immediate C, retained C,
+  Python, JavaScript, TypeScript, Go and Rust. The gallery demonstrates all
+  three states with copyable examples.
 
 ## 0.1.0-alpha.10
 

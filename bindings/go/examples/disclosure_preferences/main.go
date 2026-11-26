@@ -50,6 +50,15 @@ func main() {
 			Typography: &cui.DisclosureTypography{FontSize: 19, LineHeight: 26, Weight: cui.DisclosureWeightBold, Wrap: true},
 		}))
 	}
+	titleStates, err := app.SupportsDisclosureTitleState()
+	must(err)
+	if titleStates {
+		must(sections.SetDisclosureTitleState(cui.DisclosureTitleHovered, &cui.DisclosureTitleStyle{
+			Typography: &cui.DisclosureTypography{FontSize: 17, LineHeight: 24, Weight: cui.DisclosureWeightSemibold, Wrap: true},
+		}))
+		focus := uint32(0x275dccff)
+		must(sections.SetDisclosureTitleState(cui.DisclosureTitleFocusVisible, &cui.DisclosureTitleStyle{TitleRGBA: &focus}))
+	}
 	dividers, err := app.SupportsDisclosureDivider()
 	must(err)
 	if dividers {

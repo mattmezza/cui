@@ -72,6 +72,22 @@ const (
 	DisclosureHeadingDisabled
 )
 
+// DisclosureTitleState names an interaction style for a built-in title.
+type DisclosureTitleState uint32
+
+const (
+	DisclosureTitleHovered      DisclosureTitleState = C.CUI_BRIDGE_DISCLOSURE_TITLE_HOVERED
+	DisclosureTitleFocusVisible DisclosureTitleState = C.CUI_BRIDGE_DISCLOSURE_TITLE_FOCUS_VISIBLE
+	DisclosureTitlePressed      DisclosureTitleState = C.CUI_BRIDGE_DISCLOSURE_TITLE_PRESSED
+)
+
+// DisclosureTitleStyle refines typography or color for one interaction.
+// Nil inherits, and a pointer to zero selects transparent text.
+type DisclosureTitleStyle struct {
+	Typography *DisclosureTypography
+	TitleRGBA  *uint32
+}
+
 type DisclosureWeight uint32
 
 const (
@@ -125,6 +141,7 @@ type disclosureStyleWire = C.cui_bridge_disclosure_trigger_style_v1
 type disclosureHeadingWire = C.cui_bridge_disclosure_heading_v1
 type disclosureDividerWire = C.cui_bridge_disclosure_divider_v1
 type disclosureHeadingLayers [DisclosureHeadingDisabled + 1]*disclosureHeadingWire
+type disclosureTitleStyles [DisclosureTitlePressed + 1]*disclosureHeadingWire
 
 func disclosureExtent(v float32) bool { return v >= 0 && v <= 4096 }
 
@@ -367,6 +384,45 @@ func (n *Node) SetDisclosureHeading(layer DisclosureHeadingLayer, style *Disclos
 		}
 	}
 	n.disclosureHeadings[layer] = wire
+	return nil
+}
+
+// DisclosureTitleState copies a title style in a builder chain.
+func (n *Node) DisclosureTitleState(state DisclosureTitleState, style DisclosureTitleStyle) *Node {
+	if n.err == nil {
+		n.err = n.SetDisclosureTitleState(state, &style)
+	}
+	return n
+}
+
+// SetDisclosureTitleState copies an interaction style onto Accordion,
+// Collapsible, or a direct Accordion Item. Nil or an empty style clears it.
+func (n *Node) SetDisclosureTitleState(state DisclosureTitleState, style *DisclosureTitleStyle) error {
+	if n == nil || n.removed ||
+		(n.kind != C.CUI_BRIDGE_ACCORDION && n.kind != C.CUI_BRIDGE_COLLAPSIBLE && n.kind != C.CUI_BRIDGE_ITEM) {
+		return errors.New("title style requires a live Accordion, Collapsible or Accordion Item")
+	}
+	if state > DisclosureTitlePressed {
+		return errors.New("invalid disclosure title state")
+	}
+	var wire *disclosureHeadingWire
+	if style != nil {
+		record, err := (DisclosureHeading{
+			Typography: style.Typography, TitleRGBA: style.TitleRGBA,
+		}).wire()
+		if err != nil {
+			return err
+		}
+		if record.fields != 0 {
+			wire = &record
+		}
+	}
+	if n.app != nil {
+		if err := n.setDisclosureTitleState(state, wire); err != nil {
+			return err
+		}
+	}
+	n.disclosureTitles[state] = wire
 	return nil
 }
 

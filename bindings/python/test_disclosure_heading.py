@@ -7,6 +7,7 @@ from unittest.mock import Mock
 from cui_bridge import (
     App, DisclosureConfig, DisclosureHeadingLayer as Layer, DisclosureHeading as Heading,
     DisclosureHeadingBox as Box, DisclosureTypography as Typography, DisclosureDivider as Divider,
+    DisclosureTitleState as State, DisclosureTitleStyle as Title,
     accordion, item, column, label,
 )
 from cui_bridge.disclosure import bind_api, Heading as WireHeading, Divider as WireDivider
@@ -31,7 +32,7 @@ class HeadingTests(unittest.TestCase):
         for create in invalid_records:
             with self.assertRaises((ValueError, TypeError)):
                 create()
-        for family in ('heading', 'divider'):
+        for family in ('heading', 'divider', 'title_state'):
             symbol = 'cui_bridge_disclosure_set_' + family + '_v1'
             api = SimpleNamespace(lib=SimpleNamespace(**{symbol: Mock()}))
             bind_api(api, Mock())
@@ -39,6 +40,52 @@ class HeadingTests(unittest.TestCase):
             self.assertIsNotNone(getattr(api, 'disclosure_' + family))
             self.assertIsNone(getattr(api, 'disclosure_' + other_family))
             self.assertIsNone(api.disclosure)
+
+    def test_title_state_lifecycle(self):
+        with self.assertRaises(TypeError):
+            Title(typography={})
+        with self.assertRaises(ValueError):
+            Title(title_rgba=-1)
+        with self.assertRaises(TypeError):
+            accordion('title-group').set_disclosure_title_state(0, Title())
+        with self.assertRaises(TypeError):
+            Title(box=Box())
+        with App() as app:
+            supported = app.supports_disclosure_title_state()
+            unavailable = any(os.environ.get(key) == '1' for key in (
+                'CUI_TEST_LEGACY_DISCLOSURE', 'CUI_TEST_TITLE_STATE_UNAVAILABLE',
+            ))
+            self.assertEqual(supported, not unavailable)
+            node = item('title', 'Title').children(label('Body'))
+            events = []
+            node.on_change(events.append)
+            group = accordion('title-group').children(node)
+            group.set_disclosure_title_state(State.HOVERED, Title(title_rgba=0))
+            root = column().children(group)
+            if not supported:
+                with self.assertRaisesRegex(RuntimeError, 'optional'):
+                    app.mount(root)
+                group.set_disclosure_title_state(State.HOVERED, None)
+                app.mount(root)
+                return
+            app.mount(root)
+            app.step()
+            app._api.disclosure_heading = None
+            self.assertTrue(app.supports_disclosure_title_state())
+            node.set_disclosure_title_state(State.PRESSED, Title(typography=Typography(18)))
+            x, y, _, _ = app.bounds(node)
+            app.queue_pointer('down', x + 10, y + 10)
+            app.queue_pointer('up', x + 10, y + 10)
+            app.step()
+            node.set_disclosure_title_state(State.PRESSED, None)
+            group.set_disclosure_title_state(State.HOVERED, Title())
+            self.assertEqual(events, [])
+            app.dispatch()
+            self.assertEqual(len(events), 1)
+            app._api.disclosure_title_state = None
+            self.assertFalse(app.supports_disclosure_title_state())
+            with self.assertRaisesRegex(RuntimeError, 'optional'):
+                node.set_disclosure_title_state(State.HOVERED, Title(title_rgba=0))
 
     def test_geometry_reset_and_events(self):
         with App() as app:

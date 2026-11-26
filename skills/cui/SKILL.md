@@ -85,8 +85,10 @@ Pass `cui_disclosure_appearance` for inherited title tokens, state boxes and
 joined divider styles. The `_present_with_title_states` variants add hover,
 keyboard-focus and press typography and color for built-in enabled titles.
 Retained C can copy those states with `cui_bridge_disclosure_set_title_state_v1`.
-Language builders expose the normal, expanded and disabled heading layers.
-See `docs/DISCLOSURE.md`.
+For language builders, probe `supports_disclosure_title_state`
+(`SupportsDisclosureTitleState` in Go) independently. Use
+`DisclosureTitleStyle` for copied interaction typography and color.
+See `docs/DISCLOSURE.md` and the runnable workspace preferences examples.
 For retained Accordion and Collapsible sizes, SVG indicators and trigger
 styles, probe `supports_disclosure_presentation` (`SupportsDisclosurePresentation`
 in Go), then copy a `DisclosureConfig`. Read queued `checked` events after

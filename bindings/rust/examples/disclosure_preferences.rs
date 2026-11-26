@@ -1,8 +1,8 @@
 //! Workspace preferences. Pass a TrueType font path for the native SDL window.
 use cui_builders::{
     App, DesignSize, DisclosureConfig, DisclosureCursor, DisclosureDivider, DisclosureHeading,
-    DisclosureHeadingLayer, DisclosureTriggerStyle, DisclosureTypography, DisclosureWeight, Kind,
-    Phase, Result,
+    DisclosureHeadingLayer, DisclosureTitleState, DisclosureTitleStyle, DisclosureTriggerStyle,
+    DisclosureTypography, DisclosureWeight, Kind, Phase, Result,
 };
 use std::{cell::Cell, rc::Rc};
 
@@ -93,6 +93,30 @@ fn main() -> Result<()> {
                 }),
             )?;
         }
+    }
+    if app.supports_disclosure_title_state() {
+        app.set_disclosure_title_state(
+            sections,
+            DisclosureTitleState::Hovered,
+            Some(&DisclosureTitleStyle {
+                typography: Some(DisclosureTypography {
+                    font_size: 17.,
+                    line_height: 24.,
+                    weight: DisclosureWeight::Semibold,
+                    wrap: true,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+        )?;
+        app.set_disclosure_title_state(
+            sections,
+            DisclosureTitleState::FocusVisible,
+            Some(&DisclosureTitleStyle {
+                title_rgba: Some(0x275dccff),
+                ..Default::default()
+            }),
+        )?;
     }
     if app.supports_disclosure_divider() {
         app.set_disclosure_divider(

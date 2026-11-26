@@ -29,6 +29,10 @@ try {
     editor.set_trigger_style({hoverRgba: 0x4879e02b, cursor: 'pointer'});
     advanced.disclosure_configure({width: 360, borderless: true});
   }
+  if (app.supports_disclosure_title_state()) {
+    sections.set_disclosure_title_state('hovered', {titleRgba: 0x275dccff});
+    advanced.set_disclosure_title_state('focus-visible', {typography: {fontSize: 17, weight: 2}});
+  }
   if (app.supports_disclosure_heading()) {
     sections.set_disclosure_heading('normal', {
       box: {width: -1, height: 44, padding: 12, gap: 8},

@@ -806,6 +806,10 @@ export interface App {
   supports_disclosure_presentation(): boolean;
 }
 
+export type DisclosureTitleState = "hovered" | "focus-visible" | "pressed";
+export interface DisclosureTitleStyle {
+  typography?: DisclosureTypography | null; titleRgba?: number | null;
+}
 export type DisclosureHeadingLayer = "normal" | "expanded" | "disabled";
 export interface DisclosureHeadingBox {
   width?: number; height?: number; padding?: number; gap?: number;
@@ -824,12 +828,15 @@ export interface DisclosureHeading {
 }
 export interface DisclosureDivider { thickness?: number; insetLeft?: number; insetRight?: number; colorRgba?: number; }
 export interface DisclosureConfigured {
+  set_disclosure_title_state(state: DisclosureTitleState, style: DisclosureTitleStyle | null): this;
   set_disclosure_heading(layer: DisclosureHeadingLayer, style: DisclosureHeading | null): this;
 }
 export interface DisclosureTriggerStyled {
+  set_disclosure_title_state(state: DisclosureTitleState, style: DisclosureTitleStyle | null): this;
   set_disclosure_heading(layer: DisclosureHeadingLayer, style: DisclosureHeading | null): this;
 }
 export interface App {
+  supports_disclosure_title_state(): boolean;
   supports_disclosure_heading(): boolean;
   supports_disclosure_divider(): boolean;
 }

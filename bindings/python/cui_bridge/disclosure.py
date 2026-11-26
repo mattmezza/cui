@@ -144,6 +144,14 @@ class DisclosureHeadingLayer(IntEnum):
     DISABLED = 2
 
 
+class DisclosureTitleState(IntEnum):
+    """Interaction title overrides, resolved hovered, focus-visible, pressed."""
+
+    HOVERED = 0
+    FOCUS_VISIBLE = 1
+    PRESSED = 2
+
+
 def _dimension(value, minimum=0):
     if type(value) not in (int, float) or not minimum <= value <= 4096:
         raise ValueError('invalid disclosure dimension')
@@ -237,6 +245,41 @@ class DisclosureHeading:
 
 
 @dataclass(frozen=True)
+class DisclosureTitleStyle:
+    """Optional title typography and color; omitted fields inherit."""
+
+    typography: DisclosureTypography | None = None
+    title_rgba: int | None = None
+
+    def __post_init__(self):
+        DisclosureHeading(typography=self.typography, title_rgba=self.title_rgba)
+
+    def _wire(self):
+        return DisclosureHeading(typography=self.typography, title_rgba=self.title_rgba)._wire()
+
+
+def title_state(node, state, value):
+    if node._disposed:
+        raise RuntimeError('Widget belongs to disposed App')
+    if type(state) is not DisclosureTitleState:
+        raise TypeError('expected DisclosureTitleState')
+    if node.kind not in ('accordion', 'item', 'collapsible'):
+        raise ValueError('invalid title state target')
+    if value is not None and type(value) is not DisclosureTitleStyle:
+        raise TypeError('expected DisclosureTitleStyle or None')
+    if value is not None and value._wire() is None:
+        value = None
+    if node._app:
+        apply_optional(node, 'disclosure_title_state', value, state)
+    if not hasattr(node, '_disclosure_title_states'):
+        node._disclosure_title_states = {}
+    if value is None:
+        node._disclosure_title_states.pop(state, None)
+    else:
+        node._disclosure_title_states[state] = value
+
+
+@dataclass(frozen=True)
 class DisclosureDivider:
     """Joined Accordion divider. Zero thickness omits the divider."""
 
@@ -310,12 +353,13 @@ def divider(node, value):
 
 
 def bind_api(api, bind):
-    for family, record in (("disclosure_heading", Heading), ("disclosure_divider", Divider)):
+    for family, record in (("disclosure_heading", Heading), ("disclosure_divider", Divider),
+                           ("disclosure_title_state", Heading)):
         name = family.replace("disclosure_", "disclosure_set_") + "_v1"
         setter = None
         if hasattr(api.lib, "cui_bridge_" + name):
             arguments = [C.c_void_p, _Handle]
-            if family == "disclosure_heading":
+            if family in ("disclosure_heading", "disclosure_title_state"):
                 arguments.append(C.c_uint32)
             setter = bind(name, C.c_int, *arguments, C.POINTER(record))
         setattr(api, family, setter)
@@ -382,14 +426,16 @@ def trigger_style(node, style):
 
 def preflight(node, parent, app):
     headings = getattr(node, "_disclosure_headings", {})
+    titles = getattr(node, "_disclosure_title_states", {})
     divider_style = getattr(node, "_disclosure_divider", None)
     for family, active in (
         ("disclosure_heading", bool(headings)),
+        ("disclosure_title_state", bool(titles)),
         ("disclosure_divider", divider_style is not None),
     ):
         if active and not supports_optional(app, family):
             raise RuntimeError(f"{family} requires optional bridge symbol")
-    if headings and node.kind == "item" and (parent is None or parent.kind != "accordion"):
+    if (headings or titles) and node.kind == "item" and (parent is None or parent.kind != "accordion"):
         raise ValueError("heading Item must be direct Accordion child")
     if node._disclosure_config is not None or node._disclosure_style is not None:
         require(app)
@@ -399,6 +445,8 @@ def preflight(node, parent, app):
 
 
 def mount(node):
+    for state, value in getattr(node, "_disclosure_title_states", {}).items():
+        apply_optional(node, "disclosure_title_state", value, state)
     for layer, value in getattr(node, "_disclosure_headings", {}).items():
         apply_optional(node, "disclosure_heading", value, layer)
     if getattr(node, "_disclosure_divider", None) is not None:

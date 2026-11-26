@@ -25,3 +25,13 @@ item().set_disclosure_divider(divider);
 
 // @ts-expect-error fontSize is required when typography is supplied
 item().set_disclosure_heading('normal', {typography: {weight: 2}});
+
+import type {DisclosureTitleState, DisclosureTitleStyle} from '../index.cjs';
+const titleState: DisclosureTitleState = 'focus-visible';
+const titleStyle: DisclosureTitleStyle = {typography: {fontSize: 17}, titleRgba: 0};
+accordion().set_disclosure_title_state(titleState, titleStyle);
+item().set_disclosure_title_state('pressed', null);
+// @ts-expect-error title state has no box
+collapsible().set_disclosure_title_state('hovered', {box: {height: 20}});
+// @ts-expect-error invalid title state
+accordion().set_disclosure_title_state('normal', titleStyle);

@@ -132,6 +132,76 @@ func TestDisclosureHeadingAndDivider(t *testing.T) {
 	}
 }
 
+func TestDisclosureTitleState(t *testing.T) {
+	app, err := New(Options{Width: 430, Height: 420})
+	check(t, err)
+	defer app.Close()
+	supported, err := app.SupportsDisclosureTitleState()
+	check(t, err)
+	if want := os.Getenv("CUI_TEST_LEGACY_DISCLOSURE") != "1"; supported != want {
+		t.Fatalf("title state support=%t, want %t", supported, want)
+	}
+	var changes []Event
+	fold := Collapsible("advanced").Text("Advanced").OnChange(func(e Event) {
+		changes = append(changes, e)
+	})
+	root := Column("root").Children(fold)
+	typography := DisclosureTypography{FontSize: 27, LineHeight: 48, Weight: DisclosureWeightSemibold}
+	clear := uint32(0)
+	fold.DisclosureTitleState(DisclosureTitleHovered, DisclosureTitleStyle{
+		Typography: &typography, TitleRGBA: &clear,
+	})
+	if !supported {
+		if err := app.Mount(root); !errors.Is(err, ErrDisclosureOptionsUnavailable) {
+			t.Fatalf("draft title state returned %v", err)
+		}
+		check(t, fold.SetDisclosureTitleState(DisclosureTitleHovered, nil))
+		check(t, app.Mount(root))
+		if err := fold.SetDisclosureTitleState(DisclosureTitleHovered, nil); !errors.Is(err, ErrDisclosureOptionsUnavailable) {
+			t.Fatalf("mounted title state returned %v", err)
+		}
+		check(t, app.Step(.016))
+		disclosureClick(t, app, fold)
+		return
+	}
+	typography.FontSize = -1 // The draft stores its own validated wire record.
+	check(t, app.Mount(root))
+	check(t, app.Step(.016))
+	before, err := app.Bounds(fold)
+	check(t, err)
+	check(t, app.QueuePointer(PointerMove, before.X+10, before.Y+10))
+	check(t, app.Step(.016))
+	hovered, err := app.Bounds(fold)
+	check(t, err)
+	if hovered.Height <= before.Height {
+		t.Fatalf("draft typography did not increase the row height: %+v => %+v", before, hovered)
+	}
+	if err := fold.SetDisclosureTitleState(DisclosureTitleHovered, &DisclosureTitleStyle{
+		Typography: &typography,
+	}); err == nil {
+		t.Fatal("accepted invalid mounted typography")
+	}
+	if err := fold.SetDisclosureTitleState(DisclosureTitleState(3), nil); err == nil {
+		t.Fatal("accepted an unknown title state")
+	}
+	check(t, fold.SetDisclosureTitleState(DisclosureTitleHovered, &DisclosureTitleStyle{}))
+	check(t, app.Step(.016))
+	cleared, err := app.Bounds(fold)
+	check(t, err)
+	if cleared.Height != before.Height {
+		t.Fatalf("clear did not restore normal geometry: %+v", cleared)
+	}
+	disclosureClick(t, app, fold)
+	if len(changes) != 0 {
+		t.Fatal("callback ran before Dispatch")
+	}
+	count, err := app.Dispatch()
+	check(t, err)
+	if count != 1 || len(changes) != 1 || !changes[0].Checked || changes[0].Node != fold {
+		t.Fatalf("expected one queued expansion, got %d, %+v", count, changes)
+	}
+}
+
 func TestDisclosurePresentation(t *testing.T) {
 	app, err := New(Options{Width: 540, Height: 320})
 	check(t, err)

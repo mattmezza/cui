@@ -20,6 +20,10 @@ try {
     sections.disclosure_configure(config);
     editor.set_trigger_style(style);
   }
+  if (app.supports_disclosure_title_state()) {
+    sections.set_disclosure_title_state('hovered', {titleRgba: 0x275dccff});
+    editor.set_disclosure_title_state('focus-visible', {typography: {fontSize: 17, weight: 2}});
+  }
   if (app.supports_disclosure_heading()) {
     sections.set_disclosure_heading('normal', {
       box: {width: -1, height: 44, padding: 12, gap: 8},

@@ -724,9 +724,8 @@ provider reports an error.
 #### Style heading layers and dividers from language builders
 
 Python, JavaScript, TypeScript, Go and Rust support normal, expanded and
-disabled heading layers. Hover, keyboard-focus and press title layers
-currently require a C API.
-[Retained C title styles](#style-retained-titles-for-pointer-and-keyboard)
+disabled heading layers, and optional hover, keyboard-focus and press title
+styles. [Retained C title styles](#style-retained-titles-for-pointer-and-keyboard)
 Set them on an Accordion for shared styles, its direct Item for per-field
 overrides, or a Collapsible for its own heading. Probe heading and divider
 support independently before configuring a provider. A divider belongs to
@@ -746,9 +745,22 @@ for each layer, or omit typography to inherit it. An explicit zero title
 color is transparent. Pass a divider with zero thickness to remove its
 layout space. Clear the divider to restore the themed one-pixel line.
 
+Probe title-state support separately from the heading and divider capabilities.
+A `DisclosureTitleStyle` supplies title typography, an explicit color, or both.
+Set a stable box through a normal heading when the title needs to keep its
+hit geometry as text metrics change.
+
+| Language | App probe | Apply or clear a title state |
+| --- | --- | --- |
+| Python | `supports_disclosure_title_state()` | `widget.set_disclosure_title_state(DisclosureTitleState.HOVERED, style)`. Pass `None` to clear. |
+| JavaScript and TypeScript | `supports_disclosure_title_state()` | `node.set_disclosure_title_state("hovered", style)`. Pass `null` to clear. |
+| Go | `SupportsDisclosureTitleState()` | `node.SetDisclosureTitleState(cui.DisclosureTitleHovered, &style)`. Pass `nil` to clear. Draft builders also provide `DisclosureTitleState(state, style)`. |
+| Rust | `supports_disclosure_title_state()` | `app.set_disclosure_title_state(node, DisclosureTitleState::Hovered, Some(&style))`. Pass `None` to clear. Mounted builders also provide `disclosure_title_state(state, &style)`. |
+
 ```python
 from cui_bridge import (
-    DisclosureDivider, DisclosureHeading, DisclosureHeadingLayer, DisclosureTypography,
+    DisclosureDivider, DisclosureHeading, DisclosureHeadingLayer,
+    DisclosureTitleState, DisclosureTitleStyle, DisclosureTypography,
 )
 
 # Apply to the joined sections from the previous example.
@@ -761,6 +773,15 @@ if app.supports_disclosure_heading():
         DisclosureHeadingLayer.EXPANDED,
         DisclosureHeading(typography=DisclosureTypography(font_size=19, line_height=26, weight=3, wrap=True)),
     )
+if app.supports_disclosure_title_state():
+    sections.set_disclosure_title_state(
+        DisclosureTitleState.HOVERED,
+        DisclosureTitleStyle(typography=DisclosureTypography(font_size=17, line_height=24, weight=2, wrap=True)),
+    )
+    sections.set_disclosure_title_state(
+        DisclosureTitleState.FOCUS_VISIBLE,
+        DisclosureTitleStyle(title_rgba=0x275DCCFF),
+    )
 if app.supports_disclosure_divider():
     sections.set_disclosure_divider(DisclosureDivider(
         thickness=2, inset_left=12, inset_right=12, color_rgba=0x4D80C0AA,
@@ -771,7 +792,7 @@ Build your provider and follow the language setup guides to set the Python
 import path, bridge library, or Node addon location. Go and Rust use bundled
 sources by default. Run from the repository root without a font for a
 headless click and an in-app status update. The five examples apply the heading
-styles and divider when supported by the provider.
+styles, title interaction styles and divider when supported by the provider.
 
 ```sh
 PYTHONPATH=bindings/python python bindings/python/examples/workspace_preferences.py

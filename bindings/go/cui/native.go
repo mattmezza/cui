@@ -596,6 +596,8 @@ static cui_bridge_status (*disclosure_style)(cui_bridge_app *, cui_bridge_node,
  const cui_bridge_disclosure_trigger_style_v1 *);
 static cui_bridge_status (*disclosure_heading)(cui_bridge_app *, cui_bridge_node, uint32_t,
  const cui_bridge_disclosure_heading_v1 *);
+static cui_bridge_status (*disclosure_title)(cui_bridge_app *, cui_bridge_node, uint32_t,
+ const cui_bridge_disclosure_heading_v1 *);
 static cui_bridge_status (*disclosure_divider)(cui_bridge_app *, cui_bridge_node,
  const cui_bridge_disclosure_divider_v1 *);
 static void go_disclosure_initialize(void) {
@@ -606,6 +608,8 @@ static void go_disclosure_initialize(void) {
                           "cui_bridge_disclosure_set_trigger_style_v1");
   go_load_optional_symbol(&disclosure_heading, sizeof disclosure_heading,
                           "cui_bridge_disclosure_set_heading_v1");
+  go_load_optional_symbol(&disclosure_title, sizeof disclosure_title,
+                          "cui_bridge_disclosure_set_title_state_v1");
   go_load_optional_symbol(&disclosure_divider, sizeof disclosure_divider,
                           "cui_bridge_disclosure_set_divider_v1");
  }
@@ -614,12 +618,14 @@ static void go_disclosure_initialize(void) {
   disclosure_configure = cui_bridge_disclosure_configure_v1;
   disclosure_style = cui_bridge_disclosure_set_trigger_style_v1;
   disclosure_heading = cui_bridge_disclosure_set_heading_v1;
+  disclosure_title = cui_bridge_disclosure_set_title_state_v1;
   disclosure_divider = cui_bridge_disclosure_set_divider_v1;
  }
 #endif
 }
 static int go_disclosure_supported(void) { return disclosure_configure && disclosure_style; }
 static int go_disclosure_heading_supported(void) { return disclosure_heading != NULL; }
+static int go_disclosure_title_supported(void) { return disclosure_title != NULL; }
 static int go_disclosure_divider_supported(void) { return disclosure_divider != NULL; }
 static cui_bridge_status go_disclosure_configure(cui_bridge_app *app, cui_bridge_node node,
  const cui_bridge_disclosure_config_v1 *config) { return disclosure_configure(app, node, config); }
@@ -628,6 +634,10 @@ static cui_bridge_status go_disclosure_style(cui_bridge_app *app, cui_bridge_nod
 static cui_bridge_status go_disclosure_heading(cui_bridge_app *app, cui_bridge_node node,
  uint32_t layer, const cui_bridge_disclosure_heading_v1 *style) {
  return disclosure_heading(app, node, layer, style);
+}
+static cui_bridge_status go_disclosure_title(cui_bridge_app *app, cui_bridge_node node,
+ uint32_t state, const cui_bridge_disclosure_heading_v1 *style) {
+ return disclosure_title(app, node, state, style);
 }
 static cui_bridge_status go_disclosure_divider(cui_bridge_app *app, cui_bridge_node node,
  const cui_bridge_disclosure_divider_v1 *style) { return disclosure_divider(app, node, style); }
@@ -766,6 +776,7 @@ type Node struct {
 	disclosureConfig                     *disclosureConfigWire
 	disclosureStyle                      *disclosureStyleWire
 	disclosureHeadings                   disclosureHeadingLayers
+	disclosureTitles                     disclosureTitleStyles
 	disclosureDivider                    *disclosureDividerWire
 	paginationCustomSize                 float32
 	iconConfig                           *IconConfig
@@ -1447,6 +1458,7 @@ func (a *App) Close() error {
 		n.iconConfig, n.badgeConfig, n.paginationConfig, n.ratingConfig = nil, nil, nil, nil
 		n.disclosureConfig, n.disclosureStyle = nil, nil
 		n.disclosureHeadings, n.disclosureDivider = disclosureHeadingLayers{}, nil
+		n.disclosureTitles = disclosureTitleStyles{}
 		if n.slider != nil {
 			n.slider.callback = nil
 		}
@@ -2077,6 +2089,14 @@ func (a *App) Mount(root *Node) error {
 				return errors.New("disclosure heading requires a direct Accordion Item")
 			}
 		}
+		if n.disclosureTitles != (disclosureTitleStyles{}) {
+			if C.go_disclosure_title_supported() == 0 {
+				return ErrDisclosureOptionsUnavailable
+			}
+			if n.kind == C.CUI_BRIDGE_ITEM && (parent == nil || parent.kind != C.CUI_BRIDGE_ACCORDION) {
+				return errors.New("disclosure title style requires a direct Accordion Item")
+			}
+		}
 		if n.disclosureDivider != nil && C.go_disclosure_divider_supported() == 0 {
 			return ErrDisclosureOptionsUnavailable
 		}
@@ -2211,6 +2231,13 @@ func (a *App) Mount(root *Node) error {
 		for layer, heading := range n.disclosureHeadings {
 			if heading != nil {
 				if err := n.setDisclosureHeading(DisclosureHeadingLayer(layer), heading); err != nil {
+					return err
+				}
+			}
+		}
+		for state, style := range n.disclosureTitles {
+			if style != nil {
+				if err := n.setDisclosureTitleState(DisclosureTitleState(state), style); err != nil {
 					return err
 				}
 			}
@@ -2953,6 +2980,7 @@ func (n *Node) Remove() error {
 		x.iconConfig, x.badgeConfig, x.paginationConfig, x.ratingConfig = nil, nil, nil, nil
 		x.disclosureConfig, x.disclosureStyle = nil, nil
 		x.disclosureHeadings, x.disclosureDivider = disclosureHeadingLayers{}, nil
+		x.disclosureTitles = disclosureTitleStyles{}
 		if x.slider != nil {
 			x.slider.callback = nil
 		}
@@ -5256,6 +5284,14 @@ func (a *App) SupportsDisclosureHeading() (bool, error) {
 	return C.go_disclosure_heading_supported() != 0, nil
 }
 
+// SupportsDisclosureTitleState probes the retained title-state setter.
+func (a *App) SupportsDisclosureTitleState() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_disclosure_title_supported() != 0, nil
+}
+
 // SupportsDisclosureDivider probes the optional joined divider setter.
 func (a *App) SupportsDisclosureDivider() (bool, error) {
 	if err := a.check(); err != nil {
@@ -5273,6 +5309,17 @@ func (n *Node) setDisclosureHeading(layer DisclosureHeadingLayer, style *disclos
 		return ErrDisclosureOptionsUnavailable
 	}
 	return result(C.go_disclosure_heading(n.app.ptr, n.handle, C.uint32_t(layer), style))
+}
+
+func (n *Node) setDisclosureTitleState(state DisclosureTitleState, style *disclosureHeadingWire) error {
+	supported, err := n.app.SupportsDisclosureTitleState()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrDisclosureOptionsUnavailable
+	}
+	return result(C.go_disclosure_title(n.app.ptr, n.handle, C.uint32_t(state), style))
 }
 
 func (n *Node) setDisclosureDivider(style *disclosureDividerWire) error {

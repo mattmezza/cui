@@ -882,6 +882,14 @@ class Widget:
         self._detail = text
         return self
 
+    def set_disclosure_title_state(
+        self, state: DisclosureTitleState, style: DisclosureTitleStyle | None
+    ) -> "Widget":
+        """Copy interaction title styling. None restores inheritance."""
+        from .disclosure import title_state
+        title_state(self, state, style)
+        return self
+
     def set_disclosure_heading(
         self, layer: DisclosureHeadingLayer, style: DisclosureHeading | None
     ) -> "Widget":
@@ -2564,6 +2572,11 @@ class App:
         from .pagination_options import custom_supported
         return custom_supported(self)
 
+    def supports_disclosure_title_state(self) -> bool:
+        """Probe the optional title state setter independently."""
+        from .disclosure import supports_optional
+        return supports_optional(self, "disclosure_title_state")
+
     def supports_disclosure_heading(self) -> bool:
         """Return whether the optional retained heading setter is available."""
         from .disclosure import supports_optional
@@ -2815,3 +2828,6 @@ __all__ += ["DisclosureConfig", "DisclosureTriggerStyle"]
 from .disclosure import DisclosureHeadingLayer, DisclosureHeading, DisclosureHeadingBox, DisclosureTypography, DisclosureDivider
 
 __all__ += ["DisclosureHeadingLayer", "DisclosureHeading", "DisclosureHeadingBox", "DisclosureTypography", "DisclosureDivider"]
+
+from .disclosure import DisclosureTitleState, DisclosureTitleStyle
+__all__ += ["DisclosureTitleState", "DisclosureTitleStyle"]

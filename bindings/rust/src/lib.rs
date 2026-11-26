@@ -2,8 +2,8 @@
 mod disclosure;
 pub use disclosure::{
     DisclosureAlignment, DisclosureCard, DisclosureConfig, DisclosureCursor, DisclosureDivider,
-    DisclosureHeading, DisclosureHeadingBox, DisclosureHeadingLayer, DisclosureTriggerStyle,
-    DisclosureTypography, DisclosureWeight,
+    DisclosureHeading, DisclosureHeadingBox, DisclosureHeadingLayer, DisclosureTitleState,
+    DisclosureTitleStyle, DisclosureTriggerStyle, DisclosureTypography, DisclosureWeight,
 };
 mod icon_resources;
 mod pagination_options;

@@ -1,7 +1,8 @@
 use cui_builders::{
     App, DesignSize, DisclosureAlignment, DisclosureCard, DisclosureConfig, DisclosureCursor,
     DisclosureDivider, DisclosureHeading, DisclosureHeadingBox, DisclosureHeadingLayer,
-    DisclosureTriggerStyle, DisclosureTypography, DisclosureWeight, Error, Kind, Node, Phase,
+    DisclosureTitleState, DisclosureTitleStyle, DisclosureTriggerStyle, DisclosureTypography,
+    DisclosureWeight, Error, Kind, Node, Phase,
 };
 use std::{cell::RefCell, rc::Rc};
 
@@ -140,6 +141,68 @@ fn retained_disclosure_headings_and_divider() {
     let restored = app.bounds(second).unwrap();
     assert_eq!(restored.y, second_bounds.y - 3.);
     assert_ne!(restored.height, second_bounds.height);
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(&*changes.borrow(), &[true]);
+    assert_eq!(app.dispatch().unwrap(), 0);
+}
+
+
+#[test]
+fn retained_disclosure_title_state() {
+    let mut app = App::headless(430., 420.).unwrap();
+    let supported = std::env::var("CUI_TEST_LEGACY_DISCLOSURE").as_deref() != Ok("1");
+    assert_eq!(app.supports_disclosure_title_state(), supported);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let fold = app
+        .build_child(root, Kind::Collapsible, "advanced")
+        .unwrap()
+        .text("Advanced")
+        .unwrap();
+    let mut style = DisclosureTitleStyle {
+        typography: Some(DisclosureTypography {
+            font_size: 27.,
+            line_height: 48.,
+            weight: DisclosureWeight::Semibold,
+            ..Default::default()
+        }),
+        title_rgba: Some(0),
+    };
+    if !supported {
+        let fold = fold.finish();
+        assert_eq!(
+            app.set_disclosure_title_state(fold, DisclosureTitleState::Hovered, Some(&style))
+                .err(),
+            Some(Error::DISCLOSURE_OPTIONS_UNAVAILABLE)
+        );
+        app.step(0.016).unwrap();
+        click(&mut app, fold);
+        assert!(app.is_checked(fold).unwrap());
+        return;
+    }
+    let fold = fold
+        .disclosure_title_state(DisclosureTitleState::Hovered, &style)
+        .unwrap()
+        .finish();
+    style.typography.as_mut().unwrap().font_size = f32::NAN;
+    assert!(app
+        .set_disclosure_title_state(fold, DisclosureTitleState::Hovered, Some(&style))
+        .is_err());
+    app.step(0.016).unwrap();
+    let before = app.bounds(fold).unwrap();
+    app.pointer(Phase::Move, before.x + 10., before.y + 10.)
+        .unwrap();
+    app.step(0.016).unwrap();
+    assert!(app.bounds(fold).unwrap().height > before.height);
+    app.set_disclosure_title_state(fold, DisclosureTitleState::Hovered, None)
+        .unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.bounds(fold).unwrap().height, before.height);
+    let changes = Rc::new(RefCell::new(Vec::new()));
+    let captured = changes.clone();
+    app.on_change_event(fold, move |e| captured.borrow_mut().push(e.checked))
+        .unwrap();
+    click(&mut app, fold);
+    assert!(changes.borrow().is_empty());
     assert_eq!(app.dispatch().unwrap(), 1);
     assert_eq!(&*changes.borrow(), &[true]);
     assert_eq!(app.dispatch().unwrap(), 0);

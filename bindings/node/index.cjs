@@ -988,6 +988,7 @@ class App {
     return typeof native.supportsRadioTooltip === 'function' &&
       typeof native.setRadioTooltip === 'function' && native.supportsRadioTooltip();
   }
+  supports_disclosure_title_state() { return disclosures.supportsTitle(this); }
   supports_disclosure_heading() { return disclosures.supportsHeading(this); }
   supports_disclosure_divider() { return disclosures.supportsDivider(this); }
   supports_disclosure_presentation() { return disclosures.supports(this); }

@@ -4,6 +4,7 @@ const {endianness} = require('node:os');
 const nativeOrder = endianness() === 'BE' ? 'BE' : 'LE';
 const CONFIG = Symbol('disclosure config');
 const STYLE = Symbol('disclosure style');
+const TITLES = Symbol('disclosure title states');
 const HEADINGS = Symbol('disclosure headings');
 const DIVIDER = Symbol('disclosure divider');
 const flags =
@@ -210,6 +211,26 @@ module.exports = (native, Node, handle, sizes) => {
       throw new Error('disclosure requires optional bridge symbol');
     native.disclosureHeadingOptions(app.handle, divider ? 3 : 1, node[handle], layer, record);
   }
+  function supportsTitle(app) {
+    app._alive();
+    return typeof native.disclosureHeadingOptions === 'function' &&
+        native.disclosureHeadingOptions(app.handle, 4);
+  }
+  function applyTitle(app, node, state, record) {
+    if (!supportsTitle(app)) throw new Error('title state requires optional bridge symbol');
+    native.disclosureHeadingOptions(app.handle, 5, node[handle], state, record);
+  }
+  Node.prototype.set_disclosure_title_state = function(state, value) {
+    const index = ['hovered', 'focus-visible', 'pressed'].indexOf(state);
+    if (index < 0) throw new RangeError('invalid disclosure title state');
+    if (![15, 19, 20].includes(this.kind)) throw new TypeError('invalid title state target');
+    if (value !== null) exact(value, ['typography', 'titleRgba']);
+    const r = encodeHeading(value);
+    if (this.owner) applyTitle(this.owner, this, index, r);
+    if (r === null) this[TITLES]?.delete(index);
+    else (this[TITLES] ??= new Map()).set(index, r);
+    return this;
+  };
   Node.prototype.set_disclosure_heading = function(layer, value) {
     if (!['normal', 'expanded', 'disabled'].includes(layer))
       throw new RangeError('invalid heading layer');
@@ -233,12 +254,18 @@ module.exports = (native, Node, handle, sizes) => {
   };
   return {
     supports,
+    supportsTitle,
     supportsHeading: app => supportsOptional(app),
     supportsDivider: app => supportsOptional(app, true),
     preflight(app, root) {
       const pending = [root];
       while (pending.length) {
         const node = pending.pop();
+        if (node[TITLES]?.size) {
+          if (!supportsTitle(app)) throw new Error('title state requires optional bridge symbol');
+          if (node.kind === 20 && node.parent?.kind !== 19)
+            throw new TypeError('title state Item must be direct Accordion child');
+        }
         if (node[HEADINGS]?.size) {
           if (!supportsOptional(app)) throw new Error('heading requires optional bridge symbol');
           if (node.kind === 20 && node.parent?.kind !== 19)
@@ -253,6 +280,7 @@ module.exports = (native, Node, handle, sizes) => {
       }
     },
     mount(app, node) {
+      for (const [state, r] of node[TITLES] ?? []) applyTitle(app, node, state, r);
       for (const [layer, r] of node[HEADINGS] ?? [])
         if (r) applyOptional(app, node, r, layer);
       if (node[DIVIDER]) applyOptional(app, node, node[DIVIDER], 0, true);

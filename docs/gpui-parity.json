@@ -23,7 +23,7 @@
       },
       "limitations": [
         "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending.",
-        "Joined mode provides one outer card, dividers after whole sections, custom outer box and per-trigger background, focus outline and cursor styles. Immediate C, retained C and the language builders support inherited and state-specific title typography, row boxes and separators. Hover, keyboard-focus and press title refinements are tested in immediate C, retained C and WASM. Language-builder interaction title styling and physical native accessibility remain open."
+        "Joined mode provides one outer card, dividers after whole sections, custom outer box and per-trigger background, focus outline and cursor styles. Immediate C, retained C and the language builders support inherited and state-specific title typography, row boxes and separators. Hover, keyboard-focus and press title refinements are tested in immediate C, retained C and WASM and exposed through typed Python, JS/TS, Go and Rust builders. Physical native accessibility remains open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -128,7 +128,12 @@
           "evidence": [
             "tests/unit/test_disclosure.c",
             "tests/unit/test_bridge_disclosure.c",
-            "tests/web/test_browser.py"
+            "tests/web/test_browser.py",
+            "bindings/python/test_disclosure_heading.py",
+            "bindings/node/test/disclosure-heading.test.cjs",
+            "bindings/node/test/disclosure.types.ts",
+            "bindings/go/cui/disclosure_test.go",
+            "bindings/rust/tests/disclosure.rs"
           ]
         }
       ],
@@ -1166,7 +1171,7 @@
       },
       "limitations": [
         "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending.",
-        "Immediate and retained C support sizes, named SVGs, outer boxes, trigger feedback, state-specific title typography, wrapping and row boxes. Custom headers, measured reveal and synchronous observers remain immediate C APIs. Language builders copy heading styling. Hover, keyboard-focus and press title refinements are tested in immediate C, retained C and WASM. Language-builder interaction title styling and physical native accessibility remain open."
+        "Immediate and retained C support sizes, named SVGs, outer boxes, trigger feedback, state-specific title typography, wrapping and row boxes. Custom headers, measured reveal and synchronous observers remain immediate C APIs. Language builders copy heading styling. Hover, keyboard-focus and press title refinements are tested in immediate C, retained C and WASM and exposed through typed Python, JS/TS, Go and Rust builders. Physical native accessibility remains open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1247,7 +1252,12 @@
           "evidence": [
             "tests/unit/test_disclosure.c",
             "tests/unit/test_bridge_disclosure.c",
-            "tests/web/test_browser.py"
+            "tests/web/test_browser.py",
+            "bindings/python/test_disclosure_heading.py",
+            "bindings/node/test/disclosure-heading.test.cjs",
+            "bindings/node/test/disclosure.types.ts",
+            "bindings/go/cui/disclosure_test.go",
+            "bindings/rust/tests/disclosure.rs"
           ]
         }
       ],

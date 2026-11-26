@@ -93,6 +93,15 @@ pub enum DisclosureHeadingLayer {
     Disabled,
 }
 
+/// Interaction that can refine the typography and color of a built-in title.
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DisclosureTitleState {
+    Hovered,
+    FocusVisible,
+    Pressed,
+}
+
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DisclosureWeight {
@@ -144,6 +153,13 @@ pub struct DisclosureHeadingBox {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DisclosureHeading {
     pub box_style: Option<DisclosureHeadingBox>,
+    pub typography: Option<DisclosureTypography>,
+    pub title_rgba: Option<u32>,
+}
+
+/// Title typography or color for one interaction. None inherits.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DisclosureTitleStyle {
     pub typography: Option<DisclosureTypography>,
     pub title_rgba: Option<u32>,
 }
@@ -364,6 +380,17 @@ impl DisclosureHeading {
     }
 }
 
+impl DisclosureTitleStyle {
+    fn wire(&self) -> Result<HeadingRaw> {
+        DisclosureHeading {
+            box_style: None,
+            typography: self.typography,
+            title_rgba: self.title_rgba,
+        }
+        .wire()
+    }
+}
+
 impl DisclosureDivider {
     fn wire(&self) -> Result<DividerRaw> {
         if ![self.thickness, self.inset_left, self.inset_right]
@@ -393,6 +420,7 @@ type SetDivider = unsafe extern "C" fn(*mut c_void, RawNode, *const DividerRaw) 
 struct DisclosureApi {
     presentation: Option<(Configure, SetStyle)>,
     heading: Option<SetHeading>,
+    title_state: Option<SetHeading>,
     divider: Option<SetDivider>,
 }
 
@@ -420,6 +448,12 @@ fn resolve() -> DisclosureApi {
             layer: u32,
             heading: *const HeadingRaw,
         ) -> u32;
+        fn cui_bridge_disclosure_set_title_state_v1(
+            a: *mut c_void,
+            n: RawNode,
+            state: u32,
+            style: *const HeadingRaw,
+        ) -> u32;
         fn cui_bridge_disclosure_set_divider_v1(
             a: *mut c_void,
             n: RawNode,
@@ -432,6 +466,7 @@ fn resolve() -> DisclosureApi {
             cui_bridge_disclosure_set_trigger_style_v1,
         )),
         heading: Some(cui_bridge_disclosure_set_heading_v1),
+        title_state: Some(cui_bridge_disclosure_set_title_state_v1),
         divider: Some(cui_bridge_disclosure_set_divider_v1),
     }
 }
@@ -444,6 +479,8 @@ fn resolve() -> DisclosureApi {
             crate::notification_symbol_v1(c"cui_bridge_disclosure_set_trigger_style_v1".as_ptr());
         let heading =
             crate::notification_symbol_v1(c"cui_bridge_disclosure_set_heading_v1".as_ptr());
+        let title_state =
+            crate::notification_symbol_v1(c"cui_bridge_disclosure_set_title_state_v1".as_ptr());
         let divider =
             crate::notification_symbol_v1(c"cui_bridge_disclosure_set_divider_v1".as_ptr());
         DisclosureApi {
@@ -455,6 +492,8 @@ fn resolve() -> DisclosureApi {
             }),
             heading: (!heading.is_null())
                 .then(|| mem::transmute::<*mut c_void, SetHeading>(heading)),
+            title_state: (!title_state.is_null())
+                .then(|| mem::transmute::<*mut c_void, SetHeading>(title_state)),
             divider: (!divider.is_null())
                 .then(|| mem::transmute::<*mut c_void, SetDivider>(divider)),
         }
@@ -525,6 +564,11 @@ impl App {
         api().heading.is_some()
     }
 
+    /// Probe the retained title-state setter independently.
+    pub fn supports_disclosure_title_state(&self) -> bool {
+        api().title_state.is_some()
+    }
+
     /// Probe the optional joined divider setter independently.
     pub fn supports_disclosure_divider(&self) -> bool {
         api().divider.is_some()
@@ -546,6 +590,29 @@ impl App {
                 self.raw,
                 node,
                 layer as u32,
+                raw.as_ref().map_or(ptr::null(), ptr::from_ref),
+            )
+        })?;
+        Ok(self)
+    }
+
+    /// Copy an interaction title style. None or an empty style clears it.
+    pub fn set_disclosure_title_state(
+        &mut self,
+        node: Node,
+        state: DisclosureTitleState,
+        style: Option<&DisclosureTitleStyle>,
+    ) -> Result<&mut Self> {
+        let node = self.valid(node)?;
+        let set_title_state = api()
+            .title_state
+            .ok_or(Error::DISCLOSURE_OPTIONS_UNAVAILABLE)?;
+        let raw = style.map(DisclosureTitleStyle::wire).transpose()?;
+        check(unsafe {
+            set_title_state(
+                self.raw,
+                node,
+                state as u32,
                 raw.as_ref().map_or(ptr::null(), ptr::from_ref),
             )
         })?;
@@ -594,6 +661,17 @@ impl Builder<'_> {
     ) -> Result<Self> {
         self.app
             .set_disclosure_heading(self.node, layer, Some(style))?;
+        Ok(self)
+    }
+
+    /// Copy an interaction title style to the mounted child.
+    pub fn disclosure_title_state(
+        self,
+        state: DisclosureTitleState,
+        style: &DisclosureTitleStyle,
+    ) -> Result<Self> {
+        self.app
+            .set_disclosure_title_state(self.node, state, Some(style))?;
         Ok(self)
     }
 

@@ -567,8 +567,52 @@ untouched. Read-only and disabled prevent user changes.
 
 When loading a shared provider, require the configure, get and size symbols and
 verify that the reported size equals your record size before offering these
-options. Python, JavaScript, TypeScript, Go and Rust builders currently keep
-their original integer presenter.
+options.
+
+### Build a feedback form with Rating
+
+The same retained Rating options are available in Python, JavaScript,
+TypeScript, Go and Rust. Use the existing change callback to update an app
+label or persist the committed score. A hover preview produces no change.
+With half steps enabled the callback carries a number such as `3.5`.
+The examples probe support and keep whole scores on earlier providers.
+
+| Language | Probe | Configure, read and reset |
+| --- | --- | --- |
+| Python | `app.supports_rating_options()` | `rating.configure(RatingConfig(...))`, `rating.get_config()`, `rating.reset_config()` |
+| JavaScript / TypeScript | `app.supports_rating_options()` | `rating.configure({...})`, `rating.get_config()`, `rating.reset_config()` |
+| Go | `app.SupportsRatingOptions()` | `cui.ConfiguredRating(key, config)` or `rating.ConfigureRating(config)`, `rating.RatingConfig()`, `rating.ResetRating()` |
+| Rust | `app.supports_rating_options()` | `app.configured_rating(parent, key, &config)` or `app.configure_rating(node, &config)`, `app.rating_config(node)`, `app.reset_rating(node)` |
+
+Set up Python and the Node addon with the [builder guide](BINDING_BUILDERS.md).
+Run the feedback examples from the repository root. The commands exercise the
+UI, commit a rating, and update the visible feedback label in headless mode.
+Set `CUI_BRIDGE_LIBRARY` and `CUI_NODE_ADDON` to your provider and addon paths
+when running directly from a checkout. An installed package can supply them.
+
+```sh
+PYTHONPATH=bindings/python python bindings/python/examples/rating_options.py
+node bindings/node/examples/rating-options.cjs
+node bindings/typescript/examples/rating_options.ts
+(cd bindings/go && go run ./examples/rating_options)
+(cd bindings/rust && cargo run --example rating_options)
+```
+
+The TypeScript command needs Node with TypeScript execution support. To open a
+native window, use an SDL-enabled provider and pass a TrueType font path.
+Python takes `--font /path/to/font.ttf`. JavaScript takes the font as its first
+argument. For a bundled Linux build use `go run -tags cui_native
+./examples/rating_options -font /path/to/font.ttf` or `cargo run --features
+native --example rating_options -- /path/to/font.ttf` from the respective
+binding directory. Use the Go or Rust example to see how to create heart
+masks as shared Icon resources. Release a mask after resetting or removing
+the Rating. A config snapshot reuses those resources.
+
+[Python](../bindings/python/examples/rating_options.py) ·
+[JavaScript](../bindings/node/examples/rating-options.cjs) ·
+[TypeScript](../bindings/typescript/examples/rating_options.ts) ·
+[Go](../bindings/go/examples/rating_options/main.go) ·
+[Rust](../bindings/rust/examples/rating_options.rs)
 
 ### Configure a retained pager from C
 

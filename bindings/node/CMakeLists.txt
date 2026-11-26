@@ -554,3 +554,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
    ${CMAKE_CURRENT_SOURCE_DIR}/examples/radio-delivery.cjs)
  endif()
 endif()
+
+add_test(NAME node_rating_options COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_RATING_UNSUPPORTED=0
+ ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/rating-options.test.cjs)
+add_test(NAME node_rating_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/rating-options.cjs)
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_rating_types_runtime COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-rating-types.py
+  --tsc ${CUI_NODE_TSC_EXECUTABLE} --node ${NODE_EXECUTABLE}
+  --output ${CMAKE_CURRENT_BINARY_DIR}/rating-types)
+endif()

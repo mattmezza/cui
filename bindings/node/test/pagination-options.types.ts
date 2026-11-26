@@ -22,9 +22,8 @@ pages.configure({availableWidth: 'wide'});
 pages.configure({laterPages: false});
 // @ts-expect-error design size is a named enum
 pages.design_size(3);
-// @ts-expect-error Rating has no Pagination configuration
-rating().configure(config);
-// @ts-expect-error Rating has no Pagination configuration getter
+// @ts-expect-error Rating options reject Pagination-only properties
+rating().configure({counter: true});
 rating().get_config();
 // @ts-expect-error plain Label has no Pagination configuration
 label('status').configure(config);

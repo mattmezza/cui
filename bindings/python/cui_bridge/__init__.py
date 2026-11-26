@@ -149,6 +149,8 @@ class _API:
         bind_skeleton_api(self, bind)
         from .pagination_options import bind_api as bind_pagination_api
         bind_pagination_api(self, bind)
+        from .rating_options import bind_api as bind_rating_api
+        bind_rating_api(self, bind)
         bind_radio_paint(self, bind, _Handle)
         self.radio_set_motion = None
         if hasattr(lib, "cui_bridge_radio_set_motion_v1"):
@@ -1578,8 +1580,8 @@ def pagination(key: str, text: str = "") -> Pagination:
     return Pagination(key, text)
 
 
-def rating(key: str, text: str = "") -> Widget:
-    return Widget("rating", key, text)
+def rating(key: str, text: str = "") -> Rating:
+    return Rating(key, text)
 
 
 def stepper(key: str, text: str = "") -> Widget:
@@ -1884,6 +1886,8 @@ class App:
                     raise TypeError("use slider_model() for the controlled route")
                 if any(ancestor.kind not in ("row", "column") for ancestor in lineage):
                     raise ValueError("controlled Slider requires Row/Column ancestry")
+            if isinstance(node, Rating):
+                node._preflight_rating(self)
             if isinstance(node, Pagination):
                 node._preflight_pagination(self)
             if node._stepper_fill is not None:
@@ -1982,6 +1986,8 @@ class App:
                     node._change("set_total", node._total)
                 if isinstance(node, Pagination):
                     node._mount_pagination()
+                if isinstance(node, Rating):
+                    node._mount_rating()
                 if node.kind in _NUMERIC:
                     node._change("set_value", node._value)
                 if node.kind == "attachment": node._change("set_attachment",node._attachment)
@@ -2411,6 +2417,10 @@ class App:
         from .pagination_options import custom_supported
         return custom_supported(self)
 
+    def supports_rating_options(self) -> bool:
+        from .rating_options import supported
+        return supported(self)
+
     def supports_pagination_options(self) -> bool:
         from .pagination_options import supported
         return supported(self)
@@ -2549,6 +2559,8 @@ class App:
                     node._time_callback = None
                 if isinstance(node, (ConfiguredIcon, ConfiguredBadge)):
                     node._release_icon_config()
+                if isinstance(node, Rating):
+                    node._rating_config = None
             self._by_handle.clear()
 
     def __enter__(self) -> "App":
@@ -2624,7 +2636,8 @@ from .skeleton_presentation import __all__ as _skeleton_exports
 __all__ += _skeleton_exports
 
 from .pagination_options import Pagination, PaginationConfig
-__all__ += ["Pagination", "PaginationConfig"]
+from .rating_options import Rating, RatingConfig
+__all__ += ["Pagination", "PaginationConfig", "Rating", "RatingConfig"]
 
 from .icons import (BadgeConfig, BadgeResult, BadgeSize, BadgeVariant, ConfiguredBadge,
     ConfiguredIcon, IconAlign, IconAvailability, IconBitmap, IconCatalogEntry, IconConfig,

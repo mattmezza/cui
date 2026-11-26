@@ -2,7 +2,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {App, column, pagination, rating} = require('..');
+const {App, column, pagination, rating, label} = require('..');
 const native = require(process.env.CUI_NODE_ADDON);
 function withApp(work) { const app = new App(); try { work(app); } finally { app.dispose(); } }
 function press(app, bounds) {
@@ -118,7 +118,7 @@ test('invalid options fail before mutating retained configuration', () => {
     assert.throws(() => node.configure(options));
     assert.equal(node.get_config(), original);
   }
-  assert.throws(() => rating().configure({}), /requires Pagination/);
+  assert.throws(() => label().configure({}), /requires Pagination/);
   assert.equal(pagination().configure({next: 'é'.repeat(63)}).get_config().next.length, 63);
 });
 

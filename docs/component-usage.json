@@ -852,6 +852,13 @@
       "callback_symbols": [
         "cui_rating_change_fn"
       ],
+      "examples": [
+        "bindings/python/examples/rating_options.py",
+        "bindings/node/examples/rating-options.cjs",
+        "bindings/typescript/examples/rating_options.ts",
+        "bindings/go/examples/rating_options/main.go",
+        "bindings/rust/examples/rating_options.rs"
+      ],
       "scope": "styled frame component",
       "name": "Rating",
       "public_header": "include/cui/cui_numeric.h",

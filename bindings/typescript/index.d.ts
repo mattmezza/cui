@@ -174,7 +174,17 @@ export interface Pagination extends PagedNumericControl, DesignSized {
   reset_config(): this;
   get_config(): Readonly<Required<PaginationConfig>> | undefined;
 }
-export interface Rating extends PagedNumericControl {}
+export interface RatingConfig {
+  halfSteps?: boolean; hoverPreview?: boolean; stepDownFilled?: boolean; clearable?: boolean; readonly?: boolean;
+  designSize?: DesignSize | null; width?: number;
+  fillRgba?: number | null; outlineRgba?: number | null; previewRgba?: number | null;
+  outlineIcon?: IconResource | null; fillIcon?: IconResource | null;
+}
+export interface Rating extends PagedNumericControl {
+  configure(options: RatingConfig | null): this;
+  reset_config(): this;
+  get_config(): Readonly<Required<RatingConfig>> | undefined;
+}
 export function list_view(key?: string, text?: string): Group;
 export function menu(key?: string, text?: string): Group;
 export interface Stepper extends Group, DesignSized {
@@ -526,6 +536,7 @@ export function responsive_skeleton(key?: string, config?: SkeletonConfigInput):
 export interface App {
   supports_skeleton_presentation(): boolean;
   supports_pagination_custom_size(): boolean;
+  supports_rating_options(): boolean;
   supports_pagination_options(): boolean;
 }
 

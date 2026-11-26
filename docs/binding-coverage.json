@@ -362,7 +362,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The C bridge optionally configures shared Rating sizes, half steps, hover preview, step-down, read-only, Clear, custom colors and Icon resource masks. Python, JavaScript, TypeScript, Go and Rust builders still use their integer presenter. The C bridge retains the existing scalar notification queue."
+        "Python, JavaScript, TypeScript, Go and Rust expose the optional retained Rating configuration. Earlier providers keep whole steps. The bridge and builders report queued scalar changes. Immediate C owns the synchronous callback path. Native platform accessibility acceptance remains open."
       ]
     },
     {

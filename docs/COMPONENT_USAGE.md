@@ -474,7 +474,7 @@ The primary calls are `cui_radio_group` and `cui_radio_events`. See the [group a
 **Usage:** Pass the application-owned rating by pointer. Use the styled presenter for shared sizes, custom SVG masks, tint and optional step-down behavior. Configure a retained C Rating node with cui_bridge_rating_configure_v1.
 
 See `cui_rating`, `cui_rating_present`, the [public header](../include/cui/cui_numeric.h)
-and the [Rating guide](NUMERIC.md#rating). [Retained C setup](BRIDGE_COMPONENTS.md#configure-a-retained-rating-from-c)
+and the [Rating guide](NUMERIC.md#rating). [Retained C setup](BRIDGE_COMPONENTS.md#configure-a-retained-rating-from-c) · [Runnable feedback forms](BRIDGE_COMPONENTS.md#build-a-feedback-form-with-rating)
 
 Additional event includes: `cui/cui_numeric_selection_events.h`.
 

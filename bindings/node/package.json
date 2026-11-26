@@ -36,7 +36,9 @@
     "_source",
     "LICENSE",
     "README.md",
-    "native"
+    "native",
+    "rating-options.cjs",
+    "rating_options_internal.h"
   ],
   "os": [
     "linux"

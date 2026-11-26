@@ -377,6 +377,7 @@ static void go_load_optional_symbol(void *destination, size_t size, const char *
 }
 
 #include "pagination_ffi.h"
+#include "rating_ffi.h"
 
 // Optional symbol: admission of older providers remains unchanged.
 #if defined(CUI_GO_STATIC)
@@ -564,6 +565,7 @@ static int bridge_open(const char *path) {
  go_data_table_initialize();
  go_skeleton_initialize();
  go_pagination_initialize();
+ go_rating_initialize();
  go_radio_motion_initialize();
  go_radio_paint_initialize();
  go_radio_tab_index_initialize();
@@ -599,6 +601,7 @@ static int bridge_open(const char *path) {
  go_data_table_initialize();
  go_skeleton_initialize();
  go_pagination_initialize();
+ go_rating_initialize();
  go_radio_motion_initialize();
  go_radio_paint_initialize();
  go_radio_tab_index_initialize();
@@ -677,6 +680,7 @@ type Node struct {
 	timeLocalized                        *TimeFieldConfig
 	skeletonConfig                       *SkeletonConfig
 	paginationConfig                     *PaginationConfig
+	ratingConfig                         *RatingConfig
 	paginationCustomSize                 float32
 	iconConfig                           *IconConfig
 	badgeConfig                          *BadgeConfig
@@ -1354,7 +1358,7 @@ func (a *App) Close() error {
 	C.go_destroy(a.ptr)
 	for _, n := range a.nodes {
 		n.timeChange = nil
-		n.iconConfig, n.badgeConfig, n.paginationConfig = nil, nil, nil
+		n.iconConfig, n.badgeConfig, n.paginationConfig, n.ratingConfig = nil, nil, nil, nil
 		if n.slider != nil {
 			n.slider.callback = nil
 		}
@@ -1962,6 +1966,14 @@ func (a *App) Mount(root *Node) error {
 		if n.kind == 42 && (n.paginationConfig != nil || n.hasDesignSize) && C.go_pagination_supported() == 0 {
 			return ErrPaginationOptionsUnavailable
 		}
+		if n.ratingConfig != nil {
+			if C.go_rating_supported() == 0 {
+				return ErrRatingOptionsUnavailable
+			}
+			if _, err := n.ratingConfig.wire(a); err != nil {
+				return err
+			}
+		}
 		if n.key == "" {
 			n.key = fmt.Sprintf("go-%p", n)
 		}
@@ -2069,6 +2081,15 @@ func (a *App) Mount(root *Node) error {
 		if n.paginationConfig != nil {
 			if e := n.setPaginationConfig(n.paginationConfig); e != nil {
 				return e
+			}
+		}
+		if n.ratingConfig != nil {
+			wire, err := n.ratingConfig.wire(a)
+			if err != nil {
+				return err
+			}
+			if err := n.setRatingWire(&wire); err != nil {
+				return err
 			}
 		}
 		if n.hasSettingsQuery {
@@ -2801,7 +2822,7 @@ func (n *Node) Remove() error {
 		delete(x.app.nodes, keyID(x.handle))
 		x.removed = true
 		x.timeChange = nil
-		x.iconConfig, x.badgeConfig, x.paginationConfig = nil, nil, nil
+		x.iconConfig, x.badgeConfig, x.paginationConfig, x.ratingConfig = nil, nil, nil, nil
 		if x.slider != nil {
 			x.slider.callback = nil
 		}
@@ -4962,6 +4983,38 @@ func (n *Node) SkeletonPresentation() (SkeletonPresentation, bool, error) {
 		return SkeletonPresentation{}, false, errors.New("invalid copied Skeleton presentation")
 	}
 	return p, true, nil
+}
+
+// SupportsRatingOptions reports whether the selected provider has Rating V1.
+func (a *App) SupportsRatingOptions() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_rating_supported() != 0, nil
+}
+
+func (n *Node) setRatingWire(wire *ratingWire) error {
+	supported, err := n.app.SupportsRatingOptions()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrRatingOptionsUnavailable
+	}
+	return result(C.go_rating_configure(n.app.ptr, n.handle, wire))
+}
+
+func (n *Node) readRatingWire(wire *ratingWire) (bool, error) {
+	supported, err := n.app.SupportsRatingOptions()
+	if err != nil || !supported {
+		return false, err
+	}
+	status := C.go_rating_get_config(n.app.ptr, n.handle, wire)
+	if status == C.CUI_BRIDGE_EMPTY {
+		return false, nil
+	}
+	err = result(status)
+	return err == nil, err
 }
 
 // SupportsPaginationOptions reports whether the selected provider exposes all

@@ -207,8 +207,15 @@ class SourceManifest(unittest.TestCase):
             env = dict(os.environ, npm_config_cache=str(directory / 'npm-cache'), npm_config_offline='true')
             subprocess.run([shutil.which('npm'), 'pack', '--ignore-scripts', '--pack-destination', str(directory)],
                            cwd=node, env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
-            self.assertGreater(validator.verify_source_manifest(next(directory.glob('*.tgz'))), 1000)
+            tarball = next(directory.glob('*.tgz'))
+            self.assertGreater(validator.verify_source_manifest(tarball), 1000)
+            with tarfile.open(tarball) as archive:
+                for path in ('package/rating-options.cjs', 'package/rating_options_internal.h',
+                             'package/_source/bindings/node/examples/rating-options.cjs',
+                             'package/types/examples/rating_options.ts'):
+                    self.assertIsNotNone(archive.getmember(path))
             python = producer.stage('python', directory)
+            self.assertTrue((python / 'cui_bridge/rating_options.py').is_file())
             source = python / 'cui_bridge/_source'
             tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT, timeout=30).decode().split('\0')
             expected = [name for name in tracked if Path(name).name == '.gitignore'

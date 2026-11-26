@@ -13,6 +13,7 @@ pub use icon_resources::{
     BadgeConfig, BadgeResult, BadgeSize, BadgeVariant, IconAlign, IconAvailability, IconBitmap,
     IconBoxStyle, IconCatalogEntry, IconConfig, IconConstraints, IconError, IconInfo, IconLimits,
     IconOptions, IconResource, IconResult, IconSize, IconSource, IconSourceKind, IconTransform,
+    RatingConfig,
 };
 pub use pagination_options::{PaginationConfig, PaginationOptions};
 pub use shadows::{BoxShadow, CornerRadii, ShadowKind, ShadowPreset, ShadowStyle};

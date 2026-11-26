@@ -142,8 +142,11 @@ option includes copyable setup. [Icon resource guide](ICON.md)
 Use `cui_base_rating_ex` or `cui_base_rating_events_ex` for the selection
 policy with custom layout. Existing Rating entry points keep their value
 selection and paint defaults. Retained C nodes can opt into the presenter with
-`cui_bridge_rating_configure_v1`. The language builders still use the original
-integer presenter. [Retained C setup and resource lifetimes](BRIDGE_COMPONENTS.md#configure-a-retained-rating-from-c)
+`cui_bridge_rating_configure_v1`. Python, JavaScript, TypeScript, Go and Rust
+expose these same options through their builders with the existing queued
+scalar change. Probe for Rating options when loading shared providers.
+[Retained C setup and resource lifetimes](BRIDGE_COMPONENTS.md#configure-a-retained-rating-from-c) ·
+[Runnable feedback forms](BRIDGE_COMPONENTS.md#build-a-feedback-form-with-rating)
 
 ## Stepper
 

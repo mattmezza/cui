@@ -4,11 +4,14 @@ mod badge;
 mod ffi;
 mod presentation;
 mod presentation_ffi;
+mod rating;
 
 pub use badge::{BadgeConfig, BadgeResult, BadgeSize, BadgeVariant};
 pub use presentation::{
     IconAlign, IconBoxStyle, IconConfig, IconConstraints, IconOptions, IconResult, IconSize,
 };
+
+pub use rating::RatingConfig;
 
 use self::ffi::{api, RawBitmap, RawHandle, RawInfo, RawLimits};
 use super::{check, App, Error, Rect, Result};

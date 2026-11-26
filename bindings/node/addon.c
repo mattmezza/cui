@@ -2478,6 +2478,7 @@ static void wire_big_out(unsigned char *wire, const void *record, size_t at) {
 #include "pagination_options_internal.h"
 #include "icon_resources_internal.h"
 #include "icon_badge_internal.h"
+#include "rating_options_internal.h"
 // clang-format on
 
 static napi_value init(napi_env env, napi_value exports) {
@@ -2619,6 +2620,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("timeFieldLocalized", time_field_localized, 0);
     EXPORT("skeletonPresentation", skeleton_presentation, 0);
     EXPORT("paginationOptions", pagination_options, 0);
+    EXPORT("ratingOptions", rating_options, 0);
     EXPORT("paginationCustomSize", pagination_custom_size, 0);
     EXPORT("iconResource", icon_resource, 0);
     EXPORT("iconNode", icon_node, 0);

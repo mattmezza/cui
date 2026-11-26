@@ -2876,6 +2876,10 @@
       "tests": [
         "tests/unit/test_numeric.c",
         "tests/unit/test_bridge_rating.c",
+        "bindings/python/test_rating_options.py",
+        "bindings/node/test/rating-options.test.cjs",
+        "bindings/go/cui/rating_test.go",
+        "bindings/rust/tests/rating_options.rs",
         "tests/web/test_browser.py",
         "tests/web/test_rating_gallery.py"
       ],
@@ -2885,7 +2889,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Immediate C, retained C and WASM support whole or half steps, shared design sizes, outline-only hover preview, SVG masks and color overrides. The distinct step-down policy is opt-in. Native host accessibility acceptance, arbitrary inherited styling and retained language builder presentation remain open."
+        "Immediate C, retained C, all five language builders and WASM support whole or half steps, shared design sizes, outline-only hover preview, SVG masks and color overrides. The distinct step-down policy is opt-in. Native host accessibility acceptance and arbitrary inherited styling remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2935,6 +2939,17 @@
             "tests/unit/test_bridge_rating.c",
             "include/cui/cui_bridge.h",
             "docs/BRIDGE_COMPONENTS.md"
+          ]
+        },
+        {
+          "name": "Copied Rating options and legacy-provider fallback in five language builders",
+          "status": "tested",
+          "evidence": [
+            "bindings/python/test_rating_options.py",
+            "bindings/node/test/rating-options.test.cjs",
+            "bindings/node/test/rating-options.types.ts",
+            "bindings/go/cui/rating_test.go",
+            "bindings/rust/tests/rating_options.rs"
           ]
         }
       ],

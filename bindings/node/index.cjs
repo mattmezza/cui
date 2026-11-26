@@ -647,6 +647,7 @@ const iconBadges = require('./icon-badge.cjs')(native, Node, NODE, icons, design
 containers.add(iconBadges.badgeKind);
 const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
 const paginationOptions = require('./pagination-options.cjs')(native, Node, NODE);
+const ratingOptions = require('./rating-options.cjs')(native, Node, NODE, icons, designSizes);
 class App {
   constructor(options = {}) {
     if (options.initiallyHidden !== undefined && typeof options.initiallyHidden !== "boolean") throw new TypeError("initiallyHidden must be boolean");
@@ -671,6 +672,7 @@ class App {
     preflightDataTables(this, root);
     skeletons.preflight(this, root);
     paginationOptions.preflight(this, root);
+    ratingOptions.preflight(this, root);
     sliderModels.preflight(this, root);
     localizedTimes.preflight(this, root);
     iconBadges.preflight(this, root);
@@ -707,6 +709,7 @@ class App {
       localizedTimes.mount(this,node);
       skeletons.mount(this, node);
       paginationOptions.mount(this, node);
+      ratingOptions.mount(this, node);
       iconBadges.mount(this, node);
       if([57,58].includes(node.kind))native.setDate(this.handle,node[NODE],...node.dateValue);
       if(node.kind===56)native.setColor(this.handle,node[NODE],node.colorValue);
@@ -749,7 +752,7 @@ class App {
   _remove(node) {
     this._alive();
     native.removeNode(this.handle, node[NODE]);
-    const clear = current => { localizedTimes.release(current); iconBadges.release(current); if(current.kind===81)current.requestValue=null; this.nodes.delete(keyFor(native.nodeId(current[NODE]))); current.owner = null; for (const child of current.childrenValue) clear(child); };
+    const clear = current => { localizedTimes.release(current); iconBadges.release(current); ratingOptions.release(current); if(current.kind===81)current.requestValue=null; this.nodes.delete(keyFor(native.nodeId(current[NODE]))); current.owner = null; for (const child of current.childrenValue) clear(child); };
     clear(node);
     if (node === this.root) this.root = null;
     if (node.parent) node.parent.childrenValue = node.parent.childrenValue.filter(child => child !== node);
@@ -899,6 +902,7 @@ class App {
     return typeof native.supportsRadioTooltip === 'function' &&
       typeof native.setRadioTooltip === 'function' && native.supportsRadioTooltip();
   }
+  supports_rating_options() { return ratingOptions.supports(this); }
   supports_pagination_options() { return paginationOptions.supports(this); }
   supports_skeleton_presentation() { return skeletons.supports(this); }
   supports_localized_time_field(){return localizedTimes.supports(this);}
@@ -946,8 +950,8 @@ class App {
   theme_preset(index) {this._alive();if(!Number.isInteger(index)||index<0||index>0xffffffff)throw new TypeError("invalid theme index");native.setThemePreset(this.handle,index);return this;}
   current_theme_preset() {this._alive();return native.getThemePreset(this.handle);}
   stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } return this; }
-  close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);if(node.kind===81)node.requestValue=null;} return this; }
-  dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);if(node.kind===81)node.requestValue=null;} this.nodes.clear(); } }
+  close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);ratingOptions.release(node);if(node.kind===81)node.requestValue=null;} return this; }
+  dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);ratingOptions.release(node);if(node.kind===81)node.requestValue=null;} this.nodes.clear(); } }
 }
 module.exports = {RadioPaintLayer,radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
 

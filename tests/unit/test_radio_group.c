@@ -57,6 +57,97 @@ static void touch(cui_event_type type, float x, float y) {
         (cui_event){
             .type = type, .pointer_type = CUI_POINTER_TOUCH, .pointer_id = 42, .x = x, .y = y}));
 }
+static cui_radio_group_event_result motion_frame(cui_radio_group_motion *motion,
+                                                 const cui_radio_group_item *list, size_t count,
+                                                 cui_radio_group_options options,
+                                                 const cui_selection_indicator_parts *parts) {
+    assert(cui_begin_frame(ui, 2000, 1000, .016f));
+    cui_radio_group_event_result result =
+        cui_radio_group_present(ui, 10, &theme, list, count, &selected, &state, options,
+                                (cui_radio_group_presentation){motion, parts, parts ? count : 0},
+                                (cui_selection_handler){0});
+    drawing = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return result;
+}
+static void test_motion(void) {
+    cui_radio_group_motion motion = {0};
+    cui_selection_indicator_parts parts[] = {{101}, {102}, {103}};
+    cui_radio_group_options options = {.vertical = true};
+    selected = 11;
+    assert(motion_frame(&motion, items, 3, options, parts).legacy.valid);
+    assert(motion.items[0].progress == 1 && motion.items[1].progress == 0 &&
+           motion.next_wake_seconds == 0);
+    cui_rect before = cui_bounds(ui, 101);
+    selected = 12;
+    motion_frame(&motion, items, 3, options, parts);
+    assert(motion.items[0].progress > 0 && motion.items[0].progress < 1);
+    assert(motion.items[1].progress > 0 && motion.items[1].progress < 1);
+    assert(motion.next_wake_seconds > cui_frame_time(ui));
+    cui_rect after = cui_bounds(ui, 101);
+    assert(before.w == after.w && before.h == after.h);
+    unsigned marks = 0;
+    for (size_t i = 0; i < drawing.count; i++)
+        if (drawing.commands[i].type == CUI_DRAW_IMAGE) {
+            assert(drawing.commands[i].bounds.w == 12);
+            marks++;
+        }
+    assert(marks == 2);
+    float previous = motion.items[0].progress;
+    selected = 11;
+    for (unsigned i = 0; i < 8; i++)
+        motion_frame(&motion, items, 3, options, parts);
+    assert(motion.items[0].progress > previous);
+    cui_radio_group_item reordered[] = {items[1], items[0]};
+    float retained = motion.items[0].progress;
+    motion_frame(&motion, reordered, 2, options, NULL);
+    assert(motion.items[1].id == 11 && motion.items[1].progress >= retained);
+    assert(motion.items[2].id == 0 && !motion.items[2].initialized);
+    cui_set_reduced_motion(ui, true);
+    selected = 12;
+    motion_frame(&motion, reordered, 2, options, NULL);
+    assert(motion.items[0].progress == 1 && motion.items[1].progress == 0 &&
+           motion.next_wake_seconds == 0);
+    cui_set_reduced_motion(ui, false);
+    selected = 11;
+    for (unsigned i = 0; i < 200; i++)
+        motion_frame(&motion, reordered, 2, options, NULL);
+    assert(motion.items[1].progress == 1 && motion.items[0].progress == 0 &&
+           motion.next_wake_seconds == 0);
+    options.on_change = change;
+    options.change_user = &selected;
+    accept = false;
+    calls = 0;
+    cui_focus(ui, 12);
+    key(CUI_KEY_ENTER);
+    cui_radio_group_event_result rejected = motion_frame(&motion, items, 3, options, parts);
+    assert(rejected.legacy.requested && !rejected.legacy.changed && calls == 1 && selected == 11);
+    assert(motion.items[0].progress == 1 && motion.items[1].progress == 0);
+    accept = true;
+    key(CUI_KEY_ENTER);
+    cui_radio_group_event_result accepted = motion_frame(&motion, items, 3, options, parts);
+    assert(accepted.legacy.changed && calls == 2 && selected == 12);
+    assert(motion.items[0].progress < 1 && motion.items[1].progress > 0);
+    motion.items[0].progress = NAN;
+    motion.items[0].velocity = NAN;
+    motion_frame(&motion, items, 3, options, parts);
+    assert(isfinite(motion.items[0].progress) && isfinite(motion.items[0].velocity));
+    motion.id = 999; /* Storage reused for another group snaps instead of inheriting travel. */
+    motion_frame(&motion, items, 3, options, parts);
+    assert(motion.id == 10 && motion.items[0].progress == 0 && motion.items[1].progress == 1 &&
+           motion.next_wake_seconds == 0);
+    options.disabled = true;
+    motion_frame(&motion, items, 3, options, parts);
+    bool disabled_mark = false;
+    for (size_t i = 0; i < drawing.count; i++)
+        if (drawing.commands[i].type == CUI_DRAW_IMAGE) {
+            assert(drawing.commands[i].bitmap.tint.a == theme.on_primary.a / 2);
+            disabled_mark = true;
+        }
+    assert(disabled_mark);
+    motion_frame(&motion, items, 0, options, NULL);
+    assert(motion.items[0].id == 0 && motion.next_wake_seconds == 0);
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 2000, .height = 1000});
     assert(ui);
@@ -192,6 +283,8 @@ int main(void) {
     items[1].id = 11;
     assert(!frame(3, o).valid);
     items[1].id = saved;
+    theme = cui_theme_light();
+    test_motion();
     cui_destroy(ui);
     return 0;
 }

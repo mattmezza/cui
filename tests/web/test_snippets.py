@@ -97,7 +97,7 @@ def main():
         'Button': 'cui_str label = {0};',
         'Checkbox': 'cui_str label = {0}; cui_check_state state = CUI_CHECK_UNCHECKED;',
         'Switch': 'cui_str label = {0}; bool enabled = false; cui_switch_state spring = {0}; double now = 0;',
-        'Radio': 'cui_id selected = 0; cui_radio_group_state navigation = {0};',
+        'Radio': 'cui_id selected = 0; cui_radio_group_state navigation = {0}; cui_radio_group_motion motion = {0};',
         'Slider': 'float value = 0;',
         'Progress': 'float progress = 0; cui_progress_motion motion = {0};',
         'Skeleton': 'bool loading = true;',

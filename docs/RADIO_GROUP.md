@@ -67,13 +67,56 @@ including theme density. It uses the existing selection mark renderer and the
 same indicator/font/theme colors as the standalone radio. The separate base API
 registers/reduces behavior without styled layout; a custom renderer must submit
 boxes with the same IDs. Do not register another interactive radio with the same
-ID after calling the base API. The reference's richer child composition, tooltip
-builder, spring mark animation and unrestricted style refinement are not provided
-by this initial group API. Full Radio-family source parity is not claimed.
+ID after calling the base API. Rich child composition, integrated tooltips and full styling remain open.
+
+## Animate the marks
+
+For animated RadioGroup presentation, keep a zero-initialized
+`cui_radio_group_motion` beside the selected ID and navigation state. Give each
+group its own motion state. Pass it to `cui_radio_group_present` each frame.
+
+```c
+/* Keep these fields in the application model. Initialize them once. */
+typedef struct {
+    cui_id selected;
+    cui_radio_group_state navigation;
+    cui_radio_group_motion motion;
+} delivery_choice;
+
+double draw_delivery_choice(cui_context *ui, const cui_theme *theme,
+                            delivery_choice *choice) {
+    cui_radio_group_item items[] = {
+        {cui_id_from(ui, "standard"), cui_string("Standard"), false},
+        {cui_id_from(ui, "priority"), cui_string("Priority"), false}};
+    cui_radio_group_event_result result = cui_radio_group_present(
+        ui, cui_id_from(ui, "delivery"), theme, items, 2,
+        &choice->selected, &choice->navigation,
+        (cui_radio_group_options){.vertical = true, .name = cui_string("Delivery")},
+        (cui_radio_group_presentation){.motion = &choice->motion},
+        (cui_selection_handler){0});
+    return result.legacy.valid ? choice->motion.next_wake_seconds : 0;
+}
+```
+
+Use the returned deadline on the frame clock. Zero means the animation needs
+no frame. The first submission snaps to the model, and later accepted
+selections crossfade the outgoing and incoming marks. Selection callbacks,
+keyboard focus and checked semantics reflect the new choice in that frame.
+Reversing selection redirects the running spring. Motion follows stable item
+IDs on reorder, and removed options release their slots. The theme's
+`spring_control` and the context's reduced-motion preference govern the fade.
+
+Use `presentation.parts` and `presentation.part_count` to combine animation
+with [named indicator styling](NAMED_SELECTION_INDICATORS.md). Existing
+`on_change` and typed selection observers preserve their synchronous order.
+With a null motion pointer, the style has immediate marks. The standalone
+Radio and the retained language builders use their existing presentation.
 
 The headless test asserts same-frame selection paint, semantic set relationships,
 callback rejection/acceptance, selected no-op, keyboard wrap/disabled skipping,
 queued navigation, one tab stop, touch drag/cancel suppression, focus cleanup,
-bounded validation and all 14 design sizes at two densities. The browser suite
-uses actual mouse, keyboard and CDP touch events on the gallery's visible options.
+bounded validation and all 14 design sizes at two densities. Motion tests check
+stable mark geometry and state across reorder, removal and disabled options.
+Chromium checks fading, reversal, reduced motion and that frames stop when the
+fade settles. It also exercises mouse, keyboard and CDP touch on the visible options.
 Chromium touch emulation is not evidence from a physical mobile device.

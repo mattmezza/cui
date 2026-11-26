@@ -1519,6 +1519,7 @@ static void gallery_button_badge(cui_context *context, void *user) {
 }
 static cui_id radio_selected;
 static cui_radio_group_state radio_group_state;
+static cui_radio_group_motion radio_group_motion;
 static unsigned radio_requests;
 static void gallery_radio_change(void *user, cui_id selected) {
     (void)user;
@@ -4853,21 +4854,24 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                       .invalid = choice_invalid != 0,
                                       .skip_tab = choice_skip_tab != 0,
                                       .on_change = gallery_radio_change};
-        if (control_surface_shadows) {
-            cui_selection_indicator_parts parts[3] = {
-                {cui_id_from(ui, "gallery-radio-indicator-a")},
-                {cui_id_from(ui, "gallery-radio-indicator-b")},
-                {cui_id_from(ui, "gallery-radio-indicator-c")}};
-            cui_radio_group_with_parts(ui, cui_id_from(ui, "radio-group"), &t, items, 3,
-                                       &radio_selected, &radio_group_state, radio_options, parts,
-                                       3);
+        cui_selection_indicator_parts parts[3] = {{cui_id_from(ui, "gallery-radio-indicator-a")},
+                                                  {cui_id_from(ui, "gallery-radio-indicator-b")},
+                                                  {cui_id_from(ui, "gallery-radio-indicator-c")}};
+        cui_radio_group_presentation presentation = {.motion = &radio_group_motion,
+                                                     .parts =
+                                                         control_surface_shadows ? parts : NULL,
+                                                     .part_count = control_surface_shadows ? 3 : 0};
+        cui_radio_group_present(ui, cui_id_from(ui, "radio-group"), &t, items, 3, &radio_selected,
+                                &radio_group_state, radio_options, presentation,
+                                (cui_selection_handler){0});
+        if (control_surface_shadows)
             for (size_t i = 0; i < 3; i++)
                 gallery_control_shadow(ui, parts[i].indicator,
                                        gallery_shadow_indicator_size(&t) / 2,
                                        radio_selected == items[i].id);
-        } else
-            cui_radio_group(ui, cui_id_from(ui, "radio-group"), &t, items, 3, &radio_selected,
-                            &radio_group_state, radio_options);
+        if (radio_group_motion.next_wake_seconds > 0)
+            next_wake =
+                host_seconds + fmax(0, radio_group_motion.next_wake_seconds - cui_frame_time(ui));
         break;
     }
     case 5: {

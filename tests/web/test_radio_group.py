@@ -14,6 +14,83 @@ import threading
 from playwright.sync_api import sync_playwright
 from test_touch_components import Audit
 
+
+RADIO_MARKS = """() => {
+    const e = cuiGallery.exports, text = new TextDecoder();
+    const rows = {};
+    for (let i = 0; i < e.gallery_semantic_count(); i++) {
+        if (e.gallery_semantic(i, 0) !== 4) continue;
+        const name = text.decode(new Uint8Array(e.memory.buffer,
+            e.gallery_semantic_name(i), e.gallery_semantic_length(i)));
+        rows[name] = {bounds: [1, 2, 3, 4].map(f => e.gallery_semantic(i, f)), alpha: 0};
+    }
+    for (let i = 0; i < e.gallery_count(); i++) {
+        if (e.gallery_command(i, 0) !== 5) continue;
+        const x = e.gallery_command(i, 1) + e.gallery_command(i, 3) / 2;
+        const y = e.gallery_command(i, 2) + e.gallery_command(i, 4) / 2;
+        for (const row of Object.values(rows)) {
+            const [left, top, width, height] = row.bounds;
+            if (x >= left && x < left + width && y >= top && y < top + height)
+                row.alpha = Math.max(row.alpha, e.gallery_bitmap(i, 13));
+        }
+    }
+    return rows;
+}"""
+
+
+def check_animated_marks(browser, url):
+    page = browser.new_page(viewport={'width': 1280, 'height': 900})
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    try:
+        page.clock.install()
+        page.goto(url + '/#Radio')
+        page.wait_for_function('window.cuiGallery?.renderedComponent === "Radio"')
+        canvas = page.locator('#preview')
+        canvas.scroll_into_view_if_needed()
+        page.clock.pause_at(page.evaluate('new Date(Date.now() + 500).toISOString()'))
+
+        def alphas():
+            rows = page.evaluate(RADIO_MARKS)
+            return tuple(rows[name]['alpha'] for name in ('Standard', 'Priority'))
+
+        def select(name):
+            votes = page.evaluate('cuiGallery.exports.gallery_radio_stat(0)')
+            x, y, w, h = page.evaluate(RADIO_MARKS)[name]['bounds']
+            bounds = canvas.bounding_box()
+            page.mouse.click(bounds['x'] + x + w / 2, bounds['y'] + y + h / 2)
+            page.clock.run_for(20)
+            assert page.locator('#accessible').get_by_role('radio', name=name).get_attribute('aria-checked') == 'true'
+            assert page.locator('#accessible [role=radio][aria-checked=true]').count() == 1
+            assert page.evaluate('cuiGallery.exports.gallery_radio_stat(0)') == votes + 1
+
+        assert alphas() == (255, 0)
+        select('Priority')
+        rising = alphas()
+        assert all(0 < value < 255 for value in rising), rising
+        assert page.evaluate('cuiGallery.exports.gallery_next_wake()') > 0
+        select('Standard')
+        page.clock.run_for(55)
+        reversed_marks = alphas()
+        assert reversed_marks[0] > rising[0] and reversed_marks[1] < rising[1], (rising, reversed_marks)
+
+        page.clock.run_for(1500)
+        assert alphas() == (255, 0)
+        frame = page.evaluate('cuiGallery.frame')
+        page.clock.run_for(200)
+        assert page.evaluate('cuiGallery.frame') == frame
+        assert page.evaluate('cuiGallery.exports.gallery_next_wake()') == 0
+
+        page.emulate_media(reduced_motion='reduce')
+        page.clock.run_for(40)
+        select('Priority')
+        assert alphas() == (0, 255)
+        assert page.evaluate('cuiGallery.exports.gallery_next_wake()') == 0
+        assert not errors, errors
+    finally:
+        page.close()
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--directory',type=Path,default=Path('build/web'))
@@ -75,6 +152,8 @@ def main():
                 a.configure('disabled',False)
             a.case('Radio','disabled group rejects touch and keyboard changes',disabled)
             assert not a.errors,a.errors
+            a.case('Radio', 'marks crossfade and reverse, settle without frames, and respect reduced motion',
+                   lambda: check_animated_marks(browser, f'http://127.0.0.1:{server.server_port}'))
             args.report.parent.mkdir(parents=True,exist_ok=True)
             args.report.write_text(json.dumps(a.results,indent=2)+'\n')
             failures=[r for r in a.results if r['status']!='verified']

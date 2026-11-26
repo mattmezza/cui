@@ -4,8 +4,8 @@ Development additions after alpha.3: use a matching current source checkout and
 headers/facades. These APIs are absent from the published alpha.3 packages.
 
 On Button, Checkbox, Radio, Switch and Slider routes, **Surface shadows** enables
-an additive example. It starts off on each route; turning it off uses the existing
-legacy call. Button collection mode retains its existing route and disables this
+an additive example. It starts off on each route. With shadows off, the
+controls use their ordinary presentation. Button collection mode retains its existing route and disables this
 standalone demonstration. Component size, design scale, disabled state, alignment
 and existing event handlers remain available.
 
@@ -16,9 +16,9 @@ replays after disabled, so clearing only in a disabled callback would be wrong.
 Activation still uses the existing `on_click` exactly once. No shadow is implicit
 when the feature is off.
 
-Checkbox and Radio use explicit `cui_selection_indicator_parts` with their
-`*_with_parts` facades. Their decoration follows the selected value; it targets
-the indicator, not the label row or glyph. Switch uses the public track/thumb
+Checkbox uses its named-parts facade. RadioGroup passes named indicators
+to `cui_radio_group_present` alongside its motion state. Both shadow examples
+style the indicator box directly and follow the selected value. Switch uses the public track/thumb
 IDs; thumb DROP remains clipped by the track. Slider uses its public legacy
 track ID and an INSET layer; it does not acquire a named thumb or fill. Indicator
 radii follow current size/design metrics and actual shape; shadow radii are

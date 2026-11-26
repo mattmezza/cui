@@ -62,6 +62,7 @@ export function controlShadowUsage(name, size=0, design=0) {
   headers+='#include "cui/cui_radio_group.h"\n';helper+=extent;
   body=`    static cui_id selected;
     static cui_radio_group_state state;
+    static cui_radio_group_motion motion;
     cui_radio_group_item items[] = {
         {cui_id_from(ui, "standard"), cui_string("Standard"), false},
         {cui_id_from(ui, "priority"), cui_string("Priority"), false},
@@ -70,10 +71,13 @@ export function controlShadowUsage(name, size=0, design=0) {
         {cui_id_from(ui, "indicator-a")}, {cui_id_from(ui, "indicator-b")},
         {cui_id_from(ui, "indicator-c")}};
     if (!selected) selected = items[0].id;
-    cui_radio_group_with_parts(ui, cui_id_from(ui, "delivery"), theme,
+    cui_radio_group_present(ui, cui_id_from(ui, "delivery"), theme,
         items, 3, &selected, &state,
         (cui_radio_group_options){${sizing} .name = cui_string("Delivery options"),
-                                 .vertical = true, .disabled = disabled}, parts, 3);
+                                 .vertical = true, .disabled = disabled},
+        (cui_radio_group_presentation){.motion = &motion, .parts = parts, .part_count = 3},
+        (cui_selection_handler){0});
+    /* Schedule motion.next_wake_seconds when nonzero on the frame clock. */
     for (size_t i = 0; i < 3; i++)
         decorate(ui, parts[i].indicator, indicator_extent(theme) / 2,
                  selected == items[i].id);`;

@@ -2623,7 +2623,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Bounded controlled RadioGroup supplies same-frame single selection, one Tab stop, arrow/Home/End roving, disabled/removal cleanup and collection semantics. Headless/base-only, sanitizer and browser contact tests cover all14 design metrics. Spring marks, richer child composition, integrated tooltip and full styling/OS accessibility acceptance remain open."
+        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained motion, richer child composition, integrated tooltips, full styling and OS accessibility acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2671,6 +2671,18 @@
           ],
           "limitations": [
             "Group callback accepts or rejects synchronously before painting. Stable-ID selection removal remains caller-owned; primitive shared-integer radios retain their compatibility behavior."
+          ]
+        },
+        {
+          "name": "reversible RadioGroup checkmark opacity",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_radio_group.c",
+            "tests/web/test_radio_group.py",
+            "docs/RADIO_GROUP.md"
+          ],
+          "limitations": [
+            "The application owns the selected ID and motion storage. Motion shares theme springs and context reduced motion. Standalone Radio and retained bindings use immediate marks."
           ]
         }
       ],

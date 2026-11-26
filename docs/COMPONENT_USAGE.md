@@ -455,13 +455,13 @@ API: `cui_progress_defaults`, `cui_progress`, `cui_progress_ex`, `cui_progress_c
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** For grouped choices, retain one selected cui_id and cui_radio_group_state per collection; standalone radios retain one shared integer.
+**State:** Keep one selected ID and cui_radio_group_state per group, plus a zero-initialized cui_radio_group_motion for animated marks. Standalone radios share one integer.
 
 **Interaction:** cui_radio_group resolves controlled callback requests before painting and provides arrow/Home/End navigation with one Tab stop; standalone functions return true when selection changes.
 
-**Usage:** Submit stable unique item IDs to cui_radio_group; synchronously accept or reject on_change requests in your application model. Keep selected and navigation between frames.
+**Usage:** Submit stable unique item IDs. Use cui_radio_group_present with a motion state to crossfade marks and schedule its next frame on the host clock.
 
-API: `cui_radio`, `cui_radio_ex`. [Public header](../include/cui/cui_components.h); [group guide](RADIO_GROUP.md); [standalone guide](CONTROLS.md).
+API: `cui_radio`, `cui_radio_ex`, `cui_radio_group_present`. [Group header](../include/cui/cui_radio_group.h) · [Group guide](RADIO_GROUP.md) · [Standalone guide](CONTROLS.md).
 
 ## Rating
 

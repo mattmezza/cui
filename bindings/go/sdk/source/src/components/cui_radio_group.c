@@ -7,7 +7,7 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
                        const cui_radio_group_item *items, size_t count, cui_id *selected,
                        cui_radio_group_state *state, cui_radio_group_options o,
                        cui_selection_handler handler, cui_selection_event_result *observed,
-                       const cui_selection_indicator_parts *parts) {
+                       const cui_selection_indicator_parts *parts, cui_radio_group_motion *motion) {
     cui_radio_group_result r = {0};
     if (!t)
         return r;
@@ -37,6 +37,35 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
         r = cui_base_radio_group(ui, id, items, count, selected, state, o);
     if (!r.valid)
         return r;
+    if (motion) {
+        cui_disclosure_motion samples[CUI_RADIO_GROUP_MAX] = {0};
+        if (motion->id == id)
+            for (size_t i = 0; i < count; i++)
+                for (size_t j = 0; j < CUI_RADIO_GROUP_MAX; j++)
+                    if (motion->items[j].id == items[i].id) {
+                        samples[i] = motion->items[j];
+                        break;
+                    }
+        motion->id = id;
+        motion->next_wake_seconds = 0;
+        bool active = false;
+        for (size_t i = 0; i < count; i++) {
+            bool checked = *selected == items[i].id;
+            samples[i].id = items[i].id;
+            cui_disclosure_motion_step_ex(&samples[i], checked, cui_frame_delta(ui),
+                                          t->spring_control, cui_reduced_motion(ui));
+            if (!isfinite(samples[i].progress) || !isfinite(samples[i].velocity)) {
+                samples[i].progress = checked ? 1 : 0;
+                samples[i].velocity = 0;
+            }
+            active |= samples[i].progress != (checked ? 1 : 0) || samples[i].velocity != 0;
+        }
+        memcpy(motion->items, samples, sizeof(samples));
+        double now = cui_frame_time(ui);
+        motion->next_wake_seconds = active && isfinite(now) && now <= 1e12 ? now + 1. / 60 : 0;
+        if (motion->next_wake_seconds)
+            cui_invalidate(ui);
+    }
     cui_begin_box(ui, id, (cui_box){.row = !o.vertical, .gap = o.gap > 0 ? o.gap : 12 * density});
     for (size_t i = 0; i < count; i++) {
         bool disabled = o.disabled || items[i].disabled, checked = *selected == items[i].id;
@@ -68,7 +97,9 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
                                 .background = background,
                                 .align_x = CUI_ALIGN_CENTER,
                                 .align_y = CUI_ALIGN_CENTER});
-        if (checked)
+        float opacity = motion ? fminf(1, fmaxf(0, motion->items[i].progress)) : checked ? 1 : 0;
+        dot.a = (uint8_t)((float)dot.a * opacity);
+        if (opacity > 0)
             cui_checkmark(ui, size - 4 * density, dot);
         cui_end_box(ui);
         cui_end_box(ui);
@@ -85,7 +116,7 @@ cui_radio_group_result cui_radio_group(cui_context *ui, cui_id id, const cui_the
                                        cui_id *selected, cui_radio_group_state *state,
                                        cui_radio_group_options options) {
     return cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                  (cui_selection_handler){0}, NULL, NULL);
+                                  (cui_selection_handler){0}, NULL, NULL, NULL);
 }
 cui_radio_group_event_result cui_radio_group_events(cui_context *ui, cui_id id,
                                                     const cui_theme *theme,
@@ -96,7 +127,7 @@ cui_radio_group_event_result cui_radio_group_events(cui_context *ui, cui_id id,
     cui_radio_group_event_result result;
     memset(&result, 0, sizeof(result));
     result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                           handler, &result.events, NULL);
+                                           handler, &result.events, NULL, NULL);
     return result;
 }
 
@@ -134,7 +165,7 @@ cui_radio_group_with_parts(cui_context *ui, cui_id id, const cui_theme *theme,
     if (!cui_radio_group_parts_copy(ui, id, items, count, parts, part_count, copied))
         return (cui_radio_group_result){0};
     return cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                  (cui_selection_handler){0}, NULL, copied);
+                                  (cui_selection_handler){0}, NULL, copied, NULL);
 }
 cui_radio_group_event_result cui_radio_group_events_with_parts(
     cui_context *ui, cui_id id, const cui_theme *theme, const cui_radio_group_item *items,
@@ -145,6 +176,24 @@ cui_radio_group_event_result cui_radio_group_events_with_parts(
     if (!cui_radio_group_parts_copy(ui, id, items, count, parts, part_count, copied))
         return result;
     result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                           handler, &result.events, copied);
+                                           handler, &result.events, copied, NULL);
+    return result;
+}
+
+cui_radio_group_event_result
+cui_radio_group_present(cui_context *ui, cui_id id, const cui_theme *theme,
+                        const cui_radio_group_item *items, size_t count, cui_id *selected,
+                        cui_radio_group_state *state, cui_radio_group_options options,
+                        cui_radio_group_presentation presentation, cui_selection_handler handler) {
+    cui_radio_group_event_result result = {0};
+    cui_selection_indicator_parts copied[CUI_RADIO_GROUP_MAX];
+    if (presentation.parts || presentation.part_count) {
+        if (!cui_radio_group_parts_copy(ui, id, items, count, presentation.parts,
+                                        presentation.part_count, copied))
+            return result;
+    }
+    result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
+                                           handler, &result.events,
+                                           presentation.parts ? copied : NULL, presentation.motion);
     return result;
 }

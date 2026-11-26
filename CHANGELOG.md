@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- C RadioGroup can crossfade selection marks with the theme spring while
+  updating selection and accessibility in the same frame. The WASM example
+  shows the animation with reduced-motion support.
+
 ## 0.1.0-alpha.7
 
 - Pagination wraps its controls at the available width and keeps the page

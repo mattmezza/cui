@@ -2,6 +2,7 @@
 #ifndef CUI_RADIO_GROUP_H
 #define CUI_RADIO_GROUP_H
 #include "cui_components.h"
+#include "cui_disclosure.h"
 #include "cui_selection_events.h"
 #ifdef __cplusplus
 extern "C" {
@@ -71,6 +72,28 @@ cui_radio_group_event_result cui_radio_group_events_with_parts(
     cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *, size_t, cui_id *,
     cui_radio_group_state *, cui_radio_group_options, const cui_selection_indicator_parts *,
     size_t part_count, cui_selection_handler);
+/* Optional caller-owned decoration state. Zero initialize and retain between
+ * frames. Stable item IDs survive reorder; omitted items are cleared on each
+ * successful submission. Reusing storage with a different group resets it.
+ * Initial/reduced-motion submissions snap; only check-glyph opacity animates.
+ * next_wake_seconds is host frame time, or zero when settled. */
+typedef struct {
+    cui_id id;
+    cui_disclosure_motion items[CUI_RADIO_GROUP_MAX];
+    double next_wake_seconds;
+} cui_radio_group_motion;
+typedef struct {
+    cui_radio_group_motion *motion;
+    const cui_selection_indicator_parts *parts;
+    size_t part_count;
+} cui_radio_group_presentation;
+/* Optional parts follow the copied/validated with_parts contract. With no parts,
+ * part_count must be zero. NULL motion preserves immediate decoration. Selection,
+ * callbacks, observers and semantics remain synchronous and final this frame. */
+cui_radio_group_event_result
+cui_radio_group_present(cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *,
+                        size_t, cui_id *, cui_radio_group_state *, cui_radio_group_options,
+                        cui_radio_group_presentation, cui_selection_handler);
 #ifdef __cplusplus
 }
 #endif

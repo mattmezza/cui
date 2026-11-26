@@ -660,10 +660,14 @@ static cui_bridge_status (*attachment_configure)(cui_bridge_app *, cui_bridge_no
  const cui_bridge_attachment_config_v1 *);
 static cui_bridge_status (*attachment_preview)(cui_bridge_app *, cui_bridge_node,
  const uint8_t *, uint32_t, uint32_t, uint32_t, uint32_t);
+static cui_bridge_status (*attachment_slot_create)(cui_bridge_app *, cui_bridge_node, uint32_t, const char *, float, cui_bridge_node *);
+static int go_attachment_slots_supported(void) { return attachment_slot_create != NULL; }
+static cui_bridge_status go_attachment_slot_create(cui_bridge_app *a, cui_bridge_node n, uint32_t role, const char *key, float width, cui_bridge_node *out) { return attachment_slot_create(a,n,role,key,width,out); }
 static cui_bridge_status (*attachment_set_actions)(cui_bridge_app *, cui_bridge_node, uint32_t);
 
 static void go_attachment_initialize(void) {
  if (bridge_lib) {
+  go_load_optional_symbol(&attachment_slot_create, sizeof attachment_slot_create, "cui_bridge_attachment_slot_create_v1");
   go_load_optional_symbol(&attachment_configure, sizeof attachment_configure,
                           "cui_bridge_attachment_configure_v1");
   go_load_optional_symbol(&attachment_preview, sizeof attachment_preview,
@@ -673,6 +677,7 @@ static void go_attachment_initialize(void) {
  }
 #if defined(CUI_GO_STATIC)
  else {
+  attachment_slot_create = cui_bridge_attachment_slot_create_v1;
   attachment_configure = cui_bridge_attachment_configure_v1;
   attachment_preview = cui_bridge_attachment_set_preview_rgba_v1;
   attachment_set_actions = cui_bridge_attachment_set_actions_v1;
@@ -880,6 +885,8 @@ type Node struct {
 	attachmentOptions                    *attachmentOptionsWire
 	attachmentPreview                    *attachmentPreview
 	attachmentActions                    AttachmentActions
+	attachmentSlot                       AttachmentSlotRole
+	attachmentSlotWidth                  float32
 	imagePixels                          []byte
 	imageWidth, imageHeight, imageStride uint32
 	timeValue                            Time
@@ -1938,7 +1945,7 @@ func (n *Node) Disabled(v bool) *Node {
 	if n.err != nil {
 		return n
 	}
-	if !(n.kind == 4 || n.kind == configuredBadgeKind || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || (n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79) {
+	if !(n.attachmentSlot != 0 || n.kind == 52 || n.kind == 4 || n.kind == configuredBadgeKind || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || (n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79) {
 		n.err = errors.New("disabled requires control")
 		return n
 	}
@@ -2000,12 +2007,18 @@ func (a *App) Mount(root *Node) error {
 	seen := map[*Node]bool{}
 	keys := map[string]bool{}
 	usesResponsiveSkeleton := false
-	var visit func(*Node, *Node, int, bool) error
-	visit = func(n, parent *Node, d int, content bool) error {
+	var visit func(*Node, *Node, int, bool, bool) error
+	visit = func(n, parent *Node, d int, content, slotContent bool) error {
 		if n == nil || seen[n] || n.app != nil || n.removed {
 			return errors.New("invalid or reused node")
 		}
+		if slotContent && n.kind == int(C.CUI_BRIDGE_NOTIFICATION) {
+			return errors.New("Notification cannot be nested inside an Attachment slot")
+		}
 		seen[n] = true
+		if err := a.validateAttachmentSlots(n, parent); err != nil {
+			return err
+		}
 		if content && !radioContentKind(n.kind) {
 			return errors.New("RadioGroup Item decorations require passive content")
 		}
@@ -2182,7 +2195,7 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("duplicate key")
 		}
 		keys[n.key] = true
-		if n.kind >= 3 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 63 && n.kind != 64 && n.kind != 65 && n.kind != 66 && n.kind != 70 && n.kind != 73 && n.kind != 74 && n.kind != 75 && n.kind != 76 && n.kind != 78 && n.kind != 79 && n.kind != 80 && n.kind != configuredBadgeKind && len(n.children) > 0 {
+		if n.kind >= 3 && n.kind != 52 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 63 && n.kind != 64 && n.kind != 65 && n.kind != 66 && n.kind != 70 && n.kind != 73 && n.kind != 74 && n.kind != 75 && n.kind != 76 && n.kind != 78 && n.kind != 79 && n.kind != 80 && n.kind != configuredBadgeKind && len(n.children) > 0 {
 			return errors.New("leaf has children")
 		}
 		if (n.kind == 54 || n.kind == 60 || n.kind == 64 || n.kind == 65 || n.kind == 66 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 79) && len(n.children) > 64 {
@@ -2196,13 +2209,13 @@ func (a *App) Mount(root *Node) error {
 			}
 		}
 		for _, ch := range n.children {
-			if err := visit(ch, n, d+1, content || n.radioContent); err != nil {
+			if err := visit(ch, n, d+1, content || n.radioContent, slotContent || n.attachmentSlot != 0); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
-	if err := visit(root, nil, 1, false); err != nil {
+	if err := visit(root, nil, 1, false, false); err != nil {
 		return err
 	}
 	if usesResponsiveSkeleton && C.go_skeleton_supported() == 0 {
@@ -2220,7 +2233,11 @@ func (a *App) Mount(root *Node) error {
 		key := cs(n.key)
 		defer C.free(unsafe.Pointer(key))
 		var h C.cui_bridge_node
-		if n.kind == 81 {
+		if n.attachmentSlot != 0 {
+			if e := result(C.go_attachment_slot_create(a.ptr, p, C.uint32_t(n.attachmentSlot), key, C.float(n.attachmentSlotWidth), &h)); e != nil {
+				return e
+			}
+		} else if n.kind == 81 {
 			c, v := sliderWireConfig(n.slider.config), sliderWireValue(n.slider.confirmed)
 			if e := result(C.go_slider_create(a.ptr, p, key, &c, &v, &h)); e != nil {
 				return e
@@ -2518,7 +2535,7 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 		}
-		if (n.kind == 81 || n.kind == configuredBadgeKind || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || ((n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79)) && n.disabled {
+		if (n.attachmentSlot != 0 || n.kind == 52 || n.kind == 81 || n.kind == configuredBadgeKind || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || ((n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79)) && n.disabled {
 			if err := result(C.go_set_disabled(a.ptr, h, 1)); err != nil {
 				return err
 			}
@@ -3811,6 +3828,14 @@ func (a *App) SupportsAttachmentPreview() (bool, error) {
 		return false, err
 	}
 	return C.go_attachment_preview_supported() != 0, nil
+}
+
+// SupportsAttachmentSlots probes the optional factory independently of preview and action APIs.
+func (a *App) SupportsAttachmentSlots() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_attachment_slots_supported() != 0, nil
 }
 
 // SupportsAttachmentActions reports whether the bridge has the optional producer and V1 queue view.

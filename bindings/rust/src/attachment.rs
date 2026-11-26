@@ -1,10 +1,38 @@
 // SPDX-License-Identifier: MIT
-//! Optional retained Attachment presentation, decoded previews and actions.
+//! Optional retained Attachment presentation, decoded previews, actions and slots.
 use crate::{
-    check, value_notification_functions_v1, App, AttachmentStatus, Builder, Error, Kind,
+    check, string, value_notification_functions_v1, App, AttachmentStatus, Builder, Error, Kind,
     MetadataV1, Node, NotificationRawV1, RawNode, Result, NOTIFICATION_PROTOCOL_ERROR,
 };
-use std::{ffi::c_void, mem, ptr, sync::OnceLock};
+use std::{
+    ffi::{c_char, c_void},
+    mem, ptr,
+    sync::OnceLock,
+};
+
+/// A retained container for application-authored widgets inside an Attachment.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum AttachmentSlot {
+    /// Fallback content in the preview box. Images and lifecycle feedback can replace it.
+    Media,
+    /// Centered content above the preview, including when a decoded image is present.
+    Overlay,
+    /// A column following the card's title and description.
+    Metadata,
+    /// An action row. The preferred width in logical pixels must be in (0, 4096].
+    Actions { preferred_width: f32 },
+}
+
+impl AttachmentSlot {
+    fn wire(self) -> (u32, f32) {
+        match self {
+            Self::Media => (1, 0.),
+            Self::Overlay => (2, 0.),
+            Self::Metadata => (3, 0.),
+            Self::Actions { preferred_width } => (4, preferred_width),
+        }
+    }
+}
 
 /// Metadata font weight.
 #[repr(u32)]
@@ -246,12 +274,15 @@ pub(crate) fn decode_action(
 type SetActions = unsafe extern "C" fn(*mut c_void, RawNode, u32) -> u32;
 type Configure = unsafe extern "C" fn(*mut c_void, RawNode, *const OptionsRaw) -> u32;
 type Preview = unsafe extern "C" fn(*mut c_void, RawNode, *const u8, u32, u32, u32, u32) -> u32;
+type CreateSlot =
+    unsafe extern "C" fn(*mut c_void, RawNode, u32, *const c_char, f32, *mut RawNode) -> u32;
 
 #[derive(Default)]
 struct AttachmentApi {
     configure: Option<Configure>,
     preview: Option<Preview>,
     set_actions: Option<SetActions>,
+    create_slot: Option<CreateSlot>,
 }
 
 fn api() -> &'static AttachmentApi {
@@ -263,6 +294,14 @@ fn api() -> &'static AttachmentApi {
 fn resolve() -> AttachmentApi {
     extern "C" {
         fn cui_bridge_attachment_set_actions_v1(app: *mut c_void, node: RawNode, mask: u32) -> u32;
+        fn cui_bridge_attachment_slot_create_v1(
+            app: *mut c_void,
+            attachment: RawNode,
+            role: u32,
+            key: *const c_char,
+            preferred_width: f32,
+            out: *mut RawNode,
+        ) -> u32;
         fn cui_bridge_attachment_configure_v1(
             app: *mut c_void,
             node: RawNode,
@@ -282,6 +321,7 @@ fn resolve() -> AttachmentApi {
         configure: Some(cui_bridge_attachment_configure_v1),
         preview: Some(cui_bridge_attachment_set_preview_rgba_v1),
         set_actions: Some(cui_bridge_attachment_set_actions_v1),
+        create_slot: Some(cui_bridge_attachment_slot_create_v1),
     }
 }
 
@@ -294,7 +334,11 @@ fn resolve() -> AttachmentApi {
             crate::notification_symbol_v1(c"cui_bridge_attachment_set_preview_rgba_v1".as_ptr());
         let set_actions =
             crate::notification_symbol_v1(c"cui_bridge_attachment_set_actions_v1".as_ptr());
+        let create_slot =
+            crate::notification_symbol_v1(c"cui_bridge_attachment_slot_create_v1".as_ptr());
         AttachmentApi {
+            create_slot: (!create_slot.is_null())
+                .then(|| mem::transmute::<*mut c_void, CreateSlot>(create_slot)),
             set_actions: (!set_actions.is_null())
                 .then(|| mem::transmute::<*mut c_void, SetActions>(set_actions)),
             configure: (!configure.is_null())
@@ -318,9 +362,50 @@ impl Error {
     pub const ATTACHMENT_OPTIONS_UNAVAILABLE: Self = Self(9);
     /// The bridge lacks the Attachment action producer or its V1 queue view.
     pub const ATTACHMENT_ACTIONS_UNAVAILABLE: Self = Self(9);
+    /// The bridge lacks the retained Attachment slot factory.
+    pub const ATTACHMENT_SLOTS_UNAVAILABLE: Self = Self(9);
 }
 
 impl App {
+    /// Whether the loaded bridge can create retained slot containers.
+    pub fn supports_attachment_slots(&self) -> bool {
+        api().create_slot.is_some()
+    }
+
+    /// Create one container of the given role under a retained Attachment.
+    /// Add children with `child` or `build_child`. They keep their ordinary
+    /// callbacks and handles. Removing the slot or its card removes its subtree.
+    pub fn create_attachment_slot(
+        &mut self,
+        attachment: Node,
+        slot: AttachmentSlot,
+        key: &str,
+    ) -> Result<Node> {
+        let attachment = self.valid(attachment)?;
+        let create = api()
+            .create_slot
+            .ok_or(Error::ATTACHMENT_SLOTS_UNAVAILABLE)?;
+        let key = string(key)?;
+        let (role, width) = slot.wire();
+        let mut raw = RawNode::default();
+        check(unsafe { create(self.raw, attachment, role, key.as_ptr(), width, &mut raw) })?;
+        Ok(Node {
+            raw,
+            app_id: self.id,
+        })
+    }
+
+    /// Create the slot and borrow the app for fluent container properties.
+    pub fn build_attachment_slot(
+        &mut self,
+        attachment: Node,
+        slot: AttachmentSlot,
+        key: &str,
+    ) -> Result<Builder<'_>> {
+        let node = self.create_attachment_slot(attachment, slot, key)?;
+        Ok(Builder { app: self, node })
+    }
+
     /// Whether the loaded bridge can configure and poll typed Attachment actions.
     pub fn supports_attachment_actions(&self) -> bool {
         action_setter_available()

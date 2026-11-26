@@ -553,9 +553,11 @@ retained C support custom slots. In retained C use
 or an action row. Children keep their own events and are removed with the slot.
 In Python and JS/TS compose `attachment_slot(key, role, preferred_width)` as
 a direct child of an Attachment and probe `supports_attachment_slots()` for
-older providers. Go and Rust omit slot authoring. See
+older providers. Go uses `AttachmentSlot` and `SupportsAttachmentSlots`.
+Rust uses `App::create_attachment_slot` with an `AttachmentSlot` variant and
+checks `App::supports_attachment_slots`. See
 `docs/BRIDGE_COMPONENTS.md#compose-a-retained-attachment-from-c`,
-`docs/BRIDGE_COMPONENTS.md#compose-a-retained-attachment-in-python-or-node` and
+`docs/BRIDGE_COMPONENTS.md#compose-a-retained-attachment-in-a-language-builder` and
 `docs/ATTACHMENT_EVENTS.md#retained-actions-from-language-builders`.
 
 For a pinned navigation header/footer with body-only scrolling, use

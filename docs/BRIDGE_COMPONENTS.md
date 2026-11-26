@@ -625,14 +625,13 @@ cmake --build build-bridge --target bridge_attachment_slots_example
 Run that example with a font path and an SDL-enabled bridge to open the
 interactive native window. See [native setup](NATIVE_APP_STARTER.md) for prerequisites.
 
-### Compose a retained Attachment in Python or Node
+### Compose a retained Attachment in a language builder
 
 Python, JavaScript and TypeScript use `attachment_slot(key, role, preferred_width)`
 with `media`, `overlay`, `metadata` or `actions`. Supply a positive width for
 `actions` and leave the other widths at zero. Probe `app.supports_attachment_slots()`
 before composing slots when loading an older provider. Use the child widget's
-usual event handlers. Go and Rust builders cover the card's built-in actions
-and preview options.
+usual event handlers.
 
 ```python
 from cui_bridge import attachment, attachment_slot, button, label
@@ -646,6 +645,29 @@ card = (attachment("report", "Quarterly report.pdf").visual_size(380, 0)
             attachment_slot("actions", "actions", 100).children(inspect)))
 ```
 
+Go uses `cui.AttachmentSlot(key, role, preferredWidth)` as a direct child of
+`cui.Attachment`. `app.SupportsAttachmentSlots()` checks the loaded provider
+before mounting the tree.
+
+```go
+card := cui.Attachment("report", "Quarterly report.pdf", "1.4 MB").Children(
+    cui.AttachmentSlot("preview", cui.AttachmentSlotMedia, 0).Children(cui.Label("PDF")),
+    cui.AttachmentSlot("actions", cui.AttachmentSlotActions, 100).Children(inspect),
+)
+```
+
+Rust uses `App::create_attachment_slot` to return a node handle and
+`App::build_attachment_slot` to apply fluent container properties. Probe
+`app.supports_attachment_slots()` when selecting a provider at runtime.
+
+```rust
+let actions = app.build_attachment_slot(
+    card, AttachmentSlot::Actions { preferred_width: 100. }, "report-actions",
+)?.gap_px(4.)?.finish();
+let inspect = app.build_child(actions, Kind::Button, "inspect")?
+    .text("Inspect")?.finish();
+```
+
 Build and configure the bridge and addon as shown in the
 [preview setup](#show-an-attachment-preview-in-a-language-builder), then run
 one of these examples from the repository root. The examples run headlessly
@@ -655,6 +677,8 @@ by default and demonstrate a real Inspect activation.
 PYTHONPATH=bindings/python python bindings/python/examples/attachment_slots.py
 node bindings/node/examples/attachment-slots.cjs
 node bindings/typescript/examples/attachment_slots.ts
+(cd bindings/go && go run ./examples/attachment_slots)
+cargo run --manifest-path bindings/rust/Cargo.toml --example attachment_slots
 ```
 
 ### Show an attachment preview in a language builder
@@ -699,8 +723,7 @@ builder and `App::configure_attachment` and `App::clear_attachment_preview`
 for updates. The Go and Rust upload examples include an application-owned
 button that completes the transfer. Applications using the C bridge can opt
 into built-in Open, Remove and Retry and read them from the notification queue.
-Language builders cover presentation and previews. Immediate and retained C
-support custom slots. [Retained C composition](#compose-a-retained-attachment-from-c)
+The same cards can host ordinary child widgets. [Compose retained Attachment slots](#compose-a-retained-attachment-in-a-language-builder)
 
 From the repository root, build the headless C bridge and Node addon,
 then run the examples:

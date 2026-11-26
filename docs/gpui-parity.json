@@ -379,7 +379,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Immediate and retained C have opt-in styled end ellipsis. Retained C and all five language facades support named sizes, axis, media aspect, child status overrides and copied RGBA previews. Retained C, Python, JavaScript, TypeScript, Go and Rust opt into queued Open, Remove and Retry. The language action API uses the manual shared queue. Retained C, Python and JS/TS add custom preview fallback, overlay, metadata and action slots. Go and Rust slot builders, encoded file/network decoding, a shared resource cache, fully inherited styling and platform accessibility remain open."
+        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Immediate and retained C have opt-in styled end ellipsis. Retained C and all five language facades support named sizes, axis, media aspect, child status overrides and copied RGBA previews. Retained C, Python, JavaScript, TypeScript, Go and Rust opt into queued Open, Remove and Retry. The language action API uses the manual shared queue. Retained C and all five language builders support custom preview fallback, overlay, metadata and action slots. Encoded file/network decoding, a shared resource cache, fully inherited styling and platform accessibility remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -460,7 +460,19 @@
             "bindings/node/test/attachment-slots.types.ts",
             "docs/BRIDGE_COMPONENTS.md"
           ],
-          "scope": "Authored retained slot trees, existing child callbacks, disabled slots and preflight without the C factory. Python and Node tests exercise a released older provider. TS checks the role and width contract. Go and Rust slot builders remain open."
+          "scope": "Authored retained slot trees, existing child callbacks, disabled slots and preflight without the C factory. Python and Node tests exercise a released older provider. TS checks the role and width contract."
+        },
+        {
+          "name": "retained custom slots in Go and Rust",
+          "status": "tested",
+          "evidence": [
+            "bindings/go/cui/attachment_slots_test.go",
+            "bindings/rust/tests/attachment.rs",
+            "bindings/go/examples/attachment_slots/main.go",
+            "bindings/rust/examples/attachment_slots.rs",
+            "docs/BRIDGE_COMPONENTS.md"
+          ],
+          "scope": "Headless checks for current shared, bundled and released older providers. Slot children keep ordinary callbacks. Removing a card invalidates descendant handles and discards unread child notifications. Rust also releases callback captures owned by those removed descendants."
         },
         {
           "name": "preview/remove actions",

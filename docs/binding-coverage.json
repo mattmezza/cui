@@ -62,7 +62,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Retained C, Python, JavaScript, TypeScript, Go and Rust expose named sizes, fitted metadata, layout and lifecycle refinements and copied RGBA previews. Configuration and preview have independent capability probes. Retained C and the five language builders enable built-in Open, Remove and Retry with an optional typed view of the existing queue. Language action events use manual polling. Immediate C, retained C, Python, JavaScript and TypeScript expose custom preview, overlay, metadata and action slots. Go and Rust builders omit custom slots. Physical accessibility remains open."
+        "Retained C, Python, JavaScript, TypeScript, Go and Rust expose named sizes, fitted metadata, layout and lifecycle refinements and copied RGBA previews. Configuration and preview have independent capability probes. Retained C and the five language builders enable built-in Open, Remove and Retry with an optional typed view of the existing queue. Language action events use manual polling. Immediate C, retained C and all five language builders expose custom preview, overlay, metadata and action slots. Physical accessibility remains open."
       ]
     },
     {

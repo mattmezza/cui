@@ -71,7 +71,7 @@ StatusBar, Toolbar, and TitleBar use `Item` children. StatusBar Item `StepStatus
 
 Icon takes a catalog name such as `check` and optional `VisualSize`; an unknown name is reported at `Step`. Message renders one filled message body with an optional header and configurable width. A failed mount removes its partial native tree, so a corrected tree can be mounted on the same app.
 
-Attachment renders native status and progress metadata from a title, description, `AttachmentStatus`, `Value(0..1)`, and optional visual width. This bridge surface does not expose file transfer, remove, or retry actions.
+Attachment renders status and progress from a title, description, `AttachmentStatus`, `Value(0..1)`, and optional width. `AttachmentActions` enables built-in Open, Remove and Retry requests. File operations belong to the application. Use `AttachmentSlot` to mount normal child controls in the card. [Attachment examples](BRIDGE_COMPONENTS.md#compose-a-retained-attachment-in-a-language-builder)
 
 Image accepts decoded RGBA8 pixels with `RGBA(pixels, width, height, stride)` and optional display `VisualSize`. Go copies the input immediately; the bridge copies it again for rendering, so callers may reuse their byte slice. Dimensions must be 1–2048 pixels, stride at least four bytes per pixel, and the exact buffer at most 16 MiB. `SetRGBA` replaces pixels on a mounted image. File decoding remains the application's responsibility.
 

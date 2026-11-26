@@ -2,8 +2,8 @@
 mod attachment;
 pub use attachment::{
     AttachmentAction, AttachmentActionNotificationV1, AttachmentActionPart, AttachmentActionSource,
-    AttachmentActions, AttachmentOptions, AttachmentTextStyle, AttachmentTextWeight,
-    AttachmentTypography,
+    AttachmentActions, AttachmentOptions, AttachmentSlot, AttachmentTextStyle,
+    AttachmentTextWeight, AttachmentTypography,
 };
 mod disclosure;
 pub use disclosure::{
@@ -1486,8 +1486,17 @@ impl App {
     pub fn remove(&mut self, n: Node) -> Result<()> {
         let raw = self.valid(n)?;
         check(unsafe { cui_bridge_node_remove(self.raw, raw) })?;
-        self.callbacks.retain(|(node, _), _| *node != raw);
         let app = self.raw;
+        // A successful parent removal retires every descendant generation.
+        // Text support and previous-frame geometry do not establish liveness.
+        const STALE_HANDLE: u32 = 4;
+        self.callbacks.retain(|(node, _), _| {
+            let mut required = 0;
+            *node != raw
+                && unsafe {
+                    cui_bridge_get_text(app, *node, std::ptr::null_mut(), 0, &mut required)
+                } != STALE_HANDLE
+        });
         // Native removal also removes descendants. Check the generation of
         // every tracked table so a recycled slot cannot inherit a capacity.
         self.data_table_capacities

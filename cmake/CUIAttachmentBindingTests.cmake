@@ -34,7 +34,8 @@ function(cui_attachment_binding_tests mode go_provider rust_target legacy)
  add_test(NAME bridge_go_attachment_${mode} COMMAND ${CMAKE_COMMAND} -E env
   GOMAXPROCS=1 GOFLAGS=-p=1 GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local
   CUI_BRIDGE_LIBRARY=${go_provider} CUI_TEST_LEGACY_ATTACHMENT=${legacy}
-  ${CUI_ATTACHMENT_GO} test ${go_tags} ./cui -count=1 -run "^TestAttachment(Presentation|Actions)?$")
+  CUI_TEST_LEGACY_ATTACHMENT_SLOTS=${legacy}
+  ${CUI_ATTACHMENT_GO} test ${go_tags} ./cui -count=1 -run "^TestAttachment((Presentation|Actions)?$|Slots)")
  add_test(NAME bridge_rust_attachment_${mode} COMMAND ${CMAKE_COMMAND} -E env
   --unset=CUI_BRIDGE_LIB_DIR --unset=LD_LIBRARY_PATH --unset=LD_PRELOAD
   CARGO_TARGET_DIR=${rust_target} RUSTFLAGS=-Dwarnings CUI_TEST_LEGACY_ATTACHMENT=${legacy}
@@ -65,6 +66,16 @@ add_test(NAME bridge_rust_attachment_actions_example COMMAND ${CMAKE_COMMAND} -E
  ${attachment_shared} CARGO_TARGET_DIR=${CUI_RUST_SKELETON_TARGET_DIR} RUSTFLAGS=-Dwarnings
  ${CUI_ATTACHMENT_CARGO} run --offline --locked -j1 --example attachment_actions)
 set_tests_properties(bridge_rust_attachment_actions_example PROPERTIES
+ WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/rust" RUN_SERIAL TRUE TIMEOUT 600)
+add_test(NAME bridge_go_attachment_slots_example COMMAND ${CMAKE_COMMAND} -E env
+ GOMAXPROCS=1 GOFLAGS=-p=1 GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local
+ CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge> ${CUI_ATTACHMENT_GO} run -tags cui_dynamic ./examples/attachment_slots)
+set_tests_properties(bridge_go_attachment_slots_example PROPERTIES
+ WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/go" RUN_SERIAL TRUE TIMEOUT 600)
+add_test(NAME bridge_rust_attachment_slots_example COMMAND ${CMAKE_COMMAND} -E env
+ ${attachment_shared} CARGO_TARGET_DIR=${CUI_RUST_SKELETON_TARGET_DIR} RUSTFLAGS=-Dwarnings
+ ${CUI_ATTACHMENT_CARGO} run --offline --locked -j1 --example attachment_slots)
+set_tests_properties(bridge_rust_attachment_slots_example PROPERTIES
  WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/rust" RUN_SERIAL TRUE TIMEOUT 600)
 cui_attachment_binding_tests(dynamic $<TARGET_FILE:cui_bridge>
  "${CUI_RUST_SKELETON_TARGET_DIR}" 0 ${attachment_shared})

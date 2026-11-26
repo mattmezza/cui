@@ -1,8 +1,163 @@
 // SPDX-License-Identifier: MIT
 use cui_builders::{
-    App, AttachmentOptions, AttachmentStatus, AttachmentTextStyle, AttachmentTextWeight,
-    AttachmentTypography, DesignSize, Error, Kind,
+    App, AttachmentOptions, AttachmentSlot, AttachmentStatus, AttachmentTextStyle,
+    AttachmentTextWeight, AttachmentTypography, DesignSize, Error, Kind,
 };
+
+#[test]
+fn retained_attachment_slots() {
+    use cui_builders::Phase;
+    use std::{cell::Cell, rc::Rc};
+
+    let mut app = App::headless(480., 300.).unwrap();
+    let current = std::env::var("CUI_TEST_LEGACY_ATTACHMENT").as_deref() != Ok("1");
+    assert_eq!(app.supports_attachment_slots(), current);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let card = app
+        .build_child(root, Kind::Attachment, "file")
+        .unwrap()
+        .text("Report.pdf")
+        .unwrap()
+        .visual_size(340., 0.)
+        .unwrap()
+        .attachment_status(AttachmentStatus::Complete)
+        .unwrap()
+        .finish();
+
+    if !current {
+        assert_eq!(
+            app.create_attachment_slot(card, AttachmentSlot::Media, "media")
+                .err(),
+            Some(Error::ATTACHMENT_SLOTS_UNAVAILABLE)
+        );
+        let sibling = app.child(root, Kind::Button, "media").unwrap();
+        app.text(sibling, "Ordinary button").unwrap();
+        app.step(0.016).unwrap();
+        assert!(app.bounds(card).unwrap().width > 0.);
+        assert!(app.bounds(sibling).unwrap().width > 0.);
+        return;
+    }
+
+    assert_eq!(
+        app.create_attachment_slot(root, AttachmentSlot::Media, "invalid")
+            .err(),
+        Some(Error(8))
+    );
+    for preferred_width in [0., -1., 4097., f32::NAN, f32::INFINITY] {
+        assert_eq!(
+            app.create_attachment_slot(
+                card,
+                AttachmentSlot::Actions { preferred_width },
+                "invalid"
+            )
+            .err(),
+            Some(Error(3))
+        );
+    }
+    let media = app
+        .create_attachment_slot(card, AttachmentSlot::Media, "media")
+        .unwrap();
+    assert_eq!(
+        app.create_attachment_slot(card, AttachmentSlot::Media, "duplicate")
+            .err(),
+        Some(Error(8))
+    );
+    let overlay = app
+        .create_attachment_slot(card, AttachmentSlot::Overlay, "overlay")
+        .unwrap();
+    let metadata = app
+        .create_attachment_slot(card, AttachmentSlot::Metadata, "metadata")
+        .unwrap();
+    let actions = app
+        .build_attachment_slot(
+            card,
+            AttachmentSlot::Actions {
+                preferred_width: 100.,
+            },
+            "actions",
+        )
+        .unwrap()
+        .gap_px(8.)
+        .unwrap()
+        .finish();
+    let fallback = app.child(media, Kind::Label, "PDF").unwrap();
+    let logo = app.child(overlay, Kind::Label, "stamp").unwrap();
+    let author = app.child(metadata, Kind::Label, "author").unwrap();
+    app.text(fallback, "PDF")
+        .unwrap()
+        .text(logo, "1")
+        .unwrap()
+        .text(author, "Finance")
+        .unwrap();
+    let clicks = Rc::new(Cell::new(0));
+    let capture = Rc::new(());
+    let weak = Rc::downgrade(&capture);
+    let inspect = app
+        .build_child(actions, Kind::Button, "inspect")
+        .unwrap()
+        .text("Inspect")
+        .unwrap()
+        .on_click({
+            let clicks = Rc::clone(&clicks);
+            move || {
+                let _ = &capture;
+                clicks.set(clicks.get() + 1);
+            }
+        })
+        .unwrap()
+        .finish();
+    let outside = app
+        .build_child(root, Kind::Button, "outside")
+        .unwrap()
+        .text("Outside")
+        .unwrap()
+        .on_click({
+            let clicks = Rc::clone(&clicks);
+            move || clicks.set(clicks.get() + 10)
+        })
+        .unwrap()
+        .finish();
+    let queue_click = |app: &mut App, node| {
+        let b = app.bounds(node).unwrap();
+        for phase in [Phase::Down, Phase::Up] {
+            app.pointer(phase, b.x + b.width / 2., b.y + b.height / 2.)
+                .unwrap();
+        }
+    };
+    app.step(0.016).unwrap();
+    let preview = app.bounds(media).unwrap();
+    let layered = app.bounds(overlay).unwrap();
+    assert_eq!(
+        (preview.x, preview.y, preview.width, preview.height),
+        (layered.x, layered.y, layered.width, layered.height)
+    );
+    assert_eq!(app.bounds(actions).unwrap().width, 100.);
+
+    queue_click(&mut app, inspect);
+    app.component_disabled(actions, true).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.dispatch().unwrap(), 0);
+    app.component_disabled(actions, false).unwrap();
+    app.step(0.016).unwrap();
+    queue_click(&mut app, inspect);
+    app.step(0.016).unwrap();
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(clicks.get(), 1);
+
+    queue_click(&mut app, inspect);
+    app.step(0.016).unwrap();
+    assert!(weak.upgrade().is_some());
+    app.remove(card).unwrap();
+    assert!(weak.upgrade().is_none());
+    assert_eq!(app.bounds(actions).err(), Some(Error(4)));
+    assert_eq!(app.bounds(inspect).err(), Some(Error(4)));
+    assert_eq!(app.dispatch().unwrap(), 0);
+    app.step(0.016).unwrap();
+    queue_click(&mut app, outside);
+    app.step(0.016).unwrap();
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(clicks.get(), 11);
+}
 
 #[test]
 fn retained_attachment_presentation() {

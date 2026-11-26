@@ -49,7 +49,7 @@ Rust can prepare and copy custom artwork, or attach it to retained Icons and
 configured Badge containers. [SVG resources](RUST_ICON_RESOURCES.md) ·
 [Retained inbox example](RUST_ICON_BADGE.md).
 
-Attachment uses `text` title, `detail_text` description, `value` progress 0..1, and typed `attachment_status`; this bridge component is a metadata chip. `image_rgba` copies RGBA8 pixels into the bridge (maximum 16 MiB, 2048 pixels per dimension), so the caller can release its buffer after the call.
+Attachment uses `text` for the title, `detail_text` for the description, `value` for fractional progress, and `attachment_status` for lifecycle state. Use the scoped RGBA8 preview setter or mount child widgets with `App::create_attachment_slot`. Removing a slot or card releases callback captures owned by its removed children. [Attachment examples](BRIDGE_COMPONENTS.md#compose-a-retained-attachment-in-a-language-builder)
 
 Tree uses flat preorder Item children; Item `step_status` is depth 0..63, `checked` controls expansion, and `select` chooses the active Item. TimeField uses a portable `Time { hour, minute, second }` in 24-hour format; edits deliver HH:MM:SS text snapshots.
 

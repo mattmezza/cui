@@ -14,8 +14,8 @@
   JavaScript, TypeScript, Go and Rust. A manual typed poll reads actions and
   ordinary events from the existing queue.
 - Retained Attachment cards can host custom preview fallbacks, overlays,
-  metadata and action rows in C, Python, JavaScript and TypeScript. Child
-  controls keep their own events.
+  metadata and action rows in C, Python, JavaScript, TypeScript, Go and Rust.
+  Child controls keep their own events and lifetimes.
 
 ## 0.1.0-alpha.10
 

@@ -378,6 +378,30 @@ static void go_load_optional_symbol(void *destination, size_t size, const char *
 
 #include "pagination_ffi.h"
 
+static cui_bridge_status (*radio_motion_set)(cui_bridge_app *, cui_bridge_node, uint32_t);
+
+static void go_radio_motion_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&radio_motion_set, sizeof radio_motion_set,
+                          "cui_bridge_radio_set_motion_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else {
+  radio_motion_set = cui_bridge_radio_set_motion_v1;
+ }
+#endif
+}
+
+static int go_radio_motion_supported(void) {
+ return radio_motion_set != NULL;
+}
+
+static cui_bridge_status go_set_radio_motion(cui_bridge_app *app, cui_bridge_node node,
+                                             uint32_t enabled) {
+ return radio_motion_set ? radio_motion_set(app, node, enabled)
+                         : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+
 static void go_data_table_initialize(void) {
  if (!bridge_lib) {
 #if defined(CUI_GO_STATIC)
@@ -454,6 +478,7 @@ static int bridge_open(const char *path) {
  go_data_table_initialize();
  go_skeleton_initialize();
  go_pagination_initialize();
+ go_radio_motion_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -483,6 +508,7 @@ static int bridge_open(const char *path) {
  go_data_table_initialize();
  go_skeleton_initialize();
  go_pagination_initialize();
+ go_radio_motion_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -573,7 +599,7 @@ type Node struct {
 	hasHover                             bool
 	click                                func(Event)
 	change                               func(Event)
-	checked                              bool
+	checked, radioMotion                 bool
 	value, min, max, step                float64
 	hasRange, hasValue, hasChecked       bool
 	detail                               string
@@ -1744,6 +1770,9 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 		}
+		if n.radioMotion && C.go_radio_motion_supported() == 0 {
+			return ErrRadioMotionUnavailable
+		}
 		usesResponsiveSkeleton = usesResponsiveSkeleton || n.skeletonConfig != nil
 		if n.paginationCustomSize != 0 && C.go_pagination_custom_supported() == 0 {
 			return ErrPaginationCustomSizeUnavailable
@@ -1820,6 +1849,11 @@ func (a *App) Mount(root *Node) error {
 		n.app = a
 		n.handle = h
 		a.nodes[keyID(h)] = n
+		if n.radioMotion {
+			if err := n.SetRadioMotion(true); err != nil {
+				return err
+			}
+		}
 		if n.skeletonConfig != nil {
 			if e := n.configureMountedSkeleton(*n.skeletonConfig); e != nil {
 				return e
@@ -2578,6 +2612,50 @@ func Toggle(key string) *Node   { return &Node{kind: 8, key: key} }
 func Slider(key string) *Node   { return &Node{kind: 9, key: key, min: 0, max: 1, step: 0.01} }
 func Progress(key string) *Node { return &Node{kind: 10, key: key} }
 func Badge(text string) *Node   { return &Node{kind: 11, text: text} }
+
+// ErrRadioMotionUnavailable indicates the selected bridge lacks retained Radio motion.
+var ErrRadioMotionUnavailable = errors.New("Radio motion is unavailable in this bridge")
+
+// SupportsRadioMotion reports whether the active bridge can animate retained Radio selection.
+func (a *App) SupportsRadioMotion() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_radio_motion_supported() != 0, nil
+}
+
+// AnimateSelection is the fluent Radio and RadioGroup motion setting.
+// Use SetRadioMotion to handle errors directly when changing a mounted control.
+func (n *Node) AnimateSelection(enabled bool) *Node {
+	if n.err == nil {
+		n.err = n.SetRadioMotion(enabled)
+	}
+	return n
+}
+
+// SetRadioMotion sets the optional theme animation before or after Mount.
+// It preserves selection and change events. Disabling works on older bridges.
+func (n *Node) SetRadioMotion(enabled bool) error {
+	if n == nil || n.removed || (n.kind != int(C.CUI_BRIDGE_RADIO) && n.kind != int(C.CUI_BRIDGE_RADIO_GROUP)) {
+		return errors.New("selection motion requires a live Radio or RadioGroup")
+	}
+	if n.app != nil {
+		supported, err := n.app.SupportsRadioMotion()
+		if err != nil {
+			return err
+		}
+		if supported {
+			if err := result(C.go_set_radio_motion(n.app.ptr, n.handle, C.uint32_t(btoi(enabled)))); err != nil {
+				return err
+			}
+		} else if enabled {
+			return ErrRadioMotionUnavailable
+		}
+	}
+	n.radioMotion = enabled
+	return nil
+}
+
 func (n *Node) Checked(v bool) *Node {
 	if n.err != nil {
 		return n

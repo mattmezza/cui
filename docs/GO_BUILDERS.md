@@ -136,6 +136,31 @@ VirtualList accepts up to 64 keyed `Item` rows with fixed 32-pixel height and an
 
 The composed workspace example lives at `bindings/go/examples/workspace`. From `bindings/go`, run `CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --headless` to validate native hit targets, Account/Preferences tab navigation, name editing, notifications checkbox, an older birthday, save dialog, and status update without opening a window. To use the SDL UI, run `CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --font /absolute/path/to/font.ttf`. Automated SDL runs on Linux must use invisible Xvfb, for example `xvfb-run -a env -u WAYLAND_DISPLAY CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --font /absolute/path/to/font.ttf`; native mode remains open until the user closes its window.
 
+## Animate Radio selection from Go
+
+`Radio(key)` and `RadioGroup(key)` accept `AnimateSelection(enabled)` in a
+builder chain. Group motion applies to all its choices. Read
+`app.SupportsRadioMotion()` before opting in when the app can load an older
+library. A failed opt-in during `Mount` leaves the tree available to retry.
+Call `node.SetRadioMotion(false)` before retrying. The same method can enable
+or disable motion on a mounted node and returns any error directly.
+
+The selection is readable after `Step`. The existing `OnChange` handler runs
+during `Dispatch`, or after a frame in the native runner. Standalone Radio
+reports `Event.Checked`, and a RadioGroup reports `Event.Selected`. The animation
+alone produces no change events.
+
+The delivery example switches between Standard and Priority and updates its
+estimated arrival in the selection callback. Run these commands from a Linux
+checkout with Go and CGO. The native build uses SDL3, FreeType and HarfBuzz.
+[Complete delivery example](../bindings/go/examples/radio_delivery/main.go)
+
+```sh
+cd bindings/go
+go run ./examples/radio_delivery
+go run -tags cui_native ./examples/radio_delivery --font ../../third_party/inter/Inter-Regular.otf
+```
+
 ## Configure Pagination from Go
 
 `ConfiguredPagination` records copied layout options on a detached node. Set `AvailableWidth` to the current inner width in logical pixels to wrap, or use zero for a single row. Send committed pages to your results view through `OnChange`. For a dynamic provider, check `app.SupportsPaginationOptions()` before opting in. Ordinary `Pagination(key)` and its change callback also work with earlier providers.

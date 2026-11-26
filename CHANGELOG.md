@@ -9,7 +9,7 @@
   shared-integer selection contract.
 - The retained C bridge can animate either Radio variant while preserving its
   queued selection notifications.
-- Python, JavaScript and TypeScript expose the optional Radio and RadioGroup
+- Python, JavaScript, TypeScript and Go expose the optional Radio and RadioGroup
   animation. Their delivery forms update an arrival estimate in the existing
   selection callback.
 

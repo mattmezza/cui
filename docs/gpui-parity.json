@@ -2623,7 +2623,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained motion, richer child composition, integrated tooltips, full styling and OS accessibility acceptance remain open."
+        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. Richer child composition, integrated tooltips, full styling and OS accessibility acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2697,7 +2697,7 @@
           ]
         },
         {
-          "name": "retained Radio and RadioGroup motion in C, Python, JavaScript and TypeScript",
+          "name": "retained Radio and RadioGroup motion in C, Python, JavaScript, TypeScript and Go",
           "status": "tested",
           "evidence": [
             "tests/unit/test_bridge_radio_motion.c",
@@ -2706,10 +2706,13 @@
             "bindings/node/test/radio-motion.test.cjs",
             "bindings/node/examples/radio-delivery.cjs",
             "bindings/typescript/examples/radio_delivery.ts",
+            "bindings/go/cui/radio_motion_test.go",
+            "bindings/go/examples/radio_delivery/main.go",
+            "docs/GO_BUILDERS.md",
             "docs/BRIDGE_COMPONENTS.md"
           ],
           "limitations": [
-            "Optional C bridge configuration with Python, JavaScript and TypeScript builder settings. Existing standalone CHANGE and group selected Item payloads retain their timing. Go and Rust authoring and OS preference observation remain open."
+            "Optional C bridge configuration with Python, JavaScript, TypeScript and Go builder settings. Existing standalone CHANGE and group selected Item payloads retain their timing. Rust authoring and OS preference observation remain open."
           ]
         }
       ],

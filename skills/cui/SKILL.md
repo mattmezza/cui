@@ -72,8 +72,9 @@ complete matching headers. `--declaration` explicitly selects the concise API vi
 No output is clipped or filtered by safety keywords.
 
 For retained Radio selection animation, read the Radio section of
-`docs/BRIDGE_COMPONENTS.md`. Python and JS/TS apps can query
-`app.supports_radio_motion()` before enabling the optional animation.
+`docs/BRIDGE_COMPONENTS.md`. Python and JS/TS use
+`app.supports_radio_motion()`. Go uses `app.SupportsRadioMotion()` and
+`node.AnimateSelection(enabled)`.
 
 For HoverCard, read the fit section of `docs/CONTENT.md`. Zero height fits
 children and may request one follow-up for edge placement. A child height

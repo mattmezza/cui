@@ -160,7 +160,7 @@ python bindings/python/examples/radio_delivery.py --font third_party/inter/Inter
 
 The JavaScript checkout example uses the SDL3-backed Node addon to open the same
 form. Build with CMake, Ninja, Node development headers and the native SDL3/text
-dependencies in the [native starter](NATIVE_STARTER.md). Omit the font argument
+dependencies in the [native starter](NATIVE_APP_STARTER.md). Omit the font argument
 for a headless check. Node 25 also runs the TypeScript version headlessly.
 [JavaScript delivery form](../bindings/node/examples/radio-delivery.cjs) ·
 [TypeScript delivery form](../bindings/typescript/examples/radio_delivery.ts)
@@ -171,6 +171,11 @@ cmake --build build-node --target cui_node_bindings
 node bindings/node/examples/radio-delivery.cjs third_party/inter/Inter-Regular.otf
 node bindings/typescript/examples/radio_delivery.ts
 ```
+
+Go builders opt in with `AnimateSelection(enabled)` after checking
+`app.SupportsRadioMotion()`. Use `SetRadioMotion(enabled)` to handle a mounted
+update or a fallback directly. The Go delivery form can run headlessly or open
+an SDL window. [Go guide and runnable form](GO_BUILDERS.md#animate-radio-selection-from-go)
 
 ### Configure a retained pager from C
 

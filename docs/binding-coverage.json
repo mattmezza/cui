@@ -349,7 +349,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Standalone Radio and RadioGroup animation is available in immediate C, the retained C bridge, Python, JavaScript and TypeScript. Python and Node probe for the optional motion symbol. Go and Rust do not expose the setting."
+        "Standalone Radio and RadioGroup animation is available in immediate C, the retained C bridge, Python, JavaScript, TypeScript and Go. Python, Node and Go probe for the optional motion symbol. Rust does not expose the setting."
       ]
     },
     {

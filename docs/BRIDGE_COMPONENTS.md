@@ -236,11 +236,13 @@ after a step to measure a visible decoration.
 This is an optional C bridge symbol. Probe its availability when loading a
 provider dynamically.
 
-Python's `item.decorate_content()` enables the same behavior. Check
+Python, JavaScript and TypeScript use `item.decorate_content()`. Check
 `app.supports_radio_item_content()` for compatibility with earlier providers.
-The delivery form attaches a recommendation badge to the Priority item and
-updates the estimate through the group's existing `on_change` callback.
-[Runnable Python delivery form](../bindings/python/examples/radio_delivery.py)
+The delivery forms attach a recommendation tag to the Priority item and
+update the estimate through the group's existing `on_change` callback.
+[Python](../bindings/python/examples/radio_delivery.py) ·
+[JavaScript](../bindings/node/examples/radio-delivery.cjs) ·
+[TypeScript](../bindings/typescript/examples/radio_delivery.ts)
 
 ```python
 priority = (
@@ -251,7 +253,7 @@ priority = (
 )
 ```
 
-JavaScript, TypeScript, Go and Rust currently expose Item descriptions.
+Go and Rust currently expose Item descriptions.
 For arbitrary frame-local decorative drawing, use the
 [immediate C presenter](RADIO_GROUP.md#add-descriptions-and-custom-content).
 

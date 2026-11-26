@@ -75,8 +75,8 @@ For RadioGroup descriptions and decorative content, read
 `docs/RADIO_GROUP.md`. Retained applications can use the Item detail setter
 in `docs/BRIDGE_COMPONENTS.md` for copied accessible descriptions.
 The same guide covers passive children inside one RadioGroup Item through
-`cui_bridge_radio_item_set_content_v1` and Python's `item.decorate_content()`.
-For older Python providers, check `app.supports_radio_item_content()`.
+`cui_bridge_radio_item_set_content_v1` and `item.decorate_content()` in Python
+and JS/TS. For older providers, check `app.supports_radio_item_content()`.
 For retained Radio selection animation, read the Radio section of
 `docs/BRIDGE_COMPONENTS.md`. Python, JS/TS and Rust use
 `app.supports_radio_motion()`. Go uses `app.SupportsRadioMotion()`.

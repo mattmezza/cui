@@ -9,6 +9,14 @@ const app=new c.App({backend:'headless'}).mount(c.column().children(calendar,tre
 app.scroll(5,5,0,-80).step();
 c.radio('option', 'Option').animate_selection(app.supports_radio_motion()).checked();
 c.radio_group('choices').animate_selection().children(c.item('option', 'Option'));
+c.radio_group('choices').children(
+  c.item('priority', 'Priority').children(c.tag('recommended', 'Recommended'))
+    .decorate_content(app.supports_radio_item_content()),
+);
+// @ts-expect-error Only Items expose RadioGroup decorations.
+c.button('action').decorate_content();
+// @ts-expect-error Decoration opt-in takes a boolean.
+c.item('priority').decorate_content('yes');
 // @ts-expect-error Selection motion is specific to the Radio family.
 c.checkbox('check').animate_selection();
 // @ts-expect-error Tabs do not animate Radio marks.

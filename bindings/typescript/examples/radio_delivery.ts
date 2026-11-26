@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
-import {App, column, item, label, radio_group} from '../../node/index.cjs';
+import {App, column, item, label, radio_group, tag} from '../../node/index.cjs';
 
 const app = new App({backend: 'headless', title: 'Delivery options', width: 320, height: 200});
 try {
   const estimate = {arrival: 'Friday'};
   const summary = label(`Estimated arrival: ${estimate.arrival}`);
   const standard = item('standard', 'Standard');
-  const priority = item('priority', 'Priority').detail('Tracked delivery');
+  const decorated = app.supports_radio_item_content();
+  const recommendation = tag('recommended', 'Recommended');
+  const priority = item('priority', 'Priority').detail('Tracked delivery. Recommended.')
+    .children(recommendation).decorate_content(decorated);
   const delivery = radio_group('delivery').children(standard, priority).select(standard)
     .animate_selection(app.supports_radio_motion())
     .on_change(() => {
@@ -14,7 +17,7 @@ try {
       summary.label(`Estimated arrival: ${estimate.arrival}`);
     });
   app.mount(column().gap(12).children(label('Delivery service'), delivery, summary)).step();
-  const {x, y, width, height} = priority.bounds();
+  const {x, y, width, height} = (decorated ? recommendation : priority).bounds();
   const events = app.pointer('down', x + width / 2, y + height / 2)
     .pointer('up', x + width / 2, y + height / 2).step();
   if (events !== 1 || delivery.selected() !== priority || estimate.arrival !== 'Wednesday')

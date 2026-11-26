@@ -37,6 +37,8 @@ export class App {
   mount(root: Row | Column | RootView): this;
   /** Whether this app's native bridge can animate retained Radio selection. */
   supports_radio_motion(): boolean;
+  /** Whether this app's native bridge can paint passive children inside RadioGroup Items. */
+  supports_radio_item_content(): boolean;
   pointer(phase: PointerPhase, x: number, y: number): this;
   key(phase: KeyPhase, key: Key, modifiers?: number, repeat?: boolean): this;
   text_input(text: string): this;
@@ -70,7 +72,10 @@ export function number_input(key?: string): NumberInput;
 export interface Composite extends Node {children(...items: (Node | Node[])[]): this}
 export interface Disclosure extends Label, Composite {open(value?: boolean): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Group extends Composite {select(item: Item): this; selected(): Item | undefined; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
-export interface Item extends Disclosure {}
+export interface Item extends Disclosure {
+  /** Enable or hide passive children of a direct RadioGroup Item. */
+  decorate_content(enabled?: boolean): this;
+}
 export interface Alert extends Label {detail(text: string): this}
 export function collapsible(key?: string, text?: string): Disclosure;
 export function alert(key?: string, text?: string): Alert;

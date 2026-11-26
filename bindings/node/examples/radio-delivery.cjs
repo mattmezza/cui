@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 'use strict';
 const assert = require('node:assert/strict');
-const {App, column, item, label, radio_group} = require('../index.cjs');
+const {App, column, item, label, radio_group, tag} = require('../index.cjs');
 
 const [fontPath, mode] = process.argv.slice(2);
 const app = new App({
@@ -12,7 +12,10 @@ try {
   let arrival = 'Friday';
   const summary = label(`Estimated arrival: ${arrival}`);
   const standard = item('standard', 'Standard');
-  const priority = item('priority', 'Priority').detail('Tracked delivery');
+  const decorated = app.supports_radio_item_content();
+  const recommendation = tag('recommended', 'Recommended');
+  const priority = item('priority', 'Priority').detail('Tracked delivery. Recommended.')
+    .children(recommendation).decorate_content(decorated);
   const delivery = radio_group('delivery').children(standard, priority).select(standard)
     .animate_selection(app.supports_radio_motion())
     .on_change(() => {
@@ -26,7 +29,7 @@ try {
     else app.run();
   } else {
     app.step();
-    const {x, y, width, height} = priority.bounds();
+    const {x, y, width, height} = (decorated ? recommendation : priority).bounds();
     const events = app.pointer('down', x + width / 2, y + height / 2)
       .pointer('up', x + width / 2, y + height / 2).step();
     assert.equal(events, 1);

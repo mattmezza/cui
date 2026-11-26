@@ -105,8 +105,8 @@ and put selection instructions in the accessible name or description.
 Retained applications can attach copied description text to each direct
 RadioGroup Item with the existing detail setter. The runnable delivery forms
 use that path. [Retained descriptions](BRIDGE_COMPONENTS.md#describe-retained-radio-options)
-C bridge and Python applications can opt into children from a bounded set
-of decorative nodes. [Retained decorative content](BRIDGE_COMPONENTS.md#compose-retained-radio-option-content)
+C bridge, Python, JavaScript and TypeScript applications can opt into
+children from a bounded set of decorative nodes. [Retained decorative content](BRIDGE_COMPONENTS.md#compose-retained-radio-option-content)
 
 ## Animate the marks
 

@@ -1347,23 +1347,26 @@ static napi_value get_plot(napi_env env, napi_callback_info info) {
     return result;
 }
 static int optional_bridge_symbol(void *target, size_t size, const char *name);
-typedef cui_bridge_status (*radio_motion_fn)(cui_bridge_app *, cui_bridge_node, uint32_t);
+typedef cui_bridge_status (*radio_flag_fn)(cui_bridge_app *, cui_bridge_node, uint32_t);
 
-static radio_motion_fn radio_motion_symbol(void) {
-    radio_motion_fn set = NULL;
-    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_radio_set_motion_v1");
+static radio_flag_fn radio_flag_symbol(const char *name) {
+    radio_flag_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, name);
     return set;
 }
 
-static napi_value supports_radio_motion(napi_env env, napi_callback_info info) {
-    (void)info;
+static const char radio_motion_symbol[] = "cui_bridge_radio_set_motion_v1";
+static const char radio_item_content_symbol[] = "cui_bridge_radio_item_set_content_v1";
+
+static napi_value supports_radio_flag(napi_env env, const char *name) {
     napi_value result;
-    if (napi_get_boolean(env, radio_motion_symbol() != NULL, &result) != napi_ok)
+    if (napi_get_boolean(env, radio_flag_symbol(name) != NULL, &result) != napi_ok)
         return NULL;
     return result;
 }
 
-static napi_value set_radio_motion(napi_env env, napi_callback_info info) {
+static napi_value set_radio_flag(napi_env env, napi_callback_info info, const char *name,
+                                 const char *invalid, const char *unavailable) {
     napi_value v[3];
     js_app *app;
     js_node *node;
@@ -1371,12 +1374,33 @@ static napi_value set_radio_motion(napi_env env, napi_callback_info info) {
     if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
         return NULL;
     if (napi_get_value_bool(env, v[2], &enabled) != napi_ok)
-        return fail(env, "Radio motion requires a boolean");
-    radio_motion_fn set = radio_motion_symbol();
+        return fail(env, invalid);
+    radio_flag_fn set = radio_flag_symbol(name);
     if (!set)
-        return fail(env, "Radio motion requires cui_bridge_radio_set_motion_v1");
+        return fail(env, unavailable);
     cui_bridge_status code = set(app->bridge, node->node, enabled ? 1u : 0u);
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
+static napi_value supports_radio_motion(napi_env env, napi_callback_info info) {
+    (void)info;
+    return supports_radio_flag(env, radio_motion_symbol);
+}
+
+static napi_value set_radio_motion(napi_env env, napi_callback_info info) {
+    return set_radio_flag(env, info, radio_motion_symbol, "Radio motion requires a boolean",
+                          "Radio motion requires cui_bridge_radio_set_motion_v1");
+}
+
+static napi_value supports_radio_item_content(napi_env env, napi_callback_info info) {
+    (void)info;
+    return supports_radio_flag(env, radio_item_content_symbol);
+}
+
+static napi_value set_radio_item_content(napi_env env, napi_callback_info info) {
+    return set_radio_flag(env, info, radio_item_content_symbol,
+                          "Radio decoration requires a boolean",
+                          "Radio decoration requires cui_bridge_radio_item_set_content_v1");
 }
 
 typedef cui_bridge_status (*data_table_set_keyed_fn)(cui_bridge_app *, cui_bridge_node,
@@ -2340,6 +2364,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("getSelected", get_selected, 0);
     EXPORT("setChecked", set_num, 6);
     EXPORT("supportsRadioMotion", supports_radio_motion, 0);
+    EXPORT("supportsRadioItemContent", supports_radio_item_content, 0);
+    EXPORT("setRadioItemContent", set_radio_item_content, 0);
     EXPORT("setRadioMotion", set_radio_motion, 0);
     EXPORT("setValue", set_num, 7);
     EXPORT("setRange", set_range, 0);

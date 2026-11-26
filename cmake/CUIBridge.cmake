@@ -58,6 +58,10 @@ add_executable(test_bridge_components ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/t
 target_link_libraries(test_bridge_components PRIVATE cui_bridge)
 cui_warnings(test_bridge_components)
 add_test(NAME bridge_components COMMAND test_bridge_components)
+add_executable(bridge_virtual_inbox_example ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/virtual_inbox.c)
+target_link_libraries(bridge_virtual_inbox_example PRIVATE cui_bridge)
+cui_warnings(bridge_virtual_inbox_example)
+add_test(NAME bridge_virtual_inbox_example COMMAND bridge_virtual_inbox_example)
 add_executable(test_bridge_data_table_capacity
  ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_data_table_capacity.c)
 target_link_libraries(test_bridge_data_table_capacity PRIVATE cui_bridge)

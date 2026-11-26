@@ -98,8 +98,64 @@ The **Live inbox** gallery example uses variable heights and retains the visible
 item and its partial-row offset when you prepend a message or resize the row
 above it. Removing the first visible item clears its saved offset so its
 successor starts at the top, subject to end-of-list clamping. This C workflow
-uses the existing model helpers. The foreign builders do not expose those
-helpers.
+uses the existing model helpers.
+
+### Live updates in the retained C bridge
+
+Create a `CUI_BRIDGE_VIRTUAL_LIST` with direct `CUI_BRIDGE_ITEM` children.
+`cui_bridge_virtual_list_set_rows_v1` atomically replaces their order and heights.
+Pass each current child once in display order. Height zero uses the default
+32 logical pixels. The bridge copies the array. A malformed or stale handle,
+duplicate row, invalid height or mismatched count leaves the previous order
+and heights intact. Use the existing node APIs to change membership between
+steps. The projection covers up to 64 retained rows. The immediate model
+supports larger application-owned lists.
+
+```c
+#include <cui/cui_bridge.h>
+
+/* The existing list contains exactly these three children. The newly created
+ * Item is placed before the two previous ones, with its own extent. */
+cui_bridge_status update_inbox(cui_bridge_app *app, cui_bridge_node inbox,
+                               cui_bridge_node new_message, cui_bridge_node first,
+                               cui_bridge_node second) {
+    const cui_bridge_virtual_list_row_v1 rows[] = {
+        {new_message, 48}, {first, 56}, {second, 32}
+    };
+    return cui_bridge_virtual_list_set_rows_v1(app, inbox, sizeof rows[0], rows, 3);
+}
+```
+
+Call `cui_bridge_virtual_list_preserve_anchor_v1(app, inbox, 1)` when creating
+the list. After its first layout, subsequent row edits retain the first visible
+Item and the number of pixels scrolled inside it, clamped to the row and new
+viewport. If that Item is removed, the next surviving Item in the previous
+order starts at the top. If none follows, the nearest previous survivor is
+used. When every previous Item has gone, the list starts at its beginning.
+An explicit `cui_bridge_set_value` before the next step takes precedence.
+Query `cui_bridge_get_value` for the resolved offset after the step.
+Restoration itself is silent. Wheel and keyboard scrolling keep their queued
+change behavior, including when they occur in the same step as an edit.
+Turning preservation off keeps the numeric scroll offset, subject to clamping.
+
+The runnable C inbox wires two buttons to prepend a message and resize the
+first row. With a portable bridge build, the example drives those buttons
+headlessly and checks that the same row stays visible at the same offset.
+
+```sh
+cmake -S . -B build -G Ninja -DCUI_BUILD_BRIDGE=ON -DCUI_BUILD_NATIVE=OFF
+cmake --build build --target bridge_virtual_inbox_example
+./build/bridge_virtual_inbox_example
+```
+
+To open an actual window, build with an SDL-enabled C bridge and pass the path
+to a TrueType font as the first argument. [C example](../bindings/bridge/examples/virtual_inbox.c) ·
+[Native bridge prerequisites](BINDING_BUILDERS.md)
+
+The retained bridge currently uses a vertical viewport with explicit row
+extents. Use the immediate API for horizontal lists or a host measurement
+callback. Python, JavaScript, TypeScript, Go and Rust keep their existing
+uniform-row retained builders.
 
 Verified scope: both orientations, variable extents, keyed reorder identity,
 visible-window callback bounds, overscan, cross-axis scroll, precise wheel motion,

@@ -934,7 +934,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the C variable-extent model's anchor capture and restoration."
+        "Immediate C has the variable-extent anchor model. The retained C bridge offers batched order and extent updates with opt-in restoration. Python, JavaScript, TypeScript, Go and Rust retain uniform rows and numeric scrolling; the optional live-row APIs are pending."
       ]
     },
     {

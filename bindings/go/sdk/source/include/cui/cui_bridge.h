@@ -511,6 +511,30 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_virtual_list_item_bounds(cui_bridge_
                                                                      cui_bridge_node list,
                                                                      cui_bridge_node item,
                                                                      cui_bridge_rect *out_bounds);
+/* A complete projection of the list's existing direct Item children. The
+ * bridge copies each height and uses the array order for the child links.
+ * Each Item must appear once. Extents are finite logical pixels between
+ * 1 and 4096, or zero for the default 32. Existing handles stay live.
+ * Create or remove membership through the node APIs before submitting the
+ * projection. Count must match current membership (at most 64).
+ * Pass sizeof(cui_bridge_virtual_list_row_v1) for row_size. Errors preserve
+ * order and extents. Only call these APIs between steps on the owner thread. */
+typedef struct {
+    cui_bridge_node item;
+    float extent;
+} cui_bridge_virtual_list_row_v1;
+CUI_BRIDGE_API cui_bridge_status
+cui_bridge_virtual_list_set_rows_v1(cui_bridge_app *, cui_bridge_node list, uint32_t row_size,
+                                    const cui_bridge_virtual_list_row_v1 *rows, uint32_t count);
+/* Opt in to keeping the first visible Item and its within-row offset across
+ * layout edits. The next surviving old successor (or preceding survivor)
+ * starts at the top if the anchor is removed. The viewport clamps all offsets.
+ * Explicit set_value takes precedence until the next successful composition.
+ * Automatic correction queues no change. The default keeps the pixel offset. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_virtual_list_preserve_anchor_v1(cui_bridge_app *,
+                                                                            cui_bridge_node list,
+                                                                            uint32_t enabled);
+
 typedef struct {
     double x, y;
 } cui_bridge_plot_point;

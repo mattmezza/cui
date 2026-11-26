@@ -88,6 +88,10 @@ and queued scalar changes. Python, JS/TS, Go and Rust expose copied
 `RatingConfig`. Probe Rating options on earlier providers. See the Rating
 feedback forms in `docs/BRIDGE_COMPONENTS.md`.
 
+For retained C VirtualList, use `cui_bridge_virtual_list_set_rows_v1` for copied
+row order and extents and opt into anchor preservation. Send scroll input
+through the existing host path. See live updates in `docs/VIRTUAL_LIST.md`.
+
 For RadioGroup descriptions, decorative content, tooltips, signed tab order
 and C-only paint callbacks, read `docs/RADIO_GROUP.md`. For a controlled
 standalone Radio, use `cui_radio_events` or `cui_base_radio_events` in C.

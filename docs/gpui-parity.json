@@ -7374,7 +7374,8 @@
         "tests/unit/test_virtual.c",
         "tests/unit/test_base.c",
         "tests/unit/test_virtual_styled.c",
-        "tests/web/test_touch_components.py"
+        "tests/web/test_touch_components.py",
+        "bindings/bridge/tests/test_bridge_components.c"
       ],
       "status": "tested",
       "platforms": {
@@ -7383,7 +7384,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Styled visible-window rendering, both orientations, variable extents, scrollbars/keyboard and Auto/Infer sizing are headless tested. Intrinsic measurement is an explicit host callback; row selection/controls remain application-owned and scroll positions use float coordinates."
+        "Styled visible-window rendering, both orientations, variable extents, scrollbars/keyboard and Auto/Infer sizing are headless tested. The retained C bridge adds optional anchor preservation on vertical updates with up to 64 explicitly sized rows. Intrinsic measurement is an immediate host callback. Row selection and controls remain application-owned. Foreign builders keep the uniform-row path."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -7418,6 +7419,16 @@
           "evidence": [
             "tests/unit/test_virtual_styled.c",
             "tests/web/test_touch_components.py",
+            "docs/VIRTUAL_LIST.md"
+          ]
+        },
+        {
+          "name": "Retained C variable extents, atomic row order and opt-in anchoring",
+          "status": "tested",
+          "evidence": [
+            "bindings/bridge/tests/test_bridge_components.c",
+            "bindings/bridge/examples/virtual_inbox.c",
+            "include/cui/cui_bridge.h",
             "docs/VIRTUAL_LIST.md"
           ]
         },

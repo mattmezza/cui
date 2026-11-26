@@ -1109,9 +1109,9 @@ Event API includes: `cui/cui_tree_events.h`.
 
 **Interaction:** cui_virtual_render_item_fn composes the visible window; cui_virtual_measure_item_fn supplies intrinsic measurement; optional cui_scroll_handler observes aggregate final offsets after composition, with UNKNOWN source.
 
-**Usage:** Capture with cui_virtual_capture_anchor before model updates and apply cui_virtual_restore_anchor before drawing again. Keep keys and extents stable during row callbacks. Use cui_virtual_list_draw_events for final-offset observation; inspect changed separately from delivered change_count and the unchanged deferred control_result.
+**Usage:** Capture with cui_virtual_capture_anchor before model updates and apply cui_virtual_restore_anchor before drawing again. Keep keys and extents stable during row callbacks. Use cui_virtual_list_draw_events for final-offset observation; inspect changed separately from delivered change_count and the unchanged deferred control_result. Retained C uses cui_bridge_virtual_list_set_rows_v1 and optional anchor preservation.
 
-API: `cui_virtual_list_draw`, `cui_base_virtual_list`, `cui_virtual_list_draw_events`, `cui_base_virtual_list_events`, `cui_virtual_capture_anchor`, `cui_virtual_restore_anchor`. [Public header](../include/cui/cui_virtual_scroll.h); [guide](VIRTUAL_LIST.md), [guide](VIRTUALIZATION.md), [guide](VIRTUAL_EVENTS.md).
+API: `cui_virtual_list_draw`, `cui_base_virtual_list`, `cui_virtual_list_draw_events`, `cui_base_virtual_list_events`, `cui_virtual_capture_anchor`, `cui_virtual_restore_anchor`. [Public header](../include/cui/cui_virtual_scroll.h); [guide](VIRTUAL_LIST.md), [guide](VIRTUALIZATION.md), [guide](VIRTUAL_EVENTS.md). [Retained C live updates](VIRTUAL_LIST.md#live-updates-in-the-retained-c-bridge)
 
 Additional event includes: `cui/cui_virtual_events.h`.
 

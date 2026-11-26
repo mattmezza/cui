@@ -2746,6 +2746,74 @@ cui_bridge_status cui_bridge_command_item_bounds(cui_bridge_app *app, cui_bridge
         }
     return CUI_BRIDGE_INVALID_ARGUMENT;
 }
+enum { BRIDGE_VIRTUAL_CAPACITY = 64, BRIDGE_VIRTUAL_DEFAULT_HEIGHT = 32 };
+
+_Static_assert(sizeof(cui_bridge_virtual_list_row_v1) == 12 &&
+                   offsetof(cui_bridge_virtual_list_row_v1, extent) == 8,
+               "VirtualList row V1 layout");
+
+cui_bridge_status cui_bridge_virtual_list_set_rows_v1(cui_bridge_app *app, cui_bridge_node list,
+                                                      uint32_t row_size,
+                                                      const cui_bridge_virtual_list_row_v1 *rows,
+                                                      uint32_t count) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, list, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_VIRTUAL_LIST)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (row_size != sizeof *rows || (count && !rows))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (count > BRIDGE_VIRTUAL_CAPACITY)
+        return CUI_BRIDGE_CAPACITY;
+    uint32_t current_count = 0;
+    for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
+        ++current_count;
+    if (current_count != count)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+
+    cui_bridge_virtual_list_row_v1 proposed[BRIDGE_VIRTUAL_CAPACITY];
+    if (count)
+        memcpy(proposed, rows, count * sizeof *rows);
+    for (uint32_t i = 0; i < count; ++i) {
+        const cui_bridge_virtual_list_row_v1 *row = &proposed[i];
+        const cui_bridge_node_record *item = bridge_node(app, row->item);
+        if (!item)
+            return CUI_BRIDGE_STALE_HANDLE;
+        if (item->kind != CUI_BRIDGE_ITEM || item->parent != list.slot ||
+            (row->extent != 0 && !(row->extent >= 1 && row->extent <= 4096)))
+            return CUI_BRIDGE_INVALID_ARGUMENT;
+        for (uint32_t j = 0; j < i; ++j)
+            if (proposed[j].item.slot == row->item.slot)
+                return CUI_BRIDGE_INVALID_ARGUMENT;
+    }
+
+    node->first_child = count ? proposed[0].item.slot : 0;
+    node->last_child = count ? proposed[count - 1].item.slot : 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        cui_bridge_node_record *item = &app->nodes[proposed[i].item.slot];
+        item->next_sibling = i + 1 < count ? proposed[i + 1].item.slot : 0;
+        item->virtual_extent = proposed[i].extent;
+    }
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+
+cui_bridge_status cui_bridge_virtual_list_preserve_anchor_v1(cui_bridge_app *app,
+                                                             cui_bridge_node list,
+                                                             uint32_t enabled) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, list, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_VIRTUAL_LIST)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (enabled > 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->virtual_keep_anchor = enabled != 0;
+    return CUI_BRIDGE_OK;
+}
+
 cui_bridge_status cui_bridge_virtual_list_item_bounds(cui_bridge_app *app, cui_bridge_node list,
                                                       cui_bridge_node item,
                                                       cui_bridge_rect *out_bounds) {
@@ -3414,6 +3482,7 @@ cui_bridge_status cui_bridge_set_value(cui_bridge_app *app, cui_bridge_node hand
         if (!isfinite(value) || value < 0 || value > 1000000)
             return CUI_BRIDGE_INVALID_ARGUMENT;
         node->virtual_state.scroll.y = (float)value;
+        node->virtual_scroll_requested = true;
         node->value = value;
         return CUI_BRIDGE_OK;
     }
@@ -4956,7 +5025,8 @@ static void bridge_render_command(cui_bridge_app *app, cui_bridge_node_record *n
 }
 typedef struct {
     cui_bridge_app *app;
-    uint32_t slots[64];
+    size_t count;
+    uint32_t slots[BRIDGE_VIRTUAL_CAPACITY];
 } bridge_virtual_binding;
 static void bridge_virtual_item(cui_context *ui, const cui_theme *theme, void *user, size_t index,
                                 uint64_t key, cui_id item, cui_size size) {
@@ -4964,35 +5034,72 @@ static void bridge_virtual_item(cui_context *ui, const cui_theme *theme, void *u
     (void)item;
     (void)size;
     bridge_virtual_binding *binding = user;
-    if (index >= 64 || !binding->slots[index])
+    if (index >= binding->count)
         return;
     cui_bridge_node_record *node = &binding->app->nodes[binding->slots[index]];
     cui_text(ui, cui_string(node->text), theme->font_size, theme->text);
     for (uint32_t child = node->first_child; child; child = binding->app->nodes[child].next_sibling)
         bridge_render_node(binding->app, child);
 }
+
+static bool bridge_virtual_contains(const uint64_t *keys, size_t count, uint64_t key) {
+    for (size_t i = 0; i < count; ++i)
+        if (keys[i] == key)
+            return true;
+    return false;
+}
+
+static cui_virtual_anchor bridge_virtual_anchor(const cui_virtual_list *model, float offset,
+                                                const uint64_t *keys, size_t count) {
+    cui_virtual_anchor anchor = cui_virtual_capture_anchor(model, offset);
+    if (!anchor.valid || bridge_virtual_contains(keys, count, anchor.key))
+        return anchor;
+    /* Choose a surviving neighbor in the old order, even across a batch of
+     * additions, removals and reorderings. Start that neighbor at its edge. */
+    size_t old_count = cui_virtual_count(model);
+    uint64_t key;
+    for (size_t i = anchor.fallback_index + 1; i < old_count; ++i)
+        if (cui_virtual_key(model, i, &key) && bridge_virtual_contains(keys, count, key))
+            return (cui_virtual_anchor){.key = key, .valid = true};
+    for (size_t i = anchor.fallback_index; i > 0; --i)
+        if (cui_virtual_key(model, i - 1, &key) && bridge_virtual_contains(keys, count, key))
+            return (cui_virtual_anchor){.key = key, .valid = true};
+    return (cui_virtual_anchor){0};
+}
+
+static bool bridge_virtual_model_changed(const cui_virtual_list *model, const uint64_t *keys,
+                                         const double *heights, size_t count) {
+    if (cui_virtual_count(model) != count)
+        return true;
+    for (size_t i = 0; i < count; ++i) {
+        uint64_t key;
+        if (!cui_virtual_key(model, i, &key) || keys[i] != key ||
+            heights[i] != cui_virtual_height(model, i))
+            return true;
+    }
+    return false;
+}
+
 static void bridge_render_virtual_list(cui_bridge_app *app, uint32_t slot,
                                        cui_bridge_node_record *node) {
     if (!node->virtual_list) {
-        node->virtual_list = cui_virtual_create((cui_virtual_config){64, 32});
+        node->virtual_list = cui_virtual_create(
+            (cui_virtual_config){BRIDGE_VIRTUAL_CAPACITY, BRIDGE_VIRTUAL_DEFAULT_HEIGHT});
         if (!node->virtual_list) {
             app->frame_error = CUI_BRIDGE_OUT_OF_MEMORY;
             return;
         }
     }
-    uint64_t keys[64] = {0};
+    uint64_t keys[BRIDGE_VIRTUAL_CAPACITY];
+    double heights[BRIDGE_VIRTUAL_CAPACITY];
     bridge_virtual_binding binding = {.app = app};
-    size_t count = 0;
     for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {
-        keys[count] = app->nodes[child].id;
-        binding.slots[count] = child;
-        count++;
-    }
-    cui_virtual_result rebuilt = cui_virtual_rebuild(node->virtual_list, keys, NULL, count);
-    if (rebuilt != CUI_VIRTUAL_OK) {
-        app->frame_error =
-            rebuilt == CUI_VIRTUAL_CAPACITY ? CUI_BRIDGE_CAPACITY : CUI_BRIDGE_CORE_ERROR;
-        return;
+        size_t index = binding.count++;
+        const cui_bridge_node_record *item = &app->nodes[child];
+        keys[index] = item->id;
+        heights[index] =
+            item->virtual_extent > 0 ? item->virtual_extent : BRIDGE_VIRTUAL_DEFAULT_HEIGHT;
+        binding.slots[index] = child;
     }
     cui_virtual_widget_options options = {
         .scroll = {.width = node->visual_width > 0 ? node->visual_width : 300,
@@ -5001,15 +5108,38 @@ static void bridge_render_virtual_list(cui_bridge_app *app, uint32_t slot,
                    .disabled = node->disabled,
                    .wheel_step = 32},
         .overscan = 1};
+    cui_virtual_list *model = node->virtual_list;
+    if (bridge_virtual_model_changed(model, keys, heights, binding.count)) {
+        bool keep = node->virtual_keep_anchor && !node->virtual_scroll_requested &&
+                    node->virtual_state.last_viewport.height > 0;
+        cui_virtual_anchor anchor = {0};
+        if (keep)
+            anchor =
+                bridge_virtual_anchor(model, node->virtual_state.scroll.y, keys, binding.count);
+        cui_virtual_result built = cui_virtual_rebuild(model, keys, heights, binding.count);
+        if (built != CUI_VIRTUAL_OK) {
+            app->frame_error =
+                built == CUI_VIRTUAL_CAPACITY ? CUI_BRIDGE_CAPACITY : CUI_BRIDGE_CORE_ERROR;
+            return;
+        }
+        if (keep) {
+            /* This retained list only enables vertical scrolling. Its height
+             * is the vertical viewport even when a vertical bar is shown. */
+            node->virtual_state.scroll.y =
+                (float)cui_virtual_restore_anchor(model, anchor, options.scroll.height);
+        }
+    }
+
     float before = node->virtual_state.scroll.y;
     cui_virtual_widget_result result =
-        cui_virtual_list_draw(app->ui, node->id, &app->theme, node->virtual_list,
-                              &node->virtual_state, options, bridge_virtual_item, &binding);
+        cui_virtual_list_draw(app->ui, node->id, &app->theme, model, &node->virtual_state, options,
+                              bridge_virtual_item, &binding);
     if (result.error != CUI_VIRTUAL_OK) {
         app->frame_error =
             result.error == CUI_VIRTUAL_CAPACITY ? CUI_BRIDGE_CAPACITY : CUI_BRIDGE_CORE_ERROR;
         return;
     }
+    node->virtual_scroll_requested = false;
     node->value = node->virtual_state.scroll.y;
     if (result.scroll_changed && before != node->virtual_state.scroll.y)
         bridge_change(app, slot);

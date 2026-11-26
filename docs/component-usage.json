@@ -2366,16 +2366,19 @@
         "cui_virtual_list_draw_events",
         "cui_base_virtual_list_events",
         "cui_virtual_capture_anchor",
-        "cui_virtual_restore_anchor"
+        "cui_virtual_restore_anchor",
+        "cui_bridge_virtual_list_set_rows_v1",
+        "cui_bridge_virtual_list_preserve_anchor_v1"
       ],
       "state_types": [
         "cui_virtual_list",
         "cui_virtual_widget_state",
-        "cui_virtual_event_result"
+        "cui_virtual_event_result",
+        "cui_bridge_virtual_list_row_v1"
       ],
       "state_ownership": "Application retains cui_virtual_list and cui_virtual_widget_state; keyed extents live in the model and row controls remain application-owned.",
       "interaction": "cui_virtual_render_item_fn composes the visible window; cui_virtual_measure_item_fn supplies intrinsic measurement; optional cui_scroll_handler observes aggregate final offsets after composition, with UNKNOWN source.",
-      "usage": "Capture with cui_virtual_capture_anchor before model updates and apply cui_virtual_restore_anchor before drawing again. Keep keys and extents stable during row callbacks. Use cui_virtual_list_draw_events for final-offset observation; inspect changed separately from delivered change_count and the unchanged deferred control_result.",
+      "usage": "Capture with cui_virtual_capture_anchor before model updates and apply cui_virtual_restore_anchor before drawing again. Keep keys and extents stable during row callbacks. Use cui_virtual_list_draw_events for final-offset observation; inspect changed separately from delivered change_count and the unchanged deferred control_result. Retained C uses cui_bridge_virtual_list_set_rows_v1 and optional anchor preservation.",
       "docs": [
         "docs/VIRTUAL_LIST.md",
         "docs/VIRTUALIZATION.md",
@@ -2385,12 +2388,16 @@
         "cui_virtual_render_item_fn",
         "cui_virtual_measure_item_fn"
       ],
+      "examples": [
+        "bindings/bridge/examples/virtual_inbox.c"
+      ],
       "scope": "styled frame adapter + retained base model",
       "name": "VirtualList",
       "public_header": "include/cui/cui_virtual_scroll.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_virtual_events.h"
+        "include/cui/cui_virtual_events.h",
+        "include/cui/cui_bridge.h"
       ],
       "handler_types": [
         "cui_scroll_handler"

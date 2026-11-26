@@ -133,6 +133,8 @@ typedef struct {
     uint32_t *command_slots;
     cui_virtual_list *virtual_list;
     cui_virtual_widget_state virtual_state;
+    float virtual_extent;
+    bool virtual_keep_anchor, virtual_scroll_requested;
     cui_sidebar_state sidebar_state;
     cui_sidebar_cache *sidebar_cache;
     cui_sidebar_item_state sidebar_item_state;

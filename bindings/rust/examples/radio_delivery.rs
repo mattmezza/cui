@@ -33,6 +33,7 @@ fn main() -> Result<()> {
         .text("Delivery service")?
         .finish();
     let motion = app.supports_radio_motion();
+    let decorate = app.supports_radio_item_content();
     let group = app
         .build_child(root, Kind::RadioGroup, "delivery")?
         .animate_selection(motion)?
@@ -44,7 +45,12 @@ fn main() -> Result<()> {
     let priority = app
         .build_child(group, Kind::Item, "priority")?
         .text("Priority")?
-        .detail_text("Tracked delivery")?
+        .detail_text("Tracked delivery. Recommended.")?
+        .decorate_content(decorate)?
+        .finish();
+    let recommendation = app
+        .build_child(priority, Kind::Tag, "recommended")?
+        .text("Recommended")?
         .finish();
     app.select(group, standard)?;
     let summary = app
@@ -72,7 +78,7 @@ fn main() -> Result<()> {
     };
     if font.is_none() || smoke {
         app.step(0.016)?;
-        let b = app.bounds(priority)?;
+        let b = app.bounds(if decorate { recommendation } else { priority })?;
         app.pointer(Phase::Down, b.x + b.width / 2., b.y + b.height / 2.)?;
         app.pointer(Phase::Up, b.x + b.width / 2., b.y + b.height / 2.)?;
         assert_eq!(app.frame(0.016)?, 1);

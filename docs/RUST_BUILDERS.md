@@ -119,6 +119,32 @@ cargo run --locked --manifest-path bindings/rust/Cargo.toml --features native \
   --example radio_delivery -- --font third_party/inter/Inter-Regular.otf
 ```
 
+## Compose Radio options from Rust
+
+Use `Builder::decorate_content(enabled)` on an Item owned by a RadioGroup.
+Probe `app.supports_radio_item_content()` when your application also loads
+earlier providers. The delivery example uses the probe so its ordinary
+option remains selectable on those providers.
+[Complete delivery example](../bindings/rust/examples/radio_delivery.rs)
+
+```rust
+let decorate = app.supports_radio_item_content();
+let priority = app
+    .build_child(group, Kind::Item, "priority")?
+    .text("Priority")?
+    .detail_text("Tracked delivery. Recommended.")?
+    .decorate_content(decorate)?
+    .finish();
+app.build_child(priority, Kind::Tag, "recommended")?
+    .text("Recommended")?
+    .finish();
+```
+
+Use `app.decorate_content(priority, false)` to hide the children and keep
+their handles. The option keeps one focus stop and the group delivers
+the usual selection event. See the allowed decorative kinds in the
+[bridge composition guide](BRIDGE_COMPONENTS.md#compose-retained-radio-option-content).
+
 ## Configure Pagination from Rust
 
 Build a detached `PaginationOptions` when you want the bridge capability and record size checked before creating a retained child. Ordinary `Kind::Pagination` still works with earlier providers. `app.supports_pagination_options()` reports whether the extended API is available.

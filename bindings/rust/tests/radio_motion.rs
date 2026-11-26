@@ -76,3 +76,70 @@ fn optional_motion_preserves_selection_and_events() {
     app.remove(group).unwrap();
     assert_eq!(app.animate_selection(group, false).err(), Some(Error(4)));
 }
+
+#[test]
+fn optional_item_content_keeps_one_radio_target() {
+    let mut app = App::headless(320., 240.).unwrap();
+    let supported = app.supports_radio_item_content();
+    let expected = std::env::var("CUI_TEST_RADIO_MOTION").as_deref() != Ok("0");
+    assert_eq!(supported, expected);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let group = app.child(root, Kind::RadioGroup, "delivery").unwrap();
+    let standard = app.child(group, Kind::Item, "standard").unwrap();
+    app.text(standard, "Standard").unwrap();
+    app.select(group, standard).unwrap();
+    let priority = app
+        .build_child(group, Kind::Item, "priority")
+        .unwrap()
+        .text("Priority")
+        .unwrap()
+        .detail_text("Tracked delivery")
+        .unwrap()
+        .finish();
+    let column = app.child(priority, Kind::Column, "decoration").unwrap();
+    let tag = app.child(column, Kind::Tag, "recommended").unwrap();
+    app.text(tag, "Recommended").unwrap();
+    let control = app.child(column, Kind::Button, "invalid-child").unwrap();
+    assert_eq!(app.decorate_content(group, false).err(), Some(Error(8)));
+    assert_eq!(
+        app.decorate_content(priority, true).err(),
+        Some(Error(if supported { 8 } else { 9 }))
+    );
+    app.step(0.016).unwrap();
+    assert_eq!(app.bounds(tag).err(), Some(Error(8)));
+    app.remove(control).unwrap();
+    app.decorate_content(priority, supported).unwrap();
+
+    let changes = Rc::new(RefCell::new(Vec::new()));
+    let events = changes.clone();
+    app.on_change_event(group, move |event| {
+        events.borrow_mut().push((event.node, event.selected))
+    })
+    .unwrap();
+    app.step(0.016).unwrap();
+    let bounds = app.bounds(if supported { tag } else { priority }).unwrap();
+    for phase in [Phase::Down, Phase::Up] {
+        app.pointer(
+            phase,
+            bounds.x + bounds.width / 2.,
+            bounds.y + bounds.height / 2.,
+        )
+        .unwrap();
+    }
+    app.step(0.016).unwrap();
+    assert_eq!(app.selected(group).unwrap(), Some(priority));
+    assert!(changes.borrow().is_empty());
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(&*changes.borrow(), &[(group, Some(priority))]);
+    app.decorate_content(priority, false).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.bounds(tag).err(), Some(Error(8)));
+    if supported {
+        app.decorate_content(priority, true).unwrap();
+        app.step(0.016).unwrap();
+        assert!(app.bounds(tag).unwrap().width > 0.);
+    }
+    assert_eq!(app.dispatch().unwrap(), 0);
+    app.remove(group).unwrap();
+    assert_eq!(app.decorate_content(priority, false).err(), Some(Error(4)));
+}

@@ -1229,7 +1229,7 @@ pub struct App {
     callbacks: HashMap<(RawNode, u32), Rc<RefCell<Callback>>>,
     data_table_capacities: HashMap<RawNode, u32>,
     // Older providers lack the setter's kind check. Match their live Radio handles locally.
-    radio_nodes: std::collections::HashSet<RawNode>,
+    legacy_radio_nodes: HashMap<RawNode, radio_motion::LegacyRadioNode>,
     running: bool,
     slider: Option<slider_model::State>,
     time_localized: Option<time_localized::State>,
@@ -1422,7 +1422,7 @@ impl App {
             id,
             callbacks: HashMap::new(),
             data_table_capacities: HashMap::new(),
-            radio_nodes: std::collections::HashSet::new(),
+            legacy_radio_nodes: HashMap::new(),
             running: false,
             slider: None,
             time_localized: None,
@@ -1450,9 +1450,7 @@ impl App {
         let key = string(key)?;
         let mut raw = RawNode::default();
         check(unsafe { cui_bridge_node_create(self.raw, p, kind as u32, key.as_ptr(), &mut raw) })?;
-        if matches!(kind, Kind::Radio | Kind::RadioGroup) && !self.supports_radio_motion() {
-            self.radio_nodes.insert(raw);
-        }
+        self.track_legacy_radio_node(raw, p, kind);
         Ok(Node {
             raw,
             app_id: self.id,
@@ -1467,7 +1465,7 @@ impl App {
         // every tracked table so a recycled slot cannot inherit a capacity.
         self.data_table_capacities
             .retain(|node, _| *node != raw && read_data_table_state(app, *node).is_ok());
-        self.radio_nodes.retain(|node| {
+        self.legacy_radio_nodes.retain(|node, _| {
             let mut required = 0;
             let status = unsafe {
                 cui_bridge_get_text(app, *node, std::ptr::null_mut(), 0, &mut required)

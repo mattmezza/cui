@@ -5,6 +5,7 @@
 #include "cui/cui_icon.h"
 #include "cui_button_paint_internal.h"
 #include "cui_input_private.h"
+#include "cui_radio_tooltip_internal.h"
 #include "cui_spring_internal.h"
 #include <math.h>
 #include <stdio.h>
@@ -1904,7 +1905,7 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
 static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_theme *t,
                                         cui_str name, int *value, int option,
                                         cui_radio_options options, cui_id indicator,
-                                        cui_radio_motion *motion) {
+                                        cui_radio_motion *motion, const cui_radio_tooltip *hint) {
     cui_design_metrics design;
     if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
         return false;
@@ -1991,11 +1992,12 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
         cui_end_box(ui);
     }
     cui_end_box(ui);
+    cui_radio_tooltip_show(ui, t, id, options.disabled, hint);
     return changed;
 }
 bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                   int option, cui_radio_options options) {
-    return cui_components_radio_render(ui, id, t, name, value, option, options, 0, NULL);
+    return cui_components_radio_render(ui, id, t, name, value, option, options, 0, NULL, NULL);
 }
 bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                              int *value, int option, cui_radio_options options,
@@ -2003,7 +2005,7 @@ bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui
     if (!cui_components_indicator_parts_valid(ui, id, parts))
         return false;
     return cui_components_radio_render(ui, id, t, name, value, option, options, parts.indicator,
-                                       NULL);
+                                       NULL, NULL);
 }
 bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                        int option, cui_radio_options options, cui_radio_presentation presentation) {
@@ -2012,8 +2014,15 @@ bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str n
         return false;
     if (!ui || !id || !cui_frame_is_submitting(ui))
         return false;
+    if (!cui_radio_tooltip_valid(presentation.tooltip, id, presentation.parts.indicator)) {
+        cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_INVALID_ACTION,
+                                                    .operation = "radio_tooltip",
+                                                    .id = id});
+        return false;
+    }
     return cui_components_radio_render(ui, id, t, name, value, option, options,
-                                       presentation.parts.indicator, presentation.motion);
+                                       presentation.parts.indicator, presentation.motion,
+                                       presentation.tooltip);
 }
 bool cui_radio_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                           int option, bool disabled, cui_selection_indicator_parts parts) {

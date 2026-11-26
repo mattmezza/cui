@@ -101,13 +101,18 @@ typedef struct {
     cui_button_content_fn content;
     void *content_user;
     float max_width;
+    const cui_radio_tooltip *tooltip;
 } cui_radio_group_content;
 /* Supply one descriptor per item in the same order, or NULL/zero. Descriptors
  * are copied before selection callbacks. Strings and userdata follow ordinary
  * frame lifetimes. A nonempty description is also the radio's semantic
  * description. The optional content callback runs once per composed row after
  * selection is resolved, in an inert subtree. Submit decorative content only.
- * Keep the item label as the accessible name. No added focus or input target. */
+ * Keep the item label as the accessible name. No added focus or input target.
+ * Optional tooltip descriptors and their state must remain valid throughout
+ * the call. Give each hint a distinct ID and state. Invalid hint IDs, text
+ * or state reject the submission before selection. Explicit descriptions
+ * take precedence over tooltip text in the option's semantic description. */
 cui_radio_group_event_result cui_radio_group_present_with_content(
     cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *, size_t, cui_id *,
     cui_radio_group_state *, cui_radio_group_options, cui_radio_group_presentation,

@@ -68,8 +68,7 @@ same indicator/font/theme colors as the standalone radio. The separate base API
 registers/reduces behavior without styled layout; a custom renderer must submit
 boxes with the same IDs. Do not register another interactive radio with the same
 ID after calling the base API. Standalone Radio accepts decorative composition
-through `cui_radio_options.content`. Integrated tooltips and the full styling
-audit remain open.
+through `cui_radio_options.content`. The full styling audit remains open.
 
 ## Add descriptions and custom content
 
@@ -107,6 +106,59 @@ RadioGroup Item with the existing detail setter. The runnable delivery forms
 use that path. [Retained descriptions](BRIDGE_COMPONENTS.md#describe-retained-radio-options)
 The C bridge and all five language bindings can opt into children from a
 bounded set of decorative nodes. [Retained decorative content](BRIDGE_COMPONENTS.md#compose-retained-radio-option-content)
+
+## Add a tooltip
+
+Keep one zero-initialized `cui_radio_tooltip_state` per option in the same
+model as the selection. Build the hint descriptor during submission and
+pass the viewport in logical pixels. Give the hint its own stable ID.
+Use the same state and ID on successive frames.
+
+```c
+/* The model retains priority_hint_state. The host supplies viewport. */
+const cui_radio_tooltip priority_hint = {
+    .id = cui_id_from(ui, "priority-hint"),
+    .state = &priority_hint_state,
+    .text = cui_string("Track your package online"),
+    .options = {
+        .viewport = viewport,
+        .side = CUI_POPUP_RIGHT,
+        .width = 220,
+        .gap = 8,
+        .open_delay = .35f,
+    },
+};
+const cui_radio_group_content content[] = {
+    {.description = cui_string("Arrives in four business days")},
+    {.description = cui_string("Arrives Wednesday"), .tooltip = &priority_hint},
+};
+cui_radio_group_present_with_content(
+    ui, group_id, theme, items, 2, &selection, &navigation,
+    (cui_radio_group_options){.vertical = true, .name = cui_string("Delivery options")},
+    (cui_radio_group_presentation){0}, content, 2, (cui_selection_handler){0});
+```
+
+Standalone Radio accepts the same descriptor through
+`(cui_radio_presentation){.tooltip = &priority_hint}` in `cui_radio_present`.
+Use the ordinary label or the standalone accessibility label to name the
+option. An explicit group description takes precedence over the tooltip in
+the option's accessibility details. The radio row remains the focus and
+activation target.
+
+The common Tooltip opens after hover or focus and dismisses on Escape. A tap
+may open it when the host focuses the option. Either disabled flag hides it.
+Omitted and inert frames break the delay sequence. Reset the state when
+recreating the UI context. Honor `cui_needs_redraw` while Tooltip delays are
+pending. An unavailable viewport hides the panel until valid bounds return.
+
+Descriptors and state must stay valid through the submission, including any
+synchronous selection and decoration callbacks. Text follows the ordinary
+frame lifetime. Distinct tooltips need distinct IDs and state. Local tooltip
+ID conflicts and missing text or state reject the submission before selection.
+Global ID conflicts follow the normal composition error contract.
+
+The WASM gallery shows the Priority hint. This option is currently available
+through immediate C.
 
 ## Animate the marks
 

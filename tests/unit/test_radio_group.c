@@ -220,6 +220,98 @@ static void test_rich_content(void) {
     cui_clear_error(ui);
     assert(rich_frame(options, 3).valid && cui_last_error(ui) == CUI_OK);
 }
+
+static cui_radio_group_result hint_frame(cui_radio_group_content *content, bool inert) {
+    assert(cui_begin_frame(ui, 260, 140, .016f));
+    if (inert)
+        cui_begin_box(ui, 0, (cui_box){.inert = true});
+    cui_radio_group_result result =
+        cui_radio_group_present_with_content(ui, 10, &theme, items, 3, &selected, &state,
+                                             (cui_radio_group_options){.vertical = true},
+                                             (cui_radio_group_presentation){0}, content,
+                                             content ? 3 : 0, (cui_selection_handler){0})
+            .legacy;
+    if (inert)
+        cui_end_box(ui);
+    drawing = cui_end_frame(ui);
+    return result;
+}
+
+static void test_radio_group_tooltip(void) {
+    cui_radio_tooltip_state hint_state = {0};
+    cui_radio_tooltip hint = {.id = 401,
+                              .state = &hint_state,
+                              .text = cui_string("Track online"),
+                              .options = {.viewport = {0, 0, 260, 140},
+                                          .side = CUI_POPUP_RIGHT,
+                                          .width = 110,
+                                          .open_delay = .04f}};
+    cui_radio_group_content content[3] = {
+        [1] = {.description = cui_string("Arrives Wednesday"), .tooltip = &hint}};
+    cui_focus(ui, 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_LEAVE}));
+    selected = 11;
+    assert(hint_frame(content, false).valid && !hint_state.hover.open);
+    cui_rect row = cui_bounds(ui, 12);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = row.x + row.w / 2,
+                                           .y = row.y + row.h / 2}));
+    assert(hint_frame(content, false).valid && hint_state.hover.pending && !hint_state.hover.open &&
+           cui_needs_redraw(ui));
+    assert(hint_frame(content, false).valid && !hint_state.hover.open);
+    assert(hint_frame(content, false).valid && hint_state.hover.open);
+    cui_rect panel = cui_bounds(ui, hint.id);
+    assert(panel.w > 0 && panel.x >= row.x + row.w && panel.x + panel.w <= 260 && panel.y >= 0 &&
+           panel.y + panel.h <= 140);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    assert(count == 5 && sem[2].id == 12 && !sem[2].checked && sem[2].tab_index < 0);
+    assert(sem[2].details.description.length == 17 &&
+           !memcmp(sem[2].details.description.data, "Arrives Wednesday", 17));
+    assert(sem[4].id == hint.id && sem[4].role == CUI_ROLE_LABEL && sem[4].details.parent == 12 &&
+           sem[4].tab_index < 0);
+    assert(selected == 11);
+    key(CUI_KEY_ESCAPE);
+    assert(hint_frame(content, false).valid && hint_state.hover.suppressed &&
+           !hint_state.hover.open);
+    assert(hint_frame(content, false).valid && !hint_state.hover.open);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_LEAVE}));
+    assert(hint_frame(content, false).valid && !hint_state.hover.suppressed);
+    cui_focus(ui, 12);
+    assert(hint_frame(content, false).valid && hint_state.hover.pending);
+    assert(hint_frame(content, false).valid && !hint_state.hover.open);
+    assert(hint_frame(content, false).valid && hint_state.hover.open);
+    assert(hint_frame(content, true).valid && cui_bounds(ui, hint.id).w == 0);
+    assert(hint_frame(content, false).valid && !hint_state.hover.open);
+    assert(hint_frame(NULL, false).valid && cui_bounds(ui, hint.id).w == 0);
+
+    cui_focus(ui, 12);
+    key(CUI_KEY_ENTER);
+    hint.id = 11;
+    assert(!hint_frame(content, false).valid && selected == 11 &&
+           cui_last_error(ui) == CUI_ERROR_INVALID_ACTION);
+    cui_clear_error(ui);
+    hint.id = 401;
+    content[0].tooltip = &hint;
+    assert(!hint_frame(content, false).valid && selected == 11);
+    cui_clear_error(ui);
+    content[0].tooltip = NULL;
+    hint.options.open_delay = 0;
+    assert(hint_frame(content, false).valid);
+    cui_focus(ui, 12);
+    key(CUI_KEY_ENTER);
+    assert(hint_frame(content, false).changed && selected == 12 && hint_state.hover.open);
+    items[1].disabled = true;
+    assert(hint_frame(content, false).valid && !hint_state.hover.open &&
+           cui_bounds(ui, hint.id).w == 0 && selected == 12);
+    items[1].disabled = false;
+    hint.options.viewport.w = 0;
+    cui_focus(ui, 12);
+    for (unsigned i = 0; i < 3; i++)
+        assert(hint_frame(content, false).valid && !hint_state.hover.open &&
+               !hint_state.hover.pending);
+    assert(!cui_needs_redraw(ui));
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 2000, .height = 1000});
     assert(ui);
@@ -358,6 +450,7 @@ int main(void) {
     theme = cui_theme_light();
     test_motion();
     test_rich_content();
+    test_radio_group_tooltip();
     cui_destroy(ui);
     return 0;
 }

@@ -102,13 +102,18 @@ typedef struct {
     cui_button_content_fn content;
     void *content_user;
     float max_width;
+    const cui_radio_tooltip *tooltip;
 } cui_radio_group_content;
 /* Supply one descriptor per item in the same order, or NULL/zero. Descriptors
  * are copied before selection callbacks. Strings and userdata follow ordinary
  * frame lifetimes. A nonempty description is also the radio's semantic
  * description. The optional content callback runs once per composed row after
  * selection is resolved, in an inert subtree. Submit decorative content only.
- * Keep the item label as the accessible name. No added focus or input target. */
+ * Keep the item label as the accessible name. No added focus or input target.
+ * Optional tooltip descriptors and their state must remain valid throughout
+ * the call. Give each hint a distinct ID and state. Invalid hint IDs, text
+ * or state reject the submission before selection. Explicit descriptions
+ * take precedence over tooltip text in the option's semantic description. */
 cui_radio_group_event_result cui_radio_group_present_with_content(
     cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *, size_t, cui_id *,
     cui_radio_group_state *, cui_radio_group_options, cui_radio_group_presentation,
@@ -322,8 +327,57 @@ cui_base_radio_group_events(cui_context *ui, cui_id id, const cui_radio_group_it
 /* src/components/cui_radio_group.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_RADIO_TOOLTIP_INTERNAL_H
+#define CUI_RADIO_TOOLTIP_INTERNAL_H
+
+#include <math.h>
+
+static inline bool cui_radio_tooltip_valid(const cui_radio_tooltip *hint, cui_id trigger,
+                                           cui_id indicator) {
+    return !hint || (hint->id && hint->id != trigger && hint->id != indicator && hint->state &&
+                     hint->text.data && hint->text.length);
+}
+
+static inline bool cui_radio_tooltip_show(cui_context *ui, const cui_theme *theme, cui_id trigger,
+                                          bool disabled, const cui_radio_tooltip *hint) {
+    if (!hint)
+        return false;
+    uint64_t frame = cui_frame_sequence(ui);
+    if (!frame || cui_last_error(ui) != CUI_OK)
+        return false;
+    cui_radio_tooltip_state *state = hint->state;
+    if (state->trigger != trigger || state->panel != hint->id || state->last_frame != frame - 1)
+        *state = (cui_radio_tooltip_state){.trigger = trigger, .panel = hint->id};
+    state->last_frame = frame;
+    cui_hover_options options = hint->options;
+    cui_rect viewport = options.viewport;
+    if (!isfinite(viewport.x) || !isfinite(viewport.y) || !isfinite(viewport.w) ||
+        !isfinite(viewport.h) || viewport.w <= 0 || viewport.h <= 0) {
+        state->hover = (cui_hover_state){0};
+        return false;
+    }
+    options.trigger = trigger;
+    options.dt = cui_frame_delta(ui);
+    options.disabled |= disabled;
+    return cui_tooltip(ui, hint->id, theme, &state->hover, hint->text, options);
+}
+#endif
+
 #include <math.h>
 #include <string.h>
+static void cui_radio_group_describe(cui_context *ui, size_t first, cui_id id, cui_str text) {
+    size_t count;
+    const cui_semantic *items = cui_semantics(ui, &count);
+    for (size_t i = first; i < count; i++)
+        if (items[i].id == id) {
+            cui_semantic_details details = items[i].details;
+            details.description = text;
+            cui_set_semantic_details(ui, id, details);
+            return;
+        }
+}
+
 static cui_radio_group_result
 cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
                        const cui_radio_group_item *items, size_t count, cui_id *selected,
@@ -364,19 +418,9 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
     if (!r.valid)
         return r;
     if (content) {
-        size_t semantic_count;
-        const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
-        for (size_t i = 0; i < count; i++) {
-            if (!content[i].description.length)
-                continue;
-            for (size_t j = first_semantic; j < semantic_count; j++)
-                if (semantics[j].id == items[i].id) {
-                    cui_semantic_details details = semantics[j].details;
-                    details.description = content[i].description;
-                    cui_set_semantic_details(ui, items[i].id, details);
-                    break;
-                }
-        }
+        for (size_t i = 0; i < count; i++)
+            if (content[i].description.length)
+                cui_radio_group_describe(ui, first_semantic, items[i].id, content[i].description);
     }
     if (motion) {
         cui_disclosure_motion samples[CUI_RADIO_GROUP_MAX] = {0};
@@ -466,6 +510,12 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
         cui_end_box(ui);
     }
     cui_end_box(ui);
+    for (size_t i = 0; content && i < count; i++) {
+        bool disabled = o.disabled || items[i].disabled;
+        if (cui_radio_tooltip_show(ui, t, items[i].id, disabled, content[i].tooltip) &&
+            content[i].description.length)
+            cui_radio_group_describe(ui, first_semantic, items[i].id, content[i].description);
+    }
     return r;
 }
 
@@ -547,19 +597,48 @@ cui_radio_group_present(cui_context *ui, cui_id id, const cui_theme *theme,
                                                 options, presentation, NULL, 0, handler);
 }
 
+static bool cui_radio_group_content_valid(cui_id id, const cui_radio_group_item *items,
+                                          size_t count, const cui_radio_group_content *content,
+                                          const cui_selection_indicator_parts *parts) {
+    for (size_t i = 0; i < count; i++) {
+        const cui_radio_group_content *item = &content[i];
+        if ((item->description.length && !item->description.data) || !isfinite(item->max_width) ||
+            item->max_width < 0)
+            return false;
+        const cui_radio_tooltip *hint = item->tooltip;
+        if (!hint)
+            continue;
+        if (!cui_radio_tooltip_valid(hint, id, 0))
+            return false;
+        for (size_t j = 0; j < count; j++)
+            if (hint->id == items[j].id || (parts && hint->id == parts[j].indicator))
+                return false;
+        for (size_t j = 0; j < i; j++)
+            if (content[j].tooltip &&
+                (hint->id == content[j].tooltip->id || hint->state == content[j].tooltip->state))
+                return false;
+    }
+    return true;
+}
+
 cui_radio_group_event_result cui_radio_group_present_with_content(
     cui_context *ui, cui_id id, const cui_theme *theme, const cui_radio_group_item *items,
     size_t count, cui_id *selected, cui_radio_group_state *state, cui_radio_group_options options,
     cui_radio_group_presentation presentation, const cui_radio_group_content *content,
     size_t content_count, cui_selection_handler handler) {
     cui_radio_group_event_result result = {0};
+    cui_selection_indicator_parts copied[CUI_RADIO_GROUP_MAX];
+    if (presentation.parts || presentation.part_count) {
+        if (!cui_radio_group_parts_copy(ui, id, items, count, presentation.parts,
+                                        presentation.part_count, copied))
+            return result;
+    }
     cui_radio_group_content copied_content[CUI_RADIO_GROUP_MAX];
     if (content || content_count) {
-        bool valid = content && content_count == count && count <= CUI_RADIO_GROUP_MAX;
-        for (size_t i = 0; valid && i < count; i++) {
-            valid = (!content[i].description.length || content[i].description.data) &&
-                    isfinite(content[i].max_width) && content[i].max_width >= 0;
-        }
+        bool valid = content && content_count == count && count <= CUI_RADIO_GROUP_MAX &&
+                     (!count || items) &&
+                     cui_radio_group_content_valid(id, items, count, content,
+                                                   presentation.parts ? copied : NULL);
         if (!valid) {
             if (ui)
                 cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_INVALID_ACTION,
@@ -569,12 +648,6 @@ cui_radio_group_event_result cui_radio_group_present_with_content(
         }
         if (count)
             memcpy(copied_content, content, count * sizeof(*content));
-    }
-    cui_selection_indicator_parts copied[CUI_RADIO_GROUP_MAX];
-    if (presentation.parts || presentation.part_count) {
-        if (!cui_radio_group_parts_copy(ui, id, items, count, presentation.parts,
-                                        presentation.part_count, copied))
-            return result;
     }
     result.legacy = cui_radio_group_render(
         ui, id, theme, items, count, selected, state, options, handler, &result.events,

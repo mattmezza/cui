@@ -102,6 +102,66 @@ def check_animated_marks(browser, url):
         page.close()
 
 
+def check_tooltip(browser, url):
+    page = browser.new_page(viewport={'width': 520, 'height': 740})
+    try:
+        page.clock.install()
+        page.goto(url + '/#Radio')
+        page.wait_for_function('window.cuiGallery?.renderedComponent === "Radio"')
+        canvas = page.locator('#preview')
+        canvas.scroll_into_view_if_needed()
+        page.clock.pause_at(page.evaluate('new Date(Date.now() + 500).toISOString()'))
+
+        def panel():
+            return page.evaluate("""() => {
+                const e = cuiGallery.exports, decoder = new TextDecoder();
+                for (let i = 0; i < e.gallery_semantic_count(); ++i) {
+                    const name = decoder.decode(new Uint8Array(e.memory.buffer,
+                        e.gallery_semantic_name(i), e.gallery_semantic_length(i)));
+                    if (name === 'Track your package online') {
+                        return {bounds: [1, 2, 3, 4].map(f => e.gallery_semantic(i, f)),
+                            tabIndex: e.gallery_semantic(i, 9)};
+                    }
+                }
+                return null;
+            }""")
+
+        assert panel() is None
+        votes = page.evaluate('cuiGallery.exports.gallery_radio_stat(0)')
+        x, y, w, h = page.evaluate(RADIO_MARKS)['Priority']['bounds']
+        bounds = canvas.bounding_box()
+        page.mouse.move(bounds['x'] + x + w / 2, bounds['y'] + y + h / 2)
+        page.clock.run_for(180)
+        assert panel() is None
+        page.clock.run_for(250)
+        shown = panel()
+        assert shown and shown['tabIndex'] < 0, shown
+        px, py, pw, ph = shown['bounds']
+        assert 0 <= px < px + pw <= bounds['width'] + .2
+        assert 0 <= py < py + ph <= bounds['height'] + .2
+        priority = page.locator('#accessible').get_by_role('radio', name='Priority', exact=True)
+        assert priority.get_attribute('aria-description') == 'Arrives Wednesday with tracked delivery'
+        assert page.evaluate('cuiGallery.exports.gallery_radio_stat(0)') == votes
+        page.mouse.move(0, 0)
+        page.clock.run_for(80)
+        assert panel() is None
+
+        canvas.focus()
+        page.keyboard.press('Tab')
+        page.clock.run_for(30)
+        page.keyboard.press('ArrowDown')
+        page.clock.run_for(450)
+        assert panel() and priority.get_attribute('aria-checked') == 'true'
+        assert page.evaluate('cuiGallery.exports.gallery_radio_stat(0)') == votes + 1
+        page.keyboard.press('Escape')
+        page.clock.run_for(450)
+        assert panel() is None
+        assert priority.get_attribute('aria-checked') == 'true'
+        assert page.evaluate('cuiGallery.exports.gallery_radio_stat(0)') == votes + 1
+    finally:
+        page.close()
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--directory',type=Path,default=Path('build/web'))
@@ -210,6 +270,8 @@ def main():
             assert not a.errors,a.errors
             a.case('Radio', 'marks crossfade and reverse, settle without frames, and respect reduced motion',
                    lambda: check_animated_marks(browser, f'http://127.0.0.1:{server.server_port}'))
+            a.case('Radio', 'delayed hover and keyboard hints preserve descriptions and selection',
+                   lambda: check_tooltip(browser, f'http://127.0.0.1:{server.server_port}'))
             args.report.parent.mkdir(parents=True,exist_ok=True)
             args.report.write_text(json.dumps(a.results,indent=2)+'\n')
             failures=[r for r in a.results if r['status']!='verified']

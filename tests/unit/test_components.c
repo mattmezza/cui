@@ -496,6 +496,50 @@ static void test_radio_motion(void) {
     cui_destroy(ui);
 }
 
+static void test_radio_tooltip(void) {
+    cui_context *ui = cui_create((cui_config){.width = 280, .height = 140});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_radio_tooltip_state tip_state = {0};
+    cui_radio_tooltip tip = {.id = 193,
+                             .state = &tip_state,
+                             .text = cui_string("Includes delivery tracking"),
+                             .options = {.viewport = {0, 0, 280, 140}}};
+    cui_radio_presentation paint = {.parts = {192}, .tooltip = &tip};
+    cui_radio_options options = {.accessibility_label = cui_string("Priority delivery")};
+    int selected = 0;
+    for (unsigned frame = 0; frame < 3; frame++) {
+        if (frame == 1) {
+            cui_focus(ui, 191);
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+        } else if (frame == 2)
+            options.disabled = true;
+        assert(cui_begin_frame(ui, 280, 140, .016f));
+        assert(cui_radio_present(ui, 191, &theme, cui_string("Priority"), &selected, 1, options,
+                                 paint) == (frame == 1));
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK && tip_state.hover.open == (frame == 1));
+        assert((cui_bounds(ui, tip.id).w > 0) == (frame == 1));
+        size_t count;
+        const cui_semantic *sem = cui_semantics(ui, &count);
+        assert(count == (frame == 1 ? 2 : 1) && sem[0].role == CUI_ROLE_RADIO &&
+               sem[0].name.length == options.accessibility_label.length &&
+               !memcmp(sem[0].name.data, options.accessibility_label.data, sem[0].name.length));
+        if (frame == 1)
+            assert(sem[1].id == tip.id && sem[1].details.parent == 191 &&
+                   sem[0].details.description.length == tip.text.length);
+    }
+    assert(selected == 1);
+    tip.id = 192;
+    assert(cui_begin_frame(ui, 280, 140, .016f));
+    assert(!cui_radio_present(ui, 191, &theme, cui_string("Priority"), &selected, 1,
+                              (cui_radio_options){0}, paint));
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_ERROR_INVALID_ACTION && selected == 1);
+    cui_destroy(ui);
+}
+
 static cui_draw_list switch_frame(cui_context *ui, cui_theme *t, bool *value,
                                   cui_switch_state *state, cui_switch_options o) {
     assert(cui_begin_frame(ui, 400, 200, .016f));
@@ -1573,6 +1617,7 @@ int main(void) {
     test_radio_geometry();
     test_radio_shared_redraw();
     test_radio_motion();
+    test_radio_tooltip();
     test_semantic_theme_contrast();
     test_button_intent_outlines();
     test_button_palette_overrides();

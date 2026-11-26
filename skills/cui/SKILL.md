@@ -71,8 +71,9 @@ function declarations produce matching paths only. `api SYMBOL --full` restores
 complete matching headers. `--declaration` explicitly selects the concise API view.
 No output is clipped or filtered by safety keywords.
 
-For RadioGroup descriptions and decorative content, read
-`docs/RADIO_GROUP.md`. Retained applications can use the Item detail setter
+For RadioGroup descriptions, decorative content and immediate C tooltips, read
+`docs/RADIO_GROUP.md`. Keep one zero-initialized `cui_radio_tooltip_state`
+per option. Retained applications can use the Item detail setter
 in `docs/BRIDGE_COMPONENTS.md` for copied accessible descriptions.
 The same guide covers passive children inside one RadioGroup Item through
 `cui_bridge_radio_item_set_content_v1`, `item.decorate_content()` in Python and

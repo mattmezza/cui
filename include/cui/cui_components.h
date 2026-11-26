@@ -395,11 +395,32 @@ typedef struct {
     cui_disclosure_motion mark;
     double next_wake_seconds;
 } cui_radio_motion;
+/* Optional Tooltip state, zero initialized once per radio. Keep it between frames
+ * and reset on context recreation. Resuming after an omitted frame starts a fresh
+ * hover/focus delay. Do not share one state between options. */
+typedef struct {
+    cui_hover_state hover;
+    cui_id trigger, panel;
+    uint64_t last_frame;
+} cui_radio_tooltip_state;
+/* Borrowed descriptor. id names the tooltip, distinct from the radio, its
+ * named indicator, and other submitted IDs. text must be nonempty. Use normal
+ * Tooltip placement and delays. The radio supplies trigger and dt, and either
+ * disabled flag hides the hint. The Tooltip follows hover and focus. */
+typedef struct {
+    cui_id id;
+    cui_radio_tooltip_state *state;
+    cui_str text;
+    cui_hover_options options;
+} cui_radio_tooltip;
 /* A zero indicator is anonymous. NULL motion preserves immediate marks. The
- * options and shared-integer mutation behavior match cui_radio_ex. */
+ * options and shared-integer mutation behavior match cui_radio_ex. NULL tooltip
+ * follows the ordinary radio. An invalid tooltip ID, text or state rejects the
+ * submission before changing the value. */
 typedef struct {
     cui_radio_motion *motion;
     cui_selection_indicator_parts parts;
+    const cui_radio_tooltip *tooltip;
 } cui_radio_presentation;
 bool cui_radio_present(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                        cui_radio_options, cui_radio_presentation);

@@ -396,11 +396,32 @@ typedef struct {
     cui_disclosure_motion mark;
     double next_wake_seconds;
 } cui_radio_motion;
+/* Optional Tooltip state, zero initialized once per radio. Keep it between frames
+ * and reset on context recreation. Resuming after an omitted frame starts a fresh
+ * hover/focus delay. Do not share one state between options. */
+typedef struct {
+    cui_hover_state hover;
+    cui_id trigger, panel;
+    uint64_t last_frame;
+} cui_radio_tooltip_state;
+/* Borrowed descriptor. id names the tooltip, distinct from the radio, its
+ * named indicator, and other submitted IDs. text must be nonempty. Use normal
+ * Tooltip placement and delays. The radio supplies trigger and dt, and either
+ * disabled flag hides the hint. The Tooltip follows hover and focus. */
+typedef struct {
+    cui_id id;
+    cui_radio_tooltip_state *state;
+    cui_str text;
+    cui_hover_options options;
+} cui_radio_tooltip;
 /* A zero indicator is anonymous. NULL motion preserves immediate marks. The
- * options and shared-integer mutation behavior match cui_radio_ex. */
+ * options and shared-integer mutation behavior match cui_radio_ex. NULL tooltip
+ * follows the ordinary radio. An invalid tooltip ID, text or state rejects the
+ * submission before changing the value. */
 typedef struct {
     cui_radio_motion *motion;
     cui_selection_indicator_parts parts;
+    const cui_radio_tooltip *tooltip;
 } cui_radio_presentation;
 bool cui_radio_present(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                        cui_radio_options, cui_radio_presentation);
@@ -978,6 +999,43 @@ cui_input_event_result cui_input_private_reduce(cui_context *, cui_id, const cui
                                                 cui_input_behavior_state *, cui_input_options *,
                                                 cui_base_input_options, cui_rect viewport,
                                                 bool synthetic_hit, cui_component_text_handler);
+#endif
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_RADIO_TOOLTIP_INTERNAL_H
+#define CUI_RADIO_TOOLTIP_INTERNAL_H
+
+#include <math.h>
+
+static inline bool cui_radio_tooltip_valid(const cui_radio_tooltip *hint, cui_id trigger,
+                                           cui_id indicator) {
+    return !hint || (hint->id && hint->id != trigger && hint->id != indicator && hint->state &&
+                     hint->text.data && hint->text.length);
+}
+
+static inline bool cui_radio_tooltip_show(cui_context *ui, const cui_theme *theme, cui_id trigger,
+                                          bool disabled, const cui_radio_tooltip *hint) {
+    if (!hint)
+        return false;
+    uint64_t frame = cui_frame_sequence(ui);
+    if (!frame || cui_last_error(ui) != CUI_OK)
+        return false;
+    cui_radio_tooltip_state *state = hint->state;
+    if (state->trigger != trigger || state->panel != hint->id || state->last_frame != frame - 1)
+        *state = (cui_radio_tooltip_state){.trigger = trigger, .panel = hint->id};
+    state->last_frame = frame;
+    cui_hover_options options = hint->options;
+    cui_rect viewport = options.viewport;
+    if (!isfinite(viewport.x) || !isfinite(viewport.y) || !isfinite(viewport.w) ||
+        !isfinite(viewport.h) || viewport.w <= 0 || viewport.h <= 0) {
+        state->hover = (cui_hover_state){0};
+        return false;
+    }
+    options.trigger = trigger;
+    options.dt = cui_frame_delta(ui);
+    options.disabled |= disabled;
+    return cui_tooltip(ui, hint->id, theme, &state->hover, hint->text, options);
+}
 #endif
 
 /* SPDX-License-Identifier: MIT */
@@ -2935,7 +2993,7 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
 static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_theme *t,
                                         cui_str name, int *value, int option,
                                         cui_radio_options options, cui_id indicator,
-                                        cui_radio_motion *motion) {
+                                        cui_radio_motion *motion, const cui_radio_tooltip *hint) {
     cui_design_metrics design;
     if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
         return false;
@@ -3022,11 +3080,12 @@ static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_th
         cui_end_box(ui);
     }
     cui_end_box(ui);
+    cui_radio_tooltip_show(ui, t, id, options.disabled, hint);
     return changed;
 }
 bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                   int option, cui_radio_options options) {
-    return cui_components_radio_render(ui, id, t, name, value, option, options, 0, NULL);
+    return cui_components_radio_render(ui, id, t, name, value, option, options, 0, NULL, NULL);
 }
 bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                              int *value, int option, cui_radio_options options,
@@ -3034,7 +3093,7 @@ bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui
     if (!cui_components_indicator_parts_valid(ui, id, parts))
         return false;
     return cui_components_radio_render(ui, id, t, name, value, option, options, parts.indicator,
-                                       NULL);
+                                       NULL, NULL);
 }
 bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                        int option, cui_radio_options options, cui_radio_presentation presentation) {
@@ -3043,8 +3102,15 @@ bool cui_radio_present(cui_context *ui, cui_id id, const cui_theme *t, cui_str n
         return false;
     if (!ui || !id || !cui_frame_is_submitting(ui))
         return false;
+    if (!cui_radio_tooltip_valid(presentation.tooltip, id, presentation.parts.indicator)) {
+        cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_INVALID_ACTION,
+                                                    .operation = "radio_tooltip",
+                                                    .id = id});
+        return false;
+    }
     return cui_components_radio_render(ui, id, t, name, value, option, options,
-                                       presentation.parts.indicator, presentation.motion);
+                                       presentation.parts.indicator, presentation.motion,
+                                       presentation.tooltip);
 }
 bool cui_radio_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                           int option, bool disabled, cui_selection_indicator_parts parts) {

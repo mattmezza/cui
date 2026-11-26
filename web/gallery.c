@@ -1520,6 +1520,7 @@ static void gallery_button_badge(cui_context *context, void *user) {
 static cui_id radio_selected;
 static cui_radio_group_state radio_group_state;
 static cui_radio_group_motion radio_group_motion;
+static cui_radio_tooltip_state radio_priority_hint_state;
 static unsigned radio_requests;
 static void gallery_radio_change(void *user, cui_id selected) {
     (void)user;
@@ -4861,10 +4862,19 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                      .parts =
                                                          control_surface_shadows ? parts : NULL,
                                                      .part_count = control_surface_shadows ? 3 : 0};
+        const cui_radio_tooltip priority_hint = {.id = cui_id_from(ui, "priority-delivery-hint"),
+                                                 .state = &radio_priority_hint_state,
+                                                 .text = cui_string("Track your package online"),
+                                                 .options = {.viewport = {0, 0, width, height},
+                                                             .side = CUI_POPUP_RIGHT,
+                                                             .width = 220,
+                                                             .gap = 8,
+                                                             .open_delay = .35f}};
         const cui_radio_group_content content[] = {
             {.description = cui_string("Arrives in four business days"), .max_width = 205},
             {.description = cui_string("Arrives Wednesday with tracked delivery"),
-             .max_width = 205},
+             .max_width = 205,
+             .tooltip = &priority_hint},
             {.description = cui_string("Unavailable for this address"), .max_width = 205}};
         cui_radio_group_present_with_content(ui, cui_id_from(ui, "radio-group"), &t, items, 3,
                                              &radio_selected, &radio_group_state, radio_options,

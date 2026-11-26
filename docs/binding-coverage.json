@@ -26,7 +26,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The immediate and retained C presenters have shared sizes, SVG indicators, joined cards and per-trigger styles. Typed language builders for the new configuration are pending. Custom headers, measured reveal and synchronous observers remain immediate C APIs."
+        "The immediate and retained C presenters have shared sizes, SVG indicators, joined cards and per-trigger styles. Python, JS/TS, Go and Rust expose the copied retained presentation and queued checked changes. Custom headers, measured reveal and synchronous observers remain immediate C APIs. Inherited typography and physical accessibility still need validation."
       ]
     },
     {
@@ -135,7 +135,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The immediate and retained C presenters have shared sizes, SVG indicators, outer styles and per-trigger styles. Typed language builders for the new configuration are pending. Custom headers, measured reveal and synchronous observers remain immediate C APIs."
+        "The immediate and retained C presenters have shared sizes, SVG indicators, outer styles and per-trigger styles. Python, JS/TS, Go and Rust expose the copied retained presentation and queued checked changes. Custom headers, measured reveal and synchronous observers remain immediate C APIs. Inherited typography and physical accessibility still need validation."
       ]
     },
     {

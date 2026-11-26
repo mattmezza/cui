@@ -86,6 +86,8 @@ inside that rectangle, call `app.step()` and then `app.dispatch()`. The checked-
 CUI hit testing. Headless mode computes layout and draw commands; it does not
 paint a window or provide native font metrics.
 
+The [workspace preferences guide](BRIDGE_COMPONENTS.md#style-disclosure-from-language-builders) shows styled Accordion and Collapsible panels with queued change callbacks in Python, JavaScript and TypeScript.
+
 ## Configure Pagination from Python
 
 Use `pagination(key)` to retain the current page and register `on_change` for commits. Extended navigation requires a compatible V1 bridge. Check `app.supports_pagination_options()` before using it with a dynamically selected library. The standard numbered pager works with earlier providers.

@@ -38,6 +38,8 @@ The example authors a column, label, row and Button in Rust. A click changes sha
 
 Grouped `Item` handles in RadioGroup, Tabs, Select, and ComboBox can be selected with `select`; `selected` returns `None` before a choice. `detail_text` sets Alert body text, Select placeholder, or DropdownButton menu label; `open` controls disclosure state. `dropdown_part_bounds` locates split action and menu targets for host input.
 
+The [Rust workspace preferences example](BRIDGE_COMPONENTS.md#style-disclosure-from-language-builders) shows optional Accordion and Collapsible presentation and how to take changes into the next frame.
+
 Surfaces expose `open`/`is_open`, `on_close_event`, and typed `surface_result()`; Popover, Tooltip, and HoverCard require a live anchor via `anchor`. Hover transitions arrive through `on_change_event`.
 
 `visual_size` sets explicit dimensions for Avatar, EmptyView, GroupBox, Skeleton, and Spinner. `total`, `step_status`, and `numeric_part_bounds` expose native pagination, rating, and step interactions. `scroll_extent` sets Scrollable content dimensions and `scroll` queues a host wheel fixture; offset changes arrive through `on_change_event`.

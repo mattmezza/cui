@@ -155,6 +155,8 @@ class _API:
         bind_pagination_api(self, bind)
         from .rating_options import bind_api as bind_rating_api
         bind_rating_api(self, bind)
+        from .disclosure import bind_api as bind_disclosure_api
+        bind_disclosure_api(self, bind)
         bind_radio_paint(self, bind, _Handle)
         self.radio_set_motion = None
         if hasattr(lib, "cui_bridge_radio_set_motion_v1"):
@@ -487,6 +489,8 @@ class Widget:
         self._variant = "primary"
         self._size = "base"
         self._design_size = None
+        self._disclosure_config: DisclosureConfig | None = None
+        self._disclosure_style: DisclosureTriggerStyle | None = None
         self._stepper_visual = None
         self._stepper_fill = None
         self._avatar_identity = None
@@ -876,6 +880,18 @@ class Widget:
             raise ValueError("detail belongs to alert")
         self._change("set_detail", _utf8(text))
         self._detail = text
+        return self
+
+    def disclosure_configure(self, config: DisclosureConfig | None) -> "Widget":
+        """Copy presentation to an Accordion or Collapsible. None clears it."""
+        from .disclosure import configure
+        configure(self, config)
+        return self
+
+    def set_trigger_style(self, style: DisclosureTriggerStyle | None) -> "Widget":
+        """Copy feedback to a Collapsible or a direct Accordion Item. None clears it."""
+        from .disclosure import trigger_style
+        trigger_style(self, style)
         return self
 
     def open(self, value: bool = True) -> "Widget":
@@ -1972,6 +1988,7 @@ class App:
         return self
 
     def mount(self, tree: Widget) -> "App":
+        from .disclosure import preflight as disclosure_preflight, mount as disclosure_mount
         self._ensure_open()
         if self._root is not None:
             raise RuntimeError("App already has a root; dispose it before remounting")
@@ -1991,6 +2008,7 @@ class App:
             if node._disposed:
                 raise ValueError("widget belongs to a disposed App")
             seen.add(id(node))
+            disclosure_preflight(node, parent, self)
             if node.kind == "slider_model":
                 if not isinstance(node, SliderModel):
                     raise TypeError("use slider_model() for the controlled route")
@@ -2098,6 +2116,7 @@ class App:
                     node._mount_pagination()
                 if isinstance(node, Rating):
                     node._mount_rating()
+                disclosure_mount(node)
                 if node.kind in _NUMERIC:
                     node._change("set_value", node._value)
                 if node.kind == "attachment": node._change("set_attachment",node._attachment)
@@ -2531,6 +2550,11 @@ class App:
         from .pagination_options import custom_supported
         return custom_supported(self)
 
+    def supports_disclosure_presentation(self) -> bool:
+        """Return whether both optional retained disclosure setters are available."""
+        from .disclosure import supported
+        return supported(self)
+
     def supports_rating_options(self) -> bool:
         from .rating_options import supported
         return supported(self)
@@ -2760,3 +2784,6 @@ from .icons import (BadgeConfig, BadgeResult, BadgeSize, BadgeVariant, Configure
     icon_rotation)
 from .icons import __all__ as _icon_exports
 __all__ += _icon_exports
+
+from .disclosure import DisclosureConfig, DisclosureTriggerStyle
+__all__ += ["DisclosureConfig", "DisclosureTriggerStyle"]

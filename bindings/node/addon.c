@@ -2479,6 +2479,7 @@ static void wire_big_out(unsigned char *wire, const void *record, size_t at) {
 #include "icon_resources_internal.h"
 #include "icon_badge_internal.h"
 #include "rating_options_internal.h"
+#include "disclosure_internal.h"
 // clang-format on
 
 /* Optional pair: ordinary VirtualList remains usable on earlier providers. */
@@ -2679,6 +2680,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("skeletonPresentation", skeleton_presentation, 0);
     EXPORT("paginationOptions", pagination_options, 0);
     EXPORT("ratingOptions", rating_options, 0);
+    EXPORT("disclosureOptions", disclosure_options, 0);
     EXPORT("virtualRowsOptions", virtual_rows_options, 0);
     EXPORT("paginationCustomSize", pagination_custom_size, 0);
     EXPORT("iconResource", icon_resource, 0);

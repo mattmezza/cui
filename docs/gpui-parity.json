@@ -23,7 +23,7 @@
       },
       "limitations": [
         "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending.",
-        "Joined mode provides one outer card, dividers after whole sections, custom outer box and per-trigger background, focus outline and cursor styles. Inherited and state-specific typography/layout and separator styling, typed language configuration and physical accessibility remain open."
+        "Joined mode provides one outer card, dividers after whole sections, custom outer box and per-trigger background, focus outline and cursor styles. Inherited and state-specific typography/layout and separator styling and physical accessibility remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -95,6 +95,17 @@
           "evidence": [
             "tests/unit/test_bridge_disclosure.c",
             "bindings/bridge/examples/disclosure_preferences.c"
+          ]
+        },
+        {
+          "name": "retained presentation and queued expansion in Python, JS/TS, Go and Rust",
+          "status": "tested",
+          "evidence": [
+            "bindings/python/test_disclosure.py",
+            "bindings/node/test/disclosure.test.cjs",
+            "bindings/typescript/examples/workspace_preferences.ts",
+            "bindings/go/cui/disclosure_test.go",
+            "bindings/rust/tests/disclosure.rs"
           ]
         }
       ],
@@ -1131,7 +1142,7 @@
       },
       "limitations": [
         "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending.",
-        "Immediate C and retained C support sizes, named SVGs, outer boxes and trigger styles. Custom headers, measured reveal and synchronous observers remain immediate C APIs. Typed language configuration and physical native accessibility remain open."
+        "Immediate C and retained C support sizes, named SVGs, outer boxes and trigger styles. Custom headers, measured reveal and synchronous observers remain immediate C APIs. Physical native accessibility remains open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1179,6 +1190,17 @@
           "evidence": [
             "tests/unit/test_bridge_disclosure.c",
             "bindings/bridge/examples/disclosure_preferences.c"
+          ]
+        },
+        {
+          "name": "retained presentation and queued expansion in Python, JS/TS, Go and Rust",
+          "status": "tested",
+          "evidence": [
+            "bindings/python/test_disclosure.py",
+            "bindings/node/test/disclosure.test.cjs",
+            "bindings/typescript/examples/workspace_preferences.ts",
+            "bindings/go/cui/disclosure_test.go",
+            "bindings/rust/tests/disclosure.rs"
           ]
         }
       ],

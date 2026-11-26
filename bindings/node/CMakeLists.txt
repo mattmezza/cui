@@ -619,3 +619,41 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   endforeach()
  endif()
 endif()
+
+add_test(NAME node_disclosure COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ --test ${CMAKE_CURRENT_SOURCE_DIR}/test/disclosure.test.cjs)
+add_test(NAME node_disclosure_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/workspace-preferences.cjs)
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_disclosure_types_runtime COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-disclosure-types.py
+  --tsc ${CUI_NODE_TSC_EXECUTABLE} --node ${NODE_EXECUTABLE}
+  --output ${CMAKE_CURRENT_BINARY_DIR}/disclosure-types)
+endif()
+if(CUI_NODE_VERSION VERSION_GREATER_EQUAL "22.18")
+ add_test(NAME node_disclosure_types_example COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/workspace_preferences.ts)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ set(CUI_NODE_DISCLOSURE_LEGACY_LIBRARY "" CACHE FILEPATH "Existing bridge without Disclosure V1")
+ if(CUI_NODE_DISCLOSURE_LEGACY_LIBRARY)
+  if(NOT EXISTS "${CUI_NODE_DISCLOSURE_LEGACY_LIBRARY}" OR IS_DIRECTORY "${CUI_NODE_DISCLOSURE_LEGACY_LIBRARY}")
+   message(FATAL_ERROR "CUI_NODE_DISCLOSURE_LEGACY_LIBRARY must name an existing shared provider")
+  endif()
+  set(_node_disclosure_legacy "${CMAKE_CURRENT_BINARY_DIR}/disclosure-legacy")
+  file(MAKE_DIRECTORY "${_node_disclosure_legacy}")
+  file(CREATE_LINK "${CUI_NODE_DISCLOSURE_LEGACY_LIBRARY}" "${_node_disclosure_legacy}/libcui_bridge.so" SYMBOLIC)
+  add_library(cui_node_disclosure_legacy MODULE addon.c)
+  target_include_directories(cui_node_disclosure_legacy PRIVATE ${NODE_API_INCLUDE_DIR} ../../include)
+  target_link_libraries(cui_node_disclosure_legacy PRIVATE "${_node_disclosure_legacy}/libcui_bridge.so" m ${CMAKE_DL_LIBS})
+  target_compile_options(cui_node_disclosure_legacy PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  set_target_properties(cui_node_disclosure_legacy PROPERTIES PREFIX "" SUFFIX ".node")
+  add_test(NAME node_disclosure_legacy COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_disclosure_legacy> CUI_TEST_LEGACY_DISCLOSURE=1
+   ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/disclosure.test.cjs)
+ endif()
+endif()

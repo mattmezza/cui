@@ -727,6 +727,7 @@ containers.add(iconBadges.badgeKind);
 const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
 const paginationOptions = require('./pagination-options.cjs')(native, Node, NODE);
 const ratingOptions = require('./rating-options.cjs')(native, Node, NODE, icons, designSizes);
+const disclosures = require('./disclosure.cjs')(native, Node, NODE, designSizes);
 class App {
   constructor(options = {}) {
     if (options.initiallyHidden !== undefined && typeof options.initiallyHidden !== "boolean") throw new TypeError("initiallyHidden must be boolean");
@@ -756,6 +757,7 @@ class App {
     skeletons.preflight(this, root);
     paginationOptions.preflight(this, root);
     ratingOptions.preflight(this, root);
+    disclosures.preflight(this, root);
     sliderModels.preflight(this, root);
     localizedTimes.preflight(this, root);
     iconBadges.preflight(this, root);
@@ -793,6 +795,7 @@ class App {
       skeletons.mount(this, node);
       paginationOptions.mount(this, node);
       ratingOptions.mount(this, node);
+      disclosures.mount(this, node);
       iconBadges.mount(this, node);
       if([57,58].includes(node.kind))native.setDate(this.handle,node[NODE],...node.dateValue);
       if(node.kind===56)native.setColor(this.handle,node[NODE],node.colorValue);
@@ -985,6 +988,7 @@ class App {
     return typeof native.supportsRadioTooltip === 'function' &&
       typeof native.setRadioTooltip === 'function' && native.supportsRadioTooltip();
   }
+  supports_disclosure_presentation() { return disclosures.supports(this); }
   supports_rating_options() { return ratingOptions.supports(this); }
   supports_pagination_options() { return paginationOptions.supports(this); }
   supports_skeleton_presentation() { return skeletons.supports(this); }

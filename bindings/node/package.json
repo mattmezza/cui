@@ -38,6 +38,8 @@
     "README.md",
     "native",
     "rating-options.cjs",
+    "disclosure.cjs",
+    "disclosure_internal.h",
     "rating_options_internal.h"
   ],
   "os": [

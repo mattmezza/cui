@@ -80,6 +80,13 @@ earlier bridge. Pass an explicit axis, width 0 to grow, and height 0 for
 intrinsic height. See the Stepper layouts in `docs/BINDING_BUILDERS.md`.
 See `docs/STEPPER_NAVIGATION.md`.
 
+Use `cui_accordion_present` or `cui_collapsible_present` for immediate C.
+For retained Accordion and Collapsible sizes, SVG indicators and trigger
+styles, probe `supports_disclosure_presentation` (`SupportsDisclosurePresentation`
+in Go), then copy a `DisclosureConfig`. Read queued `checked` events after
+a frame. See `docs/BRIDGE_COMPONENTS.md` for typed settings, independent
+resets and the runnable workspace preferences examples in all five languages.
+
 Use `cui_rating_present` for shared Rating sizes, custom SVG masks, colors and
 outline-only preview. The app owns the numeric value. Set
 `CUI_RATING_STEP_DOWN_FILLED` for opt-in step-down and choose the bool or the

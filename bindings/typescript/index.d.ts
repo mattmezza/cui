@@ -102,18 +102,18 @@ export function textarea(key?: string, text?: string): Input;
 export function number_input(key?: string): NumberInput;
 
 export interface Composite extends Node {children(...items: (Node | Node[])[]): this}
-export interface Disclosure extends Label, Composite {open(value?: boolean): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface Disclosure extends Label, Composite, DisclosureTriggerStyled {open(value?: boolean): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Group extends Composite {select(item: Item): this; selected(): Item | undefined; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Item extends Disclosure, RadioTooltip, RadioPaintStyled {
   /** Enable or hide passive children of a direct RadioGroup Item. */
   decorate_content(enabled?: boolean): this;
 }
 export interface Alert extends Label {detail(text: string): this}
-export function collapsible(key?: string, text?: string): Disclosure;
+export function collapsible(key?: string, text?: string): Disclosure & DisclosureConfigured;
 export function alert(key?: string, text?: string): Alert;
 export function radio_group(key?: string): Group & RadioPaintStyled & RadioSelectionMotion & RadioTabOrder & PartShadowStyled<0>;
 export function tabs(key?: string): Group;
-export function accordion(key?: string): Composite;
+export function accordion(key?: string): Composite & DisclosureConfigured;
 export function item(key?: string, text?: string): Item;
 
 export interface Select extends Group, Label {detail(text: string): this}
@@ -758,4 +758,50 @@ export function configured_badge(key?: string, config?: BadgeConfigInput): Confi
 export interface App {
   supports_icon_presentation(): boolean;
   supports_configured_badge(): boolean;
+}
+
+export type DisclosureCursor = "default" | "pointer" | "text" | "resize_horizontal"
+  | "resize_vertical" | "move" | "not_allowed" | "crosshair" | "grab" | "grabbing"
+  | "zoom_in" | "zoom_out" | "wait" | "help";
+
+export interface DisclosureConfig {
+  /** Accordion only. */
+  joined?: boolean;
+  bordered?: boolean;
+  single?: boolean;
+  allowCollapse?: boolean;
+  /** Collapsible only. */
+  borderless?: boolean;
+  designSize?: DesignSize | null;
+  /** -1 fills, 0 fits, and a positive width sets logical pixels. */
+  width?: number;
+  customCard?: boolean;
+  clipCard?: boolean;
+  cardRadius?: number;
+  cardBorderWidth?: number;
+  cardPadding?: number;
+  cardGap?: number;
+  cardBackgroundRgba?: number;
+  cardBorderRgba?: number;
+  collapsedIcon?: string;
+  expandedIcon?: string;
+}
+
+export interface DisclosureTriggerStyle {
+  hoverRgba?: number | null;
+  pressedRgba?: number | null;
+  expandedRgba?: number | null;
+  disabledRgba?: number | null;
+  focusRgba?: number | null;
+  cursor?: DisclosureCursor | null;
+}
+
+export interface DisclosureConfigured {
+  disclosure_configure(config: DisclosureConfig | null): this;
+}
+export interface DisclosureTriggerStyled {
+  set_trigger_style(style: DisclosureTriggerStyle | null): this;
+}
+export interface App {
+  supports_disclosure_presentation(): boolean;
 }

@@ -1,4 +1,6 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
+mod disclosure;
+pub use disclosure::{DisclosureCard, DisclosureConfig, DisclosureCursor, DisclosureTriggerStyle};
 mod icon_resources;
 mod pagination_options;
 mod radio_motion;

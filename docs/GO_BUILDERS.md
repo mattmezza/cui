@@ -46,6 +46,8 @@ _ = app.Step(1.0/60)
 
 Grouped components use `Item` children. RadioGroup, Tabs, Select, and ComboBox expose a selected Item; Tabs and Accordion Item children form their panels. `Event.Selected` is a copied full handle snapshot for group changes. `Alert` takes title and message. Collapsible and Accordion Item state is available through `App.Checked`.
 
+The [Go workspace preferences example](BRIDGE_COMPONENTS.md#style-disclosure-from-language-builders) shows joined panels, trigger styles and queued expansion callbacks.
+
 Use the [Go SVG resource guide](GO_ICON_RESOURCES.md) to prepare copied coverage
 masks from embedded artwork or app-owned SVG and manage the resource cache.
 See the [retained inbox guide](GO_ICON_BADGE.md) for shared artwork and configured

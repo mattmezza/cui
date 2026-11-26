@@ -214,10 +214,14 @@ class SourceManifest(unittest.TestCase):
                              'package/_source/bindings/node/examples/rating-options.cjs',
                              'package/types/examples/rating_options.ts',
                              'package/_source/bindings/node/examples/virtual-list-inbox.cjs',
-                             'package/types/examples/virtual_list_inbox.ts'):
+                             'package/types/examples/virtual_list_inbox.ts',
+                             'package/disclosure.cjs', 'package/disclosure_internal.h',
+                             'package/_source/bindings/node/examples/workspace-preferences.cjs',
+                             'package/types/examples/workspace_preferences.ts'):
                     self.assertIsNotNone(archive.getmember(path))
             python = producer.stage('python', directory)
             self.assertTrue((python / 'cui_bridge/rating_options.py').is_file())
+            self.assertTrue((python / 'cui_bridge/disclosure.py').is_file())
             source = python / 'cui_bridge/_source'
             self.assertTrue((source / 'bindings/python/examples/virtual_list_inbox.py').is_file())
             tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT, timeout=30).decode().split('\0')

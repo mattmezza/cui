@@ -598,9 +598,67 @@ and pass a font file as the first argument. [Native prerequisites](NATIVE_APP_ST
 When dynamically loading bridge providers, look up the two additive
 `cui_bridge_disclosure_*_v1` setters before offering their controls.
 Providers without them retain their ordinary Accordion and Collapsible APIs.
-Python, JS/TS, Go and Rust builders currently have the ordinary controls.
-Custom headers, measured reveal and synchronous observers are available
-through the immediate C presenters. [Immediate C guide](DISCLOSURE.md)
+### Style disclosure from language builders
+
+Python, JavaScript, TypeScript, Go and Rust expose the same retained options.
+Configure the Accordion as a group, or configure a Collapsible directly.
+Set trigger style on a Collapsible or on an Item directly under an Accordion.
+Read expansion from the ordinary checked/open state or from the copied
+`checked` value delivered to your change callback.
+
+| Language | Probe on the app | Apply or reset |
+| --- | --- | --- |
+| Python | `supports_disclosure_presentation()` | `widget.disclosure_configure(DisclosureConfig(...))` and `item.set_trigger_style(DisclosureTriggerStyle(...))`. Pass `None` to reset either. |
+| JavaScript and TypeScript | `supports_disclosure_presentation()` | `node.disclosure_configure({...})` and `item.set_trigger_style({...})`. Pass `null` to reset either. |
+| Go | `SupportsDisclosurePresentation()` | `group.ConfigureDisclosure(&config)` and `item.SetDisclosureTriggerStyle(&style)`. Pass `nil` to reset either. Draft builders also provide `DisclosureOptions(config)` and `DisclosureStyle(style)`. |
+| Rust | `supports_disclosure_presentation()` | `app.configure_disclosure(group, Some(&config))` and `app.set_disclosure_trigger_style(item, Some(&style))`. Pass `None` to reset either. A mounted-node builder also provides `disclosure_options(&config)` and `disclosure_style(&style)`. |
+
+```python
+from cui_bridge import DisclosureConfig, DisclosureTriggerStyle, accordion, item, label
+
+editor = item("editor", "Editor").children(label("Auto-save is enabled."))
+sections = accordion("preferences").children(editor)
+if app.supports_disclosure_presentation():
+    sections.disclosure_configure(DisclosureConfig(
+        width=-1, design_size="lg", joined=True, bordered=True,
+        single=True, allow_collapse=True, collapsed_icon="plus", expanded_icon="minus",
+    ))
+    editor.set_trigger_style(DisclosureTriggerStyle(hover_rgba=0x4879E02B, cursor="pointer"))
+editor.on_change(lambda event: print("Editor expanded:", event.checked))
+```
+
+Omit a trigger field to inherit. Set a field to zero for transparent paint.
+Go uses pointers and Rust uses options to distinguish those values. Supply
+`Card: &cui.DisclosureCard{...}` in Go, `card: Some(DisclosureCard { ... })`
+in Rust, or the flat card fields with `custom_card=True` in Python and
+`customCard: true` in JavaScript and TypeScript. The bridge copies the
+settings and icon names. Configuration and styles reset independently and
+do not change expansion or replay notifications. Older providers load and
+run ordinary controls. Requesting an extended setter on an unsupported
+provider reports an error.
+
+Build your provider and follow the language setup guides to set the Python
+import path, bridge library, or Node addon location. Go and Rust use bundled
+sources by default. Run from the repository root without a font for a
+headless click and a visible-in-app status update.
+
+```sh
+PYTHONPATH=bindings/python python bindings/python/examples/workspace_preferences.py
+node bindings/node/examples/workspace-preferences.cjs
+node bindings/typescript/examples/workspace_preferences.ts
+(cd bindings/go && go run ./examples/disclosure_preferences)
+(cd bindings/rust && cargo run --example disclosure_preferences)
+```
+
+The TypeScript command needs Node with type stripping. With a native-capable
+provider, pass `--font /path/to/font.ttf` in Python, a font path in JavaScript,
+`-font /path/to/font.ttf` in Go or `-- /path/to/font.ttf` to the Cargo command.
+Add `--features native` before the Cargo example name when building the
+bundled native provider. [Python, JS and TS setup](BINDING_BUILDERS.md) ·
+[Go setup](GO_BUILDERS.md) · [Rust setup](RUST_BUILDERS.md)
+
+Custom headers, measured reveal and synchronous observers are available in
+the immediate C presenters. [Immediate C guide](DISCLOSURE.md)
 
 ### Configure a retained Rating from C
 

@@ -1,5 +1,7 @@
 # Disclosure controls
 
+For retained node trees, see the [C bridge and language builders](BRIDGE_COMPONENTS.md#style-retained-accordion-and-collapsible-from-c).
+
 `cui_disclosure.h` provides unstyled trigger behavior and styled Accordion and
 Collapsible containers. The caller owns expansion and motion state. Trigger IDs
 must remain unique and stable across frames.

@@ -340,6 +340,7 @@ set(CUI_RUST_SKELETON_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-skeleton-target" CACH
 set(CUI_RUST_SKELETON_STATIC_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-skeleton-static-target" CACHE PATH "Reusable Cargo cache for bundled Skeleton checks")
 include("${CMAKE_CURRENT_LIST_DIR}/CUIPaginationBindingTests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/CUIRatingBindingTests.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/CUIDisclosureBindingTests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/CUIVirtualListBindingTests.cmake")
 if(CUI_RUST_SKELETON_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")

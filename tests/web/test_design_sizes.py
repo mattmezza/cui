@@ -80,8 +80,9 @@ def main():
                     elif family == 'Tag':
                         text_font('Workspace', font)
                     elif family == 'Attachment':
-                        text_font('Attachment 1', font)
-                        assert semantic('Attachment 1')['h'] >= height
+                        text_font('Workspace', font)
+                        text_font('PDF', font * .875)
+                        assert semantic('Attachment 1', 9)['h'] >= height
                     elif family == 'Progress':
                         assert semantic('Progress', 21)['h'] == height * .25, (family, size, semantic('Progress', 21), height * .25)
                     elif family == 'Settings':

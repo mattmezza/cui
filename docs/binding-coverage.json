@@ -320,7 +320,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The retained builders use the numbered single-row layout. The C frame API adds the design-size scale, whole-item wrapping, page budgets, optional interactive ellipses, localized labels, labeled or icon-only chevrons and synchronous typed aggregate observation."
+        "Python, JavaScript, TypeScript, Go and Rust builders use the numbered single-row layout. The retained C V1 bridge adds copied design and navigation options with the existing scalar event. The immediate C API also offers synchronous typed aggregate observation."
       ]
     },
     {

@@ -212,6 +212,37 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_skeleton_get_config_v1(cui_bridge_ap
  * untouched. The deadline does not change the native runner's cadence. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_skeleton_get_presentation_v1(
     cui_bridge_app *, cui_bridge_node, cui_bridge_skeleton_presentation_v1 *);
+/* Optional copied presentation for the existing Pagination kind. */
+#define CUI_BRIDGE_PAGINATION_V1 1u
+enum { CUI_BRIDGE_PAGINATION_LABEL_BYTES = 128 };
+enum {
+    CUI_BRIDGE_PAGINATION_COUNTER = 1u,
+    CUI_BRIDGE_PAGINATION_ICON_ONLY = 2u,
+    CUI_BRIDGE_PAGINATION_CHEVRONS = 4u,
+    CUI_BRIDGE_PAGINATION_JUMP_MENU = 8u
+};
+typedef struct {
+    uint32_t struct_size, schema_version, flags, visible_pages;
+    /* Zero uses the default page window or a single row, respectively.
+     * Otherwise visible_pages is 5..32 and available_width is in (0,32768]. */
+    float available_width;
+    /* Single-line UTF-8, NUL-terminated within each field. Empty uses a default name. */
+    char group[CUI_BRIDGE_PAGINATION_LABEL_BYTES], first[CUI_BRIDGE_PAGINATION_LABEL_BYTES],
+        previous[CUI_BRIDGE_PAGINATION_LABEL_BYTES], next[CUI_BRIDGE_PAGINATION_LABEL_BYTES],
+        last[CUI_BRIDGE_PAGINATION_LABEL_BYTES], earlier_pages[CUI_BRIDGE_PAGINATION_LABEL_BYTES],
+        later_pages[CUI_BRIDGE_PAGINATION_LABEL_BYTES];
+} cui_bridge_pagination_config_v1;
+CUI_BRIDGE_API uint32_t cui_bridge_pagination_versions(void);
+CUI_BRIDGE_API uint32_t cui_bridge_pagination_config_size_v1(void);
+/* Owner thread, outside step. Copies V1 or clears the override with NULL.
+ * ICON_ONLY takes priority. CHEVRONS shows labeled arrows without First/Last.
+ * JUMP_MENU applies in numbered mode and uses the current host viewport.
+ * The shared design-size setter, owner page, total and CHANGE event are independent. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_pagination_configure_v1(
+    cui_bridge_app *, cui_bridge_node, const cui_bridge_pagination_config_v1 *);
+/* Caller initializes size and schema. EMPTY if no override. Errors leave out untouched. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_pagination_get_config_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_pagination_config_v1 *);
 /* Unreleased controlled Slider V1. Independent request FIFO; old Slider scalar
  * setters/events/CHANGE/autocommit are unchanged. All records own their values,
  * contain no pointers and require exact size/schema1/reserved0. New language
@@ -688,8 +719,8 @@ typedef enum {
     CUI_BRIDGE_SIZE_8XL,
     CUI_BRIDGE_SIZE_9XL
 } cui_bridge_button_size;
-/* Shared scale, currently supported by Button and Avatar only. Existing Button
- * size functions retain their Button-only contract and enum values. */
+/* Shared scale. Existing Button size functions retain their Button-only
+ * contract and enum values. */
 typedef cui_bridge_button_size cui_bridge_design_size;
 typedef enum {
     CUI_BRIDGE_ROUND_THEME = 0,
@@ -994,7 +1025,7 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_variant(cui_bridge_app *a
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_size(cui_bridge_app *app,
                                                             cui_bridge_node node,
                                                             cui_bridge_button_size size);
-/* Button, Avatar and Stepper. INHERIT restores legacy/source density sizing;
+/* Button, Avatar, Stepper and Pagination. INHERIT uses legacy/source density sizing;
  * explicit variants win over Avatar visual_size. Other kinds reject. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_design_size(cui_bridge_app *, cui_bridge_node,
                                                             cui_bridge_design_size);

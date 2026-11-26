@@ -726,6 +726,7 @@ static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *no
 #include "cui_bridge_icon_presentation_internal.h"
 #include "cui_bridge_badge_internal.h"
 #include "cui_bridge_skeleton_internal.h"
+#include "cui_bridge_pagination_internal.h"
 // clang-format on
 
 uint32_t cui_bridge_abi_version(void) {
@@ -853,6 +854,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     bridge_slider_remove(node->owner, node->own_slot);
     bridge_time_remove(node->owner, node->own_slot);
     bridge_skeleton_remove(node->owner, node->own_slot);
+    bridge_pagination_remove(node->owner, node->own_slot);
     bridge_icon_presentation_remove(node->owner, node->own_slot);
     bridge_badge_remove(node->owner, node->own_slot);
     free(node->part_shadows);
@@ -1430,6 +1432,7 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app->time_fields);
     bridge_icon_app_destroy(app);
     free(app->skeletons);
+    free(app->pagination);
     free(app);
 }
 cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
@@ -3224,7 +3227,7 @@ cui_bridge_status cui_bridge_set_design_size(cui_bridge_app *app, cui_bridge_nod
     if (status != CUI_BRIDGE_OK)
         return status;
     if (node->kind != CUI_BRIDGE_BUTTON && node->kind != CUI_BRIDGE_AVATAR &&
-        node->kind != CUI_BRIDGE_STEPPER)
+        node->kind != CUI_BRIDGE_STEPPER && node->kind != CUI_BRIDGE_PAGINATION)
         return CUI_BRIDGE_INVALID_STATE;
     if (size < CUI_BRIDGE_SIZE_INHERIT || size > CUI_BRIDGE_SIZE_9XL)
         return CUI_BRIDGE_INVALID_ARGUMENT;
@@ -5234,8 +5237,7 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
             app->frame_error = CUI_BRIDGE_CORE_ERROR;
     } else if (node->kind == CUI_BRIDGE_PAGINATION) {
         size_t page = (size_t)node->value;
-        if (cui_pagination(app->ui, node->id, &app->theme, &page, node->total, false,
-                           node->disabled)) {
+        if (bridge_pagination_draw(app, node, &page)) {
             node->value = page;
             bridge_change(app, slot);
         }

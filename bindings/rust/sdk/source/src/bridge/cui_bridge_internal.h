@@ -167,6 +167,7 @@ struct cui_bridge_app {
     bridge_time_app *time_fields;   /* Lazy localized kind55 route. */
     bridge_icon_app *icons;         /* Lazy owned resources; no legacy allocation. */
     bridge_skeleton_app *skeletons; /* Lazy responsive presentation. */
+    cui_bridge_pagination_config_v1 **pagination; /* Lazily copied per node. */
     bridge_data_table_owned *staged_table_load_more; /* Only during a step. */
     size_t data_table_capacity_bytes;                /* Committed opt-in matrices. */
 };

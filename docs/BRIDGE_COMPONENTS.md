@@ -46,7 +46,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Shimmer | `cui_shimmer_text` | copied text, retained state | Single line |
 | List | `cui_list` | selected Item, change, disabled | Up to 64 Items |
 | Menu | `cui_menu` | menu Item action, change, disabled | Up to 64 leaf actions |
-| Pagination | `cui_pagination` | current page, total, change, disabled | One-based page, total <= 1,000,000. Shared sizes, responsive rows, configurable page budgets, ellipsis menus, localized labels, labeled or icon-only chevrons and typed C aggregate callbacks are available in the [frame API](NUMERIC.md#pagination). |
+| Pagination | `cui_pagination` | current page, total, change, disabled | One-based page, total <= 1,000,000. The [C retained configuration](#configure-a-retained-pager-from-c) adds sizing, wrapping, page budgets, jump menus and localized navigation. The language builders continue to expose the numbered single-row layout. |
 | Rating | `cui_rating` | value, maximum, change, disabled | Maximum <= 10 |
 | Stepper | `cui_stepper` / opt-in `cui_stepper_visual_navigation` | selected Item, status, aggregate change, disabled; opt-in density/orientation/shared size and copied RGBA Item icons | Up to 64 Items; visual selection paints on next submission; no foreign controlled REQUEST handlers |
 | DescriptionList | `cui_description_list` | Item label/value pairs | Up to 64 Items, default columns |
@@ -116,6 +116,40 @@ means no selected row. The legacy setter assigns one-based row keys, so its
 event values keep their original meaning. Columns and sort columns stay
 one-based. The application can supply a reordered matrix after a step to apply
 a sort request.
+
+### Configure a retained pager from C
+
+The bridge keeps the page on a `CUI_BRIDGE_PAGINATION` node. Set its total and initial value through `cui_bridge_set_total` and `cui_bridge_set_value`. Use the shared design-size setter for XS through 9XL and the V1 configuration for navigation and labels. For a dynamically loaded provider, probe the optional Pagination V1 symbols and check the version bit and exact layout size before using the extended options.
+
+```c
+#include <cui/cui_bridge.h>
+
+cui_bridge_status configure_results_pages(cui_bridge_app *app, cui_bridge_node pager,
+                                          float content_width) {
+    cui_bridge_pagination_config_v1 options = {
+        .struct_size = sizeof options,
+        .schema_version = CUI_BRIDGE_PAGINATION_V1,
+        .flags = CUI_BRIDGE_PAGINATION_CHEVRONS | CUI_BRIDGE_PAGINATION_JUMP_MENU,
+        .visible_pages = 5,
+        .available_width = content_width,
+        .group = "Pages de résultats",
+        .previous = "Précédente",
+        .next = "Suivante",
+        .earlier_pages = "Pages précédentes",
+        .later_pages = "Pages suivantes",
+    };
+    cui_bridge_status status = cui_bridge_pagination_configure_v1(app, pager, &options);
+    if (status == CUI_BRIDGE_OK)
+        status = cui_bridge_set_design_size(app, pager, CUI_BRIDGE_SIZE_BASE);
+    return status;
+}
+```
+
+Run configuration on the bridge owner thread outside `cui_bridge_step`. Supply the current container's inner width in logical pixels if it should wrap, and reconfigure when that width changes. A zero width uses one row. A control wider than the width keeps its natural size. The jump menu places itself in the current host viewport and is available in numbered mode. `CUI_BRIDGE_PAGINATION_COUNTER` selects a page count. `CUI_BRIDGE_PAGINATION_ICON_ONLY` selects just Previous and Next SVG controls with accessible names and takes priority over the other flags.
+
+The bridge copies each label, up to 127 UTF-8 bytes plus NUL. Empty fields use English defaults. Labels are single-line and control characters are rejected. Configuration storage is allocated only on use, with one 916-byte configuration per configured node plus a single pointer table bounded by the app's node capacity. Invalid updates and allocation failures preserve the prior configuration. Read it back with a size- and version-initialized `cui_bridge_pagination_get_config_v1` output. Passing NULL to the configure call clears the override. Size, value and total use their independent setters.
+
+The existing scalar `CUI_BRIDGE_EVENT_CHANGE` delivers the final page via the normal bridge queue. Configuring, opening or dismissing a jump menu does not add an event. A committed jump uses the same queue and value as a Next action. The frame API's synchronous typed callback remains available through [immediate C submission](NUMERIC_SELECTION_EVENTS.md). Python, JS/TS, Go and Rust currently use their established retained pager and event APIs.
 
 ### Replace DataTable rows without losing the viewport
 

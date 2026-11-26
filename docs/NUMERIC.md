@@ -61,7 +61,7 @@ bool draw_numbered_results(cui_context *ui, cui_id id, const cui_theme *theme,
 }
 ```
 
-Opening, scrolling and dismissing the menu leave the page unchanged. Select a row by pointer, touch, keyboard or accessibility activation to commit in that frame. Escape or a pointer press outside dismisses the menu. Focus returns to the ellipsis when it is still present, or to the corresponding Previous or Next control after a jump removes it. Use a stable pager ID across frames. Changing the owner page, total or budget closes the existing menu and rejects its queued row actions. The retained binding builders provide the numbered single-row presentation. Foreign exposure of the extended C options remains open.
+Opening, scrolling and dismissing the menu leave the page unchanged. Select a row by pointer, touch, keyboard or accessibility activation to commit in that frame. Escape or a pointer press outside dismisses the menu. Focus returns to the ellipsis when it is still present, or to the corresponding Previous or Next control after a jump removes it. Use a stable pager ID across frames. Changing the owner page, total or budget closes the existing menu and rejects its queued row actions. The [retained C bridge configuration](BRIDGE_COMPONENTS.md#configure-a-retained-pager-from-c) exposes layout and labels with copied storage. The Python, JS/TS, Go and Rust builders provide the numbered single-row presentation.
 
 ### Translate the navigation
 

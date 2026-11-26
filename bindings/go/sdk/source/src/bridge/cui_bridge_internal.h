@@ -40,6 +40,7 @@ typedef struct bridge_settings_owned bridge_settings_owned;
 typedef struct bridge_data_table_owned bridge_data_table_owned;
 typedef struct bridge_rating_configured bridge_rating_configured;
 typedef struct bridge_disclosure_headings bridge_disclosure_headings;
+typedef struct bridge_disclosure_titles bridge_disclosure_titles;
 typedef enum {
     BRIDGE_STEPPER_BUTTONS,
     BRIDGE_STEPPER_FIXED,
@@ -70,6 +71,7 @@ typedef struct {
     cui_bridge_disclosure_config_v1 *disclosure_config;
     cui_disclosure_trigger_style *disclosure_style;
     bridge_disclosure_headings *disclosure_headings;
+    bridge_disclosure_titles *disclosure_titles;
     cui_disclosure_separator_style *disclosure_divider;
     cui_button_state button_state;
     cui_checkbox_state checkbox_state;

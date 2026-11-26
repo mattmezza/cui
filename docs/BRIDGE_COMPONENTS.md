@@ -633,8 +633,8 @@ monospace face. Nonzero letter spacing requires host support. Application-define
 font-family IDs and arbitrary `cui_box` properties are available in immediate C.
 
 Build and run the [workspace preferences example](../bindings/bridge/examples/disclosure_preferences.c)
-from the repository root. It applies shared heading typography and inset
-dividers. Its headless mode activates Notifications, closes the Account panel
+from the repository root. It applies shared heading typography, title feedback
+and inset dividers. Its headless mode activates Notifications, closes the Account panel
 and updates a status label.
 
 ```sh
@@ -651,6 +651,36 @@ and `cui_bridge_disclosure_set_trigger_style_v1` for the original presentation
 settings. Probe `cui_bridge_disclosure_set_heading_v1` and
 `cui_bridge_disclosure_set_divider_v1` separately for headings and dividers.
 Older providers still offer ordinary Accordion and Collapsible nodes.
+
+#### Style retained titles for pointer and keyboard
+
+Use `cui_bridge_disclosure_set_title_state_v1` with the same heading record to
+set hover, keyboard-focus or press typography and title color. The record may
+include either or both fields. Configure row geometry separately through a
+normal, expanded or disabled heading. Clear a state by passing `NULL` or a
+valid record with zero fields.
+
+```c
+cui_bridge_status style_preferences_focus(cui_bridge_app *app, cui_bridge_node accordion) {
+    const cui_bridge_disclosure_heading_v1 focus = {
+        .struct_size = sizeof focus,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_DISCLOSURE_HEADING_COLOR,
+        .title_rgba = 0x275dccff,
+    };
+    return cui_bridge_disclosure_set_title_state_v1(
+        app, accordion, CUI_BRIDGE_DISCLOSURE_TITLE_FOCUS_VISIBLE, &focus);
+}
+```
+
+Configure an Accordion for shared styles, a direct Item for per-field
+overrides or a Collapsible for its own title. States resolve in the same
+order as the immediate C presenter. The bridge copies the record between
+steps and releases the storage when the last state clears or the node is
+removed. Expansion continues to enqueue its usual change records. Probe
+`cui_bridge_disclosure_set_title_state_v1` independently of the ordinary
+heading setter when loading a provider dynamically.
+[Immediate C state order and sizing](DISCLOSURE.md#style-titles-for-pointer-and-keyboard)
 
 ### Style disclosure from language builders
 
@@ -694,9 +724,9 @@ provider reports an error.
 #### Style heading layers and dividers from language builders
 
 Python, JavaScript, TypeScript, Go and Rust support normal, expanded and
-disabled heading layers. Hover, keyboard-focus and press title layers are
-available through the immediate C presenters.
-[Immediate C title styles](DISCLOSURE.md#style-titles-for-pointer-and-keyboard)
+disabled heading layers. Hover, keyboard-focus and press title layers
+currently require a C API.
+[Retained C title styles](#style-retained-titles-for-pointer-and-keyboard)
 Set them on an Accordion for shared styles, its direct Item for per-field
 overrides, or a Collapsible for its own heading. Probe heading and divider
 support independently before configuring a provider. A divider belongs to

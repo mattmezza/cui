@@ -29,6 +29,14 @@ typedef struct {
 struct bridge_disclosure_headings {
     bridge_disclosure_heading_layer layers[CUI_BRIDGE_DISCLOSURE_HEADING_DISABLED + 1];
 };
+typedef struct {
+    uint32_t fields;
+    cui_typography_token typography;
+    cui_color color;
+} bridge_disclosure_title_style;
+struct bridge_disclosure_titles {
+    bridge_disclosure_title_style layers[CUI_BRIDGE_DISCLOSURE_TITLE_PRESSED + 1];
+};
 
 static bool bridge_disclosure_dimension(float value) {
     return isfinite(value) && value >= 0 && value <= 4096;
@@ -253,6 +261,43 @@ cui_bridge_disclosure_set_heading_v1(cui_bridge_app *app, cui_bridge_node handle
 }
 
 cui_bridge_status
+cui_bridge_disclosure_set_title_state_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                         uint32_t state,
+                                         const cui_bridge_disclosure_heading_v1 *style) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_ACCORDION && !bridge_disclosure_trigger_node(app, node))
+        return CUI_BRIDGE_INVALID_STATE;
+
+    bridge_disclosure_heading_layer next = {0};
+    if (state > CUI_BRIDGE_DISCLOSURE_TITLE_PRESSED ||
+        (style && !bridge_disclosure_decode_heading(app->ui, style, &next)) ||
+        (next.fields & CUI_BRIDGE_DISCLOSURE_HEADING_BOX))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    bridge_disclosure_titles *titles = node->disclosure_titles;
+    if (!titles && !next.fields)
+        return CUI_BRIDGE_OK;
+    if (!titles) {
+        titles = calloc(1, sizeof *titles);
+        if (!titles)
+            return CUI_BRIDGE_OUT_OF_MEMORY;
+        node->disclosure_titles = titles;
+    }
+    titles->layers[state] = (bridge_disclosure_title_style){
+        .fields = next.fields, .typography = next.typography, .color = next.color};
+    if (!(titles->layers[CUI_BRIDGE_DISCLOSURE_TITLE_HOVERED].fields |
+          titles->layers[CUI_BRIDGE_DISCLOSURE_TITLE_FOCUS_VISIBLE].fields |
+          titles->layers[CUI_BRIDGE_DISCLOSURE_TITLE_PRESSED].fields)) {
+        free(titles);
+        node->disclosure_titles = NULL;
+    }
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+
+cui_bridge_status
 cui_bridge_disclosure_set_divider_v1(cui_bridge_app *app, cui_bridge_node handle,
                                      const cui_bridge_disclosure_divider_v1 *style) {
     cui_bridge_node_record *node;
@@ -308,6 +353,30 @@ bridge_disclosure_heading_appearance(const bridge_disclosure_headings *headings)
         .normal = bridge_disclosure_heading_part(&headings->layers[0]),
         .expanded = bridge_disclosure_heading_part(&headings->layers[1]),
         .disabled = bridge_disclosure_heading_part(&headings->layers[2]),
+    };
+}
+
+static cui_disclosure_title_style
+bridge_disclosure_title_part(const bridge_disclosure_title_style *layer) {
+    return (cui_disclosure_title_style){
+        .typography =
+            layer->fields & CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY ? &layer->typography : NULL,
+        .custom_color = (layer->fields & CUI_BRIDGE_DISCLOSURE_HEADING_COLOR) != 0,
+        .color = layer->color,
+    };
+}
+
+static cui_disclosure_title_states
+bridge_disclosure_title_states(const bridge_disclosure_titles *titles) {
+    if (!titles)
+        return (cui_disclosure_title_states){0};
+    return (cui_disclosure_title_states){
+        .hovered =
+            bridge_disclosure_title_part(&titles->layers[CUI_BRIDGE_DISCLOSURE_TITLE_HOVERED]),
+        .focus_visible = bridge_disclosure_title_part(
+            &titles->layers[CUI_BRIDGE_DISCLOSURE_TITLE_FOCUS_VISIBLE]),
+        .pressed =
+            bridge_disclosure_title_part(&titles->layers[CUI_BRIDGE_DISCLOSURE_TITLE_PRESSED]),
     };
 }
 

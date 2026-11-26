@@ -1175,6 +1175,19 @@ typedef struct {
  * the owner thread. Errors preserve prior settings. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_disclosure_set_heading_v1(
     cui_bridge_app *, cui_bridge_node, uint32_t layer, const cui_bridge_disclosure_heading_v1 *);
+enum {
+    CUI_BRIDGE_DISCLOSURE_TITLE_HOVERED = 0,
+    CUI_BRIDGE_DISCLOSURE_TITLE_FOCUS_VISIBLE,
+    CUI_BRIDGE_DISCLOSURE_TITLE_PRESSED
+};
+/* Optional title refinements for the same node kinds and wire as heading_v1.
+ * Only TYPOGRAPHY and COLOR fields are allowed. NULL or zero fields clears
+ * the state. Enabled titles apply hover, keyboard focus, then pressed over
+ * their normal and expanded styles. Item values override shared per field.
+ * Touch applies pressed while held. Reflow follows the resulting text metrics.
+ * Call between steps on the owner thread. Errors preserve prior settings. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_disclosure_set_title_state_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t state, const cui_bridge_disclosure_heading_v1 *);
 typedef struct {
     uint32_t struct_size, schema_version, reserved[2];
     float thickness, inset_left, inset_right;

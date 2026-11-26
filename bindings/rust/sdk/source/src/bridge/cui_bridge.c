@@ -1235,6 +1235,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     free(node->disclosure_config);
     free(node->disclosure_style);
     free(node->disclosure_headings);
+    free(node->disclosure_titles);
     free(node->disclosure_divider);
     free(node->part_shadows);
     free(node->key);
@@ -4266,7 +4267,7 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
     }
     scratch->binding.app = app;
     size_t count = 0;
-    size_t heading_count = 0;
+    size_t heading_count = 0, title_count = 0;
     bool disclosure_style = false;
     for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {
         cui_bridge_node_record *item = &app->nodes[child];
@@ -4300,6 +4301,8 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
             disclosure_style |= item->disclosure_style != NULL;
             if (item->disclosure_headings)
                 heading_count = count + 1;
+            if (item->disclosure_titles)
+                title_count = count + 1;
         }
         count++;
     }
@@ -4505,7 +4508,9 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
             .disabled = node->disabled,
         };
         bool changed;
-        if (count && (config || disclosure_style || node->disclosure_headings || heading_count)) {
+        bool styled_titles = node->disclosure_titles || title_count;
+        if (count && (config || disclosure_style || node->disclosure_headings || heading_count ||
+                      styled_titles)) {
             cui_disclosure_trigger_appearance *headings = NULL;
             if (heading_count) {
                 headings = malloc(heading_count * sizeof *headings);
@@ -4519,6 +4524,25 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                     headings[i] = bridge_disclosure_heading_appearance(item->disclosure_headings);
                 }
             }
+            cui_disclosure_title_states *titles = NULL;
+            if (title_count) {
+                titles = malloc(title_count * sizeof *titles);
+                if (!titles) {
+                    free(headings);
+                    free(scratch);
+                    app->frame_error = CUI_BRIDGE_OUT_OF_MEMORY;
+                    return;
+                }
+                for (size_t i = 0; i < title_count; ++i) {
+                    const cui_bridge_node_record *item = &app->nodes[scratch->binding.slots[i]];
+                    titles[i] = bridge_disclosure_title_states(item->disclosure_titles);
+                }
+            }
+            cui_disclosure_title_interactions interactions = {
+                .trigger = bridge_disclosure_title_states(node->disclosure_titles),
+                .items = titles,
+                .item_count = title_count,
+            };
             cui_disclosure_appearance appearance = {
                 .trigger = bridge_disclosure_heading_appearance(node->disclosure_headings),
                 .items = headings,
@@ -4534,11 +4558,12 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                 paint.trigger_styles = scratch->disclosure_styles;
                 paint.trigger_style_count = count;
             }
-            changed =
-                cui_accordion_present(app->ui, node->id, &app->theme, scratch->disclosures, count,
-                                      scratch->opened, options, paint, bridge_group_panel,
-                                      &scratch->binding, (cui_disclosure_handler){0})
-                    .changed;
+            changed = cui_accordion_present_with_title_states(
+                          app->ui, node->id, &app->theme, scratch->disclosures, count,
+                          scratch->opened, options, paint, styled_titles ? &interactions : NULL,
+                          bridge_group_panel, &scratch->binding, (cui_disclosure_handler){0})
+                          .changed;
+            free(titles);
             free(headings);
         } else {
             changed =
@@ -5746,7 +5771,11 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         const cui_bridge_disclosure_config_v1 *config = node->disclosure_config;
         cui_str title = cui_string(node->text);
         bool changed;
-        if (config || node->disclosure_style || node->disclosure_headings) {
+        if (config || node->disclosure_style || node->disclosure_headings ||
+            node->disclosure_titles) {
+            cui_disclosure_title_interactions interactions = {
+                .trigger = bridge_disclosure_title_states(node->disclosure_titles),
+            };
             cui_disclosure_appearance appearance = {
                 .trigger = bridge_disclosure_heading_appearance(node->disclosure_headings),
             };
@@ -5760,9 +5789,10 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
                 .disabled = node->disabled,
                 .borderless = config && (config->flags & CUI_BRIDGE_DISCLOSURE_BORDERLESS_V1),
             };
-            changed = cui_collapsible_present(app->ui, node->id, &app->theme, title, &node->checked,
-                                              options, paint, bridge_panel, &binding,
-                                              (cui_disclosure_handler){0})
+            changed = cui_collapsible_present_with_title_states(
+                          app->ui, node->id, &app->theme, title, &node->checked, options, paint,
+                          node->disclosure_titles ? &interactions : NULL, bridge_panel, &binding,
+                          (cui_disclosure_handler){0})
                           .changed;
         } else {
             changed = cui_collapsible(app->ui, node->id, &app->theme, title, &node->checked,

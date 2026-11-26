@@ -259,8 +259,9 @@ applies the pressed style while held and clears it on release. An intrinsic
 row can change height when the active font metrics change. For stable hit
 geometry, use a fixed trigger box with room for every style. The gallery's
 **Interactive headings** option demonstrates these states with copyable C.
-Retained C and language builders currently expose normal, expanded and
-disabled heading layers.
+Retained C copies these title states through a separate bridge setter.
+Language builders currently expose normal, expanded and disabled heading
+layers. [Retained C title styles](BRIDGE_COMPONENTS.md#style-retained-titles-for-pointer-and-keyboard)
 
 ### Measured reveal
 

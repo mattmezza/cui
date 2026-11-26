@@ -298,6 +298,110 @@ static void test_heading_appearance(void) {
     cui_bridge_destroy(app);
 }
 
+static void test_interaction_headings(void) {
+    const cui_bridge_options options = {.struct_size = sizeof options,
+                                        .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                        .backend = CUI_BRIDGE_BACKEND_SDL,
+                                        .width = 420,
+                                        .height = 400};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = create(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "Root");
+    cui_bridge_node group = create(app, root, CUI_BRIDGE_ACCORDION, "Accordion");
+    cui_bridge_node first = create(app, group, CUI_BRIDGE_ITEM, "Notifications");
+    cui_bridge_node second = create(app, group, CUI_BRIDGE_ITEM, "Delivery");
+    cui_bridge_node fold = create(app, root, CUI_BRIDGE_COLLAPSIBLE, "Advanced");
+    const cui_bridge_disclosure_heading_v1 normal = {
+        .struct_size = sizeof normal,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY | CUI_BRIDGE_DISCLOSURE_HEADING_COLOR,
+        .font_size = 15,
+        .line_height = 22,
+        .title_rgba = 0x124071ff,
+    };
+    cui_bridge_disclosure_heading_v1 hover = normal;
+    hover.weight = 2;
+    const cui_bridge_disclosure_heading_v1 focus = {
+        .struct_size = sizeof focus,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_DISCLOSURE_HEADING_COLOR,
+        .title_rgba = 0xb02050ff,
+    };
+    cui_bridge_disclosure_heading_v1 press = normal;
+    press.fields = CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY;
+    press.text_flags = CUI_BRIDGE_DISCLOSURE_TITLE_ITALIC;
+    press.weight = 3;
+    cui_bridge_disclosure_heading_v1 item = focus;
+    item.title_rgba = 0;
+    const uint32_t hovered = CUI_BRIDGE_DISCLOSURE_TITLE_HOVERED;
+    const uint32_t focused = CUI_BRIDGE_DISCLOSURE_TITLE_FOCUS_VISIBLE;
+    const uint32_t pressed = CUI_BRIDGE_DISCLOSURE_TITLE_PRESSED;
+    assert(cui_bridge_disclosure_set_heading_v1(app, group, 0, &normal) == CUI_BRIDGE_OK);
+    assert(cui_bridge_disclosure_set_heading_v1(app, fold, 0, &normal) == CUI_BRIDGE_OK);
+    cui_bridge_disclosure_heading_v1 copied = hover;
+    assert(cui_bridge_disclosure_set_title_state_v1(app, group, hovered, &copied) == CUI_BRIDGE_OK);
+    memset(&copied, 0, sizeof copied);
+    assert(cui_bridge_disclosure_set_title_state_v1(app, group, focused, &focus) == CUI_BRIDGE_OK);
+    assert(cui_bridge_disclosure_set_title_state_v1(app, group, pressed, &press) == CUI_BRIDGE_OK);
+    assert(cui_bridge_disclosure_set_title_state_v1(app, second, hovered, &item) == CUI_BRIDGE_OK);
+    assert(cui_bridge_disclosure_set_title_state_v1(app, fold, hovered, &hover) == CUI_BRIDGE_OK);
+    assert(cui_bridge_disclosure_set_title_state_v1(app, root, hovered, &hover) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_disclosure_set_title_state_v1(app, group, pressed + 1, &hover) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    copied = hover;
+    copied.fields |= CUI_BRIDGE_DISCLOSURE_HEADING_BOX;
+    assert(cui_bridge_disclosure_set_title_state_v1(app, group, hovered, &copied) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    step(app);
+    assert(heading_lines(app, first, normal) == 1);
+
+    pointer(app, first, CUI_BRIDGE_POINTER_MOVE);
+    step(app);
+    assert(heading_lines(app, first, hover) == 1);
+    assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, CUI_BRIDGE_KEY_TAB, 0, 0) ==
+           CUI_BRIDGE_OK);
+    step(app);
+    hover.title_rgba = focus.title_rgba; /* A color-only focus layer inherits hover typography. */
+    assert(heading_lines(app, first, hover) == 1);
+    expect_empty(app);
+
+    pointer(app, second, CUI_BRIDGE_POINTER_MOVE);
+    step(app);
+    hover.title_rgba = 0;
+    assert(heading_lines(app, second, hover) == 1);
+    pointer(app, second, CUI_BRIDGE_POINTER_DOWN);
+    step(app);
+    press.title_rgba = 0;
+    assert(heading_lines(app, second, press) == 1);
+    expect_empty(app);
+    pointer(app, second, CUI_BRIDGE_POINTER_UP);
+    step(app);
+    assert(heading_lines(app, second, hover) == 1);
+    expect_change(app, second, 1);
+    expect_empty(app);
+
+    assert(cui_bridge_disclosure_set_title_state_v1(app, second, hovered, NULL) == CUI_BRIDGE_OK);
+    assert(!app->nodes[second.slot].disclosure_titles);
+    assert(cui_bridge_node_remove(app, second) == CUI_BRIDGE_OK);
+    assert(cui_bridge_disclosure_set_title_state_v1(app, second, hovered, NULL) ==
+           CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_node replacement = create(app, group, CUI_BRIDGE_ITEM, "Billing");
+    assert(replacement.slot == second.slot && !app->nodes[replacement.slot].disclosure_titles);
+
+    step(app);
+    pointer(app, fold, CUI_BRIDGE_POINTER_MOVE);
+    step(app);
+    hover.title_rgba = normal.title_rgba;
+    assert(heading_lines(app, fold, hover) == 1);
+    assert(cui_bridge_set_disabled(app, fold, 1) == CUI_BRIDGE_OK);
+    step(app);
+    assert(heading_lines(app, fold, normal) == 1);
+    expect_empty(app);
+    cui_bridge_destroy(app);
+}
+
 int main(void) {
     cui_bridge_options options = {.struct_size = sizeof options,
                                   .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -467,4 +571,5 @@ int main(void) {
     assert(row_color(app, replacement) != style.disabled_rgba);
     cui_bridge_destroy(app);
     test_heading_appearance();
+    test_interaction_headings();
 }

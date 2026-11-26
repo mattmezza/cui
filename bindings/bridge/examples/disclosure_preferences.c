@@ -130,6 +130,14 @@ int main(int argc, char **argv) {
     expanded.font_size = 19;
     expanded.line_height = 26;
     expanded.weight = 3; /* Bold. */
+    cui_bridge_disclosure_heading_v1 hover = heading;
+    hover.weight = 2; /* Semibold. */
+    const cui_bridge_disclosure_heading_v1 focus = {
+        .struct_size = sizeof focus,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_DISCLOSURE_HEADING_COLOR,
+        .title_rgba = 0x275dccff,
+    };
     const cui_bridge_disclosure_divider_v1 divider = {
         .struct_size = sizeof divider,
         .schema_version = 1,
@@ -144,6 +152,10 @@ int main(int argc, char **argv) {
               view.app, group, CUI_BRIDGE_DISCLOSURE_HEADING_NORMAL, &heading) == CUI_BRIDGE_OK);
     CHECK(cui_bridge_disclosure_set_heading_v1(
               view.app, group, CUI_BRIDGE_DISCLOSURE_HEADING_EXPANDED, &expanded) == CUI_BRIDGE_OK);
+    CHECK(cui_bridge_disclosure_set_title_state_v1(
+              view.app, group, CUI_BRIDGE_DISCLOSURE_TITLE_HOVERED, &hover) == CUI_BRIDGE_OK);
+    CHECK(cui_bridge_disclosure_set_title_state_v1(
+              view.app, group, CUI_BRIDGE_DISCLOSURE_TITLE_FOCUS_VISIBLE, &focus) == CUI_BRIDGE_OK);
     CHECK(cui_bridge_disclosure_set_divider_v1(view.app, group, &divider) == CUI_BRIDGE_OK);
     CHECK(cui_bridge_disclosure_set_trigger_style_v1(view.app, view.account, &feedback) ==
           CUI_BRIDGE_OK);

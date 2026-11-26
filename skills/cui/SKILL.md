@@ -289,7 +289,10 @@ Go) to compose passive arrow and marker artwork. Attach arrow slots to the
 Carousel and marker slots to the owning Item. The outer button still owns
 interaction. Probe `supports_carousel_control_sizes` (`SupportsCarouselControlSizes`
 in Go) to set independent arrow and marker sizes with the shared design
-scale. Read `docs/CAROUSEL.md` for layout and examples.
+scale. Immediate C also offers `cui_carousel_with_layout` for content-sized
+slides. Retain one zero-initialized `cui_carousel_fit` per fitted slide and keep
+it with the slide ID when reordering. Drive follow-up frames with
+`cui_needs_redraw`. Read `docs/CAROUSEL.md` for layout and examples.
 For a Command palette inside a dialog, set `cui_command_options.width = -1` to fit
 the body. Rows and hit targets fill the current allocation. Width-dependent
 custom row heights settle on a follow-up frame. See `docs/COMMAND.md`.

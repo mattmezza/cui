@@ -30,7 +30,8 @@ const inline = {
     Collapsible: [false, true].map(interactive => disclosureHeadingUsage(false, interactive)),
 };
 const standalone = {
-    Carousel: [snippets.Carousel, carouselBasisUsage(2), carouselBasisUsage(3, true, true, 14)],
+    Carousel: [snippets.Carousel, carouselBasisUsage(2), carouselBasisUsage(3, true, true, 14),
+               carouselBasisUsage(4), carouselBasisUsage(4, true)],
     Attachment: [readFileSync(join(process.argv[2], '..', 'attachment_slots_example.h'), 'utf8')],
     VirtualList: [virtualInboxUsage],
     Radio: [radioStyledUsage, radioControlledUsage],

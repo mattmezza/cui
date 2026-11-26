@@ -855,9 +855,9 @@ Ordered dispatch with delegated segment focus uses the direct C route.
 
 **Interaction:** cui_carousel_change_fn observes selection; cui_carousel_render_fn composes slides. A disabled Carousel also disables its built-in arrows and pagination.
 
-**Usage:** Initialize capacity once, submit slides each frame and handle selected-index changes separately from slide rendering. In immediate C, use cui_carousel_with_basis to show several items with viewport-relative slides in either orientation. In retained C, use cui_bridge_set_carousel_control_sizes_v1 for named arrow and marker sizes and cui_bridge_carousel_slot_create_v1 for passive control content.
+**Usage:** Initialize capacity once, submit slides each frame and handle selected-index changes separately from slide rendering. In immediate C, use cui_carousel_with_basis to show several items with viewport-relative slides in either orientation. Use cui_carousel_with_layout and retain one cui_carousel_fit for each content-sized slide. In retained C, use cui_bridge_set_carousel_control_sizes_v1 for named arrow and marker sizes and cui_bridge_carousel_slot_create_v1 for passive control content.
 
-API: `cui_carousel_state_init`, `cui_carousel`, `cui_carousel_with_basis`. [Public header](../include/cui/cui_carousel.h); [guide](CAROUSEL.md).
+API: `cui_carousel_state_init`, `cui_carousel`, `cui_carousel_with_basis`, `cui_carousel_with_layout`. [Public header](../include/cui/cui_carousel.h); [guide](CAROUSEL.md).
 
 Retained API `cui_bridge_set_carousel_control_sizes_v1` and `cui_bridge_carousel_slot_create_v1`. [Bridge header](../include/cui/cui_bridge.h)
 

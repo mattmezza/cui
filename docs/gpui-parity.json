@@ -5796,7 +5796,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes, fractional sizing, geometry-supported wrapping, and named sizes and passive content for navigation arrows and slide markers. Intrinsic sizing from arbitrary slide content, the first growing-width estimate, custom retained placement and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
+        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes, fractional sizing, geometry-supported wrapping, and named sizes and passive content for navigation arrows and slide markers. Immediate C and the gallery support measured in-flow content sizing with bounded workspace and a follow-up frame. Retained intrinsic sizing, exact first-frame sizing, custom retained placement and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5900,7 +5900,18 @@
           ]
         },
         {
-          "name": "complete intrinsic layout and host integration parity",
+          "name": "content-sized slides with measured snapping and clipped updates",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_carousel.c",
+            "tests/web/test_touch_page_navigation.py",
+            "tests/web/test_snippets.py",
+            "docs/CAROUSEL.md"
+          ],
+          "scope": "Immediate C and the WASM gallery cover in-flow content in both axes, mixed layout constraints, stable slide identity through reorder, clipped interaction while a size changes, silent resnapping and idle settling. Workspaces belong to the caller."
+        },
+        {
+          "name": "retained intrinsic layout and remaining host integration parity",
           "status": "not_started",
           "evidence": []
         }

@@ -366,6 +366,188 @@ static void test_item_basis(void) {
     assert(changes == 1);
     cui_destroy(ui);
 }
+typedef struct {
+    float extent;
+    cui_id child;
+    bool vertical;
+    unsigned renders, activations;
+} fit_slide;
+
+static void render_fit_slide(cui_context *ui, const cui_theme *theme, size_t index, void *user) {
+    (void)index;
+    fit_slide *slide = user;
+    slide->renders++;
+    cui_interaction interaction =
+        cui_interact(ui, slide->child, CUI_ROLE_BUTTON, cui_string("Fit child"), false, false, 0);
+    slide->activations += interaction.activated;
+    cui_begin_box(ui, slide->child,
+                  (cui_box){.width = slide->vertical ? 24 : slide->extent,
+                            .height = slide->vertical ? slide->extent : 24,
+                            .background = theme->primary});
+    cui_end_box(ui);
+}
+
+static bool fit_frame(cui_context *ui, cui_carousel_state *state, cui_carousel_options options,
+                      const cui_carousel_item *items, size_t count, cui_carousel_layout layout) {
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    cui_theme theme = cui_theme_light();
+    bool submitted = cui_carousel_with_layout(ui, 2, &theme, state, items, count, options, layout);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return submitted;
+}
+
+static float fit_extent(cui_context *ui, cui_id id, bool vertical) {
+    cui_rect bounds = cui_bounds(ui, id);
+    return vertical ? bounds.h : bounds.w;
+}
+
+static void test_content_sized_items(bool vertical) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    cui_carousel_state state;
+    cui_carousel_geometry geometry[8];
+    setup(&state, geometry, 4);
+    assert(cui_carousel_set_axis(&state,
+                                 vertical ? CUI_ORIENTATION_VERTICAL : CUI_ORIENTATION_HORIZONTAL));
+    cui_carousel_options options = cui_carousel_default();
+    options.width = options.height = 200;
+    options.gap = 8;
+    options.reduced_motion = true;
+
+    fit_slide slides[] = {{.extent = 36, .child = 100, .vertical = vertical},
+                          {.extent = 60, .child = 101, .vertical = vertical},
+                          {.extent = 52, .child = 102, .vertical = vertical},
+                          {.extent = 84, .child = 103, .vertical = vertical}};
+    cui_carousel_item items[] = {
+        {.id = 10,
+         .render = render_fit_slide,
+         .user = &slides[0],
+         .custom_box = true,
+         .box = {.padding = 4}},
+        {.id = 11, .render = render_fit_slide, .user = &slides[1]},
+        {.id = 12, .render = render_fit_slide, .user = &slides[2]},
+        {.id = 13, .extent = 120, .render = render_fit_slide, .user = &slides[3]},
+    };
+    cui_carousel_fit first = {0}, second = {0};
+    cui_carousel_fit *fits[] = {&first, &second, NULL, NULL};
+    const float basis[] = {0, 0, .5f, 0};
+    cui_carousel_layout layout = {.basis = basis, .fit = fits};
+
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    near(geometry[0].extent, 208);
+    assert(cui_needs_redraw(ui));
+    for (size_t i = 0; i < 4; ++i)
+        assert(slides[i].renders == 1);
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    near(geometry[0].extent, 52);
+    near(geometry[1].start, 52);
+    near(geometry[1].extent, 68);
+    near(geometry[2].extent, 104);
+    near(geometry[3].extent, 120);
+    near(fit_extent(ui, 10, vertical), 52);
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    assert(!cui_needs_redraw(ui));
+    for (size_t i = 0; i < 4; ++i)
+        assert(slides[i].renders == 3);
+
+    /* New content extends into the adjacent slide, but the old reserve clips
+     * both the published draw and hit region for this measurement frame. */
+    slides[0].extent = 90;
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    near(fit_extent(ui, 10, vertical), 52);
+    assert(cui_needs_redraw(ui));
+    float x = vertical ? 16 : 70, y = vertical ? 70 : 16;
+    pointer(ui, CUI_EVENT_POINTER_DOWN, x, y);
+    pointer(ui, CUI_EVENT_POINTER_UP, x, y);
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    near(geometry[0].extent, 106);
+    assert(cui_event_target(ui, 0) == 101);
+    assert(slides[0].activations == 0 && slides[1].activations == 1);
+    pointer(ui, CUI_EVENT_POINTER_DOWN, x, y);
+    pointer(ui, CUI_EVENT_POINTER_UP, x, y);
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    assert(cui_event_target(ui, 0) == 100);
+    assert(slides[0].activations == 1 && slides[1].activations == 1);
+    assert(changes == 0 && state.selected == 0);
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    assert(!cui_needs_redraw(ui));
+
+    cui_focus(ui, 2);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                           .key = vertical ? CUI_KEY_DOWN : CUI_KEY_RIGHT}));
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    assert(state.selected == 1 && changes == 1 && last_index == 1);
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    near(state.offset, -106);
+    near(vertical ? cui_bounds(ui, 101).y : cui_bounds(ui, 101).x, 0);
+    assert(find(ui, 11)->details.pos_in_set == 2 && find(ui, 11)->details.set_size == 4);
+    assert(cui_queue_accessibility_action(ui, 101, CUI_ACCESSIBILITY_ACTIVATE));
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    assert(slides[1].activations == 2 && changes == 1);
+
+    /* Measurements stay with slide identities, including when a slide is
+     * omitted and reinserted. Layout changes never emit a selection event. */
+    cui_carousel_item swapped = items[0];
+    items[0] = items[1];
+    items[1] = swapped;
+    fits[0] = &second;
+    fits[1] = &first;
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    assert(geometry[0].id == 11 && geometry[1].id == 10);
+    near(geometry[0].extent, 68);
+    near(geometry[1].extent, 106);
+    assert(fit_frame(ui, &state, options, items + 1, 3,
+                     (cui_carousel_layout){.basis = basis + 1, .fit = fits + 1}));
+    assert(fit_frame(ui, &state, options, items, 4, layout));
+    near(geometry[0].extent, 68);
+    assert(changes == 1);
+
+    slides[1].extent = 300;
+    items[0].custom_box = true;
+    if (vertical)
+        items[0].box.max_height = 45;
+    else
+        items[0].box.max_width = 45;
+    if (vertical)
+        options.height = 72;
+    else
+        options.width = 72;
+    for (unsigned i = 0; i < 3; ++i)
+        assert(fit_frame(ui, &state, options, items, 4, layout));
+    near(geometry[0].extent, 53);
+    near(geometry[1].extent, 80);
+    assert(!cui_needs_redraw(ui) && changes == 1);
+
+    /* Conflicts fail before changing state or visiting any slide. */
+    unsigned previous = slides[1].renders;
+    fits[1] = &second;
+    assert(!fit_frame(ui, &state, options, items, 4, layout));
+    fits[1] = &first;
+    fits[2] = &second;
+    assert(!fit_frame(ui, &state, options, items, 4, layout));
+    fits[2] = NULL;
+    items[1].extent = 15;
+    assert(!fit_frame(ui, &state, options, items, 4, layout));
+    assert(slides[1].renders == previous && state.count == 4 && changes == 1);
+    near(geometry[0].extent, 53);
+
+    /* Looping follows the real track length as fitted content changes. */
+    items[1].extent = 0;
+    options.width = options.height = 200;
+    slides[0].extent = slides[1].extent = 30;
+    cui_carousel_set_selected(&state, 0);
+    cui_carousel_set_looping(&state, true);
+    for (unsigned i = 0; i < 3; ++i)
+        assert(fit_frame(ui, &state, options, items, 2, layout));
+    assert(!state.runtime_looping && !cui_needs_redraw(ui));
+    slides[0].extent = 180;
+    for (unsigned i = 0; i < 3; ++i)
+        assert(fit_frame(ui, &state, options, items, 2, layout));
+    assert(state.runtime_looping && state.selected == 0 && changes == 1);
+    assert(!cui_needs_redraw(ui));
+    cui_destroy(ui);
+}
 static void test_disabled_controls(bool inline_placement) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     cui_theme theme = cui_theme_light();
@@ -1024,6 +1206,8 @@ int main(void) {
     test_widget();
     test_controls();
     test_item_basis();
+    test_content_sized_items(false);
+    test_content_sized_items(true);
     test_disabled_controls(false);
     test_disabled_controls(true);
     test_controls_during_motion();

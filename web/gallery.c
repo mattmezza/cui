@@ -865,7 +865,7 @@ float gallery_settings_stats(int field) {
 void gallery_carousel_options(int axis, int looping, int visible) {
     carousel_axis = axis != 0;
     carousel_looping = looping != 0;
-    carousel_visible = visible == 2 || visible == 3 ? visible : 1;
+    carousel_visible = visible >= 1 && visible <= 4 ? visible : 1;
 }
 float gallery_carousel_stats(int field) {
     return field == 0   ? (float)carousel_state.selected
@@ -1206,6 +1206,15 @@ static void gallery_carousel_item(cui_context *context, const cui_theme *theme, 
                                   void *user) {
     (void)user;
     static const char *titles[] = {"Build", "Preview", "Test", "Ship"};
+    if (carousel_visible == 4) {
+        static const char *details[] = {NULL, "Review changes", NULL, "Publish the release"};
+        cui_begin_box(context, 0, (cui_box){.gap = 6, .align_x = CUI_ALIGN_CENTER});
+        cui_label(context, theme, cui_string(titles[index]));
+        if (details[index])
+            cui_text(context, cui_string(details[index]), theme->font_size * .875f, theme->text);
+        cui_end_box(context);
+        return;
+    }
     cui_begin_box(context, 0,
                   (cui_box){.width = -1,
                             .height = -1,
@@ -4443,11 +4452,21 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                              : CUI_ORIENTATION_HORIZONTAL);
         cui_carousel_set_looping(&carousel_state, carousel_looping != 0);
         static const char *labels[] = {"Build slide", "Preview slide", "Test slide", "Ship slide"};
+        bool content_sized = carousel_visible == 4;
+        static cui_carousel_fit measurements[4];
+        cui_carousel_fit *fit[] = {&measurements[0], &measurements[1], &measurements[2],
+                                   &measurements[3]};
         cui_carousel_item items[4];
         for (size_t i = 0; i < 4; i++)
             items[i] = (cui_carousel_item){.id = cui_id_from(ui, labels[i]),
                                            .label = cui_string(labels[i]),
-                                           .render = gallery_carousel_item};
+                                           .render = gallery_carousel_item,
+                                           .custom_box = content_sized,
+                                           .box = {.padding = 12,
+                                                   .align_x = CUI_ALIGN_CENTER,
+                                                   .align_y = CUI_ALIGN_CENTER,
+                                                   .radius = t.radius,
+                                                   .background = t.secondary}};
         cui_begin_box(ui, cui_id_from(ui, "carousel-margin"),
                       (cui_box){.width = -1, .padding = 48});
         cui_carousel_options options = cui_carousel_default();
@@ -4461,8 +4480,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.pagination = gallery_carousel_pagination;
         float fraction = 1.f / carousel_visible;
         float basis[] = {fraction, fraction, fraction, fraction};
-        cui_carousel_with_basis(ui, cui_id_from(ui, "carousel-preview"), &t, &carousel_state, items,
-                                4, options, carousel_visible == 1 ? NULL : basis);
+        cui_carousel_with_layout(
+            ui, cui_id_from(ui, "carousel-preview"), &t, &carousel_state, items, 4, options,
+            (cui_carousel_layout){.basis = content_sized || carousel_visible == 1 ? NULL : basis,
+                                  .fit = content_sized ? fit : NULL});
         cui_end_box(ui);
         break;
     }

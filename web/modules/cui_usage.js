@@ -262,7 +262,12 @@ cui_virtual_widget_result draw_virtual_inbox(cui_context *ui, cui_id id, const c
 // and calls draw only between begin_frame and end_frame.
 export function carouselBasisUsage(visible, vertical = false, looping = false, size = 3) {
     const basis = visible === 2 ? '.5f' : visible === 3 ? '1.f / 3' : null;
-    const frame = basis
+    const fit = visible === 4;
+    const frame = fit
+        ? `cui_carousel_fit *fit[] = {&rail->fit[0], &rail->fit[1], &rail->fit[2], &rail->fit[3]};
+    bool drawn = cui_carousel_with_layout(ui, id, theme, &rail->state, slides, 4, options,
+        (cui_carousel_layout){.fit = fit});`
+        : basis
         ? `const float basis[] = {${Array(4).fill(basis).join(', ')}};
     bool drawn = cui_carousel_with_basis(ui, id, theme, &rail->state, slides, 4, options, basis);`
         : 'bool drawn = cui_carousel(ui, id, theme, &rail->state, slides, 4, options);';
@@ -273,20 +278,25 @@ export function carouselBasisUsage(visible, vertical = false, looping = false, s
 
 typedef struct {
     cui_carousel_state state;
-    cui_carousel_geometry geometry[4];
+    cui_carousel_geometry geometry[4];${fit ? '\n    cui_carousel_fit fit[4];' : ''}
 } workflow_rail;
 
 /* Keep rail at a stable address across frames. Call once. */
 bool workflow_init(workflow_rail *rail) {
     if (!cui_carousel_state_init(&rail->state, rail->geometry, 4, 4))
         return false;${axis}${loop}
-    return true;
+    ${fit ? 'for (size_t i = 0; i < 4; ++i) rail->fit[i] = (cui_carousel_fit){0};\n    ' : ''}return true;
 }
 
-static const char *const stages[] = {"Build", "Preview", "Test", "Ship"};
+static const char *const stages[] = {"Build", "Preview", "Test", "Ship"};${fit ? `
+static const char *const details[] = {NULL, "Review changes", NULL, "Publish the release"};` : ''}
 static void workflow_slide(cui_context *ui, const cui_theme *theme, size_t index, void *user) {
     (void)user;
-    cui_text(ui, cui_string(stages[index]), theme->font_size, theme->text);
+    ${fit ? `cui_begin_box(ui, 0, (cui_box){.gap = 6, .align_x = CUI_ALIGN_CENTER});
+    ` : ''}cui_text(ui, cui_string(stages[index]), theme->font_size, theme->text);${fit ? `
+    if (details[index])
+        cui_text(ui, cui_string(details[index]), theme->font_size * .875f, theme->text);
+    cui_end_box(ui);` : ''}
 }
 
 static cui_carousel_control_options workflow_control(float width, float fallback,
@@ -342,7 +352,11 @@ bool workflow_draw(cui_context *ui, const char *key, const cui_theme *theme,
     const char *const keys[] = {"build-slide", "preview-slide", "test-slide", "ship-slide"};
     for (size_t i = 0; i < 4; ++i)
         slides[i] = (cui_carousel_item){.id = cui_id_from(ui, keys[i]), .label = cui_string(stages[i]),
-                                       .render = workflow_slide};
+                                       .render = workflow_slide${fit ? `,
+                                       .custom_box = true, .box = {
+                                           .padding = 12, .radius = theme->radius,
+                                           .align_x = CUI_ALIGN_CENTER, .align_y = CUI_ALIGN_CENTER,
+                                           .background = theme->secondary}` : ''}};
     cui_carousel_options options = cui_carousel_default();
     options.now_seconds = now_seconds;
     options.controls = workflow_arrows;

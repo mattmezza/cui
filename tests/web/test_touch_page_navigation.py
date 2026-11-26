@@ -264,6 +264,39 @@ def run_cases(a):
 
     a.case('Carousel', 'relative slides resize and snap with touch in both axes', carousel_basis)
 
+    def carousel_fit():
+        a.configure('carousel-visible', 4)
+        try:
+            a.tap(a.target('Go to slide 1', 1))
+            a.page.wait_for_function('cuiGallery.exports.gallery_redraw() === 0')
+            root = a.target('Workflow carousel')
+            first = a.target('Build slide')
+            second = a.target('Preview slide')
+            assert 25 < first['f'][3] < second['f'][3] <= root['f'][3] + 16, (first, second)
+            assert abs(second['f'][1] - first['f'][1] - first['f'][3]) < .1
+            assert 'cui_carousel_with_layout' in a.page.locator('#snippet').inner_text()
+
+            before = carousel_state()
+            a.drag(root, -first['f'][3] * .9, 0, rx=.7, ry=.35)
+            assert carousel_state() == [1, before[1] + 1], 'Touch missed the measured snap'
+
+            a.configure('carousel-axis', 1)
+            a.tap(a.target('Go to slide 1', 1))
+            a.page.wait_for_function('cuiGallery.exports.gallery_redraw() === 0')
+            first = a.target('Build slide')
+            second = a.target('Preview slide')
+            assert 25 < first['f'][4] < second['f'][4] < 200, (first, second)
+            assert abs(second['f'][2] - first['f'][2] - first['f'][4]) < .1
+            assert 'CUI_ORIENTATION_VERTICAL' in a.page.locator('#snippet').inner_text()
+            idle = a.page.evaluate('cuiGallery.frame')
+            a.page.wait_for_timeout(150)
+            assert a.page.evaluate('cuiGallery.frame') == idle, 'Fit layout kept redrawing at rest'
+        finally:
+            a.configure('carousel-axis', 0)
+            a.configure('carousel-visible', 1)
+
+    a.case('Carousel', 'content-sized slides snap on mobile and settle in both axes', carousel_fit)
+
     def plot():
         align_canvas(a)
         target = a.target('Projected sine wave', 20)

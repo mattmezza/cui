@@ -101,6 +101,39 @@ bool cui_carousel(cui_context *, cui_id, const cui_theme *, cui_carousel_state *
 bool cui_carousel_with_basis(cui_context *, cui_id, const cui_theme *, cui_carousel_state *,
                              const cui_carousel_item *, size_t, cui_carousel_options,
                              const float *basis);
+/* Optional workspace for one content-sized slide. Zero initialize before first
+ * use and retain at a stable address through end_frame. Keep it with the slide
+ * when reordering. Use a distinct workspace per slide and per Carousel. Fields
+ * belong to the component. Reset the workspace to discard its last measurement. */
+typedef struct {
+    cui_rect bounds;
+    cui_id slide;
+    cui_orientation axis;
+} cui_carousel_fit;
+
+typedef struct {
+    const float *basis;           /* Optional count-entry array as in with_basis. */
+    cui_carousel_fit *const *fit; /* Optional count-entry array; NULL entries use normal sizing. */
+} cui_carousel_layout;
+
+/* A fit slide cannot also specify a positive basis or explicit extent.
+ * Measure its styled slide box on the primary axis, from one logical pixel
+ * up to the viewport. Its custom box can further reduce that limit.
+ * The first layout reserves the viewport; subsequent layouts use the last
+ * measured extent plus gap. The reserved extent clips paint and input until
+ * a redraw applies a new measurement. Custom dimensions/percentage flags
+ * are ignored, while padding and other styling apply to the measured box.
+ *
+ * Render callbacks run once per submitted slide in a frame. They must
+ * provide in-flow content with a natural size; fill/percentage children
+ * alone cannot provide a preferred size. A size change can schedule a
+ * follow-up and realign selection silently. Follow cui_needs_redraw.
+ * Both arrays are borrowed for the call. Only the workspace must survive
+ * through end_frame. Neither pointer array nor borrowed slide data is retained. */
+bool cui_carousel_with_layout(cui_context *, cui_id, const cui_theme *, cui_carousel_state *,
+                              const cui_carousel_item *, size_t, cui_carousel_options,
+                              cui_carousel_layout);
+
 /* Navigation control: Medium32 by default; caller may select a semantic/custom size,
  * label, appearance and content. Place inside the open Carousel root; positions use retained frame
  * bounds. The built-in control inherits the root's current disabled state. */

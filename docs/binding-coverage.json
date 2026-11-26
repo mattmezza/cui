@@ -742,7 +742,7 @@
       },
       "limitations": [
         "All five builders expose optional fractional slide sizing, vertical orientation, geometry-supported wrapping, built-in arrows and slide markers, and passive content slots with accessible names. Probe supports_carousel_basis, supports_carousel_axis, supports_carousel_looping, supports_carousel_controls and supports_carousel_slots (SupportsCarouselBasis, SupportsCarouselAxis, SupportsCarouselLooping, SupportsCarouselControls and SupportsCarouselSlots in Go). Older libraries keep the supported subset.",
-        "Arrows and markers support independent named sizes. Probe supports_carousel_control_sizes (SupportsCarouselControlSizes in Go) when choosing sizes on older providers. Retained slots use the built-in placement. Custom control boxes, freely placed controls and custom tooltip options are available in immediate C."
+        "Arrows and markers support independent named sizes. Probe supports_carousel_control_sizes (SupportsCarouselControlSizes in Go) when choosing sizes on older providers. Retained slots use the built-in placement. Content-sized slides and their fit workspaces are available in immediate C. Custom control boxes, freely placed controls and custom tooltip options are available in immediate C."
       ]
     },
     {

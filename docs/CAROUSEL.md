@@ -43,12 +43,9 @@ leading item padding. The root has a 16px gap between composed parts. This is
 an explicit C layout default; source content height is supplied by its host
 layout. Item `extent=0` fills the frame along the primary axis and includes the
 leading padding. A positive extent is the complete outer item size, including
-that padding, and must exceed `gap`. Custom item appearance comes from `box`;
-primary/cross dimensions are controlled by its extent and the frame. Arbitrary
-callbacks do not receive an automatic intrinsic-size measurement pass. Hosts
-translate source variable widths/heights into explicit extents, or use the pure
-geometry API for separate presentation. This boundary is deliberate and is not
-a claim of arbitrary GPUI style/layout parity.
+that padding, and must exceed `gap`. Customize the appearance with `box`.
+Use `cui_carousel_with_layout` for content-sized slides or the pure geometry
+API for separate presentation.
 
 ## Show several slides at once
 
@@ -95,6 +92,46 @@ The default movement spring has a 280ms response, damping .85 and settling
 precision .5px. Styled rendering uses Theme `spring_move` response/damping;
 reduced motion or disabled travel settles immediately. Critical and overdamped
 settings also have an analytic solution. Settled motion does not request frames.
+
+### Fit individual slides to their content
+
+Use `cui_carousel_with_layout` for content-sized slides in immediate C. Give
+each fit slide its own zero-initialized `cui_carousel_fit` and keep it with the
+slide's ID when items reorder. This example uses the first two slides' natural
+sizes, one half-width slide, and one slide with its ordinary extent.
+
+```c
+/* Retain these fields beside the Carousel model in your view. */
+cui_carousel_fit build_fit = {0}, preview_fit = {0};
+
+/* During each frame, slide callbacks submit in-flow content such as text,
+ * images with natural dimensions, or boxes with explicit dimensions. */
+cui_carousel_fit *fit[] = {&build_fit, &preview_fit, NULL, NULL};
+const float basis[] = {0, 0, .5f, 0};
+cui_carousel_with_layout(ui, id, &theme, &state, slides, 4, options,
+                         (cui_carousel_layout){.basis = basis, .fit = fit});
+```
+
+In a real view, put the two workspaces in the same persistent object as
+`cui_carousel_state` and initialize them once. Both arrays in
+`cui_carousel_layout` can be frame-local. Leave `extent` zero on a fit slide.
+A fit slide cannot also have a positive basis. Styling applies to the natural
+slide box, including its padding. A positive `box.max_width` or `box.max_height`
+on the primary axis can cap that slide below the viewport size.
+
+The first submission gives a fit slide the viewport's primary extent. Layout
+measures the slide once its children are submitted. On the next requested
+frame, Carousel uses that result to position slides and build snaps. Every
+slide renderer still runs once per frame. Content that grows stays clipped to
+its previous reserve until the new geometry is applied. A size or axis change
+can request a follow-up frame and realign the selected slide without emitting
+a change callback. Use `cui_needs_redraw` to drive those frames. A slide needs
+at least one in-flow child or padding to give it a natural extent. A child
+that only fills its parent supplies no preferred size.
+
+Select **Fit to content** in the live gallery to try the same C behavior on
+either axis and copy a full example. Retained C and the language builders
+currently offer viewport-relative slide sizing.
 
 ### Retained slides
 

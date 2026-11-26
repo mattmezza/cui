@@ -30,6 +30,8 @@ func main() {
 	must(err)
 	tooltip, err := app.SupportsRadioTooltip()
 	must(err)
+	paint, err := app.SupportsRadioPaint()
+	must(err)
 	standard := cui.Item("standard", "Standard")
 	decoration := cui.Tag("recommended", "Recommended")
 	priority := cui.Item("priority", "Priority").Detail("Tracked delivery. Recommended.").
@@ -47,6 +49,10 @@ func main() {
 		}
 		must(summary.SetText("Estimated arrival: " + arrival))
 	})
+	if paint {
+		delivery.RadioPaint(cui.RadioPaintBase, cui.RadioPaint{Fields: cui.RadioPaintRootPadding | cui.RadioPaintRootGap, RootPadding: 8, RootGap: 6})
+		priority.RadioPaint(cui.RadioPaintChecked, cui.RadioPaint{Fields: cui.RadioPaintRootBackground | cui.RadioPaintMarkColor, RootBackground: 0xe8f3ffff, MarkColor: 0x1467cfff})
+	}
 	reset := cui.Button("reset").Text("Reset selection").OnClick(func(cui.Event) {
 		delivery.Selected(standard)
 		must(summary.SetText("Estimated arrival: Friday"))

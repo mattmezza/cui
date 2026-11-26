@@ -116,3 +116,12 @@ visualStepper('visual-steps').stepper_visual(true, true, 'sm').design_size('lg')
   .children(visualStep('first', 'First').image_rgba(new Uint8Array([255,255,255,255]),1,1));
 // @ts-expect-error unknown density
 visualStepper().stepper_visual(true, false, 'huge');
+
+const radioPaint: c.RadioPaint = {rootPadding: 0, markColor: 0, labelWeight: 2};
+if (app.supports_radio_paint()) radio.radio_paint(c.RadioPaintLayer.BASE, radioPaint)
+  .radio_paint(c.RadioPaintLayer.CHECKED, {markColor: 0xffffffff})
+  .radio_paint(c.RadioPaintLayer.DISABLED, null);
+// @ts-expect-error invalid layer
+radio.radio_paint(6, {});
+// @ts-expect-error invalid weight
+radio.radio_paint(c.RadioPaintLayer.BASE, {labelWeight: 4});

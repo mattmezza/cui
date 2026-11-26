@@ -224,6 +224,13 @@ On a mounted radio, `SetRadioTabIndex(index)` returns any update error
 directly. `ClearRadioTabIndex()` restores default order. Both preserve the
 current selection. [Complete delivery example](../bindings/go/examples/radio_delivery/main.go)
 
+
+## Style Radio states from Go
+
+Probe `app.SupportsRadioPaint()` and set one layer with `RadioPaint` or `SetRadioPaint`.
+Use the delivery example to see group geometry and checked paint on live options.
+[Builder syntax and runnable form](BRIDGE_COMPONENTS.md#style-radio-states-in-language-builders)
+
 ## Configure Pagination from Go
 
 `ConfiguredPagination` records copied layout options on a detached node. Set `AvailableWidth` to the current inner width in logical pixels to wrap, or use zero for a single row. Send committed pages to your results view through `OnChange`. For a dynamic provider, check `app.SupportsPaginationOptions()` before opting in. Ordinary `Pagination(key)` and its change callback also work with earlier providers.

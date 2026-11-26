@@ -21,6 +21,71 @@ const numerics = new Set([9,10,14,42,43,52]);
 const editable = new Set([12,13,14,22,59,61,67,68,73]);
 const groups = new Set([17,18,19,21,22,23,40,41,44,45,47,48,49,54,60,61,64,65,66,70,73,74,75,78,79,80]);
 const containers = new Set([1,2,15,17,18,19,20,21,22,23,24,26,27,29,33,40,41,44,45,46,47,48,49,54,60,61,63,64,65,66,70,73,74,75,76,78,79,80]);
+const RadioPaintLayer = Object.freeze({
+  BASE: 0, CHECKED: 1, HOVERED: 2, PRESSED: 3, FOCUSED: 4, DISABLED: 5,
+});
+const radioPaintUnavailable = 'Radio paint is unavailable in this bridge';
+const nativeLittleEndian = require('node:os').endianness() === 'LE';
+const radioRgba = 0xffffffff;
+// Each entry contains the byte offset, minimum, maximum, and optional integer flag.
+// Entry order matches the C field mask.
+const radioPaintFields = {
+  rootBackground: [16, 0, radioRgba, true],
+  rootBorder: [20, 0, radioRgba, true],
+  rootBorderWidth: [44, 0, 64],
+  rootRadius: [48, 0, 256],
+  rootPadding: [52, 0, 256],
+  rootGap: [56, 0, 256],
+  indicatorBackground: [24, 0, radioRgba, true],
+  indicatorBorder: [28, 0, radioRgba, true],
+  indicatorBorderWidth: [60, 0, 64],
+  indicatorRadius: [64, 0, 256],
+  indicatorExtent: [68, 4, 128],
+  markColor: [32, 0, radioRgba, true],
+  labelColor: [36, 0, radioRgba, true],
+  descriptionColor: [40, 0, radioRgba, true],
+  labelSize: [72, 1, 128],
+  descriptionSize: [76, 1, 128],
+  labelWeight: [80, 0, 3, true],
+  descriptionWeight: [84, 0, 3, true],
+};
+const radioPaintNames = Object.keys(radioPaintFields);
+const radioBasePaint = new Set([
+  'rootRadius', 'rootPadding', 'rootGap', 'indicatorRadius', 'indicatorExtent',
+  'labelSize', 'descriptionSize', 'labelWeight', 'descriptionWeight',
+]);
+function radioPaint(node, layer, paint) {
+  if (![6, 17, 20].includes(node.kind))
+    throw new TypeError('radio_paint requires Radio, RadioGroup or a direct RadioGroup Item');
+  if (!Number.isInteger(layer) || layer < RadioPaintLayer.BASE || layer > RadioPaintLayer.DISABLED)
+    throw new RangeError('invalid Radio paint layer');
+  if (node.kind === 17 && layer !== RadioPaintLayer.BASE && layer !== RadioPaintLayer.DISABLED)
+    throw new RangeError('RadioGroup frame accepts BASE and DISABLED paint only');
+  if (paint === null) return null;
+  if (!paint || typeof paint !== 'object' || Array.isArray(paint))
+    throw new TypeError('expected RadioPaint or null');
+  const bytes = Buffer.alloc(88);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  view.setUint32(0, bytes.length, nativeLittleEndian);
+  view.setUint32(4, 1, nativeLittleEndian);
+  let mask = 0;
+  for (const [name, value] of Object.entries(paint)) {
+    const bit = radioPaintNames.indexOf(name);
+    if (bit < 0) throw new TypeError(`unknown Radio paint field ${name}`);
+    if ((node.kind === 17 && !name.startsWith('root')) ||
+        (node.kind !== 20 && name.startsWith('description')) ||
+        (layer !== RadioPaintLayer.BASE && radioBasePaint.has(name)))
+      throw new TypeError('Radio paint field is unavailable for this component or layer');
+    const [offset, min, max, integer] = radioPaintFields[name];
+    if (!Number.isFinite(value) || value < min || value > max || (integer && !Number.isInteger(value)))
+      throw new RangeError(`invalid Radio paint ${name}`);
+    if (integer) view.setUint32(offset, value, nativeLittleEndian);
+    else view.setFloat32(offset, value, nativeLittleEndian);
+    mask |= 1 << bit;
+  }
+  view.setUint32(8, mask, nativeLittleEndian);
+  return mask ? bytes : null;
+}
 const radioMotionUnavailable = 'Radio motion is unavailable in this bridge';
 const radioContentUnavailable = 'Radio decoration is unavailable in this bridge';
 const radioTooltipUnavailable = 'Radio tooltips are unavailable in this bridge';
@@ -33,6 +98,10 @@ function requestsRadioMotion(node) {
 function preflightRadioOptions(app, node, insideDecoration = false) {
   if (insideDecoration && !radioContentKinds.has(node.kind))
     throw new TypeError('RadioGroup Item decoration requires passive children');
+  if (node.radioPaintValues?.size) {
+    if (node.kind === 20 && node.parent?.kind !== 17) throw new TypeError('radio_paint requires a direct RadioGroup Item');
+    if (!app.supports_radio_paint()) throw new Error(radioPaintUnavailable);
+  }
   if (node.radioContentValue) {
     if (node.parent?.kind !== 17) throw new TypeError('decorate_content requires a direct RadioGroup Item');
     if (!app.supports_radio_item_content()) throw new Error(radioContentUnavailable);
@@ -107,6 +176,7 @@ class Node {
     this.questionFlags=null;this.rootPaddingValue=0;this.gapValue = undefined; this.variantValue = 0; this.sizeValue = 3;
     this.roundingValue = 0; this.radiusValue = 0; this.disabledValue = false;
     this.extentValue=null; this.anchorValue=null; this.visualValue=null; this.closeValue=null; this.totalValue=kind===43?5:kind===59?6:10; this.attachmentValue=0; this.imageValue=null;this.chartDataValue=[];this.chartKindValue=0;this.plotPointsValue=[];this.matrixValue=null;this.selectionModeValue=0;this.textFormatValue=0;this.panelValue=null; this.timeValue=[0,0,0];this.dateValue=[2026,1,1];this.colorValue=0x000000ff; this.statusValue=null; this.openValue = false;this.openSet=false;this.checkedSet=false; this.detailValue = ""; this.selectedValue = null; this.checkedValue = false; this.numericValue = kind===42?1:0; this.rangeValue = kind===42?[1,10,1]:kind===43?[0,5,1]:[0,1,.01]; this.changeValue = undefined;
+    this.radioPaintValues = null;
     this.radioMotionValue = false;
     this.radioTabIndexValue = null;
     this.radioContentValue = false;
@@ -213,6 +283,16 @@ class Node {
     if (!booleans.has(this.kind) || typeof value !== 'boolean') throw new TypeError('checked requires a boolean component and value');
     if(this.owner) native.setChecked(this.owner.handle,this[NODE],value ? 1 : 0);
     this.checkedValue=value;this.checkedSet=true; return this;
+  }
+  radio_paint(layer, paint) {
+    const config = radioPaint(this, layer, paint);
+    if (this.owner) {
+      if (this.owner.supports_radio_paint()) native.setRadioPaint(this.owner.handle, this[NODE], layer, config);
+      else if (config) throw new Error(radioPaintUnavailable);
+    }
+    if (config) (this.radioPaintValues ??= new Map()).set(layer, config);
+    else this.radioPaintValues?.delete(layer);
+    return this;
   }
   animate_selection(enabled = true) {
     if (this.kind !== 6 && this.kind !== 17) throw new TypeError('selection motion requires a Radio or RadioGroup');
@@ -592,6 +672,10 @@ class App {
       if (node.textValue !== undefined) native.setText(this.handle, node[NODE], node.textValue);
       if (node.gapValue !== undefined) native.setGap(this.handle, node[NODE], node.gapValue);
       if ([5,6,7,8].includes(node.kind) || (node.kind===20 && node.checkedSet)) native.setChecked(this.handle,node[NODE],node.checkedValue ? 1 : 0);
+      if (node.radioPaintValues) {
+        for (const [layer, paint] of node.radioPaintValues)
+          native.setRadioPaint(this.handle, node[NODE], layer, paint);
+      }
       if (node.radioMotionValue) native.setRadioMotion(this.handle, node[NODE], true);
       if (node.radioTabIndexValue !== null)
         native.setRadioTabIndex(this.handle, node[NODE], true, node.radioTabIndexValue);
@@ -772,6 +856,10 @@ class App {
       typeof native.pollDataTableLoadMore === 'function' && native.supportsDataTablePaging();
   }
   supports_pagination_custom_size() { return paginationOptions.supportsCustom(this); }
+  supports_radio_paint() {
+    this._alive();
+    return typeof native.supportsRadioPaint === 'function' && typeof native.setRadioPaint === 'function' && native.supportsRadioPaint();
+  }
   supports_radio_motion() {
     this._alive();
     return typeof native.supportsRadioMotion === 'function' &&
@@ -842,7 +930,7 @@ class App {
   close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);if(node.kind===81)node.requestValue=null;} return this; }
   dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);if(node.kind===81)node.requestValue=null;} this.nodes.clear(); } }
 }
-module.exports = {radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
+module.exports = {RadioPaintLayer,radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
 
 Object.assign(module.exports, sliderModels.exports);
 

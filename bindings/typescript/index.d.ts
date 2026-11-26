@@ -37,6 +37,7 @@ export class App {
   mount(root: Row | Column | RootView): this;
   /** Whether this app's native bridge can animate retained Radio selection. */
   supports_radio_motion(): boolean;
+  supports_radio_paint(): boolean;
   /** Whether this app's bridge supports signed Radio and RadioGroup Tab order. */
   supports_radio_tab_index(): boolean;
   /** Whether this app's native bridge can paint passive children inside RadioGroup Items. */
@@ -62,6 +63,22 @@ export interface Slider extends NumericControl {range(minimum: number, maximum: 
 export interface Input extends Label {current_text(): string; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface NumberInput extends Input, Slider {}
 export function checkbox(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|2>;
+/** Packed colors are numeric 0xRRGGBBAA. Explicit zero remains present.
+ * Geometry and text metrics are BASE-only; description fields require direct Items.
+ * RadioGroup accepts root fields on BASE and DISABLED only. */
+export interface RadioPaint {
+  rootBackground?: number; rootBorder?: number; rootBorderWidth?: number;
+  rootRadius?: number; rootPadding?: number; rootGap?: number;
+  indicatorBackground?: number; indicatorBorder?: number; indicatorBorderWidth?: number;
+  indicatorRadius?: number; indicatorExtent?: number; markColor?: number;
+  labelColor?: number; descriptionColor?: number; labelSize?: number; descriptionSize?: number;
+  labelWeight?: 0|1|2|3; descriptionWeight?: 0|1|2|3;
+}
+export const RadioPaintLayer: Readonly<{BASE:0; CHECKED:1; HOVERED:2; PRESSED:3; FOCUSED:4; DISABLED:5}>;
+export interface RadioPaintStyled {
+  /** Replaces a layer; null or an empty object clears it. Paint emits no notification. */
+  radio_paint(layer: 0|1|2|3|4|5, paint: RadioPaint | null): this;
+}
 export interface RadioSelectionMotion { animate_selection(enabled?: boolean): this }
 export interface RadioTabOrder {
   /** Lower signed indices come first. null restores default order. */
@@ -71,7 +88,7 @@ export interface RadioTooltip {
   /** For standalone Radio or direct RadioGroup Items. null or empty clears the hint. */
   radio_tooltip(text: string | null, delayMs?: number): this;
 }
-export function radio(key?: string, text?: string): BooleanControl & RadioSelectionMotion & RadioTabOrder & RadioTooltip & PartShadowStyled<0|1|2>;
+export function radio(key?: string, text?: string): BooleanControl & RadioPaintStyled & RadioSelectionMotion & RadioTabOrder & RadioTooltip & PartShadowStyled<0|1|2>;
 export function switch_control(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|3|4>;
 export function toggle(key?: string, text?: string): BooleanControl;
 export function slider(key?: string): Slider & PartShadowStyled<0|1|3>;
@@ -84,14 +101,14 @@ export function number_input(key?: string): NumberInput;
 export interface Composite extends Node {children(...items: (Node | Node[])[]): this}
 export interface Disclosure extends Label, Composite {open(value?: boolean): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Group extends Composite {select(item: Item): this; selected(): Item | undefined; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
-export interface Item extends Disclosure, RadioTooltip {
+export interface Item extends Disclosure, RadioTooltip, RadioPaintStyled {
   /** Enable or hide passive children of a direct RadioGroup Item. */
   decorate_content(enabled?: boolean): this;
 }
 export interface Alert extends Label {detail(text: string): this}
 export function collapsible(key?: string, text?: string): Disclosure;
 export function alert(key?: string, text?: string): Alert;
-export function radio_group(key?: string): Group & RadioSelectionMotion & RadioTabOrder & PartShadowStyled<0>;
+export function radio_group(key?: string): Group & RadioPaintStyled & RadioSelectionMotion & RadioTabOrder & PartShadowStyled<0>;
 export function tabs(key?: string): Group;
 export function accordion(key?: string): Composite;
 export function item(key?: string, text?: string): Item;

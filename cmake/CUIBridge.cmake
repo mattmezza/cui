@@ -582,7 +582,7 @@ if(CUI_GO_RADIO_MOTION_TESTS)
    CUI_BRIDGE_LIBRARY=${library} CUI_TEST_RADIO_MOTION_LEGACY=${legacy}
    CUI_TEST_RADIO_CONTENT_LEGACY=${legacy}
    CUI_TEST_RADIO_TOOLTIP_LEGACY=${legacy}
-   CUI_TEST_RADIO_TAB_INDEX_LEGACY=${legacy}
+   CUI_TEST_RADIO_TAB_INDEX_LEGACY=${legacy} CUI_TEST_RADIO_PAINT_LEGACY=${legacy}
    SDL_RENDER_DRIVER=software
    ${CUI_GO_RADIO_MOTION_EXECUTABLE} ${ARGN})
   set_tests_properties(bridge_go_radio_motion_${suffix} PROPERTIES
@@ -621,7 +621,7 @@ if(CUI_RUST_RADIO_MOTION_TESTS)
   add_test(NAME bridge_rust_radio_motion_${suffix} COMMAND ${CMAKE_COMMAND} -E env
    --unset=CUI_BRIDGE_LIB_DIR --unset=LD_LIBRARY_PATH
    CARGO_TARGET_DIR=${target} RUSTFLAGS=-Dwarnings SDL_RENDER_DRIVER=software
-   CUI_TEST_RADIO_MOTION=${supported} ${env}
+   CUI_TEST_RADIO_MOTION=${supported} CUI_TEST_RADIO_PAINT=${supported} ${env}
    ${CUI_RUST_RADIO_MOTION_CARGO} ${ARGN})
   set_tests_properties(bridge_rust_radio_motion_${suffix} PROPERTIES
    WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/rust" RUN_SERIAL TRUE TIMEOUT 600)
@@ -630,9 +630,9 @@ if(CUI_RUST_RADIO_MOTION_TESTS)
   "CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>;LD_LIBRARY_PATH=$<TARGET_FILE_DIR:cui_bridge>")
  # The layout engine uses a process-wide current context.
  cui_rust_radio_motion_test(dynamic "${CUI_RUST_RADIO_TARGET_DIR}" "${_radio_shared}" 1
-  test --offline --locked -j1 --test radio_motion -- --test-threads=1)
+  test --offline --locked -j1 --test radio_motion --test radio_paint -- --test-threads=1)
  cui_rust_radio_motion_test(static "${CUI_RUST_RADIO_STATIC_TARGET_DIR}" "" 1
-  test --offline --locked -j1 --test radio_motion -- --test-threads=1)
+  test --offline --locked -j1 --test radio_motion --test radio_paint -- --test-threads=1)
  cui_rust_radio_motion_test(example "${CUI_RUST_RADIO_STATIC_TARGET_DIR}" "" 1
   run --offline --locked -j1 --example radio_delivery)
  set(CUI_RUST_RADIO_LEGACY_LIBRARY "" CACHE FILEPATH "Optional bridge without retained Radio motion")
@@ -645,7 +645,7 @@ if(CUI_RUST_RADIO_MOTION_TESTS)
   file(CREATE_LINK "${CUI_RUST_RADIO_LEGACY_LIBRARY}" "${_radio_legacy}/libcui_bridge.so" SYMBOLIC)
   cui_rust_radio_motion_test(legacy "${CUI_RUST_RADIO_TARGET_DIR}"
    "CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>;LD_LIBRARY_PATH=${_radio_legacy}" 0
-   test --offline --locked -j1 --test radio_motion -- --test-threads=1)
+   test --offline --locked -j1 --test radio_motion --test radio_paint -- --test-threads=1)
   cui_rust_radio_motion_test(legacy_example "${CUI_RUST_RADIO_TARGET_DIR}"
    "CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>;LD_LIBRARY_PATH=${_radio_legacy}" 0
    run --offline --locked -j1 --example radio_delivery)

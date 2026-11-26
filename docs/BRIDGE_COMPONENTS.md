@@ -372,9 +372,8 @@ reaches Reset. [Python](../bindings/python/examples/radio_delivery.py) ·
 
 Use `cui_bridge_radio_set_paint_v1` on a Radio, a RadioGroup, or one of the
 group's direct Items. The bridge copies the supplied record. A dynamically
-loaded provider must export this optional symbol. The API is available to
-retained C callers. Python, JavaScript, TypeScript, Go and Rust builders do
-not yet wrap it.
+loaded provider must export this optional symbol. Python, JavaScript,
+TypeScript, Go and Rust use the same copied layers.
 
 This delivery form gives the group an inset frame and highlights the selected
 Priority option. Pass the RadioGroup handle as `group` and its Priority Item
@@ -442,6 +441,88 @@ Update styles between steps on the owner thread. Invalid records and
 allocation failure preserve the previous settings. Each styled node uses
 528 bytes of paint storage, freed when its final layer is cleared or the
 node is removed.
+
+### Style Radio states in language builders
+
+The delivery examples style a RadioGroup frame and one or more option rows.
+Selecting a service still dispatches the existing change event and updates the
+estimated arrival. Use the builder version from this checkout with a matching
+bridge. With an older bridge, skip optional styles using the capability probe.
+
+**Python**
+
+```python
+from cui_bridge import RadioPaint, RadioPaintLayer
+
+if app.supports_radio_paint():
+    delivery.radio_paint(RadioPaintLayer.BASE, RadioPaint(root_padding=8))
+    priority.radio_paint(RadioPaintLayer.CHECKED,
+                         RadioPaint(root_background_rgba=0x365C85FF, label_rgba=0xEAF4FFFF))
+```
+
+Pass `None` or an empty `RadioPaint()` to clear that layer. The same
+method works on detached builders and mounted widgets.
+[Runnable Python delivery form](../bindings/python/examples/radio_delivery.py)
+
+**JavaScript and TypeScript**
+
+```js
+const {RadioPaintLayer} = require('@cui/native');
+
+if (app.supports_radio_paint()) {
+  delivery.radio_paint(RadioPaintLayer.BASE, {rootPadding: 8});
+  priority.radio_paint(RadioPaintLayer.CHECKED, {rootBackground: 0xeaf1ffff});
+}
+```
+
+TypeScript exposes the same methods and the `RadioPaint` type. Pass
+`null` or an empty object to clear a layer.
+[JavaScript delivery form](../bindings/node/examples/radio-delivery.cjs) ·
+[TypeScript delivery form](../bindings/typescript/examples/radio_delivery.ts)
+
+**Go**
+
+```go
+supported, err := app.SupportsRadioPaint()
+if err != nil {
+    return err
+}
+if supported {
+    return priority.SetRadioPaint(cui.RadioPaintChecked, cui.RadioPaint{
+        Fields: cui.RadioPaintRootBackground,
+        RootBackground: 0xeaf1ffff,
+    })
+}
+return nil
+```
+
+Use `RadioPaint(layer, paint)` to chain on a builder and `ClearRadioPaint(layer)`
+to clear a layer. The fields mask distinguishes explicit zero from inheritance.
+[Runnable Go delivery form](../bindings/go/examples/radio_delivery/main.go)
+
+**Rust**
+
+```rust
+use cui_builders::{RadioPaint, RadioPaintLayer};
+
+if app.supports_radio_paint() {
+    app.radio_paint(priority, RadioPaintLayer::Checked, Some(&RadioPaint {
+        root_background_rgba: Some(0xeaf1ffff),
+        ..RadioPaint::default()
+    }))?;
+}
+```
+
+Rust accepts `Some(0)` as explicit zero and `None` as inheritance in each
+field. Pass `None` as the paint argument to clear the layer. Rust creates
+builder nodes immediately, so check support before adding paint if the
+application can load older providers.
+[Runnable Rust delivery form](../bindings/rust/examples/radio_delivery.rs)
+
+Run each example from the repository root. Use the setup commands under
+[Animate retained Radio selection from C](#animate-retained-radio-selection-from-c)
+to build the matching provider. Omit the font argument to run headlessly.
+The TypeScript example uses Node's TypeScript execution support.
 
 ### Configure a retained pager from C
 

@@ -182,6 +182,13 @@ An explicit index requires provider support. This builder creates its node in
 to restore default order on a mounted node. Keyboard ordering preserves
 selection and queued callbacks. [Run the delivery form](#animate-radio-selection-from-rust)
 
+
+## Style Radio states from Rust
+
+Probe `app.supports_radio_paint()` and set one layer with `app.radio_paint` or the builder method.
+Use the delivery example to see group geometry and checked paint on live options.
+[Builder syntax and runnable form](BRIDGE_COMPONENTS.md#style-radio-states-in-language-builders)
+
 ## Configure Pagination from Rust
 
 Build a detached `PaginationOptions` when you want the bridge capability and record size checked before creating a retained child. Ordinary `Kind::Pagination` still works with earlier providers. `app.supports_pagination_options()` reports whether the extended API is available.

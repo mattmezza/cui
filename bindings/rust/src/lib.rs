@@ -2,6 +2,8 @@
 mod icon_resources;
 mod pagination_options;
 mod radio_motion;
+mod radio_paint;
+pub use radio_paint::{RadioPaint, RadioPaintLayer};
 mod shadows;
 mod skeleton_presentation;
 mod slider_model;

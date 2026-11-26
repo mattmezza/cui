@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest.mock import patch
 from cui_bridge import dropdown_button, select, combobox, collapsible, alert, radio_group, tabs, accordion, item, label, App, column, checkbox, radio, switch, toggle, slider, progress, badge, input, textarea, number_input
-from cui_bridge import BridgeError, button, tag
+from cui_bridge import BridgeError, RadioPaint, RadioPaintLayer, button, tag
 
 class Components(unittest.TestCase):
     def press(self, app, node):
@@ -291,6 +291,109 @@ class Components(unittest.TestCase):
         if legacy:
             with App(library=legacy) as app:
                 self.check_provider_without_radio_tab_index(app)
+
+    def test_radio_paint_layout_and_selection(self):
+        with App(width=420, height=320) as app:
+            self.assertTrue(app.supports_radio_paint())
+            change = []
+            first = item("standard", "Standard")
+            priority = item("priority", "Priority").detail("Tracked delivery")
+            group = radio_group("delivery").children(first, priority).select(first).on_change(change.append)
+            single = radio("extra", "Save a copy").on_change(change.append)
+            app.mount(column().children(single, group)).step()
+            baseline = app.bounds(single)
+            priority_height = app.bounds(priority)[3]
+            group.radio_paint(RadioPaintLayer.BASE, RadioPaint(root_padding=8))
+            priority.radio_paint(RadioPaintLayer.BASE, RadioPaint(
+                indicator_extent=28, description_weight=3, description_size=16))
+            priority.radio_paint(RadioPaintLayer.CHECKED, RadioPaint(root_background_rgba=0))
+            single.radio_paint(RadioPaintLayer.BASE, RadioPaint(root_padding=9, label_size=22))
+            single.radio_paint(RadioPaintLayer.HOVERED, RadioPaint(root_background_rgba=0x224466FF))
+            app.step()
+            styled = app.bounds(single)
+            self.assertGreater(styled[3], baseline[3])
+            self.assertGreater(app.bounds(priority)[3], priority_height)
+            self.assertEqual(app.dispatch(), 0)
+
+            x, y, width, height = styled
+            app.queue_pointer("move", x + width / 2, y + height / 2)
+            app.step()
+            self.assertEqual(app.bounds(single), styled)
+            self.press(app, single)
+            self.assertEqual(app.dispatch(), 1)
+            self.assertTrue(single.is_checked())
+            self.assertTrue(change[-1].checked)
+            self.press(app, priority)
+            self.assertEqual(app.dispatch(), 1)
+            self.assertIs(group.selected(), priority)
+            self.assertEqual(change[-1].selected_handle,
+                             (priority._handle.slot, priority._handle.generation))
+            single.radio_paint(RadioPaintLayer.BASE, None)
+            group.radio_paint(RadioPaintLayer.BASE, RadioPaint())
+            priority.radio_paint(RadioPaintLayer.BASE, None)
+            app.step()
+            self.assertEqual(app.bounds(single)[3], baseline[3])
+            self.assertEqual(app.bounds(priority)[3], priority_height)
+            self.assertEqual(app.dispatch(), 0)
+
+    def test_radio_paint_preflight_and_wire(self):
+        from cui_bridge.radio_paint import radio_paint_wire
+
+        base, pressed = RadioPaintLayer.BASE, RadioPaintLayer.PRESSED
+        wire = radio_paint_wire("item", base, RadioPaint(
+            root_background_rgba=0, root_border_width=0, description_weight=3))
+        self.assertEqual((wire.struct_size, wire.schema_version, wire.reserved), (88, 1, 0))
+        self.assertEqual(wire.fields, (1 << 0) | (1 << 2) | (1 << 17))
+        self.assertEqual(wire.root_background_rgba, 0)
+        self.assertEqual(wire.description_weight, 3)
+        self.assertIsNone(radio_paint_wire("radio", base, RadioPaint()))
+        with self.assertRaises(TypeError):
+            radio("choice").radio_paint(0, RadioPaint())
+        for kind, layer, paint in (
+            (checkbox("not-radio"), base, RadioPaint(root_radius=4)),
+            (radio_group("group"), pressed, RadioPaint(root_background_rgba=1)),
+            (radio_group("group"), base, RadioPaint(indicator_extent=18)),
+            (radio("choice"), pressed, RadioPaint(root_padding=2)),
+            (radio("choice"), base, RadioPaint(description_weight=3)),
+            (radio("choice"), base, RadioPaint(label_size=float("nan"))),
+            (radio("choice"), base, RadioPaint(label_size=129)),
+            (radio("choice"), base, RadioPaint(mark_rgba=-1)),
+            (radio("choice"), base, RadioPaint(root_background_rgba=True)),
+        ):
+            with self.subTest(kind=kind.kind, paint=paint), self.assertRaises(ValueError):
+                kind.radio_paint(layer, paint)
+
+        child = item("setting", "Setting").radio_paint(base, RadioPaint(root_padding=9))
+        root = column().children(tabs("tabs").children(child))
+        with App() as app:
+            with self.assertRaisesRegex(ValueError, "direct RadioGroup Item"):
+                app.mount(root)
+            self.assertIsNone(root._handle)
+
+    def check_provider_without_radio_paint(self, app):
+        self.assertFalse(app.supports_radio_paint())
+        base = RadioPaintLayer.BASE
+        paint = RadioPaint(root_padding=7)
+        choice = radio("choice", "Choice").radio_paint(base, paint)
+        root = column().children(choice)
+        with self.assertRaisesRegex(RuntimeError, "cui_bridge_radio_set_paint_v1"):
+            app.mount(root)
+        self.assertIsNone(root._handle)
+        choice.radio_paint(base, None)
+        app.mount(root).step()
+        with self.assertRaisesRegex(RuntimeError, "cui_bridge_radio_set_paint_v1"):
+            choice.radio_paint(base, paint)
+        choice.radio_paint(base, None)
+        self.press(app, choice)
+        self.assertTrue(choice.is_checked())
+
+    def test_older_provider_keeps_default_radio_paint(self):
+        with App() as app, patch.object(app._api, "radio_set_paint", None):
+            self.check_provider_without_radio_paint(app)
+        legacy = os.environ.get("CUI_RADIO_LEGACY_LIBRARY")
+        if legacy:
+            with App(library=legacy) as app:
+                self.check_provider_without_radio_paint(app)
 
     def test_numeric_ranges_and_static(self):
         with App(width=800,height=800) as app:

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import {App, button, column, item, label, radio_group, tag} from '../../node/index.cjs';
+import {App, RadioPaintLayer, button, column, item, label, radio_group, tag} from '../../node/index.cjs';
 
 const app = new App({backend: 'headless', title: 'Delivery options', width: 320, height: 200});
 try {
@@ -17,6 +17,13 @@ try {
       estimate.arrival = delivery.selected() === priority ? 'Wednesday' : 'Friday';
       summary.label(`Estimated arrival: ${estimate.arrival}`);
     });
+  // Optional retained paint; providers without this extension keep the theme.
+  if (app.supports_radio_paint()) {
+    delivery.radio_paint(RadioPaintLayer.BASE, {rootPadding: 8, rootGap: 8});
+    priority.radio_paint(RadioPaintLayer.BASE, {indicatorExtent: 20, descriptionColor: 0x596579ff});
+    priority.radio_paint(RadioPaintLayer.CHECKED, {rootBackground: 0xeaf1ffff, markColor: 0x245bccff});
+    priority.radio_paint(RadioPaintLayer.HOVERED, {rootBorder: 0x245bccff, rootBorderWidth: 1});
+  }
   const ordered = app.supports_radio_tab_index();
   if (ordered) delivery.tab_index(-2);
   const reset = button('reset').label('Reset selection').on_click(() => {

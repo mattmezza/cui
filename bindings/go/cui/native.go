@@ -395,6 +395,21 @@ static cui_bridge_status go_set_radio_tooltip(cui_bridge_app *app, cui_bridge_no
                          : CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
 
+static cui_bridge_status (*radio_paint_set)(cui_bridge_app *, cui_bridge_node, uint32_t, const cui_bridge_radio_paint_v1 *);
+static void go_radio_paint_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&radio_paint_set, sizeof radio_paint_set, "cui_bridge_radio_set_paint_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else { radio_paint_set = cui_bridge_radio_set_paint_v1; }
+#endif
+}
+static int go_radio_paint_supported(void) { return radio_paint_set != NULL; }
+static cui_bridge_status go_set_radio_paint(cui_bridge_app *app, cui_bridge_node node,
+                                           uint32_t layer, const cui_bridge_radio_paint_v1 *paint) {
+ return radio_paint_set ? radio_paint_set(app, node, layer, paint) : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+
 static cui_bridge_status (*radio_motion_set)(cui_bridge_app *, cui_bridge_node, uint32_t);
 
 static cui_bridge_status (*radio_content_set)(cui_bridge_app *, cui_bridge_node, uint32_t);
@@ -530,6 +545,7 @@ static int bridge_open(const char *path) {
  go_skeleton_initialize();
  go_pagination_initialize();
  go_radio_motion_initialize();
+ go_radio_paint_initialize();
  go_radio_tab_index_initialize();
  go_radio_content_initialize();
  go_radio_tooltip_initialize();
@@ -563,6 +579,7 @@ static int bridge_open(const char *path) {
  go_skeleton_initialize();
  go_pagination_initialize();
  go_radio_motion_initialize();
+ go_radio_paint_initialize();
  go_radio_tab_index_initialize();
  go_radio_content_initialize();
  go_radio_tooltip_initialize();
@@ -656,6 +673,7 @@ type Node struct {
 	hasHover                             bool
 	click                                func(Event)
 	change                               func(Event)
+	radioPaints                          map[RadioPaintLayer]RadioPaint
 	radioTooltipText                     string
 	radioTooltipDelay                    int
 	radioTabIndex                        *int32
@@ -1750,6 +1768,14 @@ func (a *App) Mount(root *Node) error {
 		if content && !radioContentKind(n.kind) {
 			return errors.New("RadioGroup Item decorations require passive content")
 		}
+		if len(n.radioPaints) != 0 {
+			if n.kind == int(C.CUI_BRIDGE_ITEM) && (parent == nil || parent.kind != int(C.CUI_BRIDGE_RADIO_GROUP)) {
+				return errors.New("Radio paint requires a direct RadioGroup Item")
+			}
+			if C.go_radio_paint_supported() == 0 {
+				return ErrRadioPaintUnavailable
+			}
+		}
 		if n.radioTooltipText != "" {
 			if n.kind == int(C.CUI_BRIDGE_ITEM) && (parent == nil || parent.kind != int(C.CUI_BRIDGE_RADIO_GROUP)) {
 				return errors.New("Radio tooltip requires a direct RadioGroup Item")
@@ -1931,6 +1957,11 @@ func (a *App) Mount(root *Node) error {
 		n.app = a
 		n.handle = h
 		a.nodes[keyID(h)] = n
+		for layer, paint := range n.radioPaints {
+			if err := n.SetRadioPaint(layer, paint); err != nil {
+				return err
+			}
+		}
 		if n.radioTooltipText != "" {
 			if err := n.SetRadioTooltip(n.radioTooltipText, n.radioTooltipDelay); err != nil {
 				return err
@@ -5010,4 +5041,169 @@ func (n *Node) PaginationCustomSize() (float32, error) {
 	var size C.float
 	err = result(C.go_pagination_get_custom_size(n.app.ptr, n.handle, &size))
 	return float32(size), err
+}
+
+// RadioPaintLayer selects a retained Radio state override. Base geometry applies in every state.
+type RadioPaintLayer uint32
+
+const (
+	RadioPaintBase RadioPaintLayer = iota
+	RadioPaintChecked
+	RadioPaintHovered
+	RadioPaintPressed
+	RadioPaintFocused
+	RadioPaintDisabled
+)
+
+// RadioPaintFields selects explicitly present values, including transparent colors and zero dimensions.
+type RadioPaintFields uint32
+
+const (
+	RadioPaintRootBackground       RadioPaintFields = 1 << 0
+	RadioPaintRootBorder           RadioPaintFields = 1 << 1
+	RadioPaintRootBorderWidth      RadioPaintFields = 1 << 2
+	RadioPaintRootRadius           RadioPaintFields = 1 << 3
+	RadioPaintRootPadding          RadioPaintFields = 1 << 4
+	RadioPaintRootGap              RadioPaintFields = 1 << 5
+	RadioPaintIndicatorBackground  RadioPaintFields = 1 << 6
+	RadioPaintIndicatorBorder      RadioPaintFields = 1 << 7
+	RadioPaintIndicatorBorderWidth RadioPaintFields = 1 << 8
+	RadioPaintIndicatorRadius      RadioPaintFields = 1 << 9
+	RadioPaintIndicatorExtent      RadioPaintFields = 1 << 10
+	RadioPaintMarkColor            RadioPaintFields = 1 << 11
+	RadioPaintLabelColor           RadioPaintFields = 1 << 12
+	RadioPaintDescriptionColor     RadioPaintFields = 1 << 13
+	RadioPaintLabelSize            RadioPaintFields = 1 << 14
+	RadioPaintDescriptionSize      RadioPaintFields = 1 << 15
+	RadioPaintLabelWeight          RadioPaintFields = 1 << 16
+	RadioPaintDescriptionWeight    RadioPaintFields = 1 << 17
+)
+
+// RadioPaint replaces one layer. Colors use numeric 0xRRGGBBAA; dimensions are logical pixels.
+// Weights are normal=0, medium=1, semibold=2, bold=3. Geometry and text metrics require Base.
+type RadioPaint struct {
+	Fields               RadioPaintFields
+	RootBackground       uint32
+	RootBorder           uint32
+	RootBorderWidth      float32
+	RootRadius           float32
+	RootPadding          float32
+	RootGap              float32
+	IndicatorBackground  uint32
+	IndicatorBorder      uint32
+	IndicatorBorderWidth float32
+	IndicatorRadius      float32
+	IndicatorExtent      float32
+	MarkColor            uint32
+	LabelColor           uint32
+	DescriptionColor     uint32
+	LabelSize            float32
+	DescriptionSize      float32
+	LabelWeight          uint32
+	DescriptionWeight    uint32
+}
+
+var ErrRadioPaintUnavailable = errors.New("Radio paint is unavailable in this bridge")
+
+// SupportsRadioPaint reports optional retained Radio paint support.
+func (a *App) SupportsRadioPaint() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_radio_paint_supported() != 0, nil
+}
+
+// RadioPaint sets one layer before or after Mount. A zero field mask clears that layer.
+func (n *Node) RadioPaint(layer RadioPaintLayer, paint RadioPaint) *Node {
+	if n.err == nil {
+		n.err = n.SetRadioPaint(layer, paint)
+	}
+	return n
+}
+
+// ClearRadioPaint restores defaults for one layer and preserves all other layers.
+func (n *Node) ClearRadioPaint(layer RadioPaintLayer) error {
+	return n.SetRadioPaint(layer, RadioPaint{})
+}
+
+// SetRadioPaint copies one layer without selecting or notifying. Only direct RadioGroup Items accept description fields.
+// RadioGroup accepts root fields on Base and Disabled only. Unspecified fields retain theme defaults.
+// Color and border width overrides can use any option state; radius, padding, gap, extent, size and weight require Base.
+func (n *Node) SetRadioPaint(layer RadioPaintLayer, paint RadioPaint) error {
+	if n == nil || n.removed ||
+		(n.kind != int(C.CUI_BRIDGE_RADIO) && n.kind != int(C.CUI_BRIDGE_RADIO_GROUP) &&
+			n.kind != int(C.CUI_BRIDGE_ITEM)) {
+		return errors.New("paint requires a live Radio, RadioGroup or direct Item")
+	}
+	if layer > RadioPaintDisabled {
+		return errors.New("invalid Radio paint layer")
+	}
+	f := paint.Fields
+	const baseFields = RadioPaintRootRadius | RadioPaintRootPadding | RadioPaintRootGap | RadioPaintIndicatorRadius | RadioPaintIndicatorExtent | RadioPaintLabelSize | RadioPaintDescriptionSize | RadioPaintLabelWeight | RadioPaintDescriptionWeight
+	const descriptionFields = RadioPaintDescriptionColor | RadioPaintDescriptionSize | RadioPaintDescriptionWeight
+	if f & ^RadioPaintFields((1<<18)-1) != 0 || (layer != RadioPaintBase && f&baseFields != 0) ||
+		(n.kind == int(C.CUI_BRIDGE_RADIO_GROUP) &&
+			(f & ^(RadioPaintRootGap<<1-1) != 0 || (layer != RadioPaintBase && layer != RadioPaintDisabled))) ||
+		(n.kind != int(C.CUI_BRIDGE_ITEM) && f&descriptionFields != 0) {
+		return errors.New("invalid Radio paint fields for owner or layer")
+	}
+	validRange := func(bit RadioPaintFields, value, min, max float32) bool {
+		return f&bit == 0 || (value >= min && value <= max)
+	}
+	if !validRange(RadioPaintRootBorderWidth, paint.RootBorderWidth, 0, 64) ||
+		!validRange(RadioPaintRootRadius, paint.RootRadius, 0, 256) ||
+		!validRange(RadioPaintRootPadding, paint.RootPadding, 0, 256) ||
+		!validRange(RadioPaintRootGap, paint.RootGap, 0, 256) ||
+		!validRange(RadioPaintIndicatorBorderWidth, paint.IndicatorBorderWidth, 0, 64) ||
+		!validRange(RadioPaintIndicatorRadius, paint.IndicatorRadius, 0, 256) ||
+		!validRange(RadioPaintIndicatorExtent, paint.IndicatorExtent, 4, 128) ||
+		!validRange(RadioPaintLabelSize, paint.LabelSize, 1, 128) ||
+		!validRange(RadioPaintDescriptionSize, paint.DescriptionSize, 1, 128) ||
+		(f&RadioPaintLabelWeight != 0 && paint.LabelWeight > 3) || (f&RadioPaintDescriptionWeight != 0 && paint.DescriptionWeight > 3) {
+		return errors.New("invalid Radio paint range")
+	}
+
+	if n.app != nil {
+		if err := n.app.check(); err != nil {
+			return err
+		}
+		if C.go_radio_paint_supported() == 0 {
+			if f != 0 {
+				return ErrRadioPaintUnavailable
+			}
+		} else {
+			wire := C.cui_bridge_radio_paint_v1{struct_size: C.sizeof_cui_bridge_radio_paint_v1,
+				schema_version: 1, fields: C.uint32_t(f)}
+			wire.root_background_rgba = C.uint32_t(paint.RootBackground)
+			wire.root_border_rgba = C.uint32_t(paint.RootBorder)
+			wire.root_border_width = C.float(paint.RootBorderWidth)
+			wire.root_radius = C.float(paint.RootRadius)
+			wire.root_padding = C.float(paint.RootPadding)
+			wire.root_gap = C.float(paint.RootGap)
+			wire.indicator_background_rgba = C.uint32_t(paint.IndicatorBackground)
+			wire.indicator_border_rgba = C.uint32_t(paint.IndicatorBorder)
+			wire.indicator_border_width = C.float(paint.IndicatorBorderWidth)
+			wire.indicator_radius = C.float(paint.IndicatorRadius)
+			wire.indicator_extent = C.float(paint.IndicatorExtent)
+			wire.mark_rgba = C.uint32_t(paint.MarkColor)
+			wire.label_rgba = C.uint32_t(paint.LabelColor)
+			wire.description_rgba = C.uint32_t(paint.DescriptionColor)
+			wire.label_size = C.float(paint.LabelSize)
+			wire.description_size = C.float(paint.DescriptionSize)
+			wire.label_weight = C.uint32_t(paint.LabelWeight)
+			wire.description_weight = C.uint32_t(paint.DescriptionWeight)
+			if err := result(C.go_set_radio_paint(n.app.ptr, n.handle, C.uint32_t(layer), &wire)); err != nil {
+				return err
+			}
+		}
+	}
+	if f == 0 {
+		delete(n.radioPaints, layer)
+	} else {
+		if n.radioPaints == nil {
+			n.radioPaints = make(map[RadioPaintLayer]RadioPaint)
+		}
+		n.radioPaints[layer] = paint
+	}
+	return nil
 }

@@ -172,3 +172,62 @@ function checkRadioTabOrder(legacy) {
 }
 
 checkRadioTabOrder(process.env.CUI_EXPECT_RADIO_LEGACY === '1');
+
+function checkRadioPaint(legacy) {
+  const {RadioPaintLayer: L} = require('../index.cjs');
+  const app = new App({backend:'headless', maxNodes:6});
+  try {
+    assert.equal(app.supports_radio_paint(), !legacy);
+    assert.throws(() => checkbox().radio_paint(L.BASE, {}), TypeError);
+    for (const paint of [{unknown:0},{descriptionColor:0},{labelWeight:4},{indicatorExtent:3},{rootPadding:NaN},{markColor:-1}])
+      assert.throws(() => radio().radio_paint(L.BASE, paint));
+    assert.throws(() => radio().radio_paint(L.CHECKED,{rootPadding:0}), TypeError);
+    assert.throws(() => radio_group().radio_paint(L.CHECKED,{}), RangeError);
+    assert.throws(() => radio_group().radio_paint(L.BASE,{indicatorExtent:20}), TypeError);
+    const wrong = item('wrong').radio_paint(L.BASE,{labelColor:0});
+    assert.throws(() => app.mount(column().children(tabs().children(wrong))), /direct RadioGroup Item/);
+    assert.equal(app.root,null);
+    const changes = [];
+    const single = radio('single', 'Single').on_change(event => changes.push(event.checked));
+    const first = item('first', 'First'), second = item('second', 'Second').detail('Details');
+    const group = radio_group().children(first, second).select(first)
+      .on_change(() => changes.push(group.selected()));
+    const root = column().children(single,group);
+    if (legacy) {
+      single.radio_paint(L.BASE,{rootPadding:0});
+      assert.throws(() => app.mount(root), /Radio paint is unavailable/);
+      assert.equal(app.root,null);
+      single.radio_paint(L.BASE,null);
+      app.mount(root).step();
+      assert.throws(() => single.radio_paint(L.BASE,{labelColor:0}), /Radio paint is unavailable/);
+      assert.equal(single.radio_paint(L.BASE,null),single);
+      assert.equal(single.radio_paint(L.BASE,{}),single);
+      return;
+    }
+    app.mount(root).step();
+    const before = single.bounds();
+    single.radio_paint(L.BASE,{rootPadding:20,indicatorExtent:32,labelSize:18,labelWeight:2,markColor:0});
+    group.radio_paint(L.BASE,{rootBorderWidth:0,rootPadding:8});
+    second.radio_paint(L.BASE,{descriptionColor:0,descriptionSize:12,descriptionWeight:1});
+    for (const layer of [L.CHECKED,L.HOVERED,L.PRESSED,L.FOCUSED,L.DISABLED])
+      single.radio_paint(layer,{rootBackground:0,indicatorBorderWidth:0,labelColor:0});
+    assert.equal(app.step(),0);
+    const painted=single.bounds();
+    assert.ok(painted.height > before.height);
+    assert.equal(single.is_checked(),false);
+    assert.equal(group.selected(),first);
+    assert.equal(press(app,single),1);
+    assert.equal(single.is_checked(),true);
+    single.disabled();
+    assert.equal(app.step(),0);
+    assert.equal(press(app,single),0);
+    single.disabled(false).radio_paint(L.BASE,null);
+    for (const layer of [L.CHECKED,L.HOVERED,L.PRESSED,L.FOCUSED,L.DISABLED]) single.radio_paint(layer,{});
+    assert.equal(app.step(),0);
+    assert.equal(single.bounds().height,before.height);
+    assert.equal(press(app,second),1);
+    assert.equal(group.selected(),second);
+    assert.deepEqual(changes, [true, second]);
+  } finally { app.dispose(); }
+}
+checkRadioPaint(process.env.CUI_EXPECT_RADIO_LEGACY === '1');

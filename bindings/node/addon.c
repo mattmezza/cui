@@ -1475,6 +1475,48 @@ static napi_value set_radio_tooltip(napi_env env, napi_callback_info info) {
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 
+typedef cui_bridge_status (*radio_paint_fn)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                                            const cui_bridge_radio_paint_v1 *);
+static radio_paint_fn radio_paint_symbol(void) {
+    radio_paint_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_radio_set_paint_v1");
+    return set;
+}
+static napi_value supports_radio_paint(napi_env env, napi_callback_info info) {
+    (void)info;
+    napi_value result;
+    return napi_get_boolean(env, radio_paint_symbol() != NULL, &result) == napi_ok ? result : NULL;
+}
+static napi_value set_radio_paint(napi_env env, napi_callback_info info) {
+    napi_value v[4];
+    js_app *app;
+    js_node *node;
+    uint32_t layer;
+    if (!args(env, info, 4, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &layer))
+        return NULL;
+    radio_paint_fn set = radio_paint_symbol();
+    if (!set)
+        return fail(env, "Radio paint requires cui_bridge_radio_set_paint_v1");
+    napi_valuetype type;
+    if (napi_typeof(env, v[3], &type) != napi_ok)
+        return NULL;
+    cui_bridge_radio_paint_v1 paint;
+    const cui_bridge_radio_paint_v1 *value = NULL;
+    if (type != napi_null) {
+        bool buffer = false;
+        void *data;
+        size_t size;
+        if (napi_is_buffer(env, v[3], &buffer) != napi_ok || !buffer ||
+            napi_get_buffer_info(env, v[3], &data, &size) != napi_ok || size != sizeof paint)
+            return fail(env, "Radio paint requires an exact 88-byte buffer or null");
+        memcpy(&paint, data, sizeof paint);
+        value = &paint;
+    }
+    cui_bridge_status code = set(app->bridge, node->node, layer, value);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 typedef cui_bridge_status (*data_table_set_keyed_fn)(cui_bridge_app *, cui_bridge_node,
                                                      const char *const *, uint32_t,
                                                      const char *const *, const uint32_t *,
@@ -2435,6 +2477,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setSelected", set_selected, 0);
     EXPORT("getSelected", get_selected, 0);
     EXPORT("setChecked", set_num, 6);
+    EXPORT("supportsRadioPaint", supports_radio_paint, 0);
+    EXPORT("setRadioPaint", set_radio_paint, 0);
     EXPORT("supportsRadioMotion", supports_radio_motion, 0);
     EXPORT("supportsRadioItemContent", supports_radio_item_content, 0);
     EXPORT("setRadioItemContent", set_radio_item_content, 0);

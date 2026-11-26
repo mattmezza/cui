@@ -62,6 +62,36 @@ fn main() -> Result<()> {
         .build_child(priority, Kind::Tag, "recommended")?
         .text("Recommended")?
         .finish();
+    if app.supports_radio_paint() {
+        app.radio_paint(
+            group,
+            RadioPaintLayer::Base,
+            Some(&RadioPaint {
+                root_gap: Some(8.),
+                ..RadioPaint::default()
+            }),
+        )?;
+        app.radio_paint(
+            priority,
+            RadioPaintLayer::Base,
+            Some(&RadioPaint {
+                root_padding: Some(8.),
+                root_radius: Some(8.),
+                indicator_extent: Some(22.),
+                description_rgba: Some(0x667788ff),
+                ..RadioPaint::default()
+            }),
+        )?;
+        app.radio_paint(
+            priority,
+            RadioPaintLayer::Checked,
+            Some(&RadioPaint {
+                root_background_rgba: Some(0xe5f1ffff),
+                mark_rgba: Some(0x2266ccff),
+                ..RadioPaint::default()
+            }),
+        )?;
+    }
     app.select(group, standard)?;
     let summary = app
         .build_child(root, Kind::Label, "summary")?

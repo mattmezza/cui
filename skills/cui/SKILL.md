@@ -97,10 +97,11 @@ The same guide covers passive children inside one RadioGroup Item through
 JS/TS, `item.DecorateContent(enabled)` in Go, or
 `Builder::decorate_content(enabled)` in Rust. For older providers, check
 `app.supports_radio_item_content()` or Go's `app.SupportsRadioItemContent()`.
-The retained C bridge can copy state paint layers with
-`cui_bridge_radio_set_paint_v1`. See
-`docs/BRIDGE_COMPONENTS.md#style-retained-radio-states-from-c`. Foreign
-builders omit these layers. For retained Radio selection animation, read the Radio section of
+The retained C bridge and all five language builders support copied Radio paint.
+Check `supports_radio_paint()` or Go's `app.SupportsRadioPaint()` before using
+layers with an older provider. See
+`docs/BRIDGE_COMPONENTS.md#style-radio-states-in-language-builders`.
+For retained Radio selection animation, read the Radio section of
 `docs/BRIDGE_COMPONENTS.md`. Python, JS/TS and Rust use
 `app.supports_radio_motion()`. Go uses `app.SupportsRadioMotion()`.
 

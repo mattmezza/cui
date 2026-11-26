@@ -15,6 +15,8 @@ from pathlib import Path
 from threading import current_thread
 from typing import Callable, ClassVar, Iterable, Iterator, Literal
 
+from .radio_paint import RadioPaint, RadioPaintLayer, bind_radio_paint, radio_paint_wire
+
 _DATA_TABLE_LEGACY_ROWS = 32
 _DATA_TABLE_MAX_ROWS = 10_000
 
@@ -147,6 +149,7 @@ class _API:
         bind_skeleton_api(self, bind)
         from .pagination_options import bind_api as bind_pagination_api
         bind_pagination_api(self, bind)
+        bind_radio_paint(self, bind, _Handle)
         self.radio_set_motion = None
         if hasattr(lib, "cui_bridge_radio_set_motion_v1"):
             self.radio_set_motion = bind("radio_set_motion_v1", C.c_int, C.c_void_p,
@@ -477,6 +480,7 @@ class Widget:
         self._checked = False
         self._radio_motion = False
         self._radio_tab_index: int | None = None
+        self._radio_paints: dict[RadioPaintLayer, RadioPaint] | None = None
         self._radio_content = False
         self._radio_tooltip: tuple[bytes, int] | None = None
         self._detail = ""
@@ -729,6 +733,26 @@ class Widget:
             if self._app.supports_radio_tab_index():
                 self._change("radio_set_tab_index", int(index is not None), index or 0)
         self._radio_tab_index = index
+        return self
+
+    def radio_paint(self, layer: RadioPaintLayer, paint: RadioPaint | None) -> "Widget":
+        """Replace one retained Radio paint layer. None clears it."""
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        wire = radio_paint_wire(self.kind, layer, paint)
+        if self._app is not None:
+            if wire is not None:
+                self._app._require_radio_paint()
+            if self._app.supports_radio_paint():
+                self._change("radio_set_paint", int(layer), None if wire is None else C.byref(wire))
+        if wire is None:
+            if self._radio_paints is not None:
+                self._radio_paints.pop(layer, None)
+        else:
+            assert paint is not None
+            if self._radio_paints is None:
+                self._radio_paints = {}
+            self._radio_paints[layer] = paint
         return self
 
     def decorate_content(self, enabled: bool = True) -> "Widget":
@@ -1740,6 +1764,15 @@ class App:
         if not self.supports_radio_tab_index():
             raise RuntimeError("Radio Tab order requires cui_bridge_radio_set_tab_index_v1")
 
+    def supports_radio_paint(self) -> bool:
+        """Report whether the loaded bridge accepts retained Radio paint layers."""
+        self._ensure_open()
+        return self._api.radio_set_paint is not None
+
+    def _require_radio_paint(self) -> None:
+        if not self.supports_radio_paint():
+            raise RuntimeError("Radio paint requires cui_bridge_radio_set_paint_v1")
+
     def supports_radio_item_content(self) -> bool:
         """Report whether direct RadioGroup Items can paint passive children."""
         self._ensure_open()
@@ -1825,6 +1858,10 @@ class App:
                 self._require_radio_motion()
             if node._radio_tab_index is not None:
                 self._require_radio_tab_index()
+            if node._radio_paints:
+                if node.kind == "item" and (parent is None or parent.kind != "radio_group"):
+                    raise ValueError("radio_paint requires a direct RadioGroup Item")
+                self._require_radio_paint()
             if radio_content and node.kind not in _RADIO_CONTENT_KINDS:
                 raise ValueError(f"{node.kind} cannot decorate a RadioGroup Item")
             if node._radio_content:
@@ -1896,6 +1933,11 @@ class App:
                     node._change("radio_set_motion", 1)
                 if node._radio_tab_index is not None:
                     node._change("radio_set_tab_index", 1, node._radio_tab_index)
+                if node._radio_paints:
+                    for layer, paint in node._radio_paints.items():
+                        wire = radio_paint_wire(node.kind, layer, paint)
+                        assert wire is not None
+                        node._change("radio_set_paint", int(layer), C.byref(wire))
                 if node._radio_content:
                     node._change("radio_item_set_content", 1)
                 if node._radio_tooltip is not None:
@@ -2523,7 +2565,7 @@ __all__ += ["settings"]
 __all__ += ["ValueNotificationV1", "ScalarChangeNotificationV1", "TextChangeNotificationV1",
             "SelectionChangeNotificationV1"]
 
-__all__ += ["DesignSize"]
+__all__ += ["DesignSize", "RadioPaint", "RadioPaintLayer"]
 
 __all__ += ["BoxShadow", "CSSBoxShadow", "ShadowStyle", "PresetShadowStyle", "ShadowKind", "ShadowPreset", "CornerRadii"]
 

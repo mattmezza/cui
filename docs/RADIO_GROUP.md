@@ -113,8 +113,10 @@ fill for that frame, and mark alpha still follows the motion sample.
 
 Try **Styled cards** in the Radio gallery to copy a complete C example with a
 styled container, hover and checked rows. Custom paint callbacks are immediate C
-APIs. Retained C can set copied state layers for the group and its options.
-See [retained Radio paint](BRIDGE_COMPONENTS.md#style-retained-radio-states-from-c).
+APIs. The retained bridge and its language builders set copied state layers
+for the group and its options.
+[Retained C](BRIDGE_COMPONENTS.md#style-retained-radio-states-from-c) ·
+[Language examples](BRIDGE_COMPONENTS.md#style-radio-states-in-language-builders)
 
 ## Set keyboard tab order
 

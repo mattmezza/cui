@@ -85,12 +85,15 @@ def main():
             painted('Step 2 of 3')
             painted('Navigation requests: 7')
             assert 'cui_stepper_navigation' in page.locator('#snippet').inner_text()
-            frame = page.evaluate('cuiGallery.frame')
             page.set_viewport_size({'width': 390, 'height': 844})
-            page.wait_for_function('(frame)=>cuiGallery.frame>frame', arg=frame)
+            page.wait_for_function(
+                """() => {
+                    const bounds = """ + target_js + """;
+                    const details = bounds('Details'), review = bounds('Review'), finish = bounds('Finish');
+                    return details.y < review.y && review.y < finish.y;
+                }""", timeout=5000)
             painted('Step 2 of 3')
             painted('Navigation requests: 7')
-            assert target('Details')['y'] < target('Review')['y'] < target('Finish')['y']
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
             assert not errors, errors
             browser.close()

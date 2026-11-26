@@ -107,14 +107,16 @@ def main():
                         assert sum(abs(solid[i]-empty[i]) for i in range(3)) > 60, (solid, empty)
                     return separators, indicators
                 def fit_axis(vertical):
-                    details = page.evaluate(TARGET, 'Details')
-                    finish = page.evaluate(TARGET, 'Finish')
-                    canvas_width = page.locator('#preview').evaluate('e=>e.clientWidth')
-                    assert finish['x'] + finish['w'] <= canvas_width + .01, (details, finish)
-                    if vertical:
-                        assert abs(finish['x'] - details['x']) < .01 and finish['y'] > details['y']
-                    else:
-                        assert finish['x'] > details['x'] and abs(finish['y'] - details['y']) < .01
+                    page.wait_for_function(
+                        """vertical => {
+                            const bounds = """ + TARGET + """;
+                            const details = bounds('Details'), finish = bounds('Finish');
+                            const width = document.querySelector('#preview').clientWidth;
+                            if (finish.x + finish.w > width + .01) return false;
+                            return vertical
+                                ? Math.abs(finish.x - details.x) < .01 && finish.y > details.y
+                                : finish.x > details.x && Math.abs(finish.y - details.y) < .01;
+                        }""", arg=vertical, timeout=5000)
 
                 def fill_geometry(vertical):
                     fit_axis(vertical)
@@ -173,13 +175,9 @@ def main():
                     painted('Navigation requests: 0')
 
                     # Use the same mounted controls through both viewport widths.
-                    frame = page.evaluate('cuiGallery.frame')
                     page.set_viewport_size({'width': 720, 'height': 1000})
-                    page.wait_for_function('previous=>cuiGallery.frame>previous', arg=frame)
                     fill_geometry(True)
-                    frame = page.evaluate('cuiGallery.frame')
                     page.set_viewport_size({'width': width, 'height': 1000})
-                    page.wait_for_function('previous=>cuiGallery.frame>previous', arg=frame)
                     fill_geometry(False)
                     change('stepper-design', 9)
                     fit_axis(True)

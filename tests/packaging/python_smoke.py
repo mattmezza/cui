@@ -30,7 +30,8 @@ with App(**kwargs) as app:
     changes = []
     overview = item("overview", "Overview").carousel_basis(0.5)
     activity = item("activity", "Activity").carousel_basis(0.5)
-    slides = carousel("slides").visual_size(240, 100).children(overview, activity)
+    settings = item("settings", "Settings").carousel_basis(0.5)
+    slides = carousel("slides").visual_size(240, 100).children(overview, activity, settings)
     slides.on_change(changes.append)
     app.mount(column().children(widget, slides))
     app.step()

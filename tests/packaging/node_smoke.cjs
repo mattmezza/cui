@@ -24,7 +24,8 @@ assert.equal(app.supports_carousel_navigation(), true, 'installed bridge lacks C
 const changes = [];
 const overview = cui.item('overview', 'Overview').carousel_basis(0.5);
 const activity = cui.item('activity', 'Activity').carousel_basis(0.5);
-const slides = cui.carousel('slides').visual_size(240, 100).children(overview, activity)
+const settings = cui.item('settings', 'Settings').carousel_basis(0.5);
+const slides = cui.carousel('slides').visual_size(240, 100).children(overview, activity, settings)
   .on_change(event => changes.push(event.node));
 app.mount(cui.column().children(widget, slides)); app.step();
 assert.equal(activity.bounds().x - overview.bounds().x, 128);

@@ -24,6 +24,8 @@ fn main() -> Result<()> {
         .carousel_basis(0.5)?.finish();
     let activity = app.build_child(slides, Kind::Item, "activity")?.text("Activity")?
         .carousel_basis(0.5)?.finish();
+    app.build_child(slides, Kind::Item, "settings")?.text("Settings")?
+        .carousel_basis(0.5)?.finish();
     app.step(0.016)?;
     assert_eq!(app.bounds(activity)?.x - app.bounds(overview)?.x, 128.);
     let bounds = app.bounds(button)?;

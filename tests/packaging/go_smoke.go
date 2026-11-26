@@ -48,8 +48,9 @@ func main() {
 	button := cui.Button("save").Text("Save ✓").OnClick(func(cui.Event) { clicks++ })
 	overview := cui.Item("overview", "Overview").CarouselBasis(0.5)
 	activity := cui.Item("activity", "Activity").CarouselBasis(0.5)
+	settings := cui.Item("settings", "Settings").CarouselBasis(0.5)
 	var changes []cui.Event
-	slides := cui.Carousel("slides").VisualSize(240, 100).Children(overview, activity).
+	slides := cui.Carousel("slides").VisualSize(240, 100).Children(overview, activity, settings).
 		OnChange(func(event cui.Event) { changes = append(changes, event) })
 	if err := app.Mount(cui.Column("root").Children(button, slides)); err != nil {
 		panic(err)

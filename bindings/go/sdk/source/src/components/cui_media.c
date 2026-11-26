@@ -3,8 +3,13 @@
 #include "cui/cui_icon.h"
 #include "cui/cui_media_events.h"
 #include "cui/cui_scroll.h"
+#include "cui/cui_text_overflow.h"
+#include "cui_status_internal.h"
+#include "cui_text_overflow_internal.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 static cui_id cui_media_id(cui_id parent, uint64_t child) {
     uint64_t x = parent + child * UINT64_C(0x9e3779b97f4a7c15);
     x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
@@ -241,11 +246,60 @@ static void cui_media_busy(cui_context *ui, cui_id id, const cui_theme *t, cui_a
                     o.reduced_motion);
     }
 }
+typedef struct {
+    cui_context *ui;
+    float font;
+    cui_text_style style;
+} cui_media_text_measurement;
+static float cui_media_text_width(void *user, cui_str text) {
+    const cui_media_text_measurement *m = user;
+    return cui_measure_text_ex(m->ui, text, m->font, m->style).width;
+}
+static bool cui_media_metadata_shimmer(cui_context *ui, cui_id id, const cui_theme *theme,
+                                       cui_marker_state *state, cui_str full,
+                                       cui_marker_options marker, cui_text_style style) {
+    cui_media_text_measurement measurement = {ui, theme->font_size, style};
+    cui_str tail = cui_string("…");
+    float natural = cui_media_text_width(&measurement, full);
+    /* The separated runs do not include the tracking on their shared boundary. */
+    float available =
+        natural <= marker.width ? marker.width : marker.width - fmaxf(0, style.letter_spacing);
+    cui_ellipsis_fit fit =
+        cui_text_fit_ellipsis(full, available, natural, tail, cui_media_text_width, &measurement);
+    cui_str visible = {full.data, fit.prefix};
+    char local[256];
+    char *allocated = NULL;
+    if (fit.show_tail) {
+        if (fit.prefix > SIZE_MAX - tail.length)
+            return false;
+        size_t length = fit.prefix + tail.length;
+        char *joined = length <= sizeof local ? local : (allocated = malloc(length));
+        if (!joined)
+            return false;
+        if (fit.prefix)
+            memcpy(joined, full.data, fit.prefix);
+        memcpy(joined + fit.prefix, tail.data, tail.length);
+        visible = (cui_str){joined, length};
+    }
+    bool fits = visible.length && cui_media_text_width(&measurement, visible) <= marker.width;
+    if (fits) {
+        cui_marker_child text = {.kind = CUI_MARKER_TEXT, .text = visible};
+        fits = cui_marker_styled(ui, id, theme, state, &text, 1, marker, &style);
+    }
+    free(allocated);
+    return fits;
+}
+static void cui_media_metadata_label(cui_context *ui, cui_id id, cui_str label) {
+    cui_interact(ui, id, CUI_ROLE_LABEL, label, false, false, 0);
+    cui_set_tab_stop(ui, id, false);
+}
 static void cui_media_metadata(cui_context *ui, cui_id id, const cui_theme *t,
                                cui_attachment_state *state, cui_attachment_options o,
                                cui_attachment_plan p, float width, cui_attachment_result *result,
-                               cui_media_action_observer *observer) {
-    cui_begin_box(ui, id, (cui_box){.width = width, .gap = 2, .clip = true});
+                               cui_media_action_observer *observer,
+                               const cui_attachment_metadata_style *metadata) {
+    cui_begin_box(
+        ui, id, (cui_box){.width = width, .fixed_width = metadata != NULL, .gap = 2, .clip = true});
     bool retry_used = false;
     for (size_t i = 0; i < o.child_count; i++) {
         cui_attachment_child child = o.children[i];
@@ -260,24 +314,42 @@ static void cui_media_metadata(cui_context *ui, cui_id id, const cui_theme *t,
         float font = child.font_size ? child.font_size
                      : title         ? p.metrics.text
                                      : p.metrics.description;
+        cui_text_style style = {.weight = title ? CUI_TEXT_WEIGHT_MEDIUM : CUI_TEXT_WEIGHT_NORMAL};
+        if (metadata && title && metadata->custom_title)
+            style = metadata->title;
+        if (metadata && !title && metadata->custom_description)
+            style = metadata->description;
         cui_color color = title ? t->text : status == CUI_ATTACHMENT_FAILED ? t->danger : t->muted;
         if (child.custom_color)
             color = child.color;
         bool retry = !title && p.retry_description && !retry_used;
         float suffix_width = 0;
+        char percentage[16];
+        cui_str suffix = {0};
         if (retry)
-            suffix_width = fmaxf(48, cui_measure_text(ui, o.retry_label, font).width);
+            suffix = o.retry_label;
         else if (p.append_percentage && !title) {
-            char percentage[16];
             snprintf(percentage, sizeof percentage, "· %u%%", (unsigned)floorf(p.progress + .5f));
-            suffix_width = fmaxf(48, cui_measure_text(ui, cui_string(percentage), font).width);
+            suffix = cui_string(percentage);
         }
-        cui_begin_box(ui, child_id, (cui_box){.width = width, .row = true, .clip = true, .gap = 4});
-        float text_width = fmaxf(0, width - suffix_width - (suffix_width > 0 ? 4 : 0));
-        cui_begin_box(ui, cui_media_id(child_id, 1),
+        if (retry || suffix.length) {
+            float natural = cui_measure_text(ui, suffix, font).width;
+            suffix_width = metadata ? fminf(width, natural) : fmaxf(48, natural);
+        }
+        float gap = metadata && width - suffix_width <= 4 ? 0 : 4;
+        cui_begin_box(ui, child_id,
+                      (cui_box){.width = width,
+                                .fixed_width = metadata != NULL,
+                                .row = true,
+                                .clip = true,
+                                .gap = gap,
+                                .align_y = metadata ? CUI_ALIGN_CENTER : CUI_ALIGN_START});
+        float text_width = fmaxf(0, width - suffix_width - (suffix_width > 0 ? gap : 0));
+        cui_id text_id = cui_media_id(child_id, 1);
+        cui_begin_box(ui, text_id,
                       (cui_box){.width = text_width, .fixed_width = true, .clip = true});
+        bool paint_ellipsis = metadata != NULL;
         if (title && cui_attachment_in_progress(status)) {
-            cui_marker_child text = {.kind = CUI_MARKER_TEXT, .text = child.text};
             cui_marker_options marker =
                 child.custom_shimmer ? child.shimmer : cui_marker_options_default();
             marker.width = text_width;
@@ -288,10 +360,28 @@ static void cui_media_metadata(cui_context *ui, cui_id id, const cui_theme *t,
             cui_theme title_theme = *t;
             title_theme.font_size = font;
             title_theme.muted = color;
-            cui_marker(ui, cui_media_id(child_id, 2), &title_theme, &state->titles[i], &text, 1,
-                       marker);
-        } else
+            cui_id marker_id = cui_media_id(child_id, 2);
+            if (!metadata) {
+                cui_marker_child text = {.kind = CUI_MARKER_TEXT, .text = child.text};
+                cui_marker(ui, marker_id, &title_theme, &state->titles[i], &text, 1, marker);
+            } else if (text_width > 0 &&
+                       cui_media_metadata_shimmer(ui, marker_id, &title_theme, &state->titles[i],
+                                                  child.text, marker, style)) {
+                cui_media_metadata_label(ui, text_id, child.text);
+                paint_ellipsis = false;
+            }
+        } else if (!metadata)
             cui_text(ui, child.text, font, color);
+        if (paint_ellipsis) {
+            if (text_width > 0)
+                cui_text_ellipsis(ui, cui_media_id(child_id, 3), child.text,
+                                  (cui_text_ellipsis_options){.width = text_width,
+                                                              .font_size = font,
+                                                              .color = color,
+                                                              .text_style = style});
+            else
+                cui_media_metadata_label(ui, text_id, child.text);
+        }
         cui_end_box(ui);
         if (retry) {
             cui_id retry_id = cui_media_id(cui_attachment_retry_id(id), i + 1);
@@ -299,16 +389,21 @@ static void cui_media_metadata(cui_context *ui, cui_id id, const cui_theme *t,
                 cui_interact(ui, retry_id, CUI_ROLE_LINK, o.retry_label, false, false, 0);
             cui_media_action_capture(ui, observer, CUI_ATTACHMENT_ACTION_RETRY, retry_id,
                                      action.activated);
-            cui_begin_box(ui, retry_id, (cui_box){.height = font * 1.25f});
+            cui_begin_box(ui, retry_id,
+                          (cui_box){.height = font * 1.25f,
+                                    .width = metadata ? suffix_width : 0,
+                                    .fixed_width = metadata != NULL,
+                                    .clip = metadata != NULL});
             cui_text(ui, o.retry_label, font, t->primary);
             cui_end_box(ui);
             if (action.activated)
                 result->retried = true;
             retry_used = true;
-        } else if (p.append_percentage && !title) {
-            char text[16];
-            snprintf(text, sizeof text, "· %u%%", (unsigned)floorf(p.progress + .5f));
-            cui_text(ui, cui_string(text), font, color);
+        } else if (suffix.length) {
+            if (metadata)
+                cui_text_line(ui, suffix, font, color, 0, (cui_text_style){0});
+            else
+                cui_text(ui, suffix, font, color);
         }
         cui_end_box(ui);
     }
@@ -364,10 +459,16 @@ static void cui_media_card_treatment(cui_context *ui, cui_id id, cui_rect b, cui
                 cui_end_box(ui);
             }
 }
+static bool cui_media_metadata_style_valid(cui_text_style style, uint32_t capabilities) {
+    return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD &&
+           isfinite(style.letter_spacing) &&
+           (!style.letter_spacing || (capabilities & CUI_TEXT_CAP_LETTER_SPACING));
+}
 static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t,
                                                    cui_attachment_state *state,
                                                    cui_attachment_options o,
-                                                   cui_media_action_observer *observer) {
+                                                   cui_media_action_observer *observer,
+                                                   const cui_attachment_metadata_style *metadata) {
     cui_attachment_result r = {0};
     if (!ui || !id || !t || !state || !isfinite(t->radius) || t->radius < 0 ||
         (o.name.length && !o.name.data) || (o.remove_label.length && !o.remove_label.data) ||
@@ -376,12 +477,23 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
         !isfinite(o.actions_width) || o.actions_width < 0 || !isfinite(o.now_seconds) ||
         o.now_seconds < 0 || !isfinite(o.delta_seconds) || o.delta_seconds < 0)
         return r;
+    if (metadata) {
+        uint32_t capabilities = cui_text_capabilities(ui);
+        if ((metadata->custom_title &&
+             !cui_media_metadata_style_valid(metadata->title, capabilities)) ||
+            (metadata->custom_description &&
+             !cui_media_metadata_style_valid(metadata->description, capabilities)))
+            return r;
+    }
     for (size_t i = 0; i < o.child_count; i++) {
         cui_attachment_child c = o.children[i];
         if (c.kind < CUI_ATTACHMENT_TITLE || c.kind > CUI_ATTACHMENT_CUSTOM ||
             (c.text.length && !c.text.data) || !isfinite(c.font_size) || c.font_size < 0 ||
             (c.status_override &&
              (c.status < CUI_ATTACHMENT_PENDING || c.status > CUI_ATTACHMENT_COMPLETE)))
+            return r;
+        if (metadata && c.kind != CUI_ATTACHMENT_CUSTOM && c.text.length &&
+            (memchr(c.text.data, '\n', c.text.length) || memchr(c.text.data, '\r', c.text.length)))
             return r;
         if (c.custom_shimmer) {
             cui_marker_child text = {.kind = CUI_MARKER_TEXT, .text = c.text};
@@ -528,7 +640,9 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
                                              (o.model.media ? p.metrics.media + p.metrics.gap : 0) -
                                              (o.actions ? o.actions_width + p.metrics.gap : 0));
     if (o.model.content)
-        cui_media_metadata(ui, cui_media_id(id, 4), t, state, o, p, content_width, &r, observer);
+        cui_media_metadata(ui, cui_media_id(id, 4), t, state, o, p,
+                           metadata ? fmaxf(0, content_width) : content_width, &r, observer,
+                           metadata);
     if (!o.model.vertical && o.model.content && o.actions) {
         cui_begin_box(ui, cui_media_id(id, 14),
                       (cui_box){.width = p.metrics.gap, .fixed_width = true});
@@ -602,22 +716,43 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
 
 cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme *theme,
                                      cui_attachment_state *state, cui_attachment_options options) {
-    return cui_attachment_common(ui, id, theme, state, options, NULL);
+    return cui_attachment_common(ui, id, theme, state, options, NULL, NULL);
+}
+cui_attachment_result cui_attachment_with_metadata(cui_context *ui, cui_id id,
+                                                   const cui_theme *theme,
+                                                   cui_attachment_state *state,
+                                                   cui_attachment_options options,
+                                                   cui_attachment_metadata_style metadata) {
+    return cui_attachment_common(ui, id, theme, state, options, NULL, &metadata);
+}
+static cui_attachment_event_result
+cui_attachment_events_common(cui_context *ui, cui_id id, const cui_theme *theme,
+                             cui_attachment_state *state, cui_attachment_options options,
+                             cui_attachment_handler handler,
+                             const cui_attachment_metadata_style *metadata) {
+    cui_attachment_event_result result = {0};
+    if (!handler.on_activate && !handler.on_remove && !handler.on_retry) {
+        result.control = cui_attachment_common(ui, id, theme, state, options, NULL, metadata);
+        return result;
+    }
+    cui_media_action_observer observer = {.id = id, .handler = handler, .result = &result};
+    observer.frame = cui_frame_paint_enabled(ui) ? cui_frame_sequence(ui) : 0;
+    result.control = cui_attachment_common(ui, id, theme, state, options, &observer, metadata);
+    return result;
 }
 cui_attachment_event_result cui_attachment_events(cui_context *ui, cui_id id,
                                                   const cui_theme *theme,
                                                   cui_attachment_state *state,
                                                   cui_attachment_options options,
                                                   cui_attachment_handler handler) {
-    cui_attachment_event_result result = {0};
-    if (!handler.on_activate && !handler.on_remove && !handler.on_retry) {
-        result.control = cui_attachment(ui, id, theme, state, options);
-        return result;
-    }
-    cui_media_action_observer observer = {.id = id, .handler = handler, .result = &result};
-    observer.frame = cui_frame_paint_enabled(ui) ? cui_frame_sequence(ui) : 0;
-    result.control = cui_attachment_common(ui, id, theme, state, options, &observer);
-    return result;
+    return cui_attachment_events_common(ui, id, theme, state, options, handler, NULL);
+}
+cui_attachment_event_result
+cui_attachment_events_with_metadata(cui_context *ui, cui_id id, const cui_theme *theme,
+                                    cui_attachment_state *state, cui_attachment_options options,
+                                    cui_attachment_metadata_style metadata,
+                                    cui_attachment_handler handler) {
+    return cui_attachment_events_common(ui, id, theme, state, options, handler, &metadata);
 }
 
 static float cui_media_transition(float value, float *start, float *target, double *epoch,

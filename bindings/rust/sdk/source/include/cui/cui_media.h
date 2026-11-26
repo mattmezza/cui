@@ -207,6 +207,18 @@ cui_id cui_attachment_child_part_id(cui_id attachment, size_t child_index,
 cui_attachment_result cui_attachment(cui_context *, cui_id, const cui_theme *,
                                      cui_attachment_state *, cui_attachment_options);
 typedef struct {
+    cui_text_style title, description;
+    bool custom_title, custom_description;
+} cui_attachment_metadata_style;
+/* Opt-in one-line metadata with grapheme-safe end ellipsis and accessible full
+ * labels. Zero uses medium titles and regular descriptions. Typography follows
+ * host capabilities. Invalid styles or unsupported nonzero letter spacing
+ * return an invalid result. Typed labels must be single lines; custom children
+ * still own their rendering. Geometry, model and callbacks use the usual options. */
+cui_attachment_result cui_attachment_with_metadata(cui_context *, cui_id, const cui_theme *,
+                                                   cui_attachment_state *, cui_attachment_options,
+                                                   cui_attachment_metadata_style);
+typedef struct {
     cui_scroll_state scroll;
     cui_rect viewport, content;
     float leading, trailing, leading_start, trailing_start, leading_target, trailing_target;

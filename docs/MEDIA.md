@@ -66,6 +66,37 @@ with the application. Keep states and borrowed child arrays alive through frame
 completion. Tooltip composition reuses the existing Tooltip and requires the
 caller to provide viewport and timing options.
 
+### Fit file names and descriptions
+
+Use `cui_attachment_with_metadata` for single-line titles and descriptions
+with end ellipses. It measures the available space after media, actions, and
+the progress percentage or Retry link. Long labels truncate at grapheme
+boundaries. The semantic tree retains each full label. The default title uses
+medium weight and the description uses regular weight. For custom typography,
+set `custom_title` or `custom_description` and provide the corresponding
+`cui_text_style`. Font selection, weight, and letter spacing depend on the host.
+
+```c
+cui_attachment_child labels[] = {
+    {.kind = CUI_ATTACHMENT_TITLE, .text = cui_string("Workspace delivery review.pdf")},
+    {.kind = CUI_ATTACHMENT_DESCRIPTION, .text = cui_string("PDF document · 12.8 MB")},
+};
+cui_attachment_options file = cui_attachment_options_default();
+file.name = cui_string("Delivery review");
+file.model.width = 240;
+file.children = labels;
+file.child_count = sizeof labels / sizeof *labels;
+cui_attachment_with_metadata(ui, id, &theme, &state, file,
+                             (cui_attachment_metadata_style){0});
+```
+
+For typed action callbacks, use `cui_attachment_events_with_metadata` with
+the same typography options and a trailing `cui_attachment_handler`.
+The application still owns transfer state. Custom children keep their rendering
+callbacks. Typed title and description inputs must be single lines. On extremely
+narrow cards the row can retain the full semantic label when even the ellipsis
+does not fit. Retained language builders currently expose the older presentation.
+
 AttachmentGroup retains a horizontal scroll offset, or uses an explicit external
 scroll state. Its default gap is 12 and vertical padding is 4. Dominant horizontal
 wheel input updates it, while ties remain vertical for the parent chain. Optional
@@ -73,22 +104,19 @@ wheel input updates it, while ties remain vertical for the parent chain. Optiona
 transitions and reduced-motion settling. Each fade uses 24 bounded strips and
 claims no pointer target. Retained bounds measure overflow on a follow-up frame.
 
-Current integration limits: no built-in raster/SVG decoding, remote transport,
-HTTP cache, shared/scoped decoded asset cache or encoded animation parser. Host
-adapters supply those; decoded-frame playback is implemented here. True font
-weight and automatic ellipsis are absent in the existing text primitive; metadata
-is clipped to a single line. The progress ring uses 36 bounded samples; the bottom
-bar samples rounded clipping with six strips. Remove/retry shadows and automatic content ellipsis are not implemented.
-Pending dashed borders are bounded
-samples rather than a general dashed-path primitive. Arbitrary source style
-builders are exposed as composition callbacks and explicit geometry, not a full
-GPUI style language. These limits preclude a full-parity claim.
+The host supplies raster/SVG decoding, remote transport, asset caching and
+encoded animation parsing. CUI plays decoded frames. The original
+entry points still use hard-clipped metadata. The progress ring uses 36
+samples, the rounded bottom bar uses six strips, and pending outlines use
+bounded dash samples. For arbitrary content style, supply composition callbacks
+and explicit geometry.
 
 Integration: compile `src/base/cui_media.c` and `src/components/cui_media.c` into
 the styled library. The independent base test needs only its test source, media
 base source and math, with `CUI_MEDIA_BASE_ONLY`; no core/theme implementation is
 linked. Styled code needs core bitmap commands, pointer-only semantic activation,
-focus-scope hover ancestry, Theme, content helpers/Tooltip, Marker, and scroll base.
+focus-scope hover ancestry, Theme, content helpers/Tooltip, Marker, scroll base
+and the text-overflow presenter.
 Each Attachment state is bounded by 128 metadata entries; Marker state is retained
 per entry so its tracked text bounds remain valid through frame completion. State
 may be heap allocated by the application to avoid large automatic objects.

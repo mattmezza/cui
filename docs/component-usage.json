@@ -108,6 +108,8 @@
       "api_symbols": [
         "cui_attachment",
         "cui_attachment_events",
+        "cui_attachment_with_metadata",
+        "cui_attachment_events_with_metadata",
         "cui_attachment_part_id",
         "cui_attachment_child_part_id"
       ],
@@ -117,7 +119,7 @@
       ],
       "state_ownership": "Caller retains cui_attachment_state and owns attachment model, metadata and resource lifetime.",
       "interaction": "cui_attachment_result reports actions; cui_attachment_action_fn receives remove/retry activation.",
-      "usage": "Submit transfer status and progress; perform removal/retry in action callbacks, not render callbacks.",
+      "usage": "Submit transfer status and progress; perform removal/retry in action callbacks, not render callbacks. Use cui_attachment_with_metadata for one-line grapheme ellipsis, full semantic labels, and optional typography in immediate C.",
       "docs": [
         "docs/MEDIA.md",
         "docs/ATTACHMENT_EVENTS.md",

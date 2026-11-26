@@ -454,6 +454,11 @@ namespaces may have no box. For a responsive toast and keyboard/touch Close
 before hover, use direct C `cui_notifications_responsive`; honor its wake deadline.
 See `docs/STATUS_COMPONENTS.md#notification`. Scroller row IDs follow retained keys, not stable
 indices. Language-builder MAIN/ROOT/subpart targets remain pending.
+For grapheme-safe one-line Attachment labels, use `cui_attachment_with_metadata`
+or `cui_attachment_events_with_metadata` in immediate C. Zero typography options
+give medium titles and regular descriptions. The semantic tree keeps the full
+labels. See `docs/MEDIA.md#fit-file-names-and-descriptions`. Retained builders
+currently expose the earlier presentation.
 
 For opt-in C control shadow examples, read `docs/CONTROL_SURFACE_SHADOW_GALLERY.md`.
 Button's captured instance patch replays after disabled; an instance shadow must

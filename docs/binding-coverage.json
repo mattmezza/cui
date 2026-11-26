@@ -57,7 +57,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "Opt-in metadata ellipsis, full child labels, independent typography and the typed observer are immediate C APIs. Retained builders retain their existing Attachment presentation and events."
+      ]
     },
     {
       "name": "Avatar",

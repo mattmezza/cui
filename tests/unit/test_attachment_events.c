@@ -13,7 +13,7 @@ typedef struct {
     size_t old_calls[3], calls[3], child_calls;
     char order[32];
     size_t order_count;
-    bool inert, layout, omit, request_omit, change_focus, consume;
+    bool inert, layout, omit, request_omit, change_focus, consume, metadata;
     cui_id child_id;
     cui_attachment_action_event copies[3];
     cui_draw_list draw;
@@ -102,14 +102,18 @@ static cui_attachment_event_result frame(fixture *f, bool facade) {
     options.actions_user = f;
     cui_attachment_event_result out = {0};
     if (!f->omit) {
-        if (facade)
-            out = cui_attachment_events(
-                f->ui, 20, &theme, &f->state, options,
-                (cui_attachment_handler){.user = f,
-                                         .on_activate = f->typed_mask & 1 ? observed : NULL,
-                                         .on_remove = f->typed_mask & 2 ? observed : NULL,
-                                         .on_retry = f->typed_mask & 4 ? observed : NULL});
-        else
+        if (facade) {
+            cui_attachment_handler handler = {.user = f,
+                                              .on_activate = f->typed_mask & 1 ? observed : NULL,
+                                              .on_remove = f->typed_mask & 2 ? observed : NULL,
+                                              .on_retry = f->typed_mask & 4 ? observed : NULL};
+            if (f->metadata)
+                out = cui_attachment_events_with_metadata(f->ui, 20, &theme, &f->state, options,
+                                                          (cui_attachment_metadata_style){0},
+                                                          handler);
+            else
+                out = cui_attachment_events(f->ui, 20, &theme, &f->state, options, handler);
+        } else
             out.control = cui_attachment(f->ui, 20, &theme, &f->state, options);
     }
     cui_end_box(f->ui);
@@ -193,6 +197,27 @@ static cui_id description_retry(fixture *f) {
         }
     assert(found && found != cui_attachment_retry_id(20));
     return found;
+}
+static void metadata_retry(void) {
+    fixture f;
+    init(&f, 4, 4);
+    f.metadata = true;
+    f.children[1].text = cui_string("A long description alongside an independent retry link");
+    cui_attachment_event_result result = frame(&f, true);
+    assert(result.control.valid && !result.retry_count);
+    cui_id retry = description_retry(&f);
+    assert(retry == cui_attachment_child_part_id(20, 1, CUI_ATTACHMENT_CHILD_PART_RETRY));
+    cui_rect bounds = cui_bounds(f.ui, retry);
+    assert(bounds.w > 0 && bounds.x + bounds.w <= f.state.card.x + f.state.card.w);
+    assert(cui_queue_accessibility_action(f.ui, retry, CUI_ACCESSIBILITY_ACTIVATE));
+    result = frame(&f, true);
+    assert(result.control.retried && result.retry_count == 1);
+    assert(f.order_count == 2 && !memcmp(f.order, "Cc", 2));
+    assert(f.copies[2].event.activation.target == retry);
+    assert(f.copies[2].event.source == CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY);
+    result = frame(&f, true);
+    assert(!result.control.retried && !result.retry_count && f.order_count == 0);
+    cui_destroy(f.ui);
 }
 static void actions_and_evidence(bool typed_only) {
     fixture a, b;
@@ -358,6 +383,7 @@ static void availability_and_suppression(void) {
 }
 
 int main(void) {
+    metadata_retry();
     availability_and_suppression();
     actions_and_evidence(false);
     actions_and_evidence(true);

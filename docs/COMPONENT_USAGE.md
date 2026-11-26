@@ -154,11 +154,12 @@ Direct C `cui_alert_events` and `cui_alert_dismiss_fn` observe the completed bui
 
 **Interaction:** cui_attachment_result reports actions; cui_attachment_action_fn receives remove/retry activation.
 
-**Usage:** Submit transfer status and progress; perform removal/retry in action callbacks, not render callbacks.
+**Usage:** Submit transfer status and progress; perform removal/retry in action callbacks, not render callbacks. Use cui_attachment_with_metadata for one-line grapheme ellipsis, full semantic labels, and optional typography in immediate C.
 
-API: `cui_attachment`. [Public header](../include/cui/cui_media.h); [guide](MEDIA.md).
+API: `cui_attachment`, `cui_attachment_with_metadata`. [Public header](../include/cui/cui_media.h) · [Attachment guide](MEDIA.md#fit-file-names-and-descriptions).
 
-Additional event includes: `cui/cui_media_events.h`.
+The typed action observers are `cui_attachment_events` and
+`cui_attachment_events_with_metadata`. [Action timing and ownership](ATTACHMENT_EVENTS.md).
 
 ## Avatar
 

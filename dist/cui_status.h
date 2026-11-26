@@ -1000,6 +1000,15 @@ bool cui_tag(cui_context *ui, cui_id id, const cui_theme *t, cui_str text, cui_t
     cui_end_tag(ui, id, &s);
     return true;
 }
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_STATUS_INTERNAL_H
+#define CUI_STATUS_INTERNAL_H
+
+/* Components can use Marker shimmer with a pre-fitted styled line. */
+bool cui_marker_styled(cui_context *, cui_id, const cui_theme *, cui_marker_state *,
+                       const cui_marker_child *, size_t, cui_marker_options,
+                       const cui_text_style *);
+#endif
 
 static cui_id cui_status_child_id(cui_id id, size_t i) {
     return id ^ (UINT64_C(0x95d7e38a461bc203) + UINT64_C(0x9e3779b97f4a7c15) * (i + 1));
@@ -1008,9 +1017,16 @@ static void cui_status_spacer(cui_context *ui, cui_id id, float width) {
     cui_begin_box(ui, id, (cui_box){.width = width, .height = 1, .fixed_width = true});
     cui_end_box(ui);
 }
+static void cui_status_line(cui_context *ui, cui_str text, float font, cui_color color,
+                            const cui_text_style *style) {
+    if (style)
+        cui_text_line(ui, text, font, color, 0, *style);
+    else
+        cui_text(ui, text, font, color);
+}
 static void cui_status_shimmer(cui_context *ui, cui_id id, cui_rect b, cui_str text, float font,
-                               cui_color color, float phase, float spread, bool absolute,
-                               bool dark) {
+                               cui_color color, float phase, float spread, bool absolute, bool dark,
+                               const cui_text_style *style) {
     if (b.w <= 0 || b.h <= 0)
         return;
     float half = absolute ? fmaxf(1, spread) : b.w * fmaxf(.05f, fminf(spread, 1)),
@@ -1033,7 +1049,7 @@ static void cui_status_shimmer(cui_context *ui, cui_id id, cui_rect b, cui_str t
         cui_begin_box(
             ui, cui_status_child_id(id, layer + 20),
             (cui_box){.width = b.w, .height = b.h, .fixed_width = true, .fixed_height = true});
-        cui_text(ui, text, font, color);
+        cui_status_line(ui, text, font, color, style);
         cui_end_box(ui);
         cui_end_box(ui);
     }
@@ -1080,13 +1096,14 @@ bool cui_shimmer_text(cui_context *ui, cui_id id, const cui_theme *t, cui_shimme
         cui_color highlight =
             o.custom_highlight ? o.highlight : cui_status_highlight(t, color, dark);
         cui_status_shimmer(ui, cui_status_child_id(id, 501), state->text_bounds, text, font,
-                           highlight, plan.phase, o.spread, o.absolute_spread, dark);
+                           highlight, plan.phase, o.spread, o.absolute_spread, dark, NULL);
     }
     cui_end_box(ui);
     return true;
 }
-bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state *state,
-                const cui_marker_child *children, size_t count, cui_marker_options o) {
+bool cui_marker_styled(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state *state,
+                       const cui_marker_child *children, size_t count, cui_marker_options o,
+                       const cui_text_style *style) {
     cui_marker_plan p;
     if (!ui || !t || !state || !cui_base_marker(o, children, count, &p))
         return false;
@@ -1097,11 +1114,13 @@ bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state
     float widths[CUI_MARKER_MAX_CHILDREN], total = p.spinner ? 16 : 0, font = t->font_size;
     size_t slots = count + (p.spinner ? 1 : 0);
     for (size_t i = 0; i < count; i++) {
-        widths[i] = children[i].kind == CUI_MARKER_TEXT
-                        ? cui_measure_text(ui, children[i].text, font).width
-                    : children[i].width > 0               ? children[i].width
-                    : children[i].kind == CUI_MARKER_ICON ? 16
-                                                          : 0;
+        if (children[i].kind == CUI_MARKER_TEXT)
+            widths[i] = style ? cui_measure_text_ex(ui, children[i].text, font, *style).width
+                              : cui_measure_text(ui, children[i].text, font).width;
+        else
+            widths[i] = children[i].width > 0                 ? children[i].width
+                        : children[i].kind == CUI_MARKER_ICON ? 16
+                                                              : 0;
         total += widths[i];
     }
     if (slots)
@@ -1152,7 +1171,7 @@ bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state
                                                : CUI_ALIGN_START,
                                 .align_y = CUI_ALIGN_CENTER});
         if (c->kind == CUI_MARKER_TEXT) {
-            cui_text(ui, c->text, font, t->muted);
+            cui_status_line(ui, c->text, font, t->muted, style);
             cui_track_bounds(ui, child, &state->text_bounds[i]);
         } else if (c->render)
             c->render(ui, cui_status_child_id(child, 49), c->user, font, t->muted,
@@ -1160,13 +1179,14 @@ bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state
         else if (c->text.length)
             cui_text(ui, c->text, font, t->muted);
         cui_end_box(ui);
-        if (c->kind == CUI_MARKER_TEXT && o.loading && !o.reduced_motion &&
-            o.loading_style == CUI_MARKER_SHIMMER) {
+        if (c->kind == CUI_MARKER_TEXT && (!style || c->text.length) && o.loading &&
+            !o.reduced_motion && o.loading_style == CUI_MARKER_SHIMMER) {
             bool dark = t->background.r + t->background.g + t->background.b < 384;
             cui_color highlight =
                 o.custom_highlight ? o.highlight : cui_status_highlight(t, t->muted, dark);
             cui_status_shimmer(ui, cui_status_child_id(child, 50), state->text_bounds[i], c->text,
-                               font, highlight, p.phase, o.shimmer_spread, o.absolute_spread, dark);
+                               font, highlight, p.phase, o.shimmer_spread, o.absolute_spread, dark,
+                               style);
         }
     }
     if (o.variant == CUI_MARKER_SEPARATOR && p.alignment != CUI_MARKER_ALIGN_END) {
@@ -1186,6 +1206,10 @@ bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state
     }
     cui_end_box(ui);
     return true;
+}
+bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state *state,
+                const cui_marker_child *children, size_t count, cui_marker_options o) {
+    return cui_marker_styled(ui, id, t, state, children, count, o, NULL);
 }
 
 typedef struct {

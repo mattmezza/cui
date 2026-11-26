@@ -8,6 +8,7 @@
 #include "cui_message.h"
 #include "cui_status.h"
 #endif
+#include "cui_media_events.h"
 #include <assert.h>
 int main(void) {
     assert(cui_bubble_part_id(1, CUI_BUBBLE_PART_SURFACE));
@@ -22,5 +23,11 @@ int main(void) {
     assert(cui_notification_part_id(1, (cui_notification_id){1, 1}, CUI_NOTIFICATION_PART_CARD));
     assert(cui_attachment_part_id(1, CUI_ATTACHMENT_PART_MEDIA));
     assert(cui_attachment_child_part_id(1, 127, CUI_ATTACHMENT_CHILD_PART_RETRY));
+    cui_attachment_options o = cui_attachment_options_default();
+    cui_attachment_metadata_style typography = {0};
+    assert(!cui_attachment_with_metadata(NULL, 1, NULL, NULL, o, typography).valid);
+    assert(!cui_attachment_events_with_metadata(NULL, 1, NULL, NULL, o, typography,
+                                                (cui_attachment_handler){0})
+                .control.valid);
     return 0;
 }

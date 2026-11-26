@@ -491,6 +491,131 @@ static void group_events(void) {
 }
 #endif
 #ifndef CUI_MEDIA_BASE_ONLY
+static bool attachment_text_equal(cui_str actual, const char *expected) {
+    size_t length = strlen(expected);
+    return actual.length == length && !memcmp(actual.data, expected, length);
+}
+static cui_size attachment_metadata_measure(void *user, cui_str text, float font,
+                                            cui_text_style style) {
+    (void)user;
+    (void)style;
+    return (cui_size){4 * (float)text.length, font};
+}
+static void attachment_metadata_overflow(void) {
+    cui_context *ui = cui_create((cui_config){.measure_styled = attachment_metadata_measure});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    theme.font_size = 14;
+    cui_attachment_state state = {0};
+    const char *title = "Plan e\xcc\x81 - final attachment revision.pdf";
+    const char *description = "Workspace description for review";
+    cui_attachment_child children[] = {
+        {.kind = CUI_ATTACHMENT_TITLE, .text = cui_string(title)},
+        {.kind = CUI_ATTACHMENT_DESCRIPTION, .text = cui_string(description)}};
+    cui_attachment_options o = cui_attachment_options_default();
+    o.children = children;
+    o.child_count = 2;
+    o.model.width = 60; /* 40px after padding, 28px after the ellipsis. */
+    o.model.progress_known = true;
+    o.model.progress = 45;
+    o.reduced_motion = true;
+    const cui_attachment_status statuses[] = {CUI_ATTACHMENT_COMPLETE, CUI_ATTACHMENT_UPLOADING,
+                                              CUI_ATTACHMENT_PROCESSING, CUI_ATTACHMENT_FAILED};
+    for (size_t frame = 0; frame < sizeof statuses / sizeof *statuses; ++frame) {
+        o.model.status = statuses[frame];
+        cui_attachment_metadata_style typography = {0};
+        if (frame == 1) {
+            typography.custom_title = true;
+            typography.title = (cui_text_style){.weight = CUI_TEXT_WEIGHT_BOLD, .italic = true};
+        }
+        assert(cui_begin_frame(ui, 600, 300, .016f));
+        assert(cui_attachment_with_metadata(ui, 20, &theme, &state, o, typography).valid);
+        cui_draw_list draw = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        const cui_draw_command *prefix = NULL, *tail = NULL, *percent = NULL;
+        for (size_t i = 0; i < draw.count; ++i) {
+            const cui_draw_command *d = draw.commands + i;
+            if (d->type != CUI_DRAW_TEXT)
+                continue;
+            assert(d->bounds.y >= state.card.y - .01f);
+            assert(d->bounds.y + d->bounds.h <= state.card.y + state.card.h + .01f);
+            if (d->text_style.weight) {
+                assert(d->text_style.weight ==
+                       (frame == 1 ? CUI_TEXT_WEIGHT_BOLD : CUI_TEXT_WEIGHT_MEDIUM));
+                assert(d->text_style.italic == (frame == 1));
+                if (attachment_text_equal(d->text, "Plan ") ||
+                    attachment_text_equal(d->text, "Plan …"))
+                    prefix = d;
+                else if (attachment_text_equal(d->text, "…"))
+                    tail = d;
+                else
+                    assert(!"invalid grapheme truncation");
+            }
+            if (attachment_text_equal(d->text, "· 45%"))
+                percent = d;
+        }
+        assert(prefix);
+        if (cui_attachment_in_progress(o.model.status))
+            assert(attachment_text_equal(prefix->text, "Plan …"));
+        else
+            assert(tail && fabsf(tail->bounds.x - (prefix->bounds.x + prefix->bounds.w)) < .01f);
+        assert((percent != NULL) == (o.model.status == CUI_ATTACHMENT_UPLOADING));
+        size_t count = 0;
+        const cui_semantic *semantics = cui_semantics(ui, &count);
+        bool full_title = false, full_description = false;
+        for (size_t i = 0; i < count; i++) {
+            if (semantics[i].role != CUI_ROLE_LABEL)
+                continue;
+            full_title |= attachment_text_equal(semantics[i].name, title);
+            full_description |= attachment_text_equal(semantics[i].name, description);
+        }
+        assert(full_title && full_description);
+    }
+    o.model.status = CUI_ATTACHMENT_UPLOADING;
+    o.reduced_motion = false;
+    o.now_seconds = 1;
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        assert(cui_begin_frame(ui, 600, 300, .016f));
+        assert(cui_attachment_with_metadata(ui, 20, &theme, &state, o,
+                                            (cui_attachment_metadata_style){0})
+                   .valid);
+        cui_draw_list animated = cui_end_frame(ui);
+        unsigned title_draws = 0;
+        for (size_t i = 0; i < animated.count; ++i) {
+            const cui_draw_command *d = animated.commands + i;
+            if (d->type == CUI_DRAW_TEXT && d->text_style.weight == CUI_TEXT_WEIGHT_MEDIUM) {
+                assert(attachment_text_equal(d->text, "Plan …"));
+                ++title_draws;
+            }
+        }
+        assert(cui_last_error(ui) == CUI_OK && title_draws > 1);
+    }
+    o.model.status = CUI_ATTACHMENT_COMPLETE;
+    o.model.width = 360;
+    assert(cui_begin_frame(ui, 600, 300, .016f));
+    assert(
+        cui_attachment_with_metadata(ui, 20, &theme, &state, o, (cui_attachment_metadata_style){0})
+            .valid);
+    cui_draw_list draw = cui_end_frame(ui);
+    bool full = false;
+    for (size_t i = 0; i < draw.count; ++i)
+        if (draw.commands[i].type == CUI_DRAW_TEXT)
+            full |= attachment_text_equal(draw.commands[i].text, title);
+    assert(full);
+    assert(cui_begin_frame(ui, 600, 300, .016f));
+    assert(!cui_attachment_with_metadata(ui, 20, &theme, &state, o,
+                                         (cui_attachment_metadata_style){
+                                             .title = {.letter_spacing = 2}, .custom_title = true})
+                .valid);
+    assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_OK);
+    children[0].text = cui_string("Invalid\nmetadata");
+    assert(cui_begin_frame(ui, 600, 300, .016f));
+    assert(
+        !cui_attachment_with_metadata(ui, 20, &theme, &state, o, (cui_attachment_metadata_style){0})
+             .valid);
+    assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 static void attachment_size_containment(void) {
     cui_context *ui = cui_create((cui_config){.width = 2000, .height = 2000});
     assert(ui);
@@ -530,9 +655,13 @@ static void attachment_size_containment(void) {
                     o.model.progress = 45;
                     o.model.status = (cui_attachment_status)status;
                     o.reduced_motion = true;
-                    for (unsigned pass = 0; pass < 2; pass++) {
+                    for (unsigned pass = 0; pass < 4; pass++) {
                         assert(cui_begin_frame(ui, 2000, 2000, .016f));
-                        cui_attachment_result result = cui_attachment(ui, 20, &t, &state, o);
+                        cui_attachment_result result =
+                            pass < 2
+                                ? cui_attachment(ui, 20, &t, &state, o)
+                                : cui_attachment_with_metadata(ui, 20, &t, &state, o,
+                                                               (cui_attachment_metadata_style){0});
                         assert(result.valid);
                         cui_draw_list draw = cui_end_frame(ui);
                         assert(cui_last_error(ui) == CUI_OK);
@@ -620,6 +749,7 @@ int main(void) {
     images();
     attachments();
 #ifndef CUI_MEDIA_BASE_ONLY
+    attachment_metadata_overflow();
     attachment_size_containment();
     attachment_group_size_fit();
 #endif

@@ -1382,14 +1382,28 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
     (void)user;
     (void)width;
     (void)height;
+    static const char *filenames[] = {
+        "Workspace planning and quarterly delivery review — November 2026.pdf",
+        "Customer research interview highlights and recommendations.docx",
+        "Product launch photography — approved campaign selection.png",
+        "Regional operating budget and forecast reconciliation.xlsx",
+        "Accessibility review findings and remediation checklist.pdf",
+        "Engineering handover notes and integration reference.zip"};
+    static const char *descriptions[] = {
+        "PDF document · 12.8 MB · Updated today by the workspace planning team",
+        "Word document · 4.2 MB · Research synthesis for the upcoming planning workshop",
+        "PNG image · 8.6 MB · Final artwork approved for the November launch campaign",
+        "Excel workbook · 2.1 MB · Consolidated forecast across all regional teams",
+        "PDF document · 6.4 MB · Keyboard, screen reader and responsive layout findings",
+        "ZIP archive · 24.7 MB · Source materials and deployment handover documentation"};
     for (unsigned index = 0; index < 6; index++) {
         if (attachment_removed_mask & (1u << index))
             continue;
         char name[32];
         snprintf(name, sizeof(name), "Attachment %u", index + 1);
         cui_attachment_child children[2] = {
-            {.kind = CUI_ATTACHMENT_TITLE, .text = cui_string(name)},
-            {.kind = CUI_ATTACHMENT_DESCRIPTION, .text = cui_string("Workspace file")}};
+            {.kind = CUI_ATTACHMENT_TITLE, .text = cui_string(filenames[index])},
+            {.kind = CUI_ATTACHMENT_DESCRIPTION, .text = cui_string(descriptions[index])}};
         cui_attachment_options options = cui_attachment_options_default();
         options.name = cui_string(name);
         options.model.status =
@@ -1426,8 +1440,9 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
         options.delta_seconds = host_dt;
         options.reduced_motion = reduced_motion;
         options.active = true;
-        cui_attachment(context, cui_id_from(context, name), &current_theme,
-                       &attachment_states[index], options);
+        cui_attachment_with_metadata(context, cui_id_from(context, name), &current_theme,
+                                     &attachment_states[index], options,
+                                     (cui_attachment_metadata_style){0});
     }
 }
 static int clicks;

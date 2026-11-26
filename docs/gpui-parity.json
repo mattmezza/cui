@@ -292,7 +292,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions are tested headlessly and in Chromium. Built-in encoded file/network decoding, shared resource cache, full inherited text styling and exact effects remain pending; not full parity."
+        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Opt-in C metadata has styled end ellipsis. Built-in encoded file/network decoding, shared resource cache, fully inherited text styling, retained metadata authoring and platform accessibility remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -304,6 +304,17 @@
             "tests/unit/test_media.c",
             "tests/web/test_browser.py"
           ]
+        },
+        {
+          "name": "opt-in typed metadata ellipsis and font style",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_media.c",
+            "tests/unit/test_attachment_events.c",
+            "tests/web/test_browser.py",
+            "docs/MEDIA.md"
+          ],
+          "scope": "Immediate C and WASM examples. Full label semantics, grapheme boundaries, title weight, progress and retry keep separate roles. Platform accessibility and foreign metadata authoring are open."
         },
         {
           "name": "preview/remove actions",

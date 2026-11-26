@@ -5,6 +5,8 @@ arguments as `cui_attachment`, plus a borrowed `cui_attachment_handler`.
 It returns `control` (the legacy `cui_attachment_result`) and actual callback
 counts `activation_count`, `remove_count`, `retry_count` (each zero or one).
 The old options/state/result layouts and entrypoint remain unchanged.
+Use `cui_attachment_events_with_metadata` to opt into fitted titles and
+descriptions with the same action timing. [Metadata example](MEDIA.md#fit-file-names-and-descriptions).
 
 ```c
 static void remove_requested(void *user, const cui_attachment_action_event *event) {

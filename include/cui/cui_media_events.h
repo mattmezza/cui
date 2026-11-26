@@ -40,6 +40,11 @@ typedef struct {
 cui_attachment_event_result cui_attachment_events(cui_context *, cui_id, const cui_theme *,
                                                   cui_attachment_state *, cui_attachment_options,
                                                   cui_attachment_handler);
+/* Same dispatch contract with the opt-in typed metadata layout. */
+cui_attachment_event_result
+cui_attachment_events_with_metadata(cui_context *, cui_id, const cui_theme *,
+                                    cui_attachment_state *, cui_attachment_options,
+                                    cui_attachment_metadata_style, cui_attachment_handler);
 #ifdef __cplusplus
 }
 #endif

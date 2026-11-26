@@ -256,11 +256,102 @@ def verify_notification_close(browser, url):
         context.close()
 
 
+def verify_attachment_metadata(browser, url):
+    """Mobile WASM paint retains full accessible metadata and working actions."""
+    context = browser.new_context(viewport={'width':390, 'height':844}, has_touch=True)
+    page = context.new_page()
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    title = 'Workspace planning and quarterly delivery review — November 2026.pdf'
+    description = 'PDF document · 12.8 MB · Updated today by the workspace planning team'
+    metric = """name => {
+        const e = cuiGallery.exports, d = new TextDecoder();
+        for (let i = 0; i < e.gallery_semantic_count(); i++) {
+            if (d.decode(new Uint8Array(e.memory.buffer, e.gallery_semantic_name(i),
+                e.gallery_semantic_length(i))) === name)
+                return [1,2,3,4].map(f => e.gallery_semantic(i,f));
+        }
+        return null;
+    }"""
+    try:
+        page.goto(url + '#Attachment')
+        page.wait_for_function('window.cuiGallery && cuiGallery.renderedComponent === "Attachment" && cuiGallery.exports.gallery_attachment_stats(5)>0')
+        canvas = page.locator('canvas')
+        canvas.scroll_into_view_if_needed()
+        page.wait_for_function(metric, arg=title)
+        page.wait_for_function(metric, arg=description)
+        for label in (title, description):
+            assert page.locator('#accessible').get_by_text(label, exact=True).count() == 1
+        assert page.locator('#accessible [role=group]').evaluate_all('(nodes)=>nodes.filter(n=>/^Attachment [1-6]$/.test(n.getAttribute("aria-label"))).length') == 6
+        for vertical, size in ((False, '3'), (False, '1'), (True, '1'), (True, '3')):
+            page.locator('#attachment-vertical').set_checked(vertical)
+            page.locator('#design-size').select_option(size)
+            page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+            page.wait_for_function('cuiGallery.exports.gallery_error()===0')
+            # Metadata semantics keep the original string while paint has a single ellipsized line.
+            for text, weight in ((title, 1), (description, 0)):
+                page.wait_for_function(metric, arg=text)
+                painted = page.evaluate("""text => {
+                    const e=cuiGallery.exports,d=new TextDecoder();
+                    const commands = Array.from({length:e.gallery_count()},(_,i)=>i)
+                        .filter(i=>e.gallery_command(i,0)===2)
+                        .map(i=>({text:d.decode(new Uint8Array(e.memory.buffer,
+                            e.gallery_command_text(i),e.gallery_command_length(i))),
+                            bounds:[1,2,3,4].map(f=>e.gallery_command(i,f)),
+                            weight:e.gallery_command(i,22)}))
+                    return commands.filter(c=>c.text.startsWith(text.slice(0,8))).map(prefix=>{
+                        if (prefix.text.endsWith('…'))
+                            return prefix;
+                        const [x,y,w] = prefix.bounds;
+                        const tail = commands.find(c=>c.text==='…'&&c.weight===prefix.weight&&
+                            Math.abs(c.bounds[0]-x-w)<.5&&Math.abs(c.bounds[1]-y)<.5);
+                        if (!tail) return prefix;
+                        return {...prefix,text:prefix.text+tail.text,
+                            bounds:[x,y,w+tail.bounds[2],prefix.bounds[3]]};
+                    });
+                }""", text)
+                assert len(painted) == 1, painted
+                command = painted[0]
+                assert command['text'] != text and command['text'].endswith('…'), command
+                assert command['weight'] == weight, command
+                x,y,w,h = command['bounds']
+                cx,cy,cw,ch = page.evaluate(metric, 'Attachment 1')
+                assert cx <= x < x+w <= cx+cw+.5 and cy <= y < y+h <= cy+ch+.5, (command, [cx,cy,cw,ch])
+                assert '\n' not in command['text'] and '\ufffd' not in command['text']
+            page.wait_for_function('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>e.gallery_command(i,0)===5&&e.gallery_bitmap(i,0)===256&&e.gallery_bitmap(i,1)===144&&e.gallery_bitmap_revision(i,0)===1);}')
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        page.locator('#attachment-vertical').uncheck()
+        page.locator('#design-size').select_option('3')
+        def click(name, *, touch=False):
+            x,y,w,h = page.wait_for_function(metric, arg=name).json_value()
+            position = {'x':x+w/2, 'y':y+h/2}
+            if touch:
+                canvas.tap(position=position)
+            else:
+                canvas.click(position=position)
+        clicks = page.evaluate('cuiGallery.exports.gallery_attachment_stats(0)')
+        click(title)
+        page.wait_for_function('n=>cuiGallery.exports.gallery_attachment_stats(0)===n+1',
+                               arg=clicks)
+        actions = page.evaluate('cuiGallery.exports.gallery_attachment_stats(3)')
+        click('Open', touch=True)
+        page.wait_for_function('n=>cuiGallery.exports.gallery_attachment_stats(3)===n+1', arg=actions)
+        assert page.evaluate('cuiGallery.exports.gallery_attachment_stats(0)') == clicks+1
+        page.locator('#attachment-status').select_option('3')
+        retries = page.evaluate('cuiGallery.exports.gallery_attachment_stats(2)')
+        click('Retry attachment')
+        page.wait_for_function('n=>cuiGallery.exports.gallery_attachment_stats(2)===n+1&&cuiGallery.exports.gallery_attachment_stats(9)===1', arg=retries)
+        assert not errors, errors
+    finally:
+        context.close()
+
+
 def main():
     subprocess.run([sys.executable, str(Path(__file__).with_name('test_snippets.py'))], check=True)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=Path('build/web'))
     parser.add_argument('--chromium', help='Optional installed Chromium executable')
+    parser.add_argument('--attachment-only', action='store_true', help='Run focused Attachment metadata checks only')
     parser.add_argument('--notification-only', action='store_true', help='Run focused Notification checks only')
     parser.add_argument('--pagination-only', action='store_true', help='Run focused Pagination checks only')
     args = parser.parse_args()
@@ -282,6 +373,10 @@ def main():
             if args.chromium:
                 options['executable_path'] = args.chromium
             browser = p.chromium.launch(**options)
+            if args.attachment_only:
+                verify_attachment_metadata(browser, f'http://127.0.0.1:{server.server_port}/cui/')
+                browser.close()
+                return
             if args.notification_only:
                 verify_notification_close(browser, f'http://127.0.0.1:{server.server_port}/cui/')
                 browser.close()
@@ -292,6 +387,7 @@ def main():
                 browser.close()
                 return
             verify_notification_close(browser, f'http://127.0.0.1:{server.server_port}/cui/')
+            verify_attachment_metadata(browser, f'http://127.0.0.1:{server.server_port}/cui/')
             page = browser.new_page(viewport={'width': 1280, 'height': 900}, device_scale_factor=2, permissions=['clipboard-read', 'clipboard-write'])
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))

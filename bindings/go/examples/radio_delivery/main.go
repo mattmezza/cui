@@ -26,6 +26,8 @@ func main() {
 	must(err)
 	motion, err := app.SupportsRadioMotion()
 	must(err)
+	tabOrder, err := app.SupportsRadioTabIndex()
+	must(err)
 	tooltip, err := app.SupportsRadioTooltip()
 	must(err)
 	standard := cui.Item("standard", "Standard")
@@ -45,8 +47,15 @@ func main() {
 		}
 		must(summary.SetText("Estimated arrival: " + arrival))
 	})
+	reset := cui.Button("reset").Text("Reset selection").OnClick(func(cui.Event) {
+		delivery.Selected(standard)
+		must(summary.SetText("Estimated arrival: Friday"))
+	})
+	if tabOrder {
+		delivery.TabIndex(-2)
+	}
 	must(app.Mount(cui.Column("checkout").GapUnits(3).
-		Children(cui.Label("Delivery service"), delivery, summary)))
+		Children(cui.Label("Delivery service"), reset, delivery, summary)))
 
 	if *font != "" && !*smoke {
 		must(app.Run(.016))
@@ -69,6 +78,22 @@ func main() {
 	must(err)
 	if events != 1 || text != "Estimated arrival: Wednesday" {
 		panic("expected one selection callback and an updated estimate")
+	}
+	if tabOrder {
+		for _, key := range []cui.Key{cui.Tab, cui.Enter} {
+			must(app.QueueKey(cui.KeyDown, key, 0, false))
+			must(app.QueueKey(cui.KeyUp, key, 0, false))
+			must(app.Step(.016))
+		}
+		events, err = app.Dispatch()
+		must(err)
+		selected, err := app.Selected(delivery)
+		must(err)
+		text, err = app.Text(summary)
+		must(err)
+		if events != 1 || selected != standard || text != "Estimated arrival: Friday" {
+			panic("expected Reset selection to be the next Tab stop")
+		}
 	}
 }
 

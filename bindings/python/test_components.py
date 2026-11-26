@@ -212,6 +212,86 @@ class Components(unittest.TestCase):
             with App(library=legacy) as app:
                 self.check_provider_without_radio_tooltip(app)
 
+    def test_radio_tab_index_keeps_one_group_stop_and_existing_events(self):
+        with self.assertRaises(ValueError):
+            item("wrong").tab_index(-2)
+        for value in (True, 1.5, "0"):
+            with self.subTest(value=value), self.assertRaises(TypeError):
+                radio("wrong").tab_index(value)
+        for value in (-(1 << 31) - 1, 1 << 31):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                radio_group("outside-range").tab_index(value)
+
+        with App() as app:
+            self.assertTrue(app.supports_radio_tab_index())
+            clicks, changes = [], []
+            review = button("review").label("Review order").on_click(clicks.append)
+            single = radio("alternate", "Alternate").tab_index((1 << 31) - 1)
+            single.on_change(changes.append)
+            standard, priority = item("standard", "Standard"), item("priority", "Priority")
+            group = radio_group("delivery").children(standard, priority).select(standard)
+            group.tab_index(-(1 << 31)).on_change(changes.append)
+            app.mount(column().children(review, single, group)).step()
+
+            def press(key, modifiers=0):
+                app.queue_key("down", key, modifiers=modifiers)
+                app.queue_key("up", key, modifiers=modifiers)
+                app.step()
+
+            press("tab")
+            press("down")
+            self.assertEqual(changes, [])
+            self.assertIs(group.selected(), priority)
+            self.assertEqual(app.dispatch(), 1)
+            self.assertEqual(changes[0].selected_handle,
+                             (priority._handle.slot, priority._handle.generation))
+            press("tab")
+            press("enter")
+            self.assertEqual(app.dispatch(), 1)
+            self.assertIs(clicks[0].node, review)
+            press("tab", modifiers=1)
+            press("up")
+            self.assertEqual(app.dispatch(), 1)
+            self.assertIs(group.selected(), standard)
+            press("tab")
+            press("tab")
+            press("enter")
+            self.assertEqual(app.dispatch(), 1)
+            self.assertIs(changes[-1].node, single)
+            self.assertTrue(changes[-1].checked)
+
+            group.tab_index(None)
+            single.tab_index(0)
+            app.step()
+            self.assertEqual(app.dispatch(), 0)
+            press("tab")
+            press("down")
+            self.assertEqual(app.dispatch(), 1)
+            self.assertIs(group.selected(), priority)
+
+    def check_provider_without_radio_tab_index(self, app):
+        self.assertFalse(app.supports_radio_tab_index())
+        choice = radio("choice", "Choice").tab_index(0)
+        root = column().children(choice)
+        with self.assertRaisesRegex(RuntimeError, "cui_bridge_radio_set_tab_index_v1"):
+            app.mount(root)
+        self.assertIsNone(root._handle)
+        choice.tab_index(None)
+        app.mount(root).step()
+        with self.assertRaisesRegex(RuntimeError, "cui_bridge_radio_set_tab_index_v1"):
+            choice.tab_index(-1)
+        choice.tab_index(None)
+        self.press(app, choice)
+        self.assertTrue(choice.is_checked())
+
+    def test_older_provider_keeps_default_radio_order(self):
+        with App() as app, patch.object(app._api, "radio_set_tab_index", None):
+            self.check_provider_without_radio_tab_index(app)
+        legacy = os.environ.get("CUI_RADIO_LEGACY_LIBRARY")
+        if legacy:
+            with App(library=legacy) as app:
+                self.check_provider_without_radio_tab_index(app)
+
     def test_numeric_ranges_and_static(self):
         with App(width=800,height=800) as app:
             s=slider('slider').range(10,100,5).value(30)

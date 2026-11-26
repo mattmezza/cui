@@ -326,6 +326,41 @@ Use `option.SetRadioTooltip(text, delayMS...)` to handle a mounted update
 error, and pass an empty string to clear. Check `app.SupportsRadioTooltip()`
 before opting in. [Go delivery form](GO_BUILDERS.md#add-radio-tooltips-from-go)
 
+### Set signed Radio tab order
+
+Give a standalone Radio or a RadioGroup a signed index. Lower values come
+first. Equal values follow submission order, with zero as the default. The
+group has one Tab stop, which follows the focused or selected Item. Arrow keys
+still follow Item order. Setting or clearing an index preserves selection and
+the existing queued callbacks.
+
+```c
+#include <cui/cui_bridge.h>
+
+cui_bridge_status prioritize_delivery(cui_bridge_app *app, cui_bridge_node delivery) {
+    return cui_bridge_radio_set_tab_index_v1(app, delivery, 1, -2);
+}
+```
+
+Call between steps on the app's owner thread. Pass `enabled = 0` to restore
+default order. The setter stores the value on the owner and the next frame
+submits it. A direct Item inherits the group's order. Disabled targets remain
+ineligible. If you load the bridge dynamically, probe for this optional symbol.
+
+In Python, call `delivery.tab_index(-2)` on a builder or a mounted widget
+and `delivery.tab_index(None)` to clear. Use `app.supports_radio_tab_index()`
+before opting in when using a dynamically loaded provider.
+
+```python
+if app.supports_radio_tab_index():
+    delivery.tab_index(-2)
+```
+
+The delivery forms put **Reset selection** above the group. With the opt-in,
+Tab enters the group first, the arrows choose a service, and the next Tab
+reaches Reset. [Python delivery form](../bindings/python/examples/radio_delivery.py) ·
+[Go builders and delivery form](GO_BUILDERS.md#set-radio-tab-order-from-go)
+
 ### Configure a retained pager from C
 
 The bridge keeps the page on a `CUI_BRIDGE_PAGINATION` node. Set its total and initial value through `cui_bridge_set_total` and `cui_bridge_set_value`. Use the shared design-size setter for XS through 9XL and the V1 configuration for navigation and labels. For a dynamically loaded provider, probe the optional Pagination V1 symbols and check the version bit and exact layout size before using the extended options. A configured pager or one with an explicit design size or custom height uses the extended theme paint, including the current-page outline and pointer feedback. The default retained pager keeps the original paint.

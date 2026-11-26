@@ -414,6 +414,23 @@ static cui_bridge_status go_set_radio_content(cui_bridge_app *app, cui_bridge_no
                           : CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
 
+static cui_bridge_status (*radio_tab_index_set)(cui_bridge_app *, cui_bridge_node, uint32_t, int32_t);
+static void go_radio_tab_index_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&radio_tab_index_set, sizeof radio_tab_index_set,
+                         "cui_bridge_radio_set_tab_index_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else { radio_tab_index_set = cui_bridge_radio_set_tab_index_v1; }
+#endif
+}
+static int go_radio_tab_index_supported(void) { return radio_tab_index_set != NULL; }
+static cui_bridge_status go_set_radio_tab_index(cui_bridge_app *app, cui_bridge_node node,
+                                                uint32_t enabled, int32_t index) {
+ return radio_tab_index_set ? radio_tab_index_set(app, node, enabled, index)
+                            : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+
 static void go_radio_motion_initialize(void) {
  if (bridge_lib) {
   go_load_optional_symbol(&radio_motion_set, sizeof radio_motion_set,
@@ -513,6 +530,7 @@ static int bridge_open(const char *path) {
  go_skeleton_initialize();
  go_pagination_initialize();
  go_radio_motion_initialize();
+ go_radio_tab_index_initialize();
  go_radio_content_initialize();
  go_radio_tooltip_initialize();
  cui_go_icon_resources_init(bridge_lib);
@@ -545,6 +563,7 @@ static int bridge_open(const char *path) {
  go_skeleton_initialize();
  go_pagination_initialize();
  go_radio_motion_initialize();
+ go_radio_tab_index_initialize();
  go_radio_content_initialize();
  go_radio_tooltip_initialize();
  cui_go_icon_resources_init(bridge_lib);
@@ -639,6 +658,7 @@ type Node struct {
 	change                               func(Event)
 	radioTooltipText                     string
 	radioTooltipDelay                    int
+	radioTabIndex                        *int32
 	checked, radioMotion, radioContent   bool
 	value, min, max, step                float64
 	hasRange, hasValue, hasChecked       bool
@@ -1829,6 +1849,9 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 		}
+		if n.radioTabIndex != nil && C.go_radio_tab_index_supported() == 0 {
+			return ErrRadioTabIndexUnavailable
+		}
 		if n.radioMotion && C.go_radio_motion_supported() == 0 {
 			return ErrRadioMotionUnavailable
 		}
@@ -1915,6 +1938,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.radioContent {
 			if err := n.SetRadioItemContent(true); err != nil {
+				return err
+			}
+		}
+		if n.radioTabIndex != nil {
+			if err := n.SetRadioTabIndex(*n.radioTabIndex); err != nil {
 				return err
 			}
 		}
@@ -2795,6 +2823,57 @@ func (n *Node) SetRadioTooltip(text string, delayMS ...int) error {
 		}
 	}
 	n.radioTooltipText, n.radioTooltipDelay = text, delay
+	return nil
+}
+
+// ErrRadioTabIndexUnavailable indicates the bridge lacks optional Radio tab order.
+var ErrRadioTabIndexUnavailable = errors.New("Radio tab index is unavailable in this bridge")
+
+// SupportsRadioTabIndex reports optional signed Radio and RadioGroup tab order support.
+func (a *App) SupportsRadioTabIndex() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_radio_tab_index_supported() != 0, nil
+}
+
+// TabIndex opts a Radio or RadioGroup into explicit signed tab order, including zero.
+// Lower values come first. RadioGroup shares one stop across its Items.
+func (n *Node) TabIndex(index int32) *Node {
+	if n.err == nil {
+		n.err = n.SetRadioTabIndex(index)
+	}
+	return n
+}
+
+// SetRadioTabIndex sets explicit tab order before or after Mount without selecting.
+func (n *Node) SetRadioTabIndex(index int32) error { return n.setRadioTabIndex(&index) }
+
+// ClearRadioTabIndex restores automatic tab order. Clearing also works on older bridges.
+func (n *Node) ClearRadioTabIndex() error { return n.setRadioTabIndex(nil) }
+
+func (n *Node) setRadioTabIndex(index *int32) error {
+	if n == nil || n.removed || (n.kind != int(C.CUI_BRIDGE_RADIO) && n.kind != int(C.CUI_BRIDGE_RADIO_GROUP)) {
+		return errors.New("tab index requires a live Radio or RadioGroup")
+	}
+	if n.app != nil {
+		supported, err := n.app.SupportsRadioTabIndex()
+		if err != nil {
+			return err
+		}
+		if supported {
+			var value int32
+			if index != nil {
+				value = *index
+			}
+			if err := result(C.go_set_radio_tab_index(n.app.ptr, n.handle, C.uint32_t(btoi(index != nil)), C.int32_t(value))); err != nil {
+				return err
+			}
+		} else if index != nil {
+			return ErrRadioTabIndexUnavailable
+		}
+	}
+	n.radioTabIndex = index
 	return nil
 }
 

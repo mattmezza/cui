@@ -4,6 +4,7 @@
 #include "cui/cui_message.h"
 #include "cui/cui_stepper_visual.h"
 #include "cui_bridge_internal.h"
+#include <limits.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -441,6 +442,28 @@ cui_bridge_status cui_bridge_radio_set_motion_v1(cui_bridge_app *app, cui_bridge
     }
     app->radio_motions[handle.slot] = motion;
     cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+cui_bridge_status cui_bridge_radio_set_tab_index_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                    uint32_t enabled, int32_t tab_index) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_RADIO && node->kind != CUI_BRIDGE_RADIO_GROUP)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (enabled > 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+#if INT_MIN > INT32_MIN || INT_MAX < INT32_MAX
+    if (enabled && (tab_index < INT_MIN || tab_index > INT_MAX))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+#endif
+    int index = enabled ? (int)tab_index : 0;
+    if (node->radio_custom_tab_index != (enabled != 0) || node->radio_tab_index != index) {
+        node->radio_custom_tab_index = enabled != 0;
+        node->radio_tab_index = index;
+        cui_invalidate(app->ui);
+    }
     return CUI_BRIDGE_OK;
 }
 static bool bridge_radio_content_kind(cui_bridge_kind kind) {
@@ -4014,7 +4037,10 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
         cui_radio_group_options options = {.vertical = true, .disabled = node->disabled};
         cui_radio_group_presentation presentation = {.motion = bridge_radio_motion(app, slot),
                                                      .parts = named ? parts : NULL,
-                                                     .part_count = named ? count : 0};
+                                                     .part_count = named ? count : 0,
+                                                     .custom_tab_index =
+                                                         node->radio_custom_tab_index,
+                                                     .tab_index = node->radio_tab_index};
         cui_radio_group_result result =
             cui_radio_group_present_with_content(
                 app->ui, node->id, &app->theme, scratch->radios, count, &selected,
@@ -5513,7 +5539,9 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
     } else if (node->kind == CUI_BRIDGE_RADIO) {
         int value = node->checked ? 1 : 0;
         cui_radio_presentation presentation = {.motion = bridge_radio_motion(app, slot),
-                                               .tooltip = bridge_radio_tooltip(app, slot)};
+                                               .tooltip = bridge_radio_tooltip(app, slot),
+                                               .custom_tab_index = node->radio_custom_tab_index,
+                                               .tab_index = node->radio_tab_index};
         if (bridge_target_style(node, CUI_BRIDGE_SHADOW_INDICATOR))
             presentation.parts.indicator = bridge_indicator_id(node);
         bool changed =

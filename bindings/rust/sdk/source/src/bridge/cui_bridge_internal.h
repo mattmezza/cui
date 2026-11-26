@@ -53,7 +53,7 @@ typedef struct {
     bool stepper_visual, stepper_vertical;
     unsigned stepper_density;
     cui_bridge_button_rounding rounding;
-    bool disabled, custom_hover, radio_item_content;
+    bool disabled, custom_hover, radio_item_content, radio_custom_tab_index;
     cui_color hover;
     cui_bridge_box_shadows_v1 shadows;
     bridge_part_shadows *part_shadows;
@@ -133,6 +133,7 @@ typedef struct {
     cui_bridge_app *owner;
     uint32_t own_slot;
     float pagination_custom_size;
+    int radio_tab_index;
 } cui_bridge_node_record;
 typedef struct {
     uint32_t node_kind, payload_kind;

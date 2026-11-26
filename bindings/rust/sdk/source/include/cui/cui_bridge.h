@@ -961,6 +961,17 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_checked(cui_bridge_app *, cui_br
  * queued notifications keep their existing timing. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_set_motion_v1(cui_bridge_app *, cui_bridge_node,
                                                                 uint32_t enabled);
+/* Optional signed keyboard order on a Radio or RadioGroup. enabled=1 stores
+ * the index (including zero); enabled=0 restores default order and ignores the
+ * index. Lower indices come first and ties follow submission order. A group
+ * contributes a single Tab stop as focus moves among its Items. Disabled
+ * targets stay ineligible. Call on the app's owner thread between steps. The
+ * new order applies after the next successful submission. Errors preserve the
+ * previous setting. No new bridge events. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_set_tab_index_v1(cui_bridge_app *,
+                                                                   cui_bridge_node,
+                                                                   uint32_t enabled,
+                                                                   int32_t tab_index);
 /* Optional decorative children for a direct RadioGroup Item. Disabled by default.
  * An enabled item accepts Row, Column, Label, plain Badge, Avatar, Kbd, Tag, Icon
  * and Image descendants. Enabling rejects existing unsupported descendants without

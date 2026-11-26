@@ -151,6 +151,10 @@ class _API:
         if hasattr(lib, "cui_bridge_radio_set_motion_v1"):
             self.radio_set_motion = bind("radio_set_motion_v1", C.c_int, C.c_void_p,
                                          _Handle, C.c_uint32)
+        self.radio_set_tab_index = None
+        if hasattr(lib, "cui_bridge_radio_set_tab_index_v1"):
+            self.radio_set_tab_index = bind("radio_set_tab_index_v1", C.c_int, C.c_void_p,
+                                            _Handle, C.c_uint32, C.c_int32)
         self.radio_item_set_content = None
         if hasattr(lib, "cui_bridge_radio_item_set_content_v1"):
             self.radio_item_set_content = bind("radio_item_set_content_v1", C.c_int,
@@ -472,6 +476,7 @@ class Widget:
         self._disabled = False
         self._checked = False
         self._radio_motion = False
+        self._radio_tab_index: int | None = None
         self._radio_content = False
         self._radio_tooltip: tuple[bytes, int] | None = None
         self._detail = ""
@@ -705,6 +710,25 @@ class Widget:
             if self._app.supports_radio_motion():
                 self._change("radio_set_motion", int(enabled))
         self._radio_motion = enabled
+        return self
+
+    def tab_index(self, index: int | None) -> "Widget":
+        """Set signed Tab order for Radio or RadioGroup. None restores default order."""
+        if self.kind not in {"radio", "radio_group"}:
+            raise ValueError("tab_index requires Radio or RadioGroup")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if index is not None:
+            if type(index) is not int:
+                raise TypeError("tab index must be an integer or None")
+            if not -(1 << 31) <= index < (1 << 31):
+                raise ValueError("tab index must fit a signed 32-bit integer")
+        if self._app is not None:
+            if index is not None:
+                self._app._require_radio_tab_index()
+            if self._app.supports_radio_tab_index():
+                self._change("radio_set_tab_index", int(index is not None), index or 0)
+        self._radio_tab_index = index
         return self
 
     def decorate_content(self, enabled: bool = True) -> "Widget":
@@ -1707,6 +1731,15 @@ class App:
         if not self.supports_radio_motion():
             raise RuntimeError("Radio motion requires cui_bridge_radio_set_motion_v1")
 
+    def supports_radio_tab_index(self) -> bool:
+        """Report whether the loaded bridge offers signed Radio and RadioGroup Tab order."""
+        self._ensure_open()
+        return self._api.radio_set_tab_index is not None
+
+    def _require_radio_tab_index(self) -> None:
+        if not self.supports_radio_tab_index():
+            raise RuntimeError("Radio Tab order requires cui_bridge_radio_set_tab_index_v1")
+
     def supports_radio_item_content(self) -> bool:
         """Report whether direct RadioGroup Items can paint passive children."""
         self._ensure_open()
@@ -1790,6 +1823,8 @@ class App:
                 node._preflight_pagination(self)
             if node._radio_motion:
                 self._require_radio_motion()
+            if node._radio_tab_index is not None:
+                self._require_radio_tab_index()
             if radio_content and node.kind not in _RADIO_CONTENT_KINDS:
                 raise ValueError(f"{node.kind} cannot decorate a RadioGroup Item")
             if node._radio_content:
@@ -1859,6 +1894,8 @@ class App:
                     node._change("set_checked", int(node._checked))
                 if node._radio_motion:
                     node._change("radio_set_motion", 1)
+                if node._radio_tab_index is not None:
+                    node._change("radio_set_tab_index", 1, node._radio_tab_index)
                 if node._radio_content:
                     node._change("radio_item_set_content", 1)
                 if node._radio_tooltip is not None:

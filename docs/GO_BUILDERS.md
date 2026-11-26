@@ -204,6 +204,26 @@ Use `priority.SetRadioTooltip("")` to clear the hint, or pass new text and an
 optional delay to edit it on a mounted option. The option and its selection
 callback stay available on older providers. [Run the delivery form](#animate-radio-selection-from-go)
 
+## Set Radio tab order from Go
+
+Use `TabIndex(index)` on a Radio or RadioGroup builder. Lower indices come
+first. The group keeps one stop while focus moves among its Items. Probe for
+the feature first if your program may load an earlier bridge.
+
+```go
+supported, err := app.SupportsRadioTabIndex()
+if err != nil {
+    return err
+}
+if supported {
+    delivery.TabIndex(-2)
+}
+```
+
+On a mounted radio, `SetRadioTabIndex(index)` returns any update error
+directly. `ClearRadioTabIndex()` restores default order. Both preserve the
+current selection. [Complete delivery example](../bindings/go/examples/radio_delivery/main.go)
+
 ## Configure Pagination from Go
 
 `ConfiguredPagination` records copied layout options on a detached node. Set `AvailableWidth` to the current inner width in logical pixels to wrap, or use zero for a single row. Send committed pages to your results view through `OnChange`. For a dynamic provider, check `app.SupportsPaginationOptions()` before opting in. Ordinary `Pagination(key)` and its change callback also work with earlier providers.

@@ -92,7 +92,8 @@ on `cui_radio_presentation` in `cui_radio_present`. Its existing
 
 Try **Custom tab order** in the WASM Radio demo. Tab visits the delivery
 options before the reset button, even though the button appears first.
-The retained bridge and language builders do not expose custom Radio ordering.
+Retained C, Python and Go expose the same ordering through their optional
+bridge feature. [Retained examples](BRIDGE_COMPONENTS.md#set-signed-radio-tab-order)
 
 ## Add descriptions and custom content
 

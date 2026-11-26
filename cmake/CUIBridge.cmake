@@ -582,6 +582,7 @@ if(CUI_GO_RADIO_MOTION_TESTS)
    CUI_BRIDGE_LIBRARY=${library} CUI_TEST_RADIO_MOTION_LEGACY=${legacy}
    CUI_TEST_RADIO_CONTENT_LEGACY=${legacy}
    CUI_TEST_RADIO_TOOLTIP_LEGACY=${legacy}
+   CUI_TEST_RADIO_TAB_INDEX_LEGACY=${legacy}
    SDL_RENDER_DRIVER=software
    ${CUI_GO_RADIO_MOTION_EXECUTABLE} ${ARGN})
   set_tests_properties(bridge_go_radio_motion_${suffix} PROPERTIES

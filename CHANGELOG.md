@@ -24,6 +24,8 @@
   Priority.
 - Immediate C Radio and RadioGroup accept signed keyboard tab ordering.
   RadioGroup remains one Tab stop. The WASM gallery demonstrates the option.
+- Retained C, Python and Go expose the optional ordering and keep existing
+  selection events. The delivery forms put the group before Reset in Tab order.
 
 ## 0.1.0-alpha.7
 

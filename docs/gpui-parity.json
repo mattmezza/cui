@@ -2623,7 +2623,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. RadioGroup supports descriptions and decorative callbacks in immediate C. The retained C bridge, Python, JavaScript, TypeScript, Go and Rust support Item descriptions and opt-in passive children. Optional tooltips are available for standalone and grouped options in immediate C, the retained C bridge, Python, JavaScript, TypeScript, Go and Rust. Immediate C supports signed tab ordering; retained ordering, full styling and OS accessibility acceptance remain open."
+        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. RadioGroup supports descriptions and decorative callbacks in immediate C. The retained C bridge, Python, JavaScript, TypeScript, Go and Rust support Item descriptions and opt-in passive children. Optional tooltips are available for standalone and grouped options in immediate C, the retained C bridge, Python, JavaScript, TypeScript, Go and Rust. Immediate C, retained C, Python and Go support signed tab ordering. Ordering in JavaScript, TypeScript and Rust, full styling and OS accessibility acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2748,10 +2748,16 @@
           "evidence": [
             "tests/unit/test_radio_group.c:test_tab_order",
             "tests/web/test_radio_group.py:check_tab_order",
-            "docs/RADIO_GROUP.md"
+            "tests/unit/test_bridge_radio_motion.c:test_tab_order",
+            "bindings/python/test_components.py:test_radio_tab_index_keeps_one_group_stop_and_existing_events",
+            "bindings/python/examples/radio_delivery.py",
+            "bindings/go/cui/radio_tab_index_test.go",
+            "bindings/go/examples/radio_delivery/main.go",
+            "docs/RADIO_GROUP.md",
+            "docs/BRIDGE_COMPONENTS.md"
           ],
           "limitations": [
-            "Available in immediate C presentation and demonstrated for groups in the WASM gallery. The retained bridge and language builders lack ordering controls."
+            "Available in immediate C, the retained C bridge, Python and Go. The WASM gallery demonstrates group ordering. JavaScript, TypeScript and Rust builders currently omit it."
           ]
         },
         {

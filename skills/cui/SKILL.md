@@ -72,8 +72,12 @@ complete matching headers. `--declaration` explicitly selects the concise API vi
 No output is clipped or filtered by safety keywords.
 
 For RadioGroup descriptions, decorative content, option tooltips and signed
-tab ordering in immediate C, read `docs/RADIO_GROUP.md`. Keep one zero-initialized `cui_radio_tooltip_state`
-per option. Retained applications can use the Item detail setter
+tab ordering in immediate C, read `docs/RADIO_GROUP.md`. For retained order,
+probe `cui_bridge_radio_set_tab_index_v1` or the Python and Go capabilities.
+See `docs/BRIDGE_COMPONENTS.md#set-signed-radio-tab-order`.
+
+Keep one zero-initialized `cui_radio_tooltip_state` per option. Retained
+applications can use the Item detail setter
 in `docs/BRIDGE_COMPONENTS.md` for copied accessible descriptions.
 Retained C can add an optional copied hint through
 `cui_bridge_radio_set_tooltip_v1` on Radio or a direct RadioGroup Item.

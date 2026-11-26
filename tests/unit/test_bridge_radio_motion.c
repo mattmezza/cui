@@ -205,6 +205,111 @@ static void test_tooltips(void) {
     cui_bridge_destroy(app);
 }
 
+static void press(cui_bridge_app *app, cui_bridge_key key, uint32_t modifiers) {
+    assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, key, modifiers, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_UP, key, modifiers, 0) == CUI_BRIDGE_OK);
+    step(app);
+}
+
+static const cui_semantic *semantic(cui_bridge_app *app, cui_bridge_node handle) {
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(app->ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if (nodes[i].id == app->nodes[handle.slot].id)
+            return &nodes[i];
+    assert(!"missing bridge semantic");
+    return NULL;
+}
+
+static void test_tab_order(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_SDL,
+                                  .width = 320,
+                                  .height = 240,
+                                  .max_nodes = 12};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = node(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root");
+    cui_bridge_node button = node(app, root, CUI_BRIDGE_BUTTON, "review");
+    cui_bridge_node radio = node(app, root, CUI_BRIDGE_RADIO, "standalone");
+    cui_bridge_node group = node(app, root, CUI_BRIDGE_RADIO_GROUP, "group");
+    cui_bridge_node first = node(app, group, CUI_BRIDGE_ITEM, "first");
+    cui_bridge_node second = node(app, group, CUI_BRIDGE_ITEM, "second");
+    assert(cui_bridge_set_selected(app, group, first) == CUI_BRIDGE_OK);
+
+    step(app);
+    press(app, CUI_BRIDGE_KEY_TAB, 0);
+    assert(semantic(app, button)->focused);
+    cui_focus(app->ui, 0);
+    step(app);
+
+    assert(cui_bridge_radio_set_tab_index_v1(NULL, radio, 1, 1) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_radio_set_tab_index_v1(app, button, 1, 1) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_radio_set_tab_index_v1(app, first, 1, 1) == CUI_BRIDGE_INVALID_STATE);
+    allocations_until_failure = 1;
+    assert(cui_bridge_radio_set_tab_index_v1(app, radio, 1, INT32_MAX) == CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_tab_index_v1(app, group, 1, INT32_MIN) == CUI_BRIDGE_OK);
+    assert(allocations_until_failure == 1);
+    allocations_until_failure = 0;
+    assert(cui_bridge_radio_set_tab_index_v1(app, group, 2, 2) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_needs_redraw(app->ui));
+
+    step(app);
+    assert(semantic(app, first)->tab_ordered && semantic(app, first)->tab_index == INT32_MIN);
+    assert(!semantic(app, first)->tab_stop_disabled && semantic(app, second)->tab_stop_disabled);
+    assert(semantic(app, radio)->tab_ordered && semantic(app, radio)->tab_index == INT32_MAX);
+    cui_bridge_notification_v1 event;
+    assert(poll(app, &event) == CUI_BRIDGE_EMPTY);
+    press(app, CUI_BRIDGE_KEY_TAB, 0);
+    assert(semantic(app, first)->focused);
+    press(app, CUI_BRIDGE_KEY_DOWN_ARROW, 0);
+    assert(semantic(app, second)->focused && semantic(app, second)->checked &&
+           !semantic(app, first)->checked && semantic(app, first)->tab_stop_disabled &&
+           !semantic(app, second)->tab_stop_disabled &&
+           semantic(app, second)->tab_index == INT32_MIN);
+    assert(poll(app, &event) == CUI_BRIDGE_OK && event.kind == CUI_BRIDGE_NOTIFY_CHANGE &&
+           event.node.slot == group.slot && event.payload_kind == CUI_BRIDGE_PAYLOAD_SELECTION &&
+           event.payload.selected.slot == second.slot);
+
+    press(app, CUI_BRIDGE_KEY_TAB, 0);
+    assert(semantic(app, button)->focused);
+    press(app, CUI_BRIDGE_KEY_TAB, 0);
+    assert(semantic(app, radio)->focused);
+    press(app, CUI_BRIDGE_KEY_TAB, CUI_BRIDGE_MOD_SHIFT);
+    assert(semantic(app, button)->focused);
+    press(app, CUI_BRIDGE_KEY_TAB, CUI_BRIDGE_MOD_SHIFT);
+    assert(semantic(app, second)->focused && poll(app, &event) == CUI_BRIDGE_EMPTY);
+
+    assert(cui_bridge_set_disabled(app, group, 1) == CUI_BRIDGE_OK);
+    step(app);
+    cui_focus(app->ui, 0);
+    step(app);
+    press(app, CUI_BRIDGE_KEY_TAB, 0);
+    assert(semantic(app, button)->focused && semantic(app, second)->disabled);
+    assert(cui_bridge_set_disabled(app, group, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_tab_index_v1(app, radio, 1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_tab_index_v1(app, group, 0, INT32_MIN) == CUI_BRIDGE_OK);
+    step(app);
+    assert(semantic(app, radio)->tab_ordered && semantic(app, radio)->tab_index == 0);
+    assert(!semantic(app, second)->tab_ordered && semantic(app, second)->tab_index == 0);
+    press(app, CUI_BRIDGE_KEY_TAB, 0);
+    assert(semantic(app, radio)->focused); /* Equal indices use submission order. */
+    press(app, CUI_BRIDGE_KEY_TAB, 0);
+    assert(semantic(app, second)->focused);
+    assert(poll(app, &event) == CUI_BRIDGE_EMPTY);
+
+    assert(cui_bridge_radio_set_tab_index_v1(app, group, 1, -9) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_remove(app, group) == CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_tab_index_v1(app, group, 0, 0) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_node replacement = node(app, root, CUI_BRIDGE_RADIO, "replacement");
+    assert(replacement.slot == group.slot && replacement.generation != group.generation);
+    step(app);
+    assert(!semantic(app, replacement)->tab_ordered && semantic(app, replacement)->tab_index == 0);
+    cui_bridge_destroy(app);
+}
+
 int main(void) {
     cui_bridge_options options = {.struct_size = sizeof options,
                                   .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -343,4 +448,5 @@ int main(void) {
     assert(next.slot == group.slot && !bridge_radio_motion(app, next.slot));
     cui_bridge_destroy(app);
     test_tooltips();
+    test_tab_order();
 }

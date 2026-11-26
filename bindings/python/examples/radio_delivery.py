@@ -1,7 +1,7 @@
 """Choose a delivery service. Pass --font FONT to open the native app."""
 import argparse
 
-from cui_bridge import App, column, item, label, radio_group, tag
+from cui_bridge import App, button, column, item, label, radio_group, tag
 
 
 def main():
@@ -22,7 +22,12 @@ def main():
         arrival = "Wednesday" if group.selected() is priority else "Friday"
         summary.label(f"Estimated arrival: {arrival}")
 
+    def reset_selection(event):
+        group.select(standard)
+        update_estimate(event)
+
     group.on_change(update_estimate)
+    reset = button("reset").label("Reset selection").on_click(reset_selection)
     with App(backend="sdl" if args.font else "none", font_path=args.font,
              title="Delivery options", width=320, height=200) as app:
         group.animate_selection(app.supports_radio_motion())
@@ -30,7 +35,11 @@ def main():
         priority.decorate_content(decorated)
         if app.supports_radio_tooltip():
             priority.radio_tooltip("Track your parcel online")
-        app.mount(column("checkout").gap(12).children(label("Delivery service"), group, summary))
+        ordered = app.supports_radio_tab_index()
+        if ordered:
+            group.tab_index(-2)
+        app.mount(column("checkout").gap(12).children(
+            label("Delivery service"), reset, group, summary))
         if args.font:
             app.run()
         else:
@@ -42,6 +51,14 @@ def main():
             assert app.dispatch() == 1
             assert group.selected() is priority
             assert arrival == "Wednesday"
+            if ordered:
+                for key in ("tab", "enter"):
+                    app.queue_key("down", key)
+                    app.queue_key("up", key)
+                    app.step()
+                assert app.dispatch() == 1
+                assert group.selected() is standard
+                assert arrival == "Friday"
 
 
 if __name__ == "__main__":

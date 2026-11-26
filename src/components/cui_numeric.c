@@ -6,6 +6,7 @@
 #include "cui/cui_content.h"
 #include "cui/cui_icon.h"
 #include "cui/cui_number_events.h"
+#include "cui_button_paint_internal.h"
 #include <math.h>
 #include <stdio.h>
 static void cui_numeric_paint_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str text,
@@ -203,14 +204,14 @@ static void cui_pagination_paint_icon(cui_context *ui, cui_id id, const cui_them
             .size = CUI_ICON_CUSTOM, .custom_size = size, .custom_color = true, .color = color});
 }
 static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *layout, cui_id id,
-                                      cui_str label, bool disabled, const char *leading_icon,
-                                      const char *trailing_icon) {
+                                      cui_str label, bool disabled, bool current,
+                                      const char *leading_icon, const char *trailing_icon) {
     const cui_theme *t = layout->theme;
     const cui_design_metrics *m = layout->metrics;
-    cui_color text = id ? (disabled ? t->muted : t->on_primary) : (disabled ? t->muted : t->text);
+    cui_color text = disabled ? t->muted : t->text;
     if (!m) {
         if (id)
-            cui_numeric_paint_button(ui, id, t, label, disabled);
+            cui_numeric_paint_button(ui, id, t, label, disabled || current);
         else
             cui_text(ui, label, t->font_size, text);
         return;
@@ -239,20 +240,34 @@ static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *la
         }
         layout->occupied = occupied;
     }
-    if (id)
-        cui_begin_box(ui, id,
-                      (cui_box){.row = has_icon,
-                                .gap = has_icon ? m->gap : 0,
-                                .width = width,
-                                .height = m->control_height,
-                                .fixed_width = true,
-                                .fixed_height = true,
-                                .align_x = CUI_ALIGN_CENTER,
-                                .align_y = CUI_ALIGN_CENTER,
-                                .radius = t->radius,
-                                .background = disabled ? t->surface : t->primary,
-                                .border = cui_focused(ui) == id ? t->focus : t->border,
-                                .border_width = 1});
+    if (id) {
+        cui_interaction state = {0};
+        if (!disabled && !current) {
+            cui_set_cursor(ui, id, CUI_CURSOR_POINTER);
+            state.hovered = cui_hovered(ui, id);
+            state.pressed = cui_pressed(ui, id);
+            state.focus_visible =
+                cui_focused(ui) == id && cui_interaction_state(ui, id).focus_visible;
+        }
+        cui_button_style_paint paint = cui_button_default_paint(
+            (cui_box){.row = has_icon,
+                      .gap = has_icon ? m->gap : 0,
+                      .width = width,
+                      .height = m->control_height,
+                      .fixed_width = true,
+                      .fixed_height = true,
+                      .align_x = CUI_ALIGN_CENTER,
+                      .align_y = CUI_ALIGN_CENTER,
+                      .radius = t->radius,
+                      .border_width = 1},
+            t,
+            (cui_button_options){.variant = current ? CUI_BUTTON_OUTLINE : CUI_BUTTON_GHOST,
+                                 .disabled = disabled,
+                                 .open = id == layout->popup_trigger},
+            state, NULL);
+        cui_begin_box(ui, id, paint.root);
+        text = paint.foreground;
+    }
     if (id && id == layout->popup_trigger) {
         cui_rect anchor = cui_bounds(ui, id);
         cui_set_prepaint(ui, (cui_prepaint_options){.callback = cui_pagination_follow_anchor,
@@ -562,14 +577,14 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
     cui_begin_box(ui, id, (cui_box){.row = !wrap, .gap = metrics.gap, .align_y = CUI_ALIGN_CENTER});
     if (ends)
         cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 1), labels.first,
-                                  disabled || *page <= 1, NULL, NULL);
+                                  disabled || *page <= 1, false, NULL, NULL);
     cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 2),
-                              icon ? (cui_str){0} : labels.previous, disabled || *page <= 1,
+                              icon ? (cui_str){0} : labels.previous, disabled || *page <= 1, false,
                               chevrons ? "chevron-left" : NULL, NULL);
     if (!icon && options.compact) {
         char label[64];
         snprintf(label, sizeof(label), "%zu / %zu", *page, total);
-        cui_pagination_paint_item(ui, &layout, 0, cui_string(label), false, NULL, NULL);
+        cui_pagination_paint_item(ui, &layout, 0, cui_string(label), false, false, NULL, NULL);
     } else if (!icon) {
         cui_page_item items[CUI_PAGINATION_MAX_ITEMS];
         size_t n = cui_pagination_visible_items(*page, total, options.visible_pages, items);
@@ -584,27 +599,27 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
                     ui, trigger,
                     (cui_semantic_details){.parent = id,
                                            .expanded = open,
-                                           .controls = cui_pagination_popup_id(id, side),
-                                           .cursor = CUI_CURSOR_POINTER});
-                cui_pagination_paint_item(ui, &layout, trigger, (cui_str){0}, disabled, "ellipsis",
-                                          NULL);
+                                           .controls = cui_pagination_popup_id(id, side)});
+                cui_pagination_paint_item(ui, &layout, trigger, (cui_str){0}, disabled, false,
+                                          "ellipsis", NULL);
             } else if (items[i].ellipsis)
-                cui_pagination_paint_item(ui, &layout, 0, cui_string("..."), true, NULL, NULL);
+                cui_pagination_paint_item(ui, &layout, 0, cui_string("..."), true, false, NULL,
+                                          NULL);
             else {
                 char label[32];
                 snprintf(label, sizeof(label), "%zu", items[i].page);
                 cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 10 + (unsigned)i),
-                                          cui_string(label), disabled || items[i].page == *page,
-                                          NULL, NULL);
+                                          cui_string(label), disabled, items[i].page == *page, NULL,
+                                          NULL);
             }
         }
     }
     cui_pagination_paint_item(
         ui, &layout, cui_numeric_part_id(id, 3), icon ? (cui_str){0} : labels.next,
-        disabled || !total || *page >= total, NULL, chevrons ? "chevron-right" : NULL);
+        disabled || !total || *page >= total, false, NULL, chevrons ? "chevron-right" : NULL);
     if (ends)
         cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 4), labels.last,
-                                  disabled || !total || *page >= total, NULL, NULL);
+                                  disabled || !total || *page >= total, false, NULL, NULL);
     if (layout.row_open)
         cui_end_box(ui);
     cui_end_box(ui);

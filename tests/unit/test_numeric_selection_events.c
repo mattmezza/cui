@@ -302,6 +302,92 @@ static void pagination_pointer(fixture *f, unsigned part, cui_event_type type,
                                               .y = bounds.y + bounds.h / 2}));
 }
 
+static const cui_draw_command *pagination_paint(fixture *f, cui_id id, cui_draw_type type) {
+    cui_rect b = cui_bounds(f->ui, id);
+    for (size_t i = 0; i < f->draw.count; ++i) {
+        const cui_draw_command *c = &f->draw.commands[i];
+        if (c->type == type && c->bounds.x == b.x && c->bounds.y == b.y && c->bounds.w == b.w &&
+            c->bounds.h == b.h)
+            return c;
+    }
+    return NULL;
+}
+static bool same_color(cui_color a, cui_color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+static void pagination_button_paint(void) {
+    fixture f = make();
+    f.value = 1;
+    cui_pagination_options options = {.visible_pages = 5,
+                                      .design_size = CUI_DESIGN_BASE,
+                                      .navigation = CUI_PAGINATION_NAV_CHEVRONS,
+                                      .ellipsis_viewport = {0, 0, 400, 420}};
+    cui_theme t = cui_theme_light();
+    cui_theme_button_colors palette = t.buttons[CUI_THEME_BUTTON_DEFAULT];
+    cui_id next = cui_numeric_part_id(2, 3);
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    const cui_semantic *current = pagination_node(&f, CUI_ROLE_BUTTON, "1");
+    assert(current && current->disabled && current->details.selected);
+    const cui_draw_command *paint = pagination_paint(&f, current->id, CUI_DRAW_BORDER);
+    assert(paint && paint->stroke == 1 && same_color(paint->color, palette.outline_border));
+    assert(!pagination_paint(&f, next, CUI_DRAW_RECT));
+    cui_rect original = cui_bounds(f.ui, next);
+    pagination_pointer(&f, 2, CUI_EVENT_POINTER_MOVE, CUI_POINTER_MOUSE);
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    assert(cui_pointer_cursor(f.ui) == CUI_CURSOR_DEFAULT);
+
+    pagination_pointer(&f, 3, CUI_EVENT_POINTER_MOVE, CUI_POINTER_MOUSE);
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    paint = pagination_paint(&f, next, CUI_DRAW_RECT);
+    assert(paint && same_color(paint->color, t.accent));
+    assert(cui_pointer_cursor(f.ui) == CUI_CURSOR_POINTER);
+    pagination_pointer(&f, 3, CUI_EVENT_POINTER_DOWN, CUI_POINTER_MOUSE);
+    assert(!ellipsis_frame(&f, 20, options, false, false).control && f.value == 1);
+    paint = pagination_paint(&f, next, CUI_DRAW_RECT);
+    assert(paint && same_color(paint->color, palette.active));
+    pagination_pointer(&f, 3, CUI_EVENT_POINTER_UP, CUI_POINTER_MOUSE);
+    assert(ellipsis_frame(&f, 20, options, false, false).change_count == 1 && f.value == 2);
+    current = pagination_node(&f, CUI_ROLE_BUTTON, "2");
+    assert(current && current->disabled && current->details.selected);
+    assert(pagination_paint(&f, current->id, CUI_DRAW_BORDER));
+    cui_focus(f.ui, next);
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    paint = pagination_paint(&f, next, CUI_DRAW_BORDER);
+    assert(paint && paint->stroke == 2 && same_color(paint->color, t.focus));
+    cui_rect focused = cui_bounds(f.ui, next);
+    assert(focused.x == original.x && focused.y == original.y && focused.w == original.w &&
+           focused.h == original.h);
+
+    const cui_semantic *gap = pagination_node(&f, CUI_ROLE_BUTTON, "Later pages");
+    assert(gap);
+    cui_id trigger = gap->id;
+    pagination_action(&f, trigger);
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    assert(pagination_node(&f, CUI_ROLE_MENU, "Later pages") && f.value == 2 && f.calls == 1);
+    paint = pagination_paint(&f, trigger, CUI_DRAW_RECT);
+    assert(paint && same_color(paint->color, t.buttons[CUI_THEME_BUTTON_SECONDARY].active));
+    pagination_key(&f, CUI_KEY_ESCAPE);
+    assert(!ellipsis_frame(&f, 20, options, false, false).control);
+    assert(!pagination_node(&f, CUI_ROLE_MENU, "Later pages"));
+    assert(!pagination_paint(&f, trigger, CUI_DRAW_RECT));
+
+    options.disabled = true;
+    activate(&f, 3);
+    assert(!ellipsis_frame(&f, 20, options, false, false).control && f.value == 2 && f.calls == 1);
+    assert(!pagination_paint(&f, next, CUI_DRAW_RECT) &&
+           !pagination_paint(&f, next, CUI_DRAW_BORDER));
+    assert(cui_pointer_cursor(f.ui) == CUI_CURSOR_DEFAULT);
+    current = pagination_node(&f, CUI_ROLE_BUTTON, "2");
+    paint = pagination_paint(&f, current->id, CUI_DRAW_BORDER);
+    palette.outline_border.a /= 2;
+    assert(paint && same_color(paint->color, palette.outline_border));
+
+    assert(!page_frame(&f, true, true, 20, true, false, 0, false).control);
+    paint = pagination_paint(&f, next, CUI_DRAW_RECT);
+    assert(paint && same_color(paint->color, t.primary));
+    cui_destroy(f.ui);
+}
+
 static void pagination_tooltip_idle(fixture *f, cui_pagination_options options) {
     for (unsigned i = 0; i < 32; ++i)
         assert(!ellipsis_frame(f, 20, options, false, false).control);
@@ -933,6 +1019,7 @@ int main(void) {
     custom_sized_pagination();
     pagination_modes();
     pagination_localized_navigation();
+    pagination_button_paint();
     pagination_arrow_tooltips();
     pagination_ellipsis_menu();
     for (unsigned styled = 0; styled < 2; ++styled) {

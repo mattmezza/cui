@@ -116,6 +116,7 @@ def generate(name,sources):
     if name == "cui_otp_events":
         lines += ['#include "cui_components.h"', '#ifndef CUI_OTP_IMPLEMENTATION', '#define CUI_OTP_IMPLEMENTATION', '#endif', '#include "cui_otp.h"']
     if name == "cui_numeric":
+        lines += ['#include "cui_button_styles.h"']
         lines += ['#ifndef CUI_NUMERIC_SELECTION_EVENTS_IMPLEMENTATION', '#define CUI_NUMERIC_SELECTION_EVENTS_IMPLEMENTATION', '#endif', '#include "cui_numeric_selection_events.h"']
         lines += ['#ifndef CUI_NUMBER_EVENTS_IMPLEMENTATION', '#define CUI_NUMBER_EVENTS_IMPLEMENTATION', '#endif', '#include "cui_number_events.h"']
     if name in {"cui_number_events", "cui_numeric_selection_events"}:
@@ -183,7 +184,7 @@ def generate(name,sources):
         for private_include in ['#include "cui_textarea_geometry.h"', '#include "../base/cui_textarea_geometry.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_textarea_geometry.h').read_text(encoding='utf-8'))
         code=code.replace('#include "cui_table_internal.h"', (ROOT/'src/base/cui_table_internal.h').read_text(encoding='utf-8'))
-        for private_path in ['src/base/cui_pagination_internal.h', 'src/base/cui_dialog_composition_private.h', 'src/base/cui_dialog_internal.h', 'src/components/cui_slider_model_presentation_internal.h', 'src/components/cui_spring_internal.h', 'src/base/cui_base_slider_model_internal.h', 'src/base/cui_dropdown_metadata_internal.h', 'src/components/cui_popover_paint.h', 'src/components/cui_questionnaire_presentation_private.h', 'src/base/cui_questionnaire_observer_internal.h', 'src/base/cui_questionnaire_snapshot_math.h', 'src/base/cui_form_private.h', 'src/components/cui_input_private.h', 'src/components/cui_scroll_private.h', 'src/base/cui_command_events_private.h', 'src/base/cui_color_entry_internal.h', 'src/base/cui_color_hsla_entry_internal.h', 'src/base/cui_picker_composition_internal.h', 'src/base/cui_date_time_internal.h', 'src/components/cui_picker_paint_internal.h']:
+        for private_path in ['src/base/cui_pagination_internal.h', 'src/base/cui_dialog_composition_private.h', 'src/base/cui_dialog_internal.h', 'src/components/cui_slider_model_presentation_internal.h', 'src/components/cui_spring_internal.h', 'src/base/cui_base_slider_model_internal.h', 'src/base/cui_dropdown_metadata_internal.h', 'src/components/cui_popover_paint.h', 'src/components/cui_questionnaire_presentation_private.h', 'src/base/cui_questionnaire_observer_internal.h', 'src/base/cui_questionnaire_snapshot_math.h', 'src/base/cui_form_private.h', 'src/components/cui_input_private.h', 'src/components/cui_scroll_private.h', 'src/components/cui_button_paint_internal.h', 'src/base/cui_command_events_private.h', 'src/base/cui_color_entry_internal.h', 'src/base/cui_color_hsla_entry_internal.h', 'src/base/cui_picker_composition_internal.h', 'src/base/cui_date_time_internal.h', 'src/components/cui_picker_paint_internal.h']:
             private_name = private_path.rsplit("/", 1)[-1]
             for private_include in [f'#include "{private_name}"', f'#include "../base/{private_name}"', f'#include "../components/{private_name}"']:
                 code = code.replace(private_include, (ROOT/private_path).read_text(encoding='utf-8'))

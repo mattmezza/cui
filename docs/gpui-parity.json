@@ -2390,6 +2390,14 @@
           ]
         },
         {
+          "name": "theme paint and pointer cursor for navigation states",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric_selection_events.c",
+            "tests/web/test_browser.py"
+          ]
+        },
+        {
           "name": "bounded numbered window and icon-only navigation",
           "status": "tested",
           "evidence": [

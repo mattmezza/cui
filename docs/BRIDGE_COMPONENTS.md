@@ -119,7 +119,7 @@ a sort request.
 
 ### Configure a retained pager from C
 
-The bridge keeps the page on a `CUI_BRIDGE_PAGINATION` node. Set its total and initial value through `cui_bridge_set_total` and `cui_bridge_set_value`. Use the shared design-size setter for XS through 9XL and the V1 configuration for navigation and labels. For a dynamically loaded provider, probe the optional Pagination V1 symbols and check the version bit and exact layout size before using the extended options.
+The bridge keeps the page on a `CUI_BRIDGE_PAGINATION` node. Set its total and initial value through `cui_bridge_set_total` and `cui_bridge_set_value`. Use the shared design-size setter for XS through 9XL and the V1 configuration for navigation and labels. For a dynamically loaded provider, probe the optional Pagination V1 symbols and check the version bit and exact layout size before using the extended options. A configured pager or one with an explicit design size or custom height uses the extended theme paint, including the current-page outline and pointer feedback. The default retained pager keeps the original paint.
 
 ```c
 #include <cui/cui_bridge.h>

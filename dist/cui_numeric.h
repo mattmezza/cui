@@ -155,6 +155,7 @@ bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *theme, const cui_s
 
 #if defined(CUI_NUMERIC_IMPLEMENTATION) && defined(CUI_NUMERIC_DECLARATIONS_READY) && !defined(CUI_NUMERIC_IMPLEMENTATION_ONCE)
 #define CUI_NUMERIC_IMPLEMENTATION_ONCE
+#include "cui_button_styles.h"
 #ifndef CUI_NUMERIC_SELECTION_EVENTS_IMPLEMENTATION
 #define CUI_NUMERIC_SELECTION_EVENTS_IMPLEMENTATION
 #endif
@@ -900,6 +901,116 @@ cui_base_pagination_observe_internal(cui_context *, cui_id, size_t *, size_t tot
 
 
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_BUTTON_PAINT_INTERNAL_H
+#define CUI_BUTTON_PAINT_INTERNAL_H
+
+#include <math.h>
+
+/* Shared by styled controls that handle interaction and geometry separately. */
+static inline cui_button_style_paint cui_button_default_paint(cui_box b, const cui_theme *t,
+                                                              cui_button_options o,
+                                                              cui_interaction state,
+                                                              cui_color *caret) {
+    bool disabled = o.disabled;
+    bool text = o.variant == CUI_BUTTON_TEXT;
+    cui_theme_button_kind kind =
+        o.variant == CUI_BUTTON_SECONDARY ? CUI_THEME_BUTTON_SECONDARY
+        : o.variant == CUI_BUTTON_DANGER  ? CUI_THEME_BUTTON_DANGER
+        : o.variant == CUI_BUTTON_WARNING ? CUI_THEME_BUTTON_WARNING
+        : o.variant == CUI_BUTTON_SUCCESS ? CUI_THEME_BUTTON_SUCCESS
+        : o.variant == CUI_BUTTON_INFO    ? CUI_THEME_BUTTON_INFO
+        : o.variant == CUI_BUTTON_OUTLINE || o.variant == CUI_BUTTON_DEFAULT
+            ? CUI_THEME_BUTTON_DEFAULT
+            : CUI_THEME_BUTTON_PRIMARY;
+    cui_theme_button_colors palette = o.custom_colors ? o.colors : t->buttons[kind];
+    if (o.variant == CUI_BUTTON_CUSTOM && !o.custom_colors)
+        palette = (cui_theme_button_colors){.foreground = t->text, .outline_foreground = t->text};
+    bool outlined = o.outline || o.variant == CUI_BUTTON_OUTLINE;
+    /* Selected/open use their semantic style, independently of pointer state. */
+    bool selected = o.selected || o.open;
+    bool pressed = state.pressed && !selected;
+    bool hovered = state.hovered && !pressed && !selected;
+    bool active = pressed || selected;
+    cui_color foreground = outlined ? palette.outline_foreground : palette.foreground;
+    cui_color caret_color = foreground;
+    if (!o.custom_colors) {
+        if (o.variant == CUI_BUTTON_GHOST)
+            caret_color = t->secondary_foreground;
+        else if (o.variant == CUI_BUTTON_LINK)
+            caret_color = t->link;
+        else if (o.variant == CUI_BUTTON_TEXT) {
+            caret_color = t->text;
+            caret_color.a = (uint8_t)(caret_color.a * .9f);
+        }
+    }
+    caret_color.a = (uint8_t)(caret_color.a * .75f);
+    b.background = outlined ? (active          ? palette.outline_active
+                               : state.hovered ? palette.outline_hover
+                                               : palette.outline_normal)
+                            : (active          ? palette.active
+                               : state.hovered ? palette.hover
+                                               : palette.normal);
+    b.border = outlined ? palette.outline_border : palette.border;
+    if (o.variant == CUI_BUTTON_GHOST && !o.custom_colors) {
+        b.background = selected && !outlined ? t->buttons[CUI_THEME_BUTTON_SECONDARY].active
+                       : active              ? t->buttons[CUI_THEME_BUTTON_DEFAULT].active
+                       : hovered             ? t->accent
+                                             : (cui_color){0};
+        if (hovered && t->dark)
+            b.background.a = (uint8_t)(b.background.a * .5f);
+        foreground = hovered ? t->accent_foreground : t->secondary_foreground;
+    } else if (o.variant == CUI_BUTTON_LINK && !o.custom_colors) {
+        b.background = (cui_color){0};
+        foreground = selected && outlined ? t->link
+                     : active             ? t->link_active
+                     : hovered            ? t->link_hover
+                                          : t->link;
+    } else if (text && !o.custom_colors) {
+        b.background = (cui_color){0};
+        foreground = t->text;
+        foreground.a = (uint8_t)(foreground.a * (selected && outlined ? .9f
+                                                 : active             ? .7f
+                                                 : hovered            ? 1
+                                                                      : .9f));
+    }
+    if (!outlined && (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text))
+        b.border_width = 0;
+    if (!o.custom_colors && (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text))
+        b.border = (cui_color){0};
+    if (disabled) {
+        b.background = outlined ? palette.outline_normal : palette.normal;
+        float opacity = outlined ? .5f : kind == CUI_THEME_BUTTON_SECONDARY ? 1.5f : .15f;
+        b.background.a = (uint8_t)fminf(255, b.background.a * opacity);
+        b.border.a = (uint8_t)fminf(255, b.border.a * (outlined ? .5f : opacity));
+        if (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text)
+            b.background.a = 0;
+        if (o.variant == CUI_BUTTON_DEFAULT && !o.custom_colors && !outlined) {
+            b.background = t->input_background;
+            b.background.a /= 2;
+            b.border = t->input;
+            b.border.a /= 2;
+        }
+        foreground = t->muted;
+        foreground.a /= 2;
+    } else if (o.loading) {
+        b.custom_opacity = true;
+        b.opacity = .8f;
+    }
+    if (!o.hide_focus_ring && state.focus_visible) {
+        b.border = t->focus;
+        b.border_width = 2;
+    }
+    b.custom_corners = o.custom_corners;
+    b.corner_radii = o.corner_radii;
+    b.custom_border_edges = o.custom_border_edges;
+    b.border_edges = o.border_edges;
+    if (caret)
+        *caret = caret_color;
+    return (cui_button_style_paint){.root = b, .foreground = foreground};
+}
+#endif
+
 #include <math.h>
 #include <stdio.h>
 static void cui_numeric_paint_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str text,
@@ -1097,14 +1208,14 @@ static void cui_pagination_paint_icon(cui_context *ui, cui_id id, const cui_them
             .size = CUI_ICON_CUSTOM, .custom_size = size, .custom_color = true, .color = color});
 }
 static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *layout, cui_id id,
-                                      cui_str label, bool disabled, const char *leading_icon,
-                                      const char *trailing_icon) {
+                                      cui_str label, bool disabled, bool current,
+                                      const char *leading_icon, const char *trailing_icon) {
     const cui_theme *t = layout->theme;
     const cui_design_metrics *m = layout->metrics;
-    cui_color text = id ? (disabled ? t->muted : t->on_primary) : (disabled ? t->muted : t->text);
+    cui_color text = disabled ? t->muted : t->text;
     if (!m) {
         if (id)
-            cui_numeric_paint_button(ui, id, t, label, disabled);
+            cui_numeric_paint_button(ui, id, t, label, disabled || current);
         else
             cui_text(ui, label, t->font_size, text);
         return;
@@ -1133,20 +1244,34 @@ static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *la
         }
         layout->occupied = occupied;
     }
-    if (id)
-        cui_begin_box(ui, id,
-                      (cui_box){.row = has_icon,
-                                .gap = has_icon ? m->gap : 0,
-                                .width = width,
-                                .height = m->control_height,
-                                .fixed_width = true,
-                                .fixed_height = true,
-                                .align_x = CUI_ALIGN_CENTER,
-                                .align_y = CUI_ALIGN_CENTER,
-                                .radius = t->radius,
-                                .background = disabled ? t->surface : t->primary,
-                                .border = cui_focused(ui) == id ? t->focus : t->border,
-                                .border_width = 1});
+    if (id) {
+        cui_interaction state = {0};
+        if (!disabled && !current) {
+            cui_set_cursor(ui, id, CUI_CURSOR_POINTER);
+            state.hovered = cui_hovered(ui, id);
+            state.pressed = cui_pressed(ui, id);
+            state.focus_visible =
+                cui_focused(ui) == id && cui_interaction_state(ui, id).focus_visible;
+        }
+        cui_button_style_paint paint = cui_button_default_paint(
+            (cui_box){.row = has_icon,
+                      .gap = has_icon ? m->gap : 0,
+                      .width = width,
+                      .height = m->control_height,
+                      .fixed_width = true,
+                      .fixed_height = true,
+                      .align_x = CUI_ALIGN_CENTER,
+                      .align_y = CUI_ALIGN_CENTER,
+                      .radius = t->radius,
+                      .border_width = 1},
+            t,
+            (cui_button_options){.variant = current ? CUI_BUTTON_OUTLINE : CUI_BUTTON_GHOST,
+                                 .disabled = disabled,
+                                 .open = id == layout->popup_trigger},
+            state, NULL);
+        cui_begin_box(ui, id, paint.root);
+        text = paint.foreground;
+    }
     if (id && id == layout->popup_trigger) {
         cui_rect anchor = cui_bounds(ui, id);
         cui_set_prepaint(ui, (cui_prepaint_options){.callback = cui_pagination_follow_anchor,
@@ -1456,14 +1581,14 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
     cui_begin_box(ui, id, (cui_box){.row = !wrap, .gap = metrics.gap, .align_y = CUI_ALIGN_CENTER});
     if (ends)
         cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 1), labels.first,
-                                  disabled || *page <= 1, NULL, NULL);
+                                  disabled || *page <= 1, false, NULL, NULL);
     cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 2),
-                              icon ? (cui_str){0} : labels.previous, disabled || *page <= 1,
+                              icon ? (cui_str){0} : labels.previous, disabled || *page <= 1, false,
                               chevrons ? "chevron-left" : NULL, NULL);
     if (!icon && options.compact) {
         char label[64];
         snprintf(label, sizeof(label), "%zu / %zu", *page, total);
-        cui_pagination_paint_item(ui, &layout, 0, cui_string(label), false, NULL, NULL);
+        cui_pagination_paint_item(ui, &layout, 0, cui_string(label), false, false, NULL, NULL);
     } else if (!icon) {
         cui_page_item items[CUI_PAGINATION_MAX_ITEMS];
         size_t n = cui_pagination_visible_items(*page, total, options.visible_pages, items);
@@ -1478,27 +1603,27 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
                     ui, trigger,
                     (cui_semantic_details){.parent = id,
                                            .expanded = open,
-                                           .controls = cui_pagination_popup_id(id, side),
-                                           .cursor = CUI_CURSOR_POINTER});
-                cui_pagination_paint_item(ui, &layout, trigger, (cui_str){0}, disabled, "ellipsis",
-                                          NULL);
+                                           .controls = cui_pagination_popup_id(id, side)});
+                cui_pagination_paint_item(ui, &layout, trigger, (cui_str){0}, disabled, false,
+                                          "ellipsis", NULL);
             } else if (items[i].ellipsis)
-                cui_pagination_paint_item(ui, &layout, 0, cui_string("..."), true, NULL, NULL);
+                cui_pagination_paint_item(ui, &layout, 0, cui_string("..."), true, false, NULL,
+                                          NULL);
             else {
                 char label[32];
                 snprintf(label, sizeof(label), "%zu", items[i].page);
                 cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 10 + (unsigned)i),
-                                          cui_string(label), disabled || items[i].page == *page,
-                                          NULL, NULL);
+                                          cui_string(label), disabled, items[i].page == *page, NULL,
+                                          NULL);
             }
         }
     }
     cui_pagination_paint_item(
         ui, &layout, cui_numeric_part_id(id, 3), icon ? (cui_str){0} : labels.next,
-        disabled || !total || *page >= total, NULL, chevrons ? "chevron-right" : NULL);
+        disabled || !total || *page >= total, false, NULL, chevrons ? "chevron-right" : NULL);
     if (ends)
         cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 4), labels.last,
-                                  disabled || !total || *page >= total, NULL, NULL);
+                                  disabled || !total || *page >= total, false, NULL, NULL);
     if (layout.row_open)
         cui_end_box(ui);
     cui_end_box(ui);

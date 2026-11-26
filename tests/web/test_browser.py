@@ -115,6 +115,72 @@ def verify_pagination_custom_size(browser, url):
     context.close()
 
 
+def verify_pagination_paint(browser, url):
+    """Inspect actual canvas pixels and the host cursor in both system themes."""
+    state = """({name, role}) => {
+        const e = cuiGallery.exports, decode = new TextDecoder();
+        const canvas = document.querySelector('canvas');
+        const ctx = canvas.getContext('2d');
+        const sample = (x, y) => Array.from(ctx.getImageData(
+            Math.floor(x * canvas.width / canvas.clientWidth),
+            Math.floor(y * canvas.height / canvas.clientHeight), 1, 1).data);
+        for (let i = 0; i < e.gallery_semantic_count(); i++) {
+            if (e.gallery_semantic(i, 0) !== role) continue;
+            const label = decode.decode(new Uint8Array(e.memory.buffer,
+                e.gallery_semantic_name(i), e.gallery_semantic_length(i)));
+            if (label !== name) continue;
+            const f = field => e.gallery_semantic(i, field);
+            const [x, y, w, h] = [1, 2, 3, 4].map(f);
+            return {bounds: [x, y, w, h], fill: sample(x + 4, y + 6),
+                edge: sample(x + w / 2, y + .5), background: sample(4, 4), disabled: !!f(5),
+                selected: !!f(11), cursor: canvas.style.cursor};
+        }
+        return null;
+    }"""
+    button = {'name': 'Next', 'role': 1}
+    current = {'name': '3', 'role': 1}
+    for scheme in ('light', 'dark'):
+        page = browser.new_page(viewport={'width': 1280, 'height': 900},
+                                device_scale_factor=2, color_scheme=scheme)
+        try:
+            page.goto(url + '#Pagination')
+            page.wait_for_function('window.cuiGallery && cuiGallery.renderedComponent === "Pagination"')
+            page.locator('#pagination-mode').select_option('1')
+            canvas = page.locator('canvas')
+            canvas.scroll_into_view_if_needed()
+            selected = page.wait_for_function(state, arg=current).json_value()
+            assert selected['selected'] and selected['disabled']
+            assert selected['edge'] != selected['background'], selected
+            normal = page.evaluate(state, button)
+            assert normal['fill'] == normal['edge'] == normal['background'], normal
+            x, y, width, height = normal['bounds']
+            box = canvas.bounding_box()
+            page.mouse.move(box['x'] + x + width / 2, box['y'] + y + height / 2)
+            hovered = page.wait_for_function(
+                f'button => (s => s && s.fill.some((v, i) => v !== s.background[i]) && s.cursor === "pointer" && s)(({state})(button))',
+                arg=button).json_value()
+            assert hovered['bounds'] == normal['bounds']
+            page.mouse.down()
+            pressed = page.wait_for_function(
+                f'args => (s => s && s.fill.some((v, i) => v !== args.fill[i]) && s)(({state})(args.button))',
+                arg={'fill': hovered['fill'], 'button': button}).json_value()
+            assert pressed['fill'] != normal['fill'] and pressed['bounds'] == normal['bounds']
+            assert page.evaluate(state, current)['selected']
+            page.mouse.up()
+            page.wait_for_function(f'button => (s => s && s.selected)(({state})(button))',
+                                   arg={'name': '4', 'role': 1})
+            assert not page.evaluate(state, current)['selected']
+            page.locator('#disabled').check()
+            box = canvas.bounding_box()
+            page.mouse.move(box['x'] + x + width / 2, box['y'] + y + height / 2)
+            disabled = page.wait_for_function(
+                f'button => (s => s && s.disabled && s.cursor === "default" && s)(({state})(button))',
+                arg=button).json_value()
+            assert disabled['fill'] == normal['fill']
+        finally:
+            page.close()
+
+
 def main():
     subprocess.run([sys.executable, str(Path(__file__).with_name('test_snippets.py'))], check=True)
     parser = argparse.ArgumentParser(description=__doc__)
@@ -142,6 +208,7 @@ def main():
             browser = p.chromium.launch(**options)
             if args.pagination_only:
                 verify_pagination_custom_size(browser, f'http://127.0.0.1:{server.server_port}/cui/')
+                verify_pagination_paint(browser, f'http://127.0.0.1:{server.server_port}/cui/')
                 browser.close()
                 return
             page = browser.new_page(viewport={'width': 1280, 'height': 900}, device_scale_factor=2, permissions=['clipboard-read', 'clipboard-write'])
@@ -3132,6 +3199,7 @@ def main():
             page.wait_for_timeout(60)
             assert page.locator('#name').inner_text() == 'Button'
             verify_pagination_custom_size(browser, f'http://127.0.0.1:{server.server_port}/cui/')
+            verify_pagination_paint(browser, f'http://127.0.0.1:{server.server_port}/cui/')
             verify_pagination_tooltips(page)
             assert not errors, errors
             # Direct project-Pages URLs must initialize CUI, survive reloads and

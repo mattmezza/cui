@@ -4,6 +4,7 @@ fn main() -> Result<()> {
     let mut app = if env::var("CUI_PACKAGE_SMOKE_BACKEND").as_deref() == Ok("sdl") {
         App::sdl(480.,240.,"CUI Installed Rust Smoke", &env::var("CUI_PACKAGE_SMOKE_FONT").unwrap())?
     } else { App::headless(480.,240.)? };
+    assert!(app.supports_radio_tab_index(), "installed bridge lacks Radio ordering");
     let root = app.build_root(Kind::Row,"root")?.finish();
     let clicked = Rc::new(Cell::new(0));
     let callback = clicked.clone();

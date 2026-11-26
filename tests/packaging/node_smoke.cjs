@@ -11,6 +11,7 @@ const widget = cui.button('save').label('Save changes').on_click(() => ++clicks)
 const options = process.env.CUI_PACKAGE_SMOKE_BACKEND === 'sdl'
   ? {backend:'sdl', fontPath:process.env.CUI_PACKAGE_SMOKE_FONT} : {};
 const app = new cui.App(options);
+assert.equal(app.supports_radio_tab_index(), true, 'installed bridge lacks Radio ordering');
 app.mount(cui.row().children(widget)); app.step();
 const bounds = widget.bounds();
 assert(bounds.width > 0 && bounds.height > 0);

@@ -13,6 +13,9 @@ func main() {
 		panic(err)
 	}
 	defer app.Close()
+	if supported, err := app.SupportsRadioTabIndex(); err != nil || !supported {
+		panic("installed bridge lacks Radio ordering")
+	}
 	clicks := 0
 	button := cui.Button("save").Text("Save ✓").OnClick(func(cui.Event) { clicks++ })
 	if err := app.Mount(cui.Row("root").Children(button)); err != nil {

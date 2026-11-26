@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.8
+
 - C RadioGroup can crossfade selection marks with the theme spring while
   updating selection and accessibility in the same frame. The WASM example
   shows the animation with reduced-motion support.

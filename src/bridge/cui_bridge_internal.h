@@ -52,7 +52,7 @@ typedef struct {
     bool stepper_visual, stepper_vertical;
     unsigned stepper_density;
     cui_bridge_button_rounding rounding;
-    bool disabled, custom_hover;
+    bool disabled, custom_hover, radio_item_content;
     cui_color hover;
     cui_bridge_box_shadows_v1 shadows;
     bridge_part_shadows *part_shadows;

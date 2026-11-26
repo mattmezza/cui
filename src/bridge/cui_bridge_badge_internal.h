@@ -148,6 +148,12 @@ cui_bridge_status cui_bridge_badge_create_v1(cui_bridge_app *app, cui_bridge_nod
         return CUI_BRIDGE_INVALID_STATE;
     if (!parent.slot && !parent.generation)
         return CUI_BRIDGE_INVALID_STATE;
+    /* Ordinary node creation sees a plain Badge until this factory publishes
+     * the configured kind. Check its final kind's restriction before staging. */
+    if (bridge_node(app, parent))
+        for (uint32_t slot = parent.slot; slot; slot = app->nodes[slot].parent)
+            if (app->nodes[slot].radio_item_content)
+                return CUI_BRIDGE_INVALID_STATE;
     size_t key_size = 0;
     if (!bridge_utf8(key, &key_size) || !key_size)
         return CUI_BRIDGE_INVALID_UTF8;

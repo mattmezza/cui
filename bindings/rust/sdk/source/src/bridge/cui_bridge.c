@@ -443,6 +443,52 @@ cui_bridge_status cui_bridge_radio_set_motion_v1(cui_bridge_app *app, cui_bridge
     cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
+static bool bridge_radio_content_kind(cui_bridge_kind kind) {
+    switch (kind) {
+    case CUI_BRIDGE_ROW:
+    case CUI_BRIDGE_COLUMN:
+    case CUI_BRIDGE_LABEL:
+    case CUI_BRIDGE_BADGE:
+    case CUI_BRIDGE_AVATAR:
+    case CUI_BRIDGE_KBD:
+    case CUI_BRIDGE_TAG:
+    case CUI_BRIDGE_ICON:
+    case CUI_BRIDGE_IMAGE:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool bridge_radio_content_children(const cui_bridge_app *app,
+                                          const cui_bridge_node_record *parent) {
+    for (uint32_t slot = parent->first_child; slot; slot = app->nodes[slot].next_sibling) {
+        const cui_bridge_node_record *child = &app->nodes[slot];
+        if (!bridge_radio_content_kind(child->kind) || !bridge_radio_content_children(app, child))
+            return false;
+    }
+    return true;
+}
+
+cui_bridge_status cui_bridge_radio_item_set_content_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                       uint32_t enabled) {
+    cui_bridge_node_record *item;
+    cui_bridge_status status = bridge_valid_node(app, handle, &item);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (item->kind != CUI_BRIDGE_ITEM || !item->parent ||
+        app->nodes[item->parent].kind != CUI_BRIDGE_RADIO_GROUP)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (enabled > 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (item->radio_item_content == (enabled != 0))
+        return CUI_BRIDGE_OK;
+    if (enabled && !bridge_radio_content_children(app, item))
+        return CUI_BRIDGE_INVALID_STATE;
+    item->radio_item_content = enabled != 0;
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
 _Static_assert(sizeof(cui_bridge_box_shadow_v1) == 24, "shadow layer V1 ABI");
 _Static_assert(sizeof(cui_bridge_box_shadows_v1) == 224, "shadow style V1 ABI");
 _Static_assert(offsetof(cui_bridge_box_shadows_v1, layers) == 32, "shadow layers offset");
@@ -1598,9 +1644,12 @@ cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node pa
                 return CUI_BRIDGE_CAPACITY;
         }
         uint32_t depth = 1;
-        for (uint32_t ancestor = parent.slot; ancestor; ancestor = app->nodes[ancestor].parent)
+        for (uint32_t ancestor = parent.slot; ancestor; ancestor = app->nodes[ancestor].parent) {
             if (++depth > CUI_BRIDGE_MAX_DEPTH)
                 return CUI_BRIDGE_CAPACITY;
+            if (app->nodes[ancestor].radio_item_content && !bridge_radio_content_kind(kind))
+                return CUI_BRIDGE_INVALID_STATE;
+        }
     }
     size_t length = 0;
     if (!bridge_utf8(key_utf8, &length) || !length)
@@ -3690,12 +3739,15 @@ static void bridge_panel(cui_context *ui, size_t index, void *user) {
 static void bridge_root_content(cui_context *ui, void *user) {
     bridge_panel(ui, 0, user);
 }
-static void bridge_dock_content(cui_context *ui, uint64_t panel, void *user) {
+static void bridge_item_content(cui_context *ui, void *user) {
     (void)ui;
-    (void)panel;
     cui_bridge_node_record *item = user;
     for (uint32_t child = item->first_child; child; child = item->owner->nodes[child].next_sibling)
         bridge_render_node(item->owner, child);
+}
+static void bridge_dock_content(cui_context *ui, uint64_t panel, void *user) {
+    (void)panel;
+    bridge_item_content(ui, user);
 }
 typedef struct {
     cui_bridge_app *app;
@@ -3862,11 +3914,15 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
         }
         cui_selection_indicator_parts parts[64];
         cui_radio_group_content content[CUI_RADIO_GROUP_MAX] = {0};
-        bool described = false, named = false, authored = node->shadows.schema_version != 0;
+        bool has_content = false, named = false, authored = node->shadows.schema_version != 0;
         for (size_t i = 0; i < count; ++i) {
             cui_bridge_node_record *item = &app->nodes[scratch->binding.slots[i]];
             content[i].description = cui_string(item->detail);
-            described |= content[i].description.length != 0;
+            if (item->radio_item_content && item->first_child) {
+                content[i].content = bridge_item_content;
+                content[i].content_user = item;
+            }
+            has_content |= content[i].description.length != 0 || content[i].content;
             parts[i].indicator = bridge_indicator_id(item);
             named |= bridge_target_style(item, CUI_BRIDGE_SHADOW_INDICATOR) != NULL;
             authored |= item->shadows.schema_version != 0;
@@ -3876,10 +3932,10 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                                                      .parts = named ? parts : NULL,
                                                      .part_count = named ? count : 0};
         cui_radio_group_result result =
-            cui_radio_group_present_with_content(app->ui, node->id, &app->theme, scratch->radios,
-                                                 count, &selected, &node->radio_group_state,
-                                                 options, presentation, described ? content : NULL,
-                                                 described ? count : 0, (cui_selection_handler){0})
+            cui_radio_group_present_with_content(
+                app->ui, node->id, &app->theme, scratch->radios, count, &selected,
+                &node->radio_group_state, options, presentation, has_content ? content : NULL,
+                has_content ? count : 0, (cui_selection_handler){0})
                 .legacy;
         if (!result.valid && (named || authored) && app->frame_error == CUI_BRIDGE_OK)
             app->frame_error = CUI_BRIDGE_CORE_ERROR;

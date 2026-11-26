@@ -21,7 +21,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | NumberInput | `cui_number_input` | per-node numeric editor, value, range, step, change, disabled | Finite values; 127-byte draft |
 | Collapsible | `cui_collapsible` | open state, change, disabled | Child subtree is panel |
 | Alert | `cui_alert` | copied title/message | Static informational alert |
-| RadioGroup | `cui_radio_group_present_with_content` | selected Item, description, change, disabled, optional animated selection | Up to 64 Items |
+| RadioGroup | `cui_radio_group_present_with_content` | selected Item, description, change, disabled, optional animated selection and decorative children | Up to 64 Items |
 | Tabs | `cui_tabs` | selected Item, change, disabled | Up to 64 Items; Item subtree is panel |
 | Accordion | `cui_accordion` | per-Item open state, change, disabled | Up to 64 Items; multiple expansion |
 | Item | Composite descriptor | label, disabled, optional panel children | Must belong to group |
@@ -194,7 +194,48 @@ Use `item.detail(text)` in Python, JavaScript or TypeScript, `item.Detail(text)`
 in Go, and `app.detail_text(item, text)` or `Builder::detail_text(text)` in
 Rust. The delivery form examples above include a described option. Earlier
 bridge releases accept the same Item detail setter and keep ordinary
-RadioGroup labels. Arbitrary decorative children are available through the
+RadioGroup labels.
+
+### Compose retained Radio option content
+
+Enable decorative children on a direct RadioGroup Item from C with
+`cui_bridge_radio_item_set_content_v1`. This example adds a tag below an
+existing delivery option. Set the Item's label and detail for the option's
+accessible name and description.
+
+```c
+#include <cui/cui_bridge.h>
+
+cui_bridge_status add_recommendation(cui_bridge_app *app, cui_bridge_node item) {
+    cui_bridge_node tag;
+    cui_bridge_status status =
+        cui_bridge_node_create(app, item, CUI_BRIDGE_TAG, "recommended", &tag);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    status = cui_bridge_set_text(app, tag, "Recommended");
+    if (status == CUI_BRIDGE_OK)
+        status = cui_bridge_radio_item_set_content_v1(app, item, 1);
+    if (status != CUI_BRIDGE_OK)
+        cui_bridge_node_remove(app, tag);
+    return status;
+}
+```
+
+Use Row and Column to lay out Label, plain Badge, Avatar, Kbd, Tag, Icon and
+Image nodes. The entire rendered row is a single radio target with one focus
+stop and the group's usual selection event. Decorative children only paint
+and contribute layout. Leave interactive controls outside the Item and put
+meaningful decoration text in the Item's label or detail.
+
+Children are hidden by default. Enabling with an unsupported descendant
+returns `CUI_BRIDGE_INVALID_STATE` and leaves the Item unchanged. An enabled
+Item rejects attempts to create an unsupported descendant. Passing `0` hides
+the children while keeping their handles valid. Use `cui_bridge_node_bounds`
+after a step to measure a visible decoration.
+
+This is an optional C bridge symbol. Probe its availability when loading a
+provider dynamically. The language builders currently expose Item
+descriptions. For arbitrary frame-local decorative drawing, use the
 [immediate C presenter](RADIO_GROUP.md#add-descriptions-and-custom-content).
 
 ### Configure a retained pager from C

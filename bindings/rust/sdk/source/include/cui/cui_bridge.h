@@ -961,6 +961,16 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_checked(cui_bridge_app *, cui_br
  * queued notifications keep their existing timing. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_set_motion_v1(cui_bridge_app *, cui_bridge_node,
                                                                 uint32_t enabled);
+/* Optional decorative children for a direct RadioGroup Item. Disabled by default.
+ * An enabled item accepts Row, Column, Label, plain Badge, Avatar, Kbd, Tag, Icon
+ * and Image descendants. Enabling rejects existing unsupported descendants without
+ * changing the item. Creating one under an enabled item also fails. Decorations
+ * have layout bounds and paint in an inert subtree. The radio row owns input,
+ * focus and semantics. Disabling hides the subtree and keeps its nodes. Boolean
+ * is 0/1. Call on the app's owner thread outside a bridge step. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_item_set_content_v1(cui_bridge_app *,
+                                                                      cui_bridge_node item,
+                                                                      uint32_t enabled);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *, cui_bridge_node,
                                                          uint32_t disabled);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_value(cui_bridge_app *, cui_bridge_node,

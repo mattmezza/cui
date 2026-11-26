@@ -15,6 +15,8 @@
 
 - RadioGroup options can show accessible descriptions and decorative content.
   Retained builders use the existing Item detail setter for descriptions.
+  The C bridge can opt direct Items into a bounded set of decorative children
+  while keeping one focus and selection target for the row.
 
 ## 0.1.0-alpha.7
 

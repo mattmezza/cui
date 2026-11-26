@@ -349,7 +349,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Standalone Radio and RadioGroup animation is available in immediate C, the retained C bridge, Python, JavaScript, TypeScript, Go and Rust. All shared-provider bindings probe for the optional motion symbol. RadioGroup Item detail text appears as an accessible description. Arbitrary RadioGroup decorations are only authored in immediate C. Native system reduced-motion observation depends on the host."
+        "Standalone Radio and RadioGroup animation is available in immediate C, the retained C bridge, Python, JavaScript, TypeScript, Go and Rust. All shared-provider bindings probe for the optional motion symbol. RadioGroup Item detail text appears as an accessible description. Immediate C supports decorative callbacks. The retained C bridge exposes an optional passive child subtree. Language builders expose descriptions and currently omit the decorative subtree opt-in. Native system reduced-motion observation depends on the host."
       ]
     },
     {

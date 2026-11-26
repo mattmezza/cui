@@ -586,15 +586,17 @@
         "cui_kbd",
         "cui_kbd_format",
         "cui_kbd_ex",
-        "cui_kbd_format_stroke"
+        "cui_kbd_format_stroke",
+        "cui_kbd_styled"
       ],
       "state_types": [
         "cui_kbd_stroke",
-        "cui_kbd_options"
+        "cui_kbd_options",
+        "cui_kbd_style"
       ],
       "state_ownership": "Caller owns shortcut text and optional formatting buffer.",
       "interaction": "Presentation only; shortcut dispatch belongs to the application.",
-      "usage": "Submit typed single-stroke hints with Unicode first-scalar uppercase. Compose several as ordinary row children. The host owns shortcut registration.",
+      "usage": "Submit typed single-stroke hints with Unicode first-scalar uppercase. Use the styled entry point for a shared box, typography token and text paint. The host owns shortcut registration.",
       "docs": [
         "docs/CONTENT.md",
         "docs/KBD.md"

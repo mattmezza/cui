@@ -59,9 +59,6 @@ width20 and half theme radius. Outline adds a1-unit border and uses the theme
 background. `plain=true` wins over outline and renders text at the theme font
 and color without pill padding/border/minimum. CUI maps rem to
 `theme.font_size/16`; the font must be finite(0,512], radius finite/nonnegative.
-The hint has a fixed set of appearance options and uses no general inherited
-parent text-style stack. CUI solid theme tokens are the supported palette;
-this is not proof of every upstream theme/background representation.
 
 Hints are noninteractive LABEL semantics, excluded from tab traversal. The
 accessible name defaults to formatted text; an explicit name overrides it.
@@ -70,6 +67,50 @@ or ASCII controls. Invalid arguments fail before layout or semantics. Input
 strings and local formatted output are copied into Core frame storage at
 submission and survive through that frame's renderer consumption. No retained
 component state, allocator or cleanup is required.
+
+## Style the keycap
+
+`cui_kbd_styled` takes an optional `cui_kbd_style` for the normal and outline
+keycaps. Each null field uses that mode's defaults. A supplied `cui_box`
+replaces the entire pill box, including its fill, border, rounding, padding
+and size, so copy the values you want to keep. A `cui_typography_token` selects
+the font family, weight, line height, alignment and wrapping. Leave the box
+unset for an intrinsically sized pill measured using the chosen font. To wrap
+a hint as its parent narrows, set a bounded box width, keep the height at zero
+for fit, and set `typography.wrap = true`. Use a supported font provider for
+tracking and a supported renderer for linear text paint.
+
+```c
+#include "cui/cui_kbd.h"
+
+bool draw_styled_shortcut(cui_context *ui, const cui_theme *theme, cui_id id) {
+    cui_box keycap = {
+        .width = -1, .max_width = 176, .padding = 6, .radius = 8,
+        .background = theme->muted_background,
+        .border = theme->border, .border_width = 1,
+    };
+    cui_typography_token type = {
+        .size = 14, .line_height = 20, .align = CUI_TEXT_ALIGN_CENTER,
+        .wrap = true, .style = {.monospace = true},
+    };
+    cui_text_gradient_stop stops[] = {{0, theme->text}, {1, theme->accent}};
+    cui_text_paint paint = {
+        .kind = CUI_TEXT_PAINT_LINEAR, .x1 = 1, .stops = stops, .stop_count = 2,
+    };
+    return cui_kbd_styled(ui, id, theme,
+        (cui_kbd_stroke){.modifiers = CUI_MOD_ALT, .key = CUI_STR("pagedown")},
+        (cui_kbd_options){0},
+        &(cui_kbd_style){.box = &keycap, .typography = &type, .text_paint = &paint});
+}
+```
+
+Plain mode keeps its theme typography and ignores all keycap overrides.
+Style values are read during the call. Gradient stops are copied for that
+frame, so local arrays are safe. Invalid typography and gradient definitions
+fail before the hint is submitted. To add a shadow, use
+`cui_element_set_shadow_preset` on the submitted keycap ID. Backgrounds use
+Core's solid box fill. The retained builders accept a preformatted label.
+See [shared typography](TYPOGRAPHY.md) for renderer and provider requirements.
 
 Ordinary row composition fits its contents; it does not automatically turn a
 shortcut list into a responsive wrapping grid. For narrow help panels, let the
@@ -80,8 +121,10 @@ formatting and presentation additions.
 
 The C and WASI fixtures exercise all 1,580 changed Unicode 17 uppercase
 mappings, scalar-safe truncation, overlap, untouched suffixes, the legacy
-helper, geometry and accessible labels. The headless gallery test inspects
-both the semantic label and the draw command for `Ctrl+Shift+SS`.
+helper, geometry and accessible labels. The style fixture covers first-frame
+width, responsive wrapping, copied gradient stops and the unstyled plain
+path. The headless gallery inspects the semantic and draw labels, pill width,
+monospace style and gradient stops.
 
 ```sh
 cmake -S tests/fixtures/kbd -B /path/to/private-build -G Ninja \

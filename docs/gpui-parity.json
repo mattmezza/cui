@@ -1993,7 +1993,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Typed single-stroke normal, outline and plain hints, platform labels, Unicode 17 first-scalar uppercase and ordinary sibling composition tested. Host Action/keybinding lookup and arbitrary source Styled properties remain open; see docs/KBD.md."
+        "Typed single-stroke hints support Unicode 17 first-scalar uppercase, pill box and typography overrides, and solid or linear text paint. Host Action/keybinding lookup, general inherited styling and retained typed hints remain open; see docs/KBD.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2025,6 +2025,15 @@
           ],
           "limitations": [
             "Pinned source models one stroke; grouped hints are ordinary sibling composition, demonstrated by the compiled guide. No sequence recognition or host binding lookup is claimed."
+          ]
+        },
+        {
+          "name": "per-hint keycap styling and responsive wrapping",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_kbd.c",
+            "tests/web/test_kbd_stepper_gallery.py",
+            "docs/KBD.md"
           ]
         },
         {

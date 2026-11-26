@@ -11,6 +11,10 @@ There is no grouped/multi-step shortcut rendering method in this component.
 The fallback at lines 191–205 uppercases the first Unicode scalar and appends
 the remainder unchanged. CUI subsequently implemented this with its pinned
 Unicode 17 data and tests for both single-scalar mappings and expansions.
+Lines 219–246 apply per-instance style after setting pill defaults and return
+plain text before that styling step. The C styled entry point maps the
+per-instance behavior to the existing box, typography and text-paint APIs.
+The application still owns host Action lookup and inherited styling.
 The [story](https://github.com/longbridge/gpui-kit/blob/87d10ae5e1299d1be18670a37570c5402f952e34/crates/story/src/stories/kbd_story.rs)
 composes independent hints in an ordinary horizontal flex container with gap
 and wrap. The [frozen guide](https://github.com/longbridge/gpui-kit/blob/87d10ae5e1299d1be18670a37570c5402f952e34/website/component/kbd.md)

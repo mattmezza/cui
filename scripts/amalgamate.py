@@ -179,7 +179,8 @@ def generate(name,sources):
         code=code.replace('#include "cui_scroll_layout_internal.h"', (ROOT/'src/core/cui_scroll_layout_internal.h').read_text(encoding='utf-8'))
         code=code.replace('#include "cui_scrollbar_track_internal.h"', (ROOT/'src/core/cui_scrollbar_track_internal.h').read_text(encoding='utf-8'))
         code=code.replace('#include "cui_scroll_regions_internal.h"', (ROOT/'src/core/cui_scroll_regions_internal.h').read_text(encoding='utf-8'))
-        code=code.replace('#include "cui_text_paint_internal.h"', (ROOT/'src/core/cui_text_paint_internal.h').read_text(encoding='utf-8'))
+        for private_include in ['#include "cui_text_paint_internal.h"', '#include "../core/cui_text_paint_internal.h"']:
+            code=code.replace(private_include, (ROOT/'src/core/cui_text_paint_internal.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_design_metrics.h"', '#include "../base/cui_design_metrics.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_design_metrics.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_icon_layout.h"', '#include "../base/cui_icon_layout.h"']:

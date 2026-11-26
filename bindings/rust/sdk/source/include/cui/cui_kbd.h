@@ -2,6 +2,7 @@
 #ifndef CUI_KBD_H
 #define CUI_KBD_H
 #include "cui_content.h"
+#include "cui_typography.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -35,6 +36,19 @@ typedef struct {
  * frame storage on submission; no retained state or resources. Compose several
  * calls in a normal parent row for grouped hints; no sequence/binding lookup. */
 bool cui_kbd_ex(cui_context *, cui_id, const cui_theme *, cui_kbd_stroke, cui_kbd_options);
+typedef struct {
+    const cui_box *box;                     /* Optional complete pill box. */
+    const cui_typography_token *typography; /* Optional font, line layout and wrapping. */
+    const cui_text_paint *text_paint;       /* Optional solid or supported linear text paint. */
+} cui_kbd_style;
+/* NULL fields keep the normal or outline defaults. With no box override, the
+ * pill fits its typography. To wrap at the current parent width, supply a
+ * fitting-height box with a bounded width and set typography.wrap. Plain mode
+ * ignores all style overrides. The inputs are read during submission and any
+ * gradient stops are copied into the frame. Invalid typography/paint returns
+ * false before submission. Use Core's named box API to add shadows after it. */
+bool cui_kbd_styled(cui_context *, cui_id, const cui_theme *, cui_kbd_stroke, cui_kbd_options,
+                    const cui_kbd_style *);
 #ifdef __cplusplus
 }
 #endif

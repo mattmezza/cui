@@ -310,7 +310,8 @@ selection. See `docs/COMMAND.md`.
 For shortcut hints, `cui_kbd_format_stroke` uppercases the first Unicode scalar,
 including expansions. Use `CUI_KBD_TEXT_CAPACITY` for a complete result. Hosts
 own shortcut bindings, and retained builders accept a formatted label.
-See `docs/KBD.md`.
+Use `cui_kbd_styled` with shared box, typography or text paint for keycaps.
+Plain hints skip those overrides. See `docs/KBD.md`.
 For loading placeholders, see `docs/SKELETON_RESPONSIVE.md`. Keep motion per
 shape, schedule the earliest wake and attach busy state to the application region.
 

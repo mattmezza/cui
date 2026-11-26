@@ -3,6 +3,7 @@
 #ifndef CUI_KBD_H
 #define CUI_KBD_H
 #include "cui_content.h"
+#include "cui_typography.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -36,6 +37,19 @@ typedef struct {
  * frame storage on submission; no retained state or resources. Compose several
  * calls in a normal parent row for grouped hints; no sequence/binding lookup. */
 bool cui_kbd_ex(cui_context *, cui_id, const cui_theme *, cui_kbd_stroke, cui_kbd_options);
+typedef struct {
+    const cui_box *box;                     /* Optional complete pill box. */
+    const cui_typography_token *typography; /* Optional font, line layout and wrapping. */
+    const cui_text_paint *text_paint;       /* Optional solid or supported linear text paint. */
+} cui_kbd_style;
+/* NULL fields keep the normal or outline defaults. With no box override, the
+ * pill fits its typography. To wrap at the current parent width, supply a
+ * fitting-height box with a bounded width and set typography.wrap. Plain mode
+ * ignores all style overrides. The inputs are read during submission and any
+ * gradient stops are copied into the frame. Invalid typography/paint returns
+ * false before submission. Use Core's named box API to add shadows after it. */
+bool cui_kbd_styled(cui_context *, cui_id, const cui_theme *, cui_kbd_stroke, cui_kbd_options,
+                    const cui_kbd_style *);
 #ifdef __cplusplus
 }
 #endif
@@ -1700,9 +1714,87 @@ size_t cui_kbd_format_stroke(cui_kbd_stroke stroke, bool mac, char *output, size
 /* src/components/cui_kbd.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_TEXT_PAINT_INTERNAL_H
+#define CUI_TEXT_PAINT_INTERNAL_H
+
 #include <math.h>
-bool cui_kbd_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_stroke stroke,
-                cui_kbd_options options) {
+static inline bool cui_text_paint_valid(cui_text_paint p, bool resolved) {
+    if (p.kind == CUI_TEXT_PAINT_SOLID)
+        return p.stop_count == 0;
+    if (p.kind != CUI_TEXT_PAINT_LINEAR || !p.stops || p.stop_count < 2 || p.stop_count > 8 ||
+        p.anchor < CUI_TEXT_ANCHOR_BLOCK || p.anchor > CUI_TEXT_ANCHOR_LINE || !isfinite(p.x0) ||
+        !isfinite(p.y0) || !isfinite(p.x1) || !isfinite(p.y1))
+        return false;
+    if (!resolved && (p.x0 < 0 || p.x0 > 1 || p.y0 < 0 || p.y0 > 1 || p.x1 < 0 || p.x1 > 1 ||
+                      p.y1 < 0 || p.y1 > 1 || (p.x0 == p.x1 && p.y0 == p.y1)))
+        return false;
+    float previous = 0;
+    for (size_t i = 0; i < p.stop_count; ++i) {
+        float at = p.stops[i].position;
+        if (!isfinite(at) || at < previous || at > 1)
+            return false;
+        previous = at;
+    }
+    return true;
+}
+static inline cui_color cui_text_paint_sample(cui_text_paint p, double x, double y) {
+    if (p.kind == CUI_TEXT_PAINT_SOLID)
+        return p.color;
+    double dx = (double)p.x1 - p.x0, dy = (double)p.y1 - p.y0;
+    double length = dx * dx + dy * dy;
+    double t = length > 0 ? ((x - p.x0) * dx + (y - p.y0) * dy) / length : 1;
+    size_t right = 0;
+    while (right < p.stop_count && p.stops[right].position <= t)
+        ++right;
+    if (!right)
+        return p.stops[0].color;
+    if (right == p.stop_count)
+        return p.stops[right - 1].color;
+    cui_text_gradient_stop a = p.stops[right - 1], b = p.stops[right];
+    double f = (t - a.position) / (b.position - a.position);
+    double alpha = a.color.a + (b.color.a - a.color.a) * f;
+    if (alpha <= 0)
+        return (cui_color){0};
+    cui_color result;
+#define CUI_PAINT_CHANNEL(ch)                                                                      \
+    (uint8_t)lround(((1 - f) * a.color.ch * a.color.a + f * b.color.ch * b.color.a) / alpha)
+    result.r = CUI_PAINT_CHANNEL(r);
+    result.g = CUI_PAINT_CHANNEL(g);
+    result.b = CUI_PAINT_CHANNEL(b);
+#undef CUI_PAINT_CHANNEL
+    result.a = (uint8_t)lround(alpha);
+    return result;
+}
+static inline bool cui_text_tracking_supported(const cui_draw_list *list, bool supported) {
+    for (size_t i = 0; i < list->count; ++i) {
+        const cui_draw_command *c = &list->commands[i];
+        if (c->type == CUI_DRAW_TEXT && (!isfinite(c->text_style.letter_spacing) ||
+                                         (c->text_style.letter_spacing != 0 && !supported)))
+            return false;
+    }
+    return true;
+}
+static inline bool cui_text_paints_supported(const cui_draw_list *list, bool linear) {
+    for (size_t i = 0; i < list->count; ++i) {
+        const cui_draw_command *c = &list->commands[i];
+        if (c->text_paint.kind == CUI_TEXT_PAINT_SOLID) {
+            if (c->text_paint.stop_count)
+                return false;
+            continue;
+        }
+        if (!linear || c->type != CUI_DRAW_TEXT || c->text_color_count ||
+            !cui_text_paint_valid(c->text_paint, true))
+            return false;
+    }
+    return true;
+}
+#endif
+
+#include <math.h>
+
+bool cui_kbd_styled(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_stroke stroke,
+                    cui_kbd_options options, const cui_kbd_style *style) {
     char text[CUI_KBD_TEXT_CAPACITY];
     if (!ui || !id || !theme || !cui_frame_is_submitting(ui) || !isfinite(theme->font_size) ||
         theme->font_size <= 0 || theme->font_size > 512 || !isfinite(theme->radius) ||
@@ -1721,18 +1813,29 @@ bool cui_kbd_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_stro
     }
     cui_str formatted = cui_string(text);
     float scale = theme->font_size / 16;
-    float font = options.plain ? theme->font_size : 12 * scale;
-    if (!(font > 0) || !isfinite(font))
+    if (options.plain)
+        style = NULL;
+    const cui_typography_token *custom_type = style ? style->typography : NULL;
+    const cui_text_paint *custom_paint = style ? style->text_paint : NULL;
+    cui_typography_token type = {.size = options.plain ? theme->font_size : 12 * scale,
+                                 .line_height = options.plain ? 0 : 12 * scale,
+                                 .align = CUI_TEXT_ALIGN_CENTER,
+                                 .wrap = true};
+    if (custom_type)
+        type = *custom_type;
+    if (!cui_typography_token_valid(type) || !isfinite(type.style.letter_spacing) ||
+        (type.style.letter_spacing && !(cui_text_capabilities(ui) & CUI_TEXT_CAP_LETTER_SPACING)) ||
+        (custom_paint && !cui_text_paint_valid(*custom_paint, false)))
         return false;
     float border = !options.plain && options.outline ? 1 : 0;
-    cui_size measured = cui_measure_text(ui, formatted, font);
-    if (!isfinite(measured.width) || measured.width < 0 || !isfinite(measured.height) ||
-        measured.height < 0)
-        return false;
     cui_box box = {0};
-    if (!options.plain)
+    if (style && style->box)
+        box = *style->box;
+    else if (!options.plain) {
+        cui_size measured = cui_measure_text_ex(ui, formatted, type.size, type.style);
+        float line = type.line_height > 0 ? type.line_height : measured.height;
         box = (cui_box){.width = fmaxf(20 * scale, measured.width + 8 * scale + 2 * border),
-                        .height = 16 * scale + 2 * border,
+                        .height = (custom_type ? line + 4 * scale : 16 * scale) + 2 * border,
                         .fixed_width = true,
                         .fixed_height = true,
                         .align_x = CUI_ALIGN_CENTER,
@@ -1741,15 +1844,27 @@ bool cui_kbd_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_stro
                         .border = theme->border,
                         .border_width = border,
                         .radius = theme->radius * .5f};
+    }
     cui_begin_box(ui, id, box);
     cui_interact(ui, id, CUI_ROLE_LABEL,
                  options.accessible_name.length ? options.accessible_name : formatted, false, false,
                  0);
     cui_set_tab_stop(ui, id, false);
-    cui_text_with_line_height(ui, formatted, font, options.plain ? theme->text : theme->muted,
-                              options.plain ? 0 : font);
+    cui_color color = options.plain ? theme->text : theme->muted;
+    bool submitted = true;
+    if (custom_paint)
+        submitted = cui_typography_text_painted(ui, formatted, type, *custom_paint);
+    else if (custom_type)
+        submitted = cui_typography_text(ui, formatted, type, color);
+    else
+        cui_text_with_line_height(ui, formatted, type.size, color, type.line_height);
     cui_end_box(ui);
-    return true;
+    return submitted;
+}
+
+bool cui_kbd_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_stroke stroke,
+                cui_kbd_options options) {
+    return cui_kbd_styled(ui, id, theme, stroke, options, NULL);
 }
 
 #endif

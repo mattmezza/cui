@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Style Kbd pills with a shared box, typography token and solid or gradient
+  text. Bounded pills can wrap as the parent narrows.
 - Typed Kbd hints apply Unicode 17 uppercase to the first scalar. They handle
   expansions such as `ß` to `SS` and preserve the rest of the label.
 - A growing Command palette keeps a fully visible selection in view when

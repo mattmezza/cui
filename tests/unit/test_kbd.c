@@ -266,11 +266,111 @@ static void failures(void) {
     CHECK(!n && cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+
+static cui_size measure_styled(void *user, cui_str text, float font, cui_text_style style) {
+    (void)user;
+    return (cui_size){text.length * font * (style.monospace ? .7f : .5f), font + 3};
+}
+
+static void styled_hints(void) {
+    cui_context *ui = cui_create((cui_config){.measure_styled = measure_styled});
+    CHECK(ui);
+    cui_theme theme = cui_theme_light();
+    theme.font_size = 16;
+    cui_kbd_stroke stroke = {.key = CUI_STR("pagedown")};
+    cui_box box = {.width = .5f,
+                   .width_percent = true,
+                   .padding = 4,
+                   .background = {52, 34, 92, 255},
+                   .radius = 8};
+    cui_typography_token typography = {
+        .style = {.weight = CUI_TEXT_WEIGHT_BOLD, .monospace = true, .family = 7},
+        .size = 10,
+        .line_height = 19,
+        .align = CUI_TEXT_ALIGN_RIGHT,
+        .wrap = true};
+    cui_text_gradient_stop stops[] = {{0, {245, 120, 180, 255}}, {1, {230, 244, 255, 255}}};
+    cui_text_paint paint = {
+        .kind = CUI_TEXT_PAINT_LINEAR, .x1 = 1, .stops = stops, .stop_count = 2};
+    cui_kbd_style style = {.box = &box, .typography = &typography, .text_paint = &paint};
+    float widths[] = {240, 112, 240};
+    float height = 0;
+    for (size_t i = 0; i < sizeof widths / sizeof widths[0]; ++i) {
+        CHECK(cui_begin_frame(ui, widths[i], 160, .016f));
+        cui_begin_box(ui, 12, (cui_box){.width = widths[i], .fixed_width = true});
+        CHECK(cui_kbd_styled(ui, 10, &theme, stroke, (cui_kbd_options){.outline = true}, &style));
+        CHECK(cui_element_set_shadow_preset(ui, 10, CUI_SHADOW_XS, (cui_corner_radii){8, 8, 8, 8}));
+        stops[0].color.r = 0;
+        cui_end_box(ui);
+        cui_draw_list draw = cui_end_frame(ui);
+        stops[0].color.r = 245;
+        CHECK(cui_last_error(ui) == CUI_OK);
+        cui_rect bounds = cui_bounds(ui, 10);
+        CHECK(fabsf(bounds.w - widths[i] * .5f) < .1f);
+        if (!i)
+            height = bounds.h;
+        else
+            CHECK(fabsf(bounds.h - height - (i == 1 ? typography.line_height : 0)) < .1f);
+        CHECK(!find(draw, CUI_DRAW_BORDER));
+        CHECK(find(draw, CUI_DRAW_DROP_SHADOW));
+        bool has_fill = false;
+        size_t rows = 0;
+        for (size_t j = 0; j < draw.count; ++j) {
+            const cui_draw_command *text = &draw.commands[j];
+            if (text->type == CUI_DRAW_RECT && text->color.r == 52 &&
+                text->corner_radii.top_left == 8)
+                has_fill = true;
+            if (text->type != CUI_DRAW_TEXT)
+                continue;
+            ++rows;
+            CHECK(text->font_size == 10 && text->bounds.h == typography.line_height);
+            CHECK(text->text_style.monospace && text->text_style.weight == CUI_TEXT_WEIGHT_BOLD &&
+                  text->text_style.family == 7);
+            CHECK(text->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&
+                  text->text_paint.stops != stops && text->text_paint.stops[0].color.r == 245);
+            CHECK(fabsf(text->bounds.x + text->bounds.w - (bounds.x + bounds.w - box.padding)) <
+                  .2f);
+        }
+        CHECK(has_fill);
+        CHECK(rows == (i == 1 ? 2u : 1u));
+        size_t count;
+        const cui_semantic *semantic = cui_semantics(ui, &count);
+        CHECK(count == 1 && semantic[0].role == CUI_ROLE_LABEL && semantic[0].tab_stop_disabled);
+        CHECK(semantic[0].name.length == 9 && !memcmp(semantic[0].name.data, "Page Down", 9));
+    }
+
+    CHECK(cui_begin_frame(ui, 240, 160, .016f));
+    cui_text_paint solid = {.kind = CUI_TEXT_PAINT_SOLID, .color = {32, 65, 120, 255}};
+    CHECK(cui_kbd_styled(ui, 10, &theme, stroke, (cui_kbd_options){0},
+                         &(cui_kbd_style){.typography = &typography, .text_paint = &solid}));
+    cui_draw_list draw = cui_end_frame(ui);
+    CHECK(cui_last_error(ui) == CUI_OK);
+    CHECK(fabsf(cui_bounds(ui, 10).w - 71) < .1f && cui_bounds(ui, 10).h == 23);
+    CHECK(find(draw, CUI_DRAW_TEXT)->color.b == 120);
+
+    CHECK(cui_begin_frame(ui, 240, 160, .016f));
+    typography.style.letter_spacing = 1;
+    CHECK(!cui_kbd_styled(ui, 11, &theme, stroke, (cui_kbd_options){0}, &style));
+    typography.style.letter_spacing = 0;
+    paint.x1 = 0;
+    CHECK(!cui_kbd_styled(ui, 11, &theme, stroke, (cui_kbd_options){0}, &style));
+    typography.size = NAN;
+    CHECK(cui_kbd_styled(ui, 10, &theme, stroke, (cui_kbd_options){.plain = true}, &style));
+    draw = cui_end_frame(ui);
+    CHECK(cui_last_error(ui) == CUI_OK && draw.count == 1);
+    CHECK(find(draw, CUI_DRAW_TEXT)->font_size == theme.font_size);
+    size_t count;
+    const cui_semantic *semantic = cui_semantics(ui, &count);
+    CHECK(count == 1 && semantic[0].id == 10);
+    cui_destroy(ui);
+}
+
 int main(void) {
     formats();
     unicode_mappings();
     render();
     failures();
+    styled_hints();
     puts("Kbd source slice: ok");
     return 0;
 }

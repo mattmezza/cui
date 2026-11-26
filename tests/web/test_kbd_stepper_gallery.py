@@ -40,7 +40,9 @@ def main():
             assert all(h['width'] > 0 and h['height'] > 0 for h in hints)
             assert hints[0]['x'] < hints[1]['x'] < hints[2]['x']
             assert abs(hints[0]['y']-hints[1]['y']) < 2
-            assert 'cui_kbd_ex' in page.locator('#snippet').inner_text()
+            styled = target('Alt+Page Down')
+            assert styled['y'] > hints[0]['y'] and abs(styled['width'] - 176) < 1
+            assert 'cui_kbd_styled' in page.locator('#snippet').inner_text()
             assert page.locator('#component-guides a').filter(has_text='Keyboard').count() >= 1
             def painted(text):
                 expression = """()=>{const w=cuiGallery.exports,d=new TextDecoder();
@@ -51,6 +53,21 @@ def main():
                     print('Missing paint:', text, 'Actual:', page.evaluate(expression)[:1200], 'Errors:', errors, flush=True)
                     raise
             painted('Ctrl+Shift+SS')
+            painted('Alt+Page Down')
+            assert page.evaluate('''() => {
+                const w = cuiGallery.exports, decoder = new TextDecoder();
+                for (let i = 0; i < w.gallery_count(); ++i) {
+                    const text = decoder.decode(new Uint8Array(w.memory.buffer,
+                        w.gallery_command_text(i), w.gallery_command_length(i)));
+                    if (text === "Alt+Page Down") {
+                        return w.gallery_command(i, 11) === 14 &&
+                               w.gallery_command(i, 24) === 1 &&
+                               w.gallery_command(i, 25) === 1 &&
+                               w.gallery_command(i, 30) === 2;
+                    }
+                }
+                return false;
+            }''')
             page.goto(f'http://127.0.0.1:{server.server_port}/#Stepper')
             page.wait_for_function('window.cuiGallery?.renderedComponent==="Stepper"')
             def click(name):
@@ -98,7 +115,7 @@ def main():
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
             assert not errors, errors
             browser.close()
-            print('PASS: Unicode Kbd label and pointer/key Stepper validation, same-item requests, disabled suppression and mobile containment')
+            print('PASS: Unicode and styled Kbd labels, pointer/key Stepper validation, same-item requests, disabled suppression and mobile containment')
     finally:
         server.shutdown()
         server.server_close()

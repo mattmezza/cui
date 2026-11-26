@@ -5924,7 +5924,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                      &checked, disabled);
         cui_end_group_box(ui);
         break;
-    case 17:
+    case 17: {
         cui_label(ui, &t, cui_string("Shortcut hints"));
         cui_begin_box(ui, cui_id_from(ui, "shortcut-hints"), (cui_box){.row = true, .gap = t.gap});
         cui_kbd_ex(ui, cui_id_from(ui, "kbd"), &t,
@@ -5935,8 +5935,28 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_kbd_ex(ui, cui_id_from(ui, "kbd-plain"), &t, (cui_kbd_stroke){.key = CUI_STR("enter")},
                    (cui_kbd_options){.plain = true});
         cui_end_box(ui);
+        cui_box keycap = {.width = -1,
+                          .max_width = 176,
+                          .padding = 6,
+                          .radius = 8,
+                          .background = t.muted_background,
+                          .border = t.border,
+                          .border_width = 1};
+        cui_typography_token type = {.size = 14,
+                                     .line_height = 20,
+                                     .align = CUI_TEXT_ALIGN_CENTER,
+                                     .wrap = true,
+                                     .style = {.monospace = true}};
+        cui_text_gradient_stop stops[] = {{0, t.text}, {1, t.accent}};
+        cui_text_paint paint = {
+            .kind = CUI_TEXT_PAINT_LINEAR, .x1 = 1, .stops = stops, .stop_count = 2};
+        cui_kbd_styled(ui, cui_id_from(ui, "kbd-styled"), &t,
+                       (cui_kbd_stroke){.modifiers = CUI_MOD_ALT, .key = CUI_STR("pagedown")},
+                       (cui_kbd_options){0},
+                       &(cui_kbd_style){.box = &keycap, .typography = &type, .text_paint = &paint});
         cui_label(ui, &t, cui_string("Hints do not register shortcuts."));
         break;
+    }
     case 18:
         gallery_skeleton_profile(&t);
         break;

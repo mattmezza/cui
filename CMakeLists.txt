@@ -1149,6 +1149,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/CALENDAR_PRESENTATION.md")
 endif()
 add_test(NAME calendar_distribution_contract COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_calendar_distribution.py)
 add_test(NAME questionnaire_distribution_contract COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_questionnaire_distribution.py)
+# This test configures two clean projects with separate 90-second deadlines.
+set_tests_properties(questionnaire_distribution_contract PROPERTIES TIMEOUT 200)
 add_executable(test_dropdown_button_metadata tests/unit/test_dropdown_button_metadata.c)
 target_link_libraries(test_dropdown_button_metadata PRIVATE cui cui_software)
 cui_warnings(test_dropdown_button_metadata)

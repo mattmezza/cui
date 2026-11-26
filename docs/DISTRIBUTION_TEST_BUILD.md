@@ -47,3 +47,12 @@ hosted runners and workload differ, so it does not isolate the shared-object cha
 or establish a repeatable speedup. The overall workflow was still running when
 these completed job-step timings were recorded. Full optimization and the runtime,
 standalone and independent self-contained checks remain enabled.
+
+## Questionnaire configure deadline
+
+On the [alpha.10 Windows Release run](https://github.com/mattmezza/cui/actions/runs/45852900282/job/140023625109),
+the Questionnaire distribution check hit the 60-second CTest limit. The check
+stages package sources and configures two clean CMake projects. Each configure
+has a 90-second subprocess deadline. CTest allows the full check 200 seconds
+and keeps the separate subprocess deadlines. This avoids retrying the full job
+solely because the combined checks exceed the unit-test budget.

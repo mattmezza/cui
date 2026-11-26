@@ -741,7 +741,7 @@
         "rust": "tested_subset"
       },
       "limitations": [
-        "All five builders expose optional horizontal fractional slides on current bridges. Probe supports_carousel_basis or SupportsCarouselBasis. Older providers retain full-width slides. Vertical orientation, custom controls and looping are immediate C only."
+        "All five builders expose optional fractional slide sizing and vertical orientation. Probe supports_carousel_basis and supports_carousel_axis (SupportsCarouselBasis and SupportsCarouselAxis in Go). Older providers keep their horizontal layout and may require full-width slides. Custom controls and looping remain immediate C only."
       ]
     },
     {

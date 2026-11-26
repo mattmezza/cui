@@ -1267,6 +1267,14 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_visual_size(cui_bridge_app *, cu
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_slide_basis_v1(cui_bridge_app *,
                                                                         cui_bridge_node item,
                                                                         float basis);
+enum { CUI_BRIDGE_CAROUSEL_HORIZONTAL, CUI_BRIDGE_CAROUSEL_VERTICAL };
+/* Optional Carousel axis operation. Horizontal is the default. An axis change
+ * takes effect on the next submission, cancels active Carousel gestures and
+ * preserves selection without emitting an event. Vertical slide basis uses
+ * the visual height (200 logical pixels when unset). */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_axis_v1(cui_bridge_app *,
+                                                                 cui_bridge_node carousel,
+                                                                 uint32_t axis);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_total(cui_bridge_app *, cui_bridge_node,
                                                       uint32_t total);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_step_status(cui_bridge_app *, cui_bridge_node item,

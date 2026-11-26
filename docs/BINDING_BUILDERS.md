@@ -682,6 +682,8 @@ MessageScroller contains Item messages; `detail` is the sender and
 its initial frame. Carousel contains Item slides and provides `select` and
 `selected`. Set a direct slide Item's `carousel_basis(0.5)` to fit two slides.
 Check `app.supports_carousel_basis()` before using this with an older bridge.
+Use `carousel_axis("vertical")` on the Carousel after checking
+`app.supports_carousel_axis()`. Vertical fractions use the visual height.
 Use `visual_size(0, height)` for a growing fractional Carousel. See the
 [retained Carousel example](CAROUSEL.md#retained-slides).
 Resizable contains Item panels with `panel_size(100..4096)` widths;

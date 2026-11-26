@@ -2999,6 +2999,19 @@ cui_bridge_status cui_bridge_set_carousel_slide_basis_v1(cui_bridge_app *app,
     node->carousel_basis = basis;
     return CUI_BRIDGE_OK;
 }
+cui_bridge_status cui_bridge_set_carousel_axis_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                  uint32_t axis) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_CAROUSEL)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (axis != CUI_BRIDGE_CAROUSEL_HORIZONTAL && axis != CUI_BRIDGE_CAROUSEL_VERTICAL)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->carousel_axis = axis;
+    return CUI_BRIDGE_OK;
+}
 cui_bridge_status cui_bridge_set_scroll_extent(cui_bridge_app *app, cui_bridge_node handle,
                                                float width, float height) {
     cui_bridge_node_record *node;
@@ -5085,6 +5098,10 @@ static void bridge_render_carousel(cui_bridge_app *app, uint32_t slot,
         node->carousel_state = state;
         node->carousel_geometry = geometry;
     }
+    cui_orientation axis = node->carousel_axis == CUI_BRIDGE_CAROUSEL_VERTICAL
+                               ? CUI_ORIENTATION_VERTICAL
+                               : CUI_ORIENTATION_HORIZONTAL;
+    cui_carousel_set_axis(node->carousel_state, axis);
     bridge_carousel_binding *binding = calloc(1, sizeof *binding);
     if (!binding) {
         app->frame_error = CUI_BRIDGE_OUT_OF_MEMORY;

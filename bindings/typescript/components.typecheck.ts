@@ -136,3 +136,10 @@ visualStepper().stepper_fill(false, 'md', '300');
 const fractionalSlide: c.Item = c.item("slide").carousel_basis(.5).carousel_basis(0);
 const hasCarouselBasis: boolean = app.supports_carousel_basis();
 void fractionalSlide; void hasCarouselBasis;
+
+const verticalCarousel: c.Carousel = c.carousel("axis").carousel_axis("vertical").carousel_axis("horizontal");
+const hasCarouselAxis: boolean = app.supports_carousel_axis();
+// @ts-expect-error unsupported Carousel axis
+c.carousel("bad-axis").carousel_axis("diagonal");
+// @ts-expect-error Carousel axis is not an Item operation
+c.item("bad-axis-item").carousel_axis("vertical");

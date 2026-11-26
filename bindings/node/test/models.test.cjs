@@ -206,3 +206,30 @@ console.log('PASS native Dock split layout, activation snapshots and metadata fr
  zero.carousel_basis(0);assert.throws(()=>zero.carousel_basis(.5),/unavailable/);
  assert.equal(zero.carouselBasisValue,0);legacy.dispose();
 }
+
+{
+ for(const value of [null,1,true,'diagonal']) assert.throws(()=>c.carousel('bad').carousel_axis(value));
+ assert.throws(()=>c.item('bad').carousel_axis('vertical'));
+ const app=new c.App({width:640}),events=[];
+ assert.equal(app.supports_carousel_axis(),true);
+ const slides=Array.from({length:4},(_,i)=>c.item('v'+i).carousel_basis(.5));
+ const carousel=c.carousel('vertical').carousel_axis('vertical').visual_size(240,200).children(...slides).on_change(e=>events.push(e));
+ app.mount(c.column().children(carousel)).step();
+ assert.ok(Math.abs(slides[1].bounds().y-slides[0].bounds().y-108)<1);
+ carousel.visual_size(240,300);app.step();
+ assert.ok(Math.abs(slides[1].bounds().y-slides[0].bounds().y-158)<1);
+ assert.deepEqual(events,[]);
+ const {x,y}=carousel.bounds();app.scroll(x+30,y+30,0,-1).step();
+ assert.equal(carousel.selected(),slides[1]);assert.equal(events.length,1);
+ assert.ok(events[0].selectedHandle.generation>0);
+ carousel.carousel_axis('horizontal');app.step();
+ assert.equal(carousel.selected(),slides[1]);assert.equal(events.length,1);
+ app.dispose();assert.throws(()=>carousel.carousel_axis('vertical'),/disposed/);
+ const legacy=new c.App();legacy.supports_carousel_axis=()=>false;
+ const rejected=c.carousel('unsupported').carousel_axis('vertical');
+ assert.throws(()=>legacy.mount(c.column().children(rejected)),/unavailable/);assert.ok(!rejected.owner);
+ const horizontal=c.carousel('legacy').carousel_axis('vertical').carousel_axis('horizontal');
+ legacy.mount(c.column().children(horizontal));horizontal.carousel_axis('horizontal');
+ assert.throws(()=>horizontal.carousel_axis('vertical'),/unavailable/);
+ assert.equal(horizontal.carouselAxisValue,'horizontal');legacy.dispose();
+}

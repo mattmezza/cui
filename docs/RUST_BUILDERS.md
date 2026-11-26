@@ -66,7 +66,10 @@ Carousel accepts Item slides and uses `select`/`selected`; native wheel, drag, a
 Use `app.supports_carousel_basis()` before setting a fraction. For example,
 `app.build_child(carousel, Kind::Item, "activity")?.text("Activity")?.carousel_basis(0.5)?.finish()`
 creates a slide that takes half of the viewport. Use
-`app.carousel_basis(item, 0.)?` to restore full width. See the
+`app.carousel_basis(item, 0.)?` to restore the full primary extent. After
+checking `app.supports_carousel_axis()`, call `carousel_axis(CarouselAxis::Vertical)?`
+on the Carousel builder or use `app.carousel_axis(carousel, CarouselAxis::Vertical)?`.
+Vertical fractions use the visual height. See the
 [retained Carousel guide](CAROUSEL.md#retained-slides).
 
 Resizable accepts Item panels with pixel widths in `value`; `resizable_handle_bounds` locates a draggable divider and change events carry new sizes.

@@ -99,6 +99,7 @@ function requestsRadioMotion(node) {
 }
 const stepperFillUnavailable = 'Stepper Fill requires cui_bridge_set_stepper_fill';
 function preflightNodeOptions(app, node, insideDecoration = false, insideAttachmentSlot = false) {
+  if (node.carouselAxisValue === 'vertical' && !app.supports_carousel_axis()) throw new Error('Carousel axis unavailable');
   if (node.carouselBasisValue) {
     if (node.parent?.kind !== 65) throw new TypeError('carousel_basis requires a direct Carousel Item');
     if (!app.supports_carousel_basis()) throw new Error('Carousel basis unavailable');
@@ -193,6 +194,7 @@ class Node {
     this.roundingValue = 0; this.radiusValue = 0; this.disabledValue = false;
     this.extentValue=null; this.anchorValue=null; this.visualValue=null; this.closeValue=null; this.totalValue=kind===43?5:kind===59?6:10; this.attachmentValue=0; this.imageValue=null;this.chartDataValue=[];this.chartKindValue=0;this.plotPointsValue=[];this.matrixValue=null;this.selectionModeValue=0;this.textFormatValue=0;this.panelValue=null; this.timeValue=[0,0,0];this.dateValue=[2026,1,1];this.colorValue=0x000000ff; this.statusValue=null; this.openValue = false;this.openSet=false;this.checkedSet=false; this.detailValue = ""; this.selectedValue = null; this.checkedValue = false; this.numericValue = kind===42?1:0; this.rangeValue = kind===42?[1,10,1]:kind===43?[0,5,1]:[0,1,.01]; this.changeValue = undefined;
     this.radioPaintValues = null;
+    this.carouselAxisValue = 'horizontal';
     this.carouselBasisValue = 0;
     this.radioMotionValue = false;
     this.radioTabIndexValue = null;
@@ -398,6 +400,19 @@ class Node {
   anchor(node) {if(![27,28,29].includes(this.kind)||!(node instanceof Node))throw new TypeError('invalid anchor');if(this.owner){if(node.owner!==this.owner)throw new Error('foreign anchor');native.setAnchor(this.owner.handle,this[NODE],node[NODE]);}this.anchorValue=node;return this;}
   is_open() {if(![15,20,24,25,26,27,28,29,58,62,63,75].includes(this.kind))throw new Error('component has no open state');if(!this.owner)return this.openValue;return native.getOpen(this.owner.handle,this[NODE]);}
   on_close(callback) {if(!surfaces.has(this.kind)||typeof callback!=='function')throw new TypeError('invalid close callback');this.closeValue=callback;return this;}
+  carousel_axis(axis) {
+    if (this.kind !== 65) throw new TypeError('carousel_axis requires a Carousel');
+    if (!['horizontal', 'vertical'].includes(axis)) throw new TypeError('axis must be horizontal or vertical');
+    if (this.owner) {
+      this.owner._alive();
+      if (axis === 'vertical' || this.carouselAxisValue === 'vertical') {
+        if (!this.owner.supports_carousel_axis()) throw new Error('Carousel axis unavailable');
+        native.setCarouselAxis(this.owner.handle, this[NODE], axis === 'vertical' ? 1 : 0);
+      }
+    }
+    this.carouselAxisValue = axis;
+    return this;
+  }
   carousel_basis(fraction) {
     if (this.kind !== 20) throw new TypeError('carousel_basis requires an Item');
     if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1)
@@ -838,6 +853,7 @@ class App {
         for (const [layer, paint] of node.radioPaintValues)
           native.setRadioPaint(this.handle, node[NODE], layer, paint);
       }
+      if (node.carouselAxisValue === 'vertical') native.setCarouselAxis(this.handle, node[NODE], 1);
       if (node.carouselBasisValue) native.setCarouselBasis(this.handle, node[NODE], node.carouselBasisValue);
       if (node.radioMotionValue) native.setRadioMotion(this.handle, node[NODE], true);
       if (node.radioTabIndexValue !== null)
@@ -1043,6 +1059,11 @@ class App {
   supports_stepper_fill() {
     this._alive();
     return typeof native.supportsStepperFill==='function' && typeof native.setStepperFill==='function' && native.supportsStepperFill();
+  }
+  supports_carousel_axis() {
+    this._alive();
+    return typeof native.supportsCarouselAxis === 'function' &&
+      typeof native.setCarouselAxis === 'function' && native.supportsCarouselAxis();
   }
   supports_carousel_basis() {
     this._alive();

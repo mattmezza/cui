@@ -299,6 +299,10 @@ class _API:
         self.get_selected = bind("get_selected", C.c_int, C.c_void_p, _Handle, C.POINTER(_Handle))
         self.get_open = bind("get_open", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_uint32))
         self.set_anchor = bind("set_anchor", C.c_int, C.c_void_p, _Handle, _Handle)
+        self.set_carousel_axis = None
+        if hasattr(lib, "cui_bridge_set_carousel_axis_v1"):
+            self.set_carousel_axis = bind("set_carousel_axis_v1", C.c_int,
+                                          C.c_void_p, _Handle, C.c_uint32)
         self.set_carousel_basis = None
         if hasattr(lib, "cui_bridge_set_carousel_slide_basis_v1"):
             self.set_carousel_basis = bind("set_carousel_slide_basis_v1", C.c_int,
@@ -543,6 +547,7 @@ class Widget:
         self._selected: Widget | None = None
         self._anchor: Widget | None = None
         self._extent: tuple[float, float] | None = None
+        self._carousel_axis = "horizontal"
         self._carousel_basis = 0.0
         self._visual: tuple[float, float] | None = None
         self._total = 5 if kind == "rating" else 6 if kind == "otp_input" else 10
@@ -1014,6 +1019,21 @@ class Widget:
         if self.kind not in _SURFACE or not callable(callback):
             raise ValueError("on_close requires a surface and callback")
         self._close_callback = callback
+        return self
+
+    def carousel_axis(self, axis: str) -> "Widget":
+        """Choose horizontal (default) or vertical Carousel navigation."""
+        if self.kind != "carousel":
+            raise ValueError("carousel_axis requires a Carousel")
+        if axis not in ("horizontal", "vertical"):
+            raise ValueError("axis must be horizontal or vertical")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is not None and (axis == "vertical" or self._carousel_axis == "vertical"):
+            if not self._app.supports_carousel_axis():
+                raise RuntimeError("Carousel axis requires cui_bridge_set_carousel_axis_v1")
+            self._change("set_carousel_axis", int(axis == "vertical"))
+        self._carousel_axis = axis
         return self
 
     def carousel_basis(self, fraction: float) -> "Widget":
@@ -2018,6 +2038,10 @@ class App:
         self._ensure_open()
         return self._api.set_matrix_keyed is not None
 
+    def supports_carousel_axis(self) -> bool:
+        self._ensure_open()
+        return self._api.set_carousel_axis is not None
+
     def supports_carousel_basis(self) -> bool:
         self._ensure_open()
         return self._api.set_carousel_basis is not None
@@ -2156,6 +2180,8 @@ class App:
                 node._preflight_pagination(self)
             if node._stepper_fill is not None:
                 self._require_stepper_fill()
+            if node._carousel_axis == "vertical" and not self.supports_carousel_axis():
+                raise RuntimeError("Carousel axis requires cui_bridge_set_carousel_axis_v1")
             if node._carousel_basis:
                 if parent is None or parent.kind != "carousel":
                     raise ValueError("carousel_basis requires a direct Carousel Item")
@@ -2241,6 +2267,8 @@ class App:
                     node._change("set_gap", node._gap)
                 if node.kind in _BOOLEAN or (node.kind == "item" and node._checked_set):
                     node._change("set_checked", int(node._checked))
+                if node._carousel_axis == "vertical":
+                    node._change("set_carousel_axis", 1)
                 if node._carousel_basis:
                     node._change("set_carousel_basis", node._carousel_basis)
                 if node._radio_motion:

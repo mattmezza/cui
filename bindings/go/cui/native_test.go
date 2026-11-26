@@ -1195,6 +1195,67 @@ func TestCarouselBasis(t *testing.T) {
 	}
 }
 
+func TestCarouselAxis(t *testing.T) {
+	a := app(t)
+	supported, err := a.SupportsCarouselAxis()
+	check(t, err)
+	legacy := os.Getenv("CUI_TEST_LEGACY_CAROUSEL_AXIS") == "1"
+	if supported == legacy {
+		t.Fatalf("Carousel axis capability = %t, legacy test = %t", supported, legacy)
+	}
+	first, second := Item("overview", "Overview"), Item("activity", "Activity")
+	third, fourth := Item("reports", "Reports"), Item("audit", "Audit")
+	carousel := Carousel("slides").CarouselAxis(CarouselVertical).VisualSize(240, 200).
+		Children(first, second, third, fourth)
+	root := Column("root").Children(carousel)
+	if legacy {
+		if err := a.Mount(root); err != ErrCarouselAxisUnavailable {
+			t.Fatalf("expected unavailable before mounting, got %v", err)
+		}
+		check(t, carousel.CarouselAxis(CarouselHorizontal).Err())
+	} else {
+		for _, slide := range []*Node{first, second, third, fourth} {
+			check(t, slide.CarouselBasis(.5).Err())
+		}
+	}
+	var selected *Node
+	carousel.OnChange(func(event Event) { selected = event.Selected })
+	check(t, a.Mount(root))
+	check(t, a.Step(.016))
+	frame, err := a.Bounds(carousel)
+	check(t, err)
+	p, err := a.Bounds(first)
+	check(t, err)
+	q, err := a.Bounds(second)
+	check(t, err)
+	if legacy {
+		if q.X-p.X != 256 || q.Y != p.Y {
+			t.Fatalf("expected legacy horizontal geometry, got %+v / %+v", p, q)
+		}
+		check(t, a.QueueScroll(frame.X+30, frame.Y+30, -1, 0))
+	} else {
+		if q.Y-p.Y != 108 || q.X != p.X {
+			t.Fatalf("expected vertical half-height slides, got %+v / %+v", p, q)
+		}
+		check(t, a.QueueScroll(frame.X+30, frame.Y+30, 0, -1))
+	}
+	check(t, a.Step(.016))
+	count, err := a.Dispatch()
+	check(t, err)
+	if count != 1 || selected != second {
+		t.Fatalf("expected one selection of the second slide")
+	}
+	check(t, carousel.CarouselAxis(CarouselHorizontal).Err())
+	check(t, a.Step(.016))
+	current, err := a.Selected(carousel)
+	check(t, err)
+	count, err = a.Dispatch()
+	check(t, err)
+	if count != 0 || current != second {
+		t.Fatal("axis change moved the selected slide identity or emitted an event")
+	}
+}
+
 func TestResizable(t *testing.T) {
 	a := app(t)
 	first := Item("first", "First panel").PanelSize(240)

@@ -95,12 +95,14 @@ FocusTrap contains arbitrary child nodes. `Open(true)` activates a native modal 
 
 MessageScroller accepts up to 64 `Item` children. Item text is the message body, `Detail` is the sender, and `StepStatus(0/1)` selects incoming or outgoing. `VisualSize` sets the viewport. After the first `Step`, `App.Value(scroller)` reads the live vertical offset and `SetOffset` changes it; `OnChange` receives native offset changes. The initial frame follows the newest message.
 
-Carousel accepts up to 64 `Item` slides with text or child content. `VisualSize` sets the viewport, `Selected(item)` changes the slide, and `App.Selected` reads it. Native wheel, drag, and keyboard navigation emit `OnChange` with a full selected Item handle snapshot. The bridge currently uses horizontal orientation and does not support nested Carousels.
+Carousel accepts up to 64 `Item` slides with text or child content. `VisualSize` sets the viewport, `Selected(item)` changes the slide, and `App.Selected` reads it. Native wheel, drag, and keyboard navigation emit `OnChange` with a full selected Item handle snapshot. Nested Carousels remain unsupported.
 
 After checking `App.SupportsCarouselBasis()`, call `CarouselBasis(0.5)` on
 each Item to show two slides. Use `VisualSize(0, height)` on the Carousel to
 grow with the parent, or set a positive width for a fixed Carousel. Reset an
-Item to full width with `CarouselBasis(0)`. See the
+Item to the full primary extent with `CarouselBasis(0)`. After checking
+`App.SupportsCarouselAxis()`, use `CarouselAxis(cui.CarouselVertical)` for
+slides that navigate along the visual height. See the
 [retained Carousel guide](CAROUSEL.md#retained-slides).
 
 Resizable accepts up to 64 `Item` panels in a horizontal split. Set an Item's initial width with `PanelSize(100..4096)`, read its live width with `App.Value(item)`, and locate a divider with `App.ResizableHandleBounds(group, precedingItem)`. Dragging a divider emits `OnChange` on the resized Item with numeric `Event.Value`. `VisualSize` configures the group and `Disabled(true)` suppresses dragging.

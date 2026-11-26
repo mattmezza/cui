@@ -128,6 +128,7 @@ typedef struct {
     cui_carousel_state *carousel_state;
     cui_carousel_geometry *carousel_geometry;
     float carousel_basis;
+    uint32_t carousel_axis;
     cui_resizable_state *resizable_state;
     cui_resizable_slot *resizable_slots;
     bridge_text_view_owned *text_view;

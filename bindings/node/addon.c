@@ -1559,6 +1559,36 @@ static napi_value set_radio_flag(napi_env env, napi_callback_info info, const ch
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 
+typedef cui_bridge_status (*carousel_axis_fn)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static carousel_axis_fn carousel_axis_symbol(void) {
+    carousel_axis_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_set_carousel_axis_v1");
+    return set;
+}
+static napi_value supports_carousel_axis(napi_env env, napi_callback_info info) {
+    (void)info;
+    napi_value result;
+    if (napi_get_boolean(env, carousel_axis_symbol() != NULL, &result) != napi_ok)
+        return NULL;
+    return result;
+}
+static napi_value set_carousel_axis(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *node;
+    double axis;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !number_arg(env, v[2], &axis))
+        return NULL;
+    if (axis != 0 && axis != 1)
+        return fail(env, "axis must be 0 or 1");
+    carousel_axis_fn set = carousel_axis_symbol();
+    if (!set)
+        return fail(env, "Carousel axis requires cui_bridge_set_carousel_axis_v1");
+    cui_bridge_status code = set(app->bridge, node->node, (uint32_t)axis);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 typedef cui_bridge_status (*carousel_basis_fn)(cui_bridge_app *, cui_bridge_node, float);
 static carousel_basis_fn carousel_basis_symbol(void) {
     carousel_basis_fn set = NULL;
@@ -2751,6 +2781,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setChecked", set_num, 6);
     EXPORT("supportsRadioPaint", supports_radio_paint, 0);
     EXPORT("setRadioPaint", set_radio_paint, 0);
+    EXPORT("supportsCarouselAxis", supports_carousel_axis, 0);
+    EXPORT("setCarouselAxis", set_carousel_axis, 0);
     EXPORT("supportsCarouselBasis", supports_carousel_basis, 0);
     EXPORT("setCarouselBasis", set_carousel_basis, 0);
     EXPORT("supportsRadioMotion", supports_radio_motion, 0);

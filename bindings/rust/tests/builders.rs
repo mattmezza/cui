@@ -934,6 +934,64 @@ fn carousel_slide_basis() {
 }
 
 #[test]
+fn carousel_axis() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let legacy = std::env::var("CUI_TEST_LEGACY_CAROUSEL_AXIS").as_deref() == Ok("1");
+    assert_eq!(app.supports_carousel_axis(), !legacy);
+    let builder = app
+        .build_child(root, Kind::Carousel, "carousel")
+        .unwrap()
+        .visual_size(240., 200.)
+        .unwrap();
+    let carousel = if legacy {
+        builder.finish()
+    } else {
+        builder.carousel_axis(CarouselAxis::Vertical).unwrap().finish()
+    };
+    if legacy {
+        assert_eq!(
+            app.carousel_axis(carousel, CarouselAxis::Vertical).err(),
+            Some(Error::CAROUSEL_AXIS_UNAVAILABLE)
+        );
+    }
+    let mut slides = Vec::new();
+    for key in ["overview", "activity", "reports", "audit"] {
+        let slide = app.child(carousel, Kind::Item, key).unwrap();
+        if !legacy {
+            app.carousel_basis(slide, 0.5).unwrap();
+        }
+        slides.push(slide);
+    }
+    let events = Rc::new(Cell::new(None));
+    let observation = events.clone();
+    app.on_change_event(carousel, move |event| observation.set(event.selected))
+        .unwrap();
+    app.step(0.016).unwrap();
+    let area = app.bounds(carousel).unwrap();
+    let first = app.bounds(slides[0]).unwrap();
+    let second = app.bounds(slides[1]).unwrap();
+    let (dx, dy) = if legacy {
+        assert_eq!((second.x - first.x, second.y - first.y), (256., 0.));
+        (-1., 0.)
+    } else {
+        assert_eq!((second.x - first.x, second.y - first.y), (0., 108.));
+        (0., -1.)
+    };
+    app.scroll(area.x + 30., area.y + 30., dx, dy).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(events.get(), Some(slides[1]));
+    if !legacy {
+        app.carousel_axis(carousel, CarouselAxis::Horizontal).unwrap();
+        app.step(0.016).unwrap();
+        assert_eq!(app.selected(carousel).unwrap(), Some(slides[1]));
+        assert_eq!(app.dispatch().unwrap(), 0);
+    }
+}
+
+#[test]
 fn resizable_panel_drag() {
     let _guard = NATIVE.lock().unwrap();
     let mut app = App::headless(500., 300.).unwrap();

@@ -5796,7 +5796,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support horizontal basis sizing. Intrinsic sizing from arbitrary slide content, the first growing-width estimate and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
+        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes and fractional sizing. Intrinsic sizing from arbitrary slide content, the first growing-width estimate and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5823,7 +5823,7 @@
             "tests/web/test_snippets.py",
             "docs/CAROUSEL.md"
           ],
-          "scope": "Immediate C and the WASM gallery cover both axes, mixed extents, clipping, silent resizing and touch snapping. The C bridge covers horizontal fractional slides, fixed and growing viewports, resetting and selection identity. Language bindings expose the optional retained setter and capability probe."
+          "scope": "Immediate C and the WASM gallery cover both axes, mixed extents, clipping, silent resizing and touch snapping. The C bridge and five language builders cover both axes, fractional layout, axis-specific navigation, stable selection and silent reconfiguration. Optional symbols allow older bridges to keep their previous layout."
         },
         {
           "name": "keyboard, pointer drag and wheel navigation with nested child ownership and cross-axis page handoff",

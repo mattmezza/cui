@@ -108,6 +108,42 @@ class Models(unittest.TestCase):
             app.queue_text('3');app.step();app.dispatch();self.assertEqual(otp.current_text(),'123');self.assertEqual(events[-1].text,'123')
             otp.disabled();app.step();events.clear();app.queue_text('4');app.step();app.dispatch();self.assertEqual(events,[]);self.assertEqual(otp.current_text(),'123')
 
+    def test_carousel_axis(self):
+        for value in (None, 1, True, "diagonal"):
+            with self.assertRaises(ValueError): c.carousel("bad").carousel_axis(value)
+        with self.assertRaises(ValueError): c.item("bad").carousel_axis("vertical")
+        with c.App(width=640) as app:
+            self.assertTrue(app.supports_carousel_axis())
+            events=[]
+            slides=[c.item("v"+str(i)).carousel_basis(.5) for i in range(4)]
+            carousel=c.carousel("vertical").carousel_axis("vertical").visual_size(240,200).children(*slides).on_change(events.append)
+            app.mount(c.column().children(carousel));app.step()
+            a,b=app.bounds(slides[0]),app.bounds(slides[1])
+            self.assertAlmostEqual(b[1]-a[1],108,delta=1)
+            carousel.visual_size(240,300);app.step()
+            a,b=app.bounds(slides[0]),app.bounds(slides[1])
+            self.assertAlmostEqual(b[1]-a[1],158,delta=1)
+            app.dispatch();self.assertEqual(events,[])
+            x,y,_,_=app.bounds(carousel)
+            app.queue_scroll(x+30,y+30,0,-1);app.step();app.dispatch()
+            self.assertIs(carousel.selected(),slides[1])
+            self.assertEqual(len(events),1)
+            self.assertEqual(events[0].selected_handle,(slides[1]._handle.slot,slides[1]._handle.generation))
+            carousel.carousel_axis("horizontal");app.step();app.dispatch()
+            self.assertIs(carousel.selected(),slides[1])
+            self.assertEqual(len(events),1)
+        with self.assertRaises(RuntimeError): carousel.carousel_axis("vertical")
+        with c.App() as app:
+            with patch.object(app._api,"set_carousel_axis",None):
+                self.assertFalse(app.supports_carousel_axis())
+                rejected=c.carousel("unsupported").carousel_axis("vertical")
+                with self.assertRaises(RuntimeError): app.mount(c.column().children(rejected))
+                self.assertIsNone(rejected._handle)
+                carousel=c.carousel("legacy").carousel_axis("vertical").carousel_axis("horizontal")
+                app.mount(c.column().children(carousel));carousel.carousel_axis("horizontal")
+                with self.assertRaises(RuntimeError): carousel.carousel_axis("vertical")
+                self.assertEqual(carousel._carousel_axis,"horizontal")
+
     def test_carousel_basis(self):
         for value in (-.1, 1.1, float("nan"), float("inf")):
             with self.assertRaises(ValueError): c.item("bad").carousel_basis(value)

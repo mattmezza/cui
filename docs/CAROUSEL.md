@@ -113,8 +113,22 @@ Builder or `app.carousel_basis(item, 0.5)?` after creating the Item. Each bindin
 can query `supports_carousel_basis()` (Go `SupportsCarouselBasis()`). With an
 older bridge, omit the setter to keep full-width slides and ordinary navigation.
 
+For a vertical retained Carousel, call
+`cui_bridge_set_carousel_axis_v1(app, carousel, CUI_BRIDGE_CAROUSEL_VERTICAL)`.
+Set a positive height with `cui_bridge_set_visual_size` or use the default
+200 logical pixels. Fractional slides use the height as their primary extent.
+The width keeps the same fixed or growing rules. Changing the axis applies on
+the next frame, ends the previous gesture and keeps the selected Item without
+emitting a selection event.
+
+Python, JavaScript and TypeScript use `carousel_axis("vertical")`, Go uses
+`CarouselAxis(cui.CarouselVertical)`, and Rust uses
+`carousel_axis(CarouselAxis::Vertical)?`. Query `supports_carousel_axis()`
+(Go `SupportsCarouselAxis()`) before requesting vertical layout on older bridges.
+
 This Python example mounts a Carousel with two visible slides and a third to
-scroll to. The equivalent JavaScript or TypeScript uses the same builder methods.
+scroll to. It uses vertical layout when the loaded bridge supports it.
+The equivalent JavaScript or TypeScript uses the same builder methods.
 Use the native app constructor and run loop to show the UI in a window. The
 [builder guide](BINDING_BUILDERS.md) shows how to start a native app.
 
@@ -131,17 +145,21 @@ with cui.App(width=640, height=360) as app:
         for slide in slides:
             slide.carousel_basis(0.5)
 
-    rail = cui.carousel("dashboard").visual_size(320, 120).children(*slides)
+    rail = cui.carousel("dashboard").visual_size(320, 200).children(*slides)
+    vertical = app.supports_carousel_axis()
+    if vertical:
+        rail.carousel_axis("vertical")
     app.mount(cui.column("root").children(rail))
     app.step()
     x, y, _, _ = app.bounds(rail)
-    app.queue_scroll(x + 30, y + 30, -1, 0)
+    dx, dy = (0, -1) if vertical else (-1, 0)
+    app.queue_scroll(x + 30, y + 30, dx, dy)
     app.step()
     assert rail.selected() is slides[1]
 ```
 
-Retained Carousel uses horizontal orientation and default spacing. Vertical
-orientation, looping and custom controls use the immediate C API.
+Retained Carousel uses default spacing. Looping and custom controls use the
+immediate C API.
 
 ## Input ownership
 

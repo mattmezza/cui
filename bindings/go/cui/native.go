@@ -706,18 +706,28 @@ static cui_bridge_status go_attachment_preview(cui_bridge_app *a, cui_bridge_nod
 }
 
 static cui_bridge_status (*carousel_set_basis)(cui_bridge_app *, cui_bridge_node, float);
+static cui_bridge_status (*carousel_set_axis)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static void go_carousel_initialize(void) {
- if (bridge_lib)
+ if (bridge_lib) {
   go_load_optional_symbol(&carousel_set_basis, sizeof carousel_set_basis,
                           "cui_bridge_set_carousel_slide_basis_v1");
+  go_load_optional_symbol(&carousel_set_axis, sizeof carousel_set_axis,
+                          "cui_bridge_set_carousel_axis_v1");
+ }
 #if defined(CUI_GO_STATIC)
- else
+ else {
   carousel_set_basis = cui_bridge_set_carousel_slide_basis_v1;
+  carousel_set_axis = cui_bridge_set_carousel_axis_v1;
+ }
 #endif
 }
 static int go_carousel_basis_supported(void) { return carousel_set_basis != NULL; }
 static cui_bridge_status go_carousel_set_basis(cui_bridge_app *a, cui_bridge_node slide, float basis) {
  return carousel_set_basis(a, slide, basis);
+}
+static int go_carousel_axis_supported(void) { return carousel_set_axis != NULL; }
+static cui_bridge_status go_carousel_set_axis(cui_bridge_app *a, cui_bridge_node carousel, uint32_t axis) {
+ return carousel_set_axis(a, carousel, axis);
 }
 
 static int bridge_open(const char *path) {
@@ -905,6 +915,7 @@ type Node struct {
 	attachmentSlot                       AttachmentSlotRole
 	attachmentSlotWidth                  float32
 	carouselBasis                        float32
+	carouselAxis                         CarouselAxis
 	imagePixels                          []byte
 	imageWidth, imageHeight, imageStride uint32
 	timeValue                            Time
@@ -2037,6 +2048,9 @@ func (a *App) Mount(root *Node) error {
 		if err := a.validateAttachmentSlots(n, parent); err != nil {
 			return err
 		}
+		if n.carouselAxis == CarouselVertical && C.go_carousel_axis_supported() == 0 {
+			return ErrCarouselAxisUnavailable
+		}
 		if n.carouselBasis > 0 {
 			if parent == nil || parent.kind != int(C.CUI_BRIDGE_CAROUSEL) {
 				return errors.New("CarouselBasis requires a direct Carousel Item")
@@ -2519,6 +2533,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.carouselBasis > 0 {
 			if err := result(C.go_carousel_set_basis(a.ptr, h, C.float(n.carouselBasis))); err != nil {
+				return err
+			}
+		}
+		if n.carouselAxis == CarouselVertical {
+			if err := result(C.go_carousel_set_axis(a.ptr, h, C.uint32_t(n.carouselAxis))); err != nil {
 				return err
 			}
 		}
@@ -3959,6 +3978,51 @@ func FocusTrap(key string) *Node       { return &Node{kind: 63, key: key} }
 func MessageScroller(key string) *Node { return &Node{kind: 64, key: key} }
 func Carousel(key string) *Node        { return &Node{kind: 65, key: key} }
 func Resizable(key string) *Node       { return &Node{kind: 66, key: key} }
+
+// CarouselAxis selects the primary direction of a Carousel.
+type CarouselAxis uint32
+
+const (
+	CarouselHorizontal CarouselAxis = C.CUI_BRIDGE_CAROUSEL_HORIZONTAL
+	CarouselVertical   CarouselAxis = C.CUI_BRIDGE_CAROUSEL_VERTICAL
+)
+
+// ErrCarouselAxisUnavailable means the loaded bridge only supports horizontal carousels.
+var ErrCarouselAxisUnavailable = errors.New("Carousel axis requires cui_bridge_set_carousel_axis_v1")
+
+// SupportsCarouselAxis reports whether the loaded bridge supports vertical Carousel layout.
+func (a *App) SupportsCarouselAxis() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_carousel_axis_supported() != 0, nil
+}
+
+// CarouselAxis sets the direction for the next frame. The selected slide is preserved.
+func (n *Node) CarouselAxis(axis CarouselAxis) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != int(C.CUI_BRIDGE_CAROUSEL) || n.removed || (axis != CarouselHorizontal && axis != CarouselVertical) {
+		n.err = errors.New("CarouselAxis requires a live Carousel and a valid axis")
+		return n
+	}
+	if n.app != nil && axis != n.carouselAxis {
+		supported, err := n.app.SupportsCarouselAxis()
+		if err != nil {
+			n.err = err
+		} else if !supported {
+			n.err = ErrCarouselAxisUnavailable
+		} else {
+			n.err = result(C.go_carousel_set_axis(n.app.ptr, n.handle, C.uint32_t(axis)))
+		}
+		if n.err != nil {
+			return n
+		}
+	}
+	n.carouselAxis = axis
+	return n
+}
 
 // ErrCarouselBasisUnavailable means the loaded bridge lacks fractional slide sizing.
 var ErrCarouselBasisUnavailable = errors.New("Carousel basis requires cui_bridge_set_carousel_slide_basis_v1")

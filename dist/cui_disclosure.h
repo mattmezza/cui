@@ -566,8 +566,8 @@ static void cui_disclosure_apply_part(cui_disclosure_trigger_part *out,
 
 static cui_disclosure_trigger_part
 cui_disclosure_trigger_part_for(const cui_disclosure_paint *paint, size_t index, bool open,
-                                bool disabled, const cui_box *box) {
-    cui_disclosure_trigger_part part = {.box = box};
+                                bool disabled) {
+    cui_disclosure_trigger_part part = {0};
     const cui_disclosure_appearance *a = paint ? paint->options.appearance : NULL;
     if (!a)
         return part;
@@ -655,11 +655,19 @@ static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *
     box.border = theme->border;
     box.border_width = bordered && !joined ? 1 : 0;
     cui_disclosure_trigger_part part =
-        cui_disclosure_trigger_part_for(paint, index, open, disabled, style);
-    if (part.box)
-        box = *part.box;
+        cui_disclosure_trigger_part_for(paint, index, open, disabled);
+    const cui_box *override = part.box ? part.box : style;
+    if (override)
+        box = *override;
     else if (part.typography && !render)
         box.height = 0;
+    /* The containing width is already constrained. Keep the full-width
+     * trigger within it when unwrapped title metrics grow this frame. */
+    if (part.box && paint->fill_width && box.width == -1 && !box.fixed_width &&
+        !box.width_percent && box.max_width <= 0) {
+        box.width = 1;
+        box.width_percent = true;
+    }
     const cui_disclosure_trigger_style *state = cui_disclosure_style(paint, index);
     if (cui_focused(ui) == id) {
         box.border = state && state->custom_focus ? state->focus : theme->focus;
@@ -693,7 +701,7 @@ static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *
         effective.disabled = disabled;
         render(ui, &effective, index, open, user);
     } else {
-        bool bounded = part.box ? box.width != 0 || box.fixed_width || box.width_percent
+        bool bounded = override ? box.width != 0 || box.fixed_width || box.width_percent
                                 : paint && paint->fill_width;
         cui_disclosure_title(ui, id, theme, label, open, disabled, bounded, paint, part);
     }

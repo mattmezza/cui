@@ -1234,6 +1234,8 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     node->radio_paints = NULL;
     free(node->disclosure_config);
     free(node->disclosure_style);
+    free(node->disclosure_headings);
+    free(node->disclosure_divider);
     free(node->part_shadows);
     free(node->key);
     free(node->text);
@@ -4264,6 +4266,7 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
     }
     scratch->binding.app = app;
     size_t count = 0;
+    size_t heading_count = 0;
     bool disclosure_style = false;
     for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {
         cui_bridge_node_record *item = &app->nodes[child];
@@ -4295,6 +4298,8 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                                                     ? *item->disclosure_style
                                                     : (cui_disclosure_trigger_style){0};
             disclosure_style |= item->disclosure_style != NULL;
+            if (item->disclosure_headings)
+                heading_count = count + 1;
         }
         count++;
     }
@@ -4500,9 +4505,31 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
             .disabled = node->disabled,
         };
         bool changed;
-        if (count && (config || disclosure_style)) {
+        if (count && (config || disclosure_style || node->disclosure_headings || heading_count)) {
+            cui_disclosure_trigger_appearance *headings = NULL;
+            if (heading_count) {
+                headings = malloc(heading_count * sizeof *headings);
+                if (!headings) {
+                    free(scratch);
+                    app->frame_error = CUI_BRIDGE_OUT_OF_MEMORY;
+                    return;
+                }
+                for (size_t i = 0; i < heading_count; ++i) {
+                    const cui_bridge_node_record *item = &app->nodes[scratch->binding.slots[i]];
+                    headings[i] = bridge_disclosure_heading_appearance(item->disclosure_headings);
+                }
+            }
+            cui_disclosure_appearance appearance = {
+                .trigger = bridge_disclosure_heading_appearance(node->disclosure_headings),
+                .items = headings,
+                .item_count = heading_count,
+                .separator = node->disclosure_divider,
+            };
             cui_box card;
             cui_disclosure_presentation paint = bridge_disclosure_presentation(config, &card);
+            if (node->disclosure_headings || heading_count ||
+                (paint.joined && appearance.separator))
+                paint.appearance = &appearance;
             if (disclosure_style) {
                 paint.trigger_styles = scratch->disclosure_styles;
                 paint.trigger_style_count = count;
@@ -4512,6 +4539,7 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                                       scratch->opened, options, paint, bridge_group_panel,
                                       &scratch->binding, (cui_disclosure_handler){0})
                     .changed;
+            free(headings);
         } else {
             changed =
                 cui_accordion(app->ui, node->id, &app->theme, scratch->disclosures, count,
@@ -5718,9 +5746,14 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         const cui_bridge_disclosure_config_v1 *config = node->disclosure_config;
         cui_str title = cui_string(node->text);
         bool changed;
-        if (config || node->disclosure_style) {
+        if (config || node->disclosure_style || node->disclosure_headings) {
+            cui_disclosure_appearance appearance = {
+                .trigger = bridge_disclosure_heading_appearance(node->disclosure_headings),
+            };
             cui_box card;
             cui_disclosure_presentation paint = bridge_disclosure_presentation(config, &card);
+            if (node->disclosure_headings)
+                paint.appearance = &appearance;
             paint.trigger_styles = node->disclosure_style;
             paint.trigger_style_count = node->disclosure_style ? 1 : 0;
             cui_collapsible_options options = {

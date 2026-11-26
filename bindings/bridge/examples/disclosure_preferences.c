@@ -117,8 +117,34 @@ int main(int argc, char **argv) {
         .pressed_rgba = 0x4879e047u,
         .cursor = CUI_BRIDGE_DISCLOSURE_CURSOR_POINTER,
     };
+    const cui_bridge_disclosure_heading_v1 heading = {
+        .struct_size = sizeof heading,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY,
+        .font_size = 17,
+        .line_height = 24,
+        .weight = 1, /* Medium. */
+        .text_flags = CUI_BRIDGE_DISCLOSURE_TITLE_WRAP,
+    };
+    cui_bridge_disclosure_heading_v1 expanded = heading;
+    expanded.font_size = 19;
+    expanded.line_height = 26;
+    expanded.weight = 3; /* Bold. */
+    const cui_bridge_disclosure_divider_v1 divider = {
+        .struct_size = sizeof divider,
+        .schema_version = 1,
+        .thickness = 2,
+        .inset_left = 12,
+        .inset_right = 12,
+        .color_rgba = 0x4d80c0aau,
+    };
     CHECK(cui_bridge_disclosure_configure_v1(view.app, group, &card) == CUI_BRIDGE_OK);
     CHECK(cui_bridge_disclosure_configure_v1(view.app, advanced, &nested) == CUI_BRIDGE_OK);
+    CHECK(cui_bridge_disclosure_set_heading_v1(
+              view.app, group, CUI_BRIDGE_DISCLOSURE_HEADING_NORMAL, &heading) == CUI_BRIDGE_OK);
+    CHECK(cui_bridge_disclosure_set_heading_v1(
+              view.app, group, CUI_BRIDGE_DISCLOSURE_HEADING_EXPANDED, &expanded) == CUI_BRIDGE_OK);
+    CHECK(cui_bridge_disclosure_set_divider_v1(view.app, group, &divider) == CUI_BRIDGE_OK);
     CHECK(cui_bridge_disclosure_set_trigger_style_v1(view.app, view.account, &feedback) ==
           CUI_BRIDGE_OK);
     CHECK(cui_bridge_disclosure_set_trigger_style_v1(view.app, view.notifications, &feedback) ==

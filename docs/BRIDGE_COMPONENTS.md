@@ -582,9 +582,60 @@ its previous value, in child order. Collapsible keeps its existing
 frame-level change record. The records carry the resulting `checked`
 value. Panel children follow expansion and share normal retained lifetimes.
 
+#### Style retained headings and dividers
+
+Call `cui_bridge_disclosure_set_heading_v1` on an Accordion to set shared
+heading styles. Use the same setter on a direct Item for overrides or on a
+Collapsible for its standalone heading. Each layer can supply typography,
+a vertically centered row box, and an explicit title color. Normal applies
+first, then Expanded when open, then Disabled when disabled. At each layer
+the Item takes precedence per field. The trigger feedback setter continues
+to control hover, press and the focus outline.
+
+```c
+cui_bridge_status style_preferences_headings(cui_bridge_app *app, cui_bridge_node accordion) {
+    const cui_bridge_disclosure_heading_v1 heading = {
+        .struct_size = sizeof heading,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY,
+        .font_size = 17,
+        .line_height = 24,
+        .weight = 1, /* Medium. */
+        .text_flags = CUI_BRIDGE_DISCLOSURE_TITLE_WRAP,
+    };
+    const cui_bridge_disclosure_divider_v1 divider = {
+        .struct_size = sizeof divider,
+        .schema_version = 1,
+        .thickness = 2,
+        .inset_left = 12,
+        .inset_right = 12,
+        .color_rgba = 0x4d80c0aau,
+    };
+    cui_bridge_status status = cui_bridge_disclosure_set_heading_v1(
+        app, accordion, CUI_BRIDGE_DISCLOSURE_HEADING_NORMAL, &heading);
+    return status == CUI_BRIDGE_OK
+        ? cui_bridge_disclosure_set_divider_v1(app, accordion, &divider) : status;
+}
+```
+
+Give the group a bounded width to wrap titles. Set the divider once on the
+Accordion and enable `JOINED` in its display configuration to show it after
+each complete section. Zero thickness removes the divider and its layout
+space. NULL restores the theme divider, or clears the specified heading layer.
+
+Both setters copy their input and preserve the existing settings on errors.
+The bridge allocates heading storage only on configured nodes and releases it
+after the last layer is cleared or the node is removed. Divider storage follows
+the Accordion lifetime and can be cleared independently. Setters are silent
+and run between steps. The wire box covers width, height, padding, gap,
+corner radius, background and border. Typography uses the host default or
+monospace face. Nonzero letter spacing requires host support. Application-defined
+font-family IDs and arbitrary `cui_box` properties are available in immediate C.
+
 Build and run the [workspace preferences example](../bindings/bridge/examples/disclosure_preferences.c)
-from the repository root. Its headless mode activates Notifications, closes
-the Account panel and updates a status label.
+from the repository root. It applies shared heading typography and inset
+dividers. Its headless mode activates Notifications, closes the Account panel
+and updates a status label.
 
 ```sh
 cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
@@ -595,9 +646,12 @@ cmake --build build --target bridge_disclosure_preferences_example
 For a native window, use a native-capable build with `CUI_BUILD_NATIVE=ON`
 and pass a font file as the first argument. [Native prerequisites](NATIVE_APP_STARTER.md)
 
-When dynamically loading bridge providers, look up the two additive
-`cui_bridge_disclosure_*_v1` setters before offering their controls.
-Providers without them retain their ordinary Accordion and Collapsible APIs.
+When dynamically loading providers, look up `cui_bridge_disclosure_configure_v1`
+and `cui_bridge_disclosure_set_trigger_style_v1` for the original presentation
+settings. Probe `cui_bridge_disclosure_set_heading_v1` and
+`cui_bridge_disclosure_set_divider_v1` separately for headings and dividers.
+Older providers still offer ordinary Accordion and Collapsible nodes.
+
 ### Style disclosure from language builders
 
 Python, JavaScript, TypeScript, Go and Rust expose the same retained options.
@@ -657,8 +711,10 @@ Add `--features native` before the Cargo example name when building the
 bundled native provider. [Python, JS and TS setup](BINDING_BUILDERS.md) ·
 [Go setup](GO_BUILDERS.md) · [Rust setup](RUST_BUILDERS.md)
 
-Custom headers, measured reveal, synchronous observers, inherited title
-typography, state-specific boxes and dividers are available in the immediate C presenters. [Immediate C guide](DISCLOSURE.md)
+The language builders currently expose the display configuration and trigger
+feedback settings above. Heading layers and divider styling are available
+from retained C. Immediate C also provides custom headers, measured reveal
+and synchronous observers. [Immediate C guide](DISCLOSURE.md)
 
 ### Configure a retained Rating from C
 

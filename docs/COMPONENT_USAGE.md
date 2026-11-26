@@ -109,7 +109,7 @@ The checkbox updates the application's bool. Controlled Switch/Toggle `on_change
 
 **Interaction:** Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.
 
-**Usage:** Submit stable item IDs and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width and SVG indicators. Set joined for one outer card and use appearance for inherited and per-state titles, trigger boxes and divider styles. Keep motion alive through end_frame. The C bridge and typed builders copy retained presentation and keep queued change records.
+**Usage:** Submit stable item IDs and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width and SVG indicators. Set joined for one outer card and use appearance for inherited titles, trigger boxes and divider styles. Retain motion through end_frame. Retained C copies heading layers and divider styles through optional bridge setters and keeps queued change records.
 
 API: `cui_accordion`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md); [retained C](BRIDGE_COMPONENTS.md#style-retained-accordion-and-collapsible-from-c).
 
@@ -250,7 +250,7 @@ API: `cui_sdl3_clipboard_interface`. [Public header](../include/cui/cui_sdl3.h);
 
 **Interaction:** Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.
 
-**Usage:** Submit a stable ID and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width, SVG indicators and trigger feedback. Pass appearance for responsive title typography and state-specific boxes. Keep motion alive through end_frame. The C bridge and typed builders copy retained presentation and keep queued change records.
+**Usage:** Submit a stable ID and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width, SVG indicators and trigger feedback. Pass appearance for responsive title typography and state-specific boxes. Retain motion through end_frame. Retained C copies heading layers through an optional bridge setter and keeps queued change records.
 
 API: `cui_collapsible`, `cui_collapsible_ex`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md); [retained C](BRIDGE_COMPONENTS.md#style-retained-accordion-and-collapsible-from-c).
 

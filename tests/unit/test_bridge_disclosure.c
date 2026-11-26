@@ -8,15 +8,28 @@
 
 static uint64_t icon_masks[8];
 static size_t icon_count;
+typedef struct {
+    cui_rect bounds;
+    cui_text_style style;
+    float font_size;
+    cui_color color;
+} text_sample;
+static text_sample text_samples[128];
+static size_t text_count;
 static bool render_disclosure(cui_software *target, const cui_draw_list *draw, cui_color clear) {
     icon_count = 0;
+    text_count = 0;
     cui_draw_command commands[128];
     size_t command_count = 0;
     for (size_t i = 0; i < draw->count; ++i) {
         const cui_draw_command *cmd = &draw->commands[i];
         /* This fixture runs on the portable build without a native font provider. */
-        if (cmd->type == CUI_DRAW_TEXT)
+        if (cmd->type == CUI_DRAW_TEXT) {
+            assert(text_count < sizeof text_samples / sizeof text_samples[0]);
+            text_samples[text_count++] =
+                (text_sample){cmd->bounds, cmd->text_style, cmd->font_size, cmd->color};
             continue;
+        }
         assert(command_count < sizeof commands / sizeof commands[0]);
         commands[command_count++] = *cmd;
         if (cmd->type != CUI_DRAW_IMAGE)
@@ -103,6 +116,186 @@ static void expect_empty(cui_bridge_app *app) {
     cui_bridge_event_ex event;
     uint32_t needed;
     assert(cui_bridge_poll_event_ex(app, &event, NULL, 0, &needed) == CUI_BRIDGE_EMPTY);
+}
+
+static size_t heading_lines(cui_bridge_app *app, cui_bridge_node node,
+                            cui_bridge_disclosure_heading_v1 expected) {
+    cui_bridge_rect row = bounds(app, node);
+    size_t lines = 0;
+    for (size_t i = 0; i < text_count; ++i) {
+        const text_sample *draw = &text_samples[i];
+        if (draw->bounds.y < row.y || draw->bounds.y >= row.y + row.height)
+            continue;
+        assert(draw->font_size == expected.font_size && draw->style.weight == expected.weight &&
+               draw->style.italic == !!(expected.text_flags & CUI_BRIDGE_DISCLOSURE_TITLE_ITALIC) &&
+               draw->style.monospace ==
+                   !!(expected.text_flags & CUI_BRIDGE_DISCLOSURE_TITLE_MONOSPACE));
+        assert(bridge_pack_color(draw->color) == expected.title_rgba);
+        ++lines;
+    }
+    return lines;
+}
+
+static void test_heading_appearance(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_SDL,
+                                  .width = 750,
+                                  .height = 620};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = create(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "Root");
+    cui_bridge_node group = create(app, root, CUI_BRIDGE_ACCORDION, "Accordion");
+    cui_bridge_node first = create(app, group, CUI_BRIDGE_ITEM, "Workspace and access preferences");
+    cui_bridge_node panel = create(app, first, CUI_BRIDGE_LABEL, "Invite a colleague");
+    cui_bridge_node second = create(app, group, CUI_BRIDGE_ITEM, "Notifications");
+    cui_bridge_node solo = create(app, root, CUI_BRIDGE_COLLAPSIBLE, "Advanced");
+    cui_bridge_disclosure_config_v1 card = {
+        .struct_size = sizeof card,
+        .schema_version = 1,
+        .flags = CUI_BRIDGE_DISCLOSURE_JOINED_V1 | CUI_BRIDGE_DISCLOSURE_ALLOW_COLLAPSE_V1,
+        .width = -1,
+    };
+    const cui_bridge_disclosure_heading_v1 normal = {
+        .struct_size = sizeof normal,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY | CUI_BRIDGE_DISCLOSURE_HEADING_COLOR,
+        .font_size = 22,
+        .line_height = 30,
+        .weight = 1,
+        .align = 2,
+        .text_flags = CUI_BRIDGE_DISCLOSURE_TITLE_WRAP,
+        .title_rgba = 0x445588ff,
+    };
+    cui_bridge_disclosure_heading_v1 open = normal;
+    open.fields |= CUI_BRIDGE_DISCLOSURE_HEADING_BOX;
+    open.width = -1;
+    open.padding = 15;
+    open.gap = 8;
+    open.background_rgba = 0x163b4eff;
+    open.font_size = 26;
+    open.line_height = 34;
+    open.weight = 3;
+    open.title_rgba = 0xfffaeaff;
+    cui_bridge_disclosure_heading_v1 disabled = normal;
+    disabled.fields = CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY;
+    disabled.font_size = 18;
+    disabled.text_flags |=
+        CUI_BRIDGE_DISCLOSURE_TITLE_ITALIC | CUI_BRIDGE_DISCLOSURE_TITLE_MONOSPACE;
+    const cui_bridge_disclosure_heading_v1 item_color = {
+        .struct_size = sizeof item_color,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_DISCLOSURE_HEADING_COLOR,
+        .font_size = NAN, /* Inactive and ignored. */
+        .title_rgba = 0,
+    };
+    const cui_bridge_disclosure_divider_v1 divider = {
+        .struct_size = sizeof divider,
+        .schema_version = 1,
+        .thickness = 4,
+        .inset_left = 12,
+        .inset_right = 18,
+        .color_rgba = 0x347a97ff,
+    };
+
+    assert(cui_bridge_disclosure_set_heading_v1(app, root, 0, &normal) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_disclosure_set_heading_v1(app, group, 3, &normal) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_disclosure_set_heading_v1(app, group, 0, &normal) == CUI_BRIDGE_OK);
+    cui_bridge_disclosure_heading_v1 copied = open;
+    assert(cui_bridge_disclosure_set_heading_v1(app, group, 1, &copied) == CUI_BRIDGE_OK);
+    memset(&copied, 0, sizeof copied);
+    assert(cui_bridge_disclosure_set_heading_v1(app, group, 2, &disabled) == CUI_BRIDGE_OK);
+    assert(cui_bridge_disclosure_set_heading_v1(app, second, 0, &item_color) == CUI_BRIDGE_OK);
+    assert(cui_bridge_disclosure_set_heading_v1(app, solo, 0, &normal) == CUI_BRIDGE_OK);
+    assert(cui_bridge_disclosure_set_divider_v1(app, solo, &divider) == CUI_BRIDGE_INVALID_STATE);
+    step(app);
+    float unjoined_y = bounds(app, second).y;
+    cui_bridge_disclosure_divider_v1 reset = divider;
+    assert(cui_bridge_disclosure_set_divider_v1(app, group, &reset) == CUI_BRIDGE_OK);
+    memset(&reset, 0, sizeof reset);
+    step(app);
+    expect_empty(app);
+    assert(bounds(app, second).y == unjoined_y); /* Dormant before JOINED. */
+    assert(cui_bridge_disclosure_configure_v1(app, group, &card) == CUI_BRIDGE_OK);
+
+    cui_bridge_disclosure_heading_v1 invalid = normal;
+    invalid.letter_spacing = 1;
+    assert(cui_bridge_disclosure_set_heading_v1(app, group, 0, &invalid) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    invalid = normal;
+    invalid.struct_size -= 4;
+    assert(cui_bridge_disclosure_set_heading_v1(app, group, 0, &invalid) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    invalid = open;
+    invalid.padding = NAN;
+    assert(cui_bridge_disclosure_set_heading_v1(app, group, 1, &invalid) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    reset = divider;
+    reset.inset_left = -1;
+    assert(cui_bridge_disclosure_set_divider_v1(app, group, &reset) == CUI_BRIDGE_INVALID_ARGUMENT);
+    step(app);
+    expect_empty(app);
+    assert(heading_lines(app, first, normal) == 1);
+    cui_bridge_disclosure_heading_v1 transparent = normal;
+    transparent.title_rgba = 0;
+    assert(heading_lines(app, second, transparent) == 1);
+    assert(heading_lines(app, solo, normal) == 1);
+    cui_bridge_rect first_row = bounds(app, first), second_row = bounds(app, second);
+    assert(second_row.y == first_row.y + first_row.height + divider.thickness);
+    float seam = second_row.y - 2;
+    assert(pixel(first_row.x + 12, seam) == divider.color_rgba);
+    assert(pixel(first_row.x + 11, seam) != divider.color_rgba);
+    assert(pixel(first_row.x + first_row.width - 19, seam) == divider.color_rgba);
+    assert(pixel(first_row.x + first_row.width - 18, seam) != divider.color_rgba);
+
+    app->width = 270;
+    step(app);
+    assert(bounds(app, first).height > first_row.height && heading_lines(app, first, normal) > 1);
+    activate(app, first);
+    step(app);
+    expect_change(app, first, 1);
+    expect_empty(app);
+    assert(heading_lines(app, first, open) > 1);
+    assert(bounds(app, first).width == bounds(app, group).width);
+    assert(row_color(app, first) == open.background_rgba);
+    second_row = bounds(app, second);
+    cui_bridge_rect body = bounds(app, panel);
+    assert(body.y >= bounds(app, first).y + bounds(app, first).height);
+    assert(pixel(second_row.x + 13, second_row.y - 2) == divider.color_rgba);
+    assert(cui_bridge_set_disabled(app, first, 1) == CUI_BRIDGE_OK);
+    step(app);
+    disabled.title_rgba = open.title_rgba; /* Disabled typography inherits the expanded color. */
+    assert(heading_lines(app, first, disabled) > 1);
+    expect_empty(app);
+
+    activate(app, solo);
+    step(app);
+    expect_change(app, solo, 1);
+    assert(heading_lines(app, solo, normal) == 1);
+    expect_empty(app);
+
+    second_row = bounds(app, second);
+    reset = divider;
+    reset.thickness = 0;
+    assert(cui_bridge_disclosure_set_divider_v1(app, group, &reset) == CUI_BRIDGE_OK);
+    step(app);
+    assert(bounds(app, second).y == second_row.y - divider.thickness);
+    assert(cui_bridge_disclosure_set_divider_v1(app, group, NULL) == CUI_BRIDGE_OK);
+    step(app);
+    assert(bounds(app, second).y == second_row.y - divider.thickness + 1);
+
+    assert(cui_bridge_node_remove(app, second) == CUI_BRIDGE_OK);
+    assert(cui_bridge_disclosure_set_heading_v1(app, second, 0, NULL) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_node replacement = create(app, group, CUI_BRIDGE_ITEM, "Delivery");
+    assert(replacement.slot == second.slot);
+    assert(cui_bridge_disclosure_set_heading_v1(app, solo, 0, NULL) == CUI_BRIDGE_OK);
+    step(app);
+    assert(heading_lines(app, replacement, normal) == 1);
+    assert(!app->nodes[solo.slot].disclosure_headings);
+    expect_empty(app);
+    cui_bridge_destroy(app);
 }
 
 int main(void) {
@@ -273,4 +466,5 @@ int main(void) {
     step(app);
     assert(row_color(app, replacement) != style.disabled_rgba);
     cui_bridge_destroy(app);
+    test_heading_appearance();
 }

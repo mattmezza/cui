@@ -11,6 +11,24 @@ _Static_assert(sizeof(cui_bridge_disclosure_trigger_style_v1) == 40 &&
                    offsetof(cui_bridge_disclosure_trigger_style_v1, hover_rgba) == 16 &&
                    offsetof(cui_bridge_disclosure_trigger_style_v1, cursor) == 36,
                "Disclosure trigger style V1 ABI");
+_Static_assert(sizeof(cui_bridge_disclosure_heading_v1) == 76 &&
+                   offsetof(cui_bridge_disclosure_heading_v1, font_size) == 16 &&
+                   offsetof(cui_bridge_disclosure_heading_v1, width) == 44,
+               "Disclosure heading V1 ABI");
+_Static_assert(sizeof(cui_bridge_disclosure_divider_v1) == 32 &&
+                   offsetof(cui_bridge_disclosure_divider_v1, thickness) == 16,
+               "Disclosure divider V1 ABI");
+
+typedef struct {
+    uint32_t fields;
+    cui_box box;
+    cui_typography_token typography;
+    cui_color color;
+} bridge_disclosure_heading_layer;
+
+struct bridge_disclosure_headings {
+    bridge_disclosure_heading_layer layers[CUI_BRIDGE_DISCLOSURE_HEADING_DISABLED + 1];
+};
 
 static bool bridge_disclosure_dimension(float value) {
     return isfinite(value) && value >= 0 && value <= 4096;
@@ -20,6 +38,13 @@ static bool bridge_disclosure_icon(const char *name, size_t capacity) {
     const char *end = memchr(name, 0, capacity);
     return end && (end == name ||
                    cui_icon_query((cui_str){name, (size_t)(end - name)}) == CUI_ICON_EMBEDDED);
+}
+
+static bool bridge_disclosure_trigger_node(const cui_bridge_app *app,
+                                           const cui_bridge_node_record *node) {
+    return node->kind == CUI_BRIDGE_COLLAPSIBLE ||
+           (node->kind == CUI_BRIDGE_ITEM && node->parent &&
+            app->nodes[node->parent].kind == CUI_BRIDGE_ACCORDION);
 }
 
 static bool bridge_disclosure_config_valid(const cui_bridge_disclosure_config_v1 *c,
@@ -95,9 +120,7 @@ cui_bridge_disclosure_set_trigger_style_v1(cui_bridge_app *app, cui_bridge_node 
     cui_bridge_status status = bridge_valid_node(app, handle, &node);
     if (status != CUI_BRIDGE_OK)
         return status;
-    if (node->kind != CUI_BRIDGE_COLLAPSIBLE &&
-        (node->kind != CUI_BRIDGE_ITEM || !node->parent ||
-         app->nodes[node->parent].kind != CUI_BRIDGE_ACCORDION))
+    if (!bridge_disclosure_trigger_node(app, node))
         return CUI_BRIDGE_INVALID_STATE;
     cui_bridge_disclosure_trigger_style_v1 next = {0};
     if (style) {
@@ -138,6 +161,154 @@ cui_bridge_disclosure_set_trigger_style_v1(cui_bridge_app *app, cui_bridge_node 
     }
     cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
+}
+
+static bool bridge_disclosure_decode_heading(cui_context *ui,
+                                             const cui_bridge_disclosure_heading_v1 *wire,
+                                             bridge_disclosure_heading_layer *out) {
+    if (!bridge_icon_header(wire, sizeof *wire))
+        return false;
+    cui_bridge_disclosure_heading_v1 style;
+    memcpy(&style, wire, sizeof style);
+    const uint32_t fields = CUI_BRIDGE_DISCLOSURE_HEADING_BOX |
+                            CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY |
+                            CUI_BRIDGE_DISCLOSURE_HEADING_COLOR;
+    if (style.reserved || (style.fields & ~fields))
+        return false;
+    if (style.fields & CUI_BRIDGE_DISCLOSURE_HEADING_BOX) {
+        if ((style.width != -1 && !bridge_disclosure_dimension(style.width)) ||
+            !bridge_disclosure_dimension(style.height) ||
+            !bridge_disclosure_dimension(style.padding) ||
+            !bridge_disclosure_dimension(style.gap) || !bridge_disclosure_dimension(style.radius) ||
+            !bridge_disclosure_dimension(style.border_width))
+            return false;
+        out->box = (cui_box){.width = style.width,
+                             .height = style.height,
+                             .row = true,
+                             .align_y = CUI_ALIGN_CENTER,
+                             .padding = style.padding,
+                             .gap = style.gap,
+                             .radius = style.radius,
+                             .border_width = style.border_width,
+                             .background = bridge_icon_rgba(style.background_rgba),
+                             .border = bridge_icon_rgba(style.border_rgba)};
+    }
+    if (style.fields & CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY) {
+        const uint32_t flags = CUI_BRIDGE_DISCLOSURE_TITLE_WRAP |
+                               CUI_BRIDGE_DISCLOSURE_TITLE_ITALIC |
+                               CUI_BRIDGE_DISCLOSURE_TITLE_MONOSPACE;
+        if (style.font_size <= 0 || !bridge_disclosure_dimension(style.font_size) ||
+            !bridge_disclosure_dimension(style.line_height) ||
+            !bridge_disclosure_dimension(fabsf(style.letter_spacing)) ||
+            (style.letter_spacing != 0 &&
+             !(cui_text_capabilities(ui) & CUI_TEXT_CAP_LETTER_SPACING)) ||
+            style.weight > CUI_TEXT_WEIGHT_BOLD || style.align > CUI_TEXT_ALIGN_RIGHT ||
+            (style.text_flags & ~flags))
+            return false;
+        out->typography = (cui_typography_token){
+            .style = {.weight = (cui_text_weight)style.weight,
+                      .italic = (style.text_flags & CUI_BRIDGE_DISCLOSURE_TITLE_ITALIC) != 0,
+                      .monospace = (style.text_flags & CUI_BRIDGE_DISCLOSURE_TITLE_MONOSPACE) != 0,
+                      .letter_spacing = style.letter_spacing},
+            .size = style.font_size,
+            .line_height = style.line_height,
+            .align = (cui_text_align)style.align,
+            .wrap = (style.text_flags & CUI_BRIDGE_DISCLOSURE_TITLE_WRAP) != 0,
+        };
+    }
+    out->fields = style.fields;
+    out->color = bridge_icon_rgba(style.title_rgba);
+    return true;
+}
+
+cui_bridge_status
+cui_bridge_disclosure_set_heading_v1(cui_bridge_app *app, cui_bridge_node handle, uint32_t layer,
+                                     const cui_bridge_disclosure_heading_v1 *style) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_ACCORDION && !bridge_disclosure_trigger_node(app, node))
+        return CUI_BRIDGE_INVALID_STATE;
+    bridge_disclosure_heading_layer next = {0};
+    if (layer > CUI_BRIDGE_DISCLOSURE_HEADING_DISABLED ||
+        (style && !bridge_disclosure_decode_heading(app->ui, style, &next)))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    bridge_disclosure_headings *headings = node->disclosure_headings;
+    if (!headings && !next.fields)
+        return CUI_BRIDGE_OK;
+    if (!headings) {
+        headings = calloc(1, sizeof *headings);
+        if (!headings)
+            return CUI_BRIDGE_OUT_OF_MEMORY;
+        node->disclosure_headings = headings;
+    }
+    headings->layers[layer] = next;
+    if (!(headings->layers[0].fields | headings->layers[1].fields | headings->layers[2].fields)) {
+        free(headings);
+        node->disclosure_headings = NULL;
+    }
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+
+cui_bridge_status
+cui_bridge_disclosure_set_divider_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                     const cui_bridge_disclosure_divider_v1 *style) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_ACCORDION)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (!style) {
+        free(node->disclosure_divider);
+        node->disclosure_divider = NULL;
+    } else {
+        if (!bridge_icon_header(style, sizeof *style))
+            return CUI_BRIDGE_INVALID_ARGUMENT;
+        cui_bridge_disclosure_divider_v1 wire;
+        memcpy(&wire, style, sizeof wire);
+        if (wire.reserved[0] || wire.reserved[1] || !bridge_disclosure_dimension(wire.thickness) ||
+            !bridge_disclosure_dimension(wire.inset_left) ||
+            !bridge_disclosure_dimension(wire.inset_right))
+            return CUI_BRIDGE_INVALID_ARGUMENT;
+        if (!node->disclosure_divider) {
+            node->disclosure_divider = malloc(sizeof *node->disclosure_divider);
+            if (!node->disclosure_divider)
+                return CUI_BRIDGE_OUT_OF_MEMORY;
+        }
+        *node->disclosure_divider = (cui_disclosure_separator_style){
+            .thickness = wire.thickness,
+            .inset_left = wire.inset_left,
+            .inset_right = wire.inset_right,
+            .color = bridge_icon_rgba(wire.color_rgba),
+        };
+    }
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+
+static cui_disclosure_trigger_part
+bridge_disclosure_heading_part(const bridge_disclosure_heading_layer *layer) {
+    return (cui_disclosure_trigger_part){
+        .box = layer->fields & CUI_BRIDGE_DISCLOSURE_HEADING_BOX ? &layer->box : NULL,
+        .typography =
+            layer->fields & CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY ? &layer->typography : NULL,
+        .custom_color = (layer->fields & CUI_BRIDGE_DISCLOSURE_HEADING_COLOR) != 0,
+        .color = layer->color,
+    };
+}
+
+static cui_disclosure_trigger_appearance
+bridge_disclosure_heading_appearance(const bridge_disclosure_headings *headings) {
+    if (!headings)
+        return (cui_disclosure_trigger_appearance){0};
+    return (cui_disclosure_trigger_appearance){
+        .normal = bridge_disclosure_heading_part(&headings->layers[0]),
+        .expanded = bridge_disclosure_heading_part(&headings->layers[1]),
+        .disabled = bridge_disclosure_heading_part(&headings->layers[2]),
+    };
 }
 
 static cui_disclosure_presentation

@@ -1083,7 +1083,8 @@ typedef struct {
     char collapsed_icon[64], expanded_icon[64];
 } cui_bridge_disclosure_config_v1;
 /* Copies the configuration on Accordion or Collapsible. NULL restores legacy
- * policy and clears display options. Independent trigger styles remain.
+ * policy and clears display options. Trigger and heading styles remain.
+ * A separately installed divider becomes dormant when JOINED is reset.
  * Exact size and schema 1. Design size uses CUI_BRIDGE_SIZE_*.
  * Width is -1 to fill, 0 to fit, or a positive logical width up to 4096. Icon
  * arrays must contain a NUL and name an embedded catalog icon or path. Empty
@@ -1137,6 +1138,56 @@ typedef struct {
  * previous style. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_disclosure_set_trigger_style_v1(
     cui_bridge_app *, cui_bridge_node, const cui_bridge_disclosure_trigger_style_v1 *);
+enum {
+    CUI_BRIDGE_DISCLOSURE_HEADING_NORMAL = 0,
+    CUI_BRIDGE_DISCLOSURE_HEADING_EXPANDED,
+    CUI_BRIDGE_DISCLOSURE_HEADING_DISABLED
+};
+enum {
+    CUI_BRIDGE_DISCLOSURE_HEADING_BOX = 1u << 0,
+    CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY = 1u << 1,
+    CUI_BRIDGE_DISCLOSURE_HEADING_COLOR = 1u << 2
+};
+enum {
+    CUI_BRIDGE_DISCLOSURE_TITLE_WRAP = 1u << 0,
+    CUI_BRIDGE_DISCLOSURE_TITLE_ITALIC = 1u << 1,
+    CUI_BRIDGE_DISCLOSURE_TITLE_MONOSPACE = 1u << 2
+};
+typedef struct {
+    uint32_t struct_size, schema_version, fields, reserved;
+    float font_size, line_height, letter_spacing;
+    uint32_t weight, align, text_flags, title_rgba;
+    float width, height, padding, gap, radius, border_width;
+    uint32_t background_rgba, border_rgba;
+} cui_bridge_disclosure_heading_v1;
+/* Copy one heading layer on Accordion (shared), a direct Accordion Item,
+ * or Collapsible. NULL or zero fields clears the layer. Exact size, schema 1,
+ * reserved 0. Resolve each field normal, expanded, then disabled. At each
+ * step an Item overrides its Accordion. BOX replaces the complete trigger
+ * box with a vertically centered row. Width -1 fills, 0 fits; height 0 fits.
+ * Active dimensions are 0–4096 logical pixels; font_size must be positive.
+ * line_height 0 uses natural metrics. Signed letter_spacing is -4096–4096;
+ * nonzero requires a capable host. Weight is normal=0 to bold=3, align is
+ * left=0, center=1, right=2. WRAP reflows within a bounded width. MONOSPACE
+ * selects the host's monospace face where available. Colors are 0xRRGGBBAA,
+ * including transparent. Inactive fields are ignored. Independent of trigger
+ * feedback, display configuration and queued events. Call between steps on
+ * the owner thread. Errors preserve prior settings. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_disclosure_set_heading_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t layer, const cui_bridge_disclosure_heading_v1 *);
+typedef struct {
+    uint32_t struct_size, schema_version, reserved[2];
+    float thickness, inset_left, inset_right;
+    uint32_t color_rgba;
+} cui_bridge_disclosure_divider_v1;
+/* Copy an Accordion's joined divider. Exact size, schema 1, reserved zero.
+ * Dimensions are 0–4096 logical pixels; zero thickness omits the divider.
+ * NULL restores the themed divider. The style is dormant until JOINED is
+ * enabled. Applies after each complete section except the last. Independent
+ * of display configuration and queued events. Call between steps on the
+ * owner thread. Errors preserve prior settings. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_disclosure_set_divider_v1(
+    cui_bridge_app *, cui_bridge_node, const cui_bridge_disclosure_divider_v1 *);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *, cui_bridge_node,
                                                          uint32_t disabled);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_value(cui_bridge_app *, cui_bridge_node,

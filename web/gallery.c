@@ -6754,18 +6754,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 34: {
         cui_pagination_ex(ui, cui_id_from(ui, "pagination"), &t, &page_number, 20,
-                          (cui_pagination_options){.compact = pagination_mode == 0,
-                                                   .disabled = disabled,
-                                                   .design_size = design_size,
-                                                   .available_width = fmaxf(1, width - 48),
-                                                   .visible_pages = pagination_visible_pages,
-                                                   .icon_only = pagination_mode == 2,
-                                                   .ellipsis_viewport = {0, 0, width, height},
-                                                   .navigation = pagination_mode == 3
-                                                       ? CUI_PAGINATION_NAV_CHEVRONS
-                                                       : CUI_PAGINATION_NAV_DEFAULT,
-                                                   .labels = pagination_french
-                                                       ? &pagination_labels_fr : NULL});
+                          (cui_pagination_options){
+                              .compact = pagination_mode == 0,
+                              .disabled = disabled,
+                              .design_size = design_size,
+                              .available_width = fmaxf(1, width - 48),
+                              .visible_pages = pagination_visible_pages,
+                              .icon_only = pagination_mode == 2,
+                              .ellipsis_viewport = {0, 0, width, height},
+                              .navigation = pagination_mode == 3 ? CUI_PAGINATION_NAV_CHEVRONS
+                                                                 : CUI_PAGINATION_NAV_DEFAULT,
+                              .labels = pagination_french ? &pagination_labels_fr : NULL});
         char text[64];
         snprintf(text, sizeof(text), pagination_french ? "Page %zu sur 20" : "Page %zu of 20",
                  page_number);

@@ -252,8 +252,8 @@ static void pagination_localized_navigation(void) {
         for (size_t i = 0; i < f.draw.count; ++i) {
             const cui_draw_command *c = &f.draw.commands[i];
             cui_rect box = c->bounds;
-            if (box.x < bounds.x || box.x + box.w > bounds.x + bounds.w ||
-                box.y < bounds.y || box.y + box.h > bounds.y + bounds.h)
+            if (box.x < bounds.x || box.x + box.w > bounds.x + bounds.w || box.y < bounds.y ||
+                box.y + box.h > bounds.y + bounds.h)
                 continue;
             if (c->type == CUI_DRAW_IMAGE)
                 icon = box;

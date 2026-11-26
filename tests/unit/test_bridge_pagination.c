@@ -124,13 +124,16 @@ int main(void) {
     strcpy(rejected.next, "\xc0\x80");
     assert(cui_bridge_pagination_configure_v1(app, pager, &rejected) == CUI_BRIDGE_INVALID_UTF8);
     strcpy(rejected.next, "Next\nPage");
-    assert(cui_bridge_pagination_configure_v1(app, pager, &rejected) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_pagination_configure_v1(app, pager, &rejected) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
     rejected = out;
     rejected.visible_pages = 33;
-    assert(cui_bridge_pagination_configure_v1(app, pager, &rejected) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_pagination_configure_v1(app, pager, &rejected) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
     rejected = out;
     rejected.available_width = INFINITY;
-    assert(cui_bridge_pagination_configure_v1(app, pager, &rejected) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_pagination_configure_v1(app, pager, &rejected) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
     app->width = 316; /* Mock the native host reporting its current logical viewport. */
     step(app);
     page_is(app, pager, 11, false);

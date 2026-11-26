@@ -79,7 +79,8 @@ bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *
                     bool compact, bool disabled);
 typedef enum {
     CUI_PAGINATION_NAV_DEFAULT = 0,
-    CUI_PAGINATION_NAV_CHEVRONS /* Previous and Next with labels and chevrons, without First/Last. */
+    CUI_PAGINATION_NAV_CHEVRONS /* Previous and Next with labels and chevrons, without First/Last.
+                                 */
 } cui_pagination_navigation;
 typedef struct {
     cui_str group, first, previous, next, last, earlier_pages, later_pages;

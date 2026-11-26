@@ -80,7 +80,8 @@ bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *
                     bool compact, bool disabled);
 typedef enum {
     CUI_PAGINATION_NAV_DEFAULT = 0,
-    CUI_PAGINATION_NAV_CHEVRONS /* Previous and Next with labels and chevrons, without First/Last. */
+    CUI_PAGINATION_NAV_CHEVRONS /* Previous and Next with labels and chevrons, without First/Last.
+                                 */
 } cui_pagination_navigation;
 typedef struct {
     cui_str group, first, previous, next, last, earlier_pages, later_pages;
@@ -1078,11 +1079,10 @@ typedef struct {
 } cui_pagination_layout;
 static void cui_pagination_paint_icon(cui_context *ui, cui_id id, const cui_theme *theme,
                                       const char *icon, float size, cui_color color) {
-    cui_icon_named(ui, cui_numeric_part_id(id, 0), theme, cui_string(icon),
-                   (cui_icon_options){.size = CUI_ICON_CUSTOM,
-                                      .custom_size = size,
-                                      .custom_color = true,
-                                      .color = color});
+    cui_icon_named(
+        ui, cui_numeric_part_id(id, 0), theme, cui_string(icon),
+        (cui_icon_options){
+            .size = CUI_ICON_CUSTOM, .custom_size = size, .custom_color = true, .color = color});
 }
 static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *layout, cui_id id,
                                       cui_str label, bool disabled, const char *leading_icon,
@@ -1270,8 +1270,9 @@ static cui_pagination_menu *cui_pagination_reduce_menu(cui_context *ui, cui_id i
         cui_id action = 0;
         cui_menu_command command = {0};
         cui_base_menu_tree_events(
-            ui, cui_pagination_gap_id(id, state->side), cui_pagination_gap_name(labels, state->side),
-            state->entries, state->count, &action, &state->menu, false, cui_frame_delta(ui), false,
+            ui, cui_pagination_gap_id(id, state->side),
+            cui_pagination_gap_name(labels, state->side), state->entries, state->count, &action,
+            &state->menu, false, cui_frame_delta(ui), false,
             (cui_menu_command_handler){cui_pagination_menu_activated, &command});
         if (action && command.command == action &&
             (command.event.flags & CUI_COMPONENT_EVENT_HAS_INDEX)) {
@@ -1296,8 +1297,7 @@ static void cui_pagination_paint_menu(cui_context *ui, cui_id id, const cui_them
         cui_measure_text(ui, state->entries[state->count - 1].label, metrics.font_size);
     cui_menu_popup_paint(
         ui, theme, cui_pagination_gap_name(labels, state->side), state->entries, state->count,
-        &state->menu,
-        anchor,
+        &state->menu, anchor,
         (cui_menu_tree_options){.popup = {.viewport = viewport,
                                           .side = CUI_POPUP_BELOW,
                                           .width = fmaxf(88, label.width + 2 * metrics.padding_x +
@@ -1395,9 +1395,9 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
             }
         }
     }
-    cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 3),
-                              icon ? (cui_str){0} : labels.next, disabled || !total || *page >= total,
-                              NULL, chevrons ? "chevron-right" : NULL);
+    cui_pagination_paint_item(
+        ui, &layout, cui_numeric_part_id(id, 3), icon ? (cui_str){0} : labels.next,
+        disabled || !total || *page >= total, NULL, chevrons ? "chevron-right" : NULL);
     if (ends)
         cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 4), labels.last,
                                   disabled || !total || *page >= total, NULL, NULL);

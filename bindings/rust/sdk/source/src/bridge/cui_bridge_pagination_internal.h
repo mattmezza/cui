@@ -33,11 +33,11 @@ static cui_bridge_status bridge_pagination_validate_node(cui_bridge_app *app,
     return node->kind == CUI_BRIDGE_PAGINATION ? CUI_BRIDGE_OK : CUI_BRIDGE_INVALID_STATE;
 }
 static cui_bridge_status bridge_pagination_copy_labels(const cui_bridge_pagination_config_v1 *src,
-                                                        cui_bridge_pagination_config_v1 *dst) {
-    const char *from[] = {src->group, src->first, src->previous, src->next, src->last,
-                          src->earlier_pages, src->later_pages};
-    char *to[] = {dst->group, dst->first, dst->previous, dst->next, dst->last,
-                  dst->earlier_pages, dst->later_pages};
+                                                       cui_bridge_pagination_config_v1 *dst) {
+    const char *from[] = {src->group, src->first,         src->previous,   src->next,
+                          src->last,  src->earlier_pages, src->later_pages};
+    char *to[] = {dst->group, dst->first,         dst->previous,   dst->next,
+                  dst->last,  dst->earlier_pages, dst->later_pages};
     for (size_t field = 0; field < sizeof from / sizeof from[0]; ++field) {
         const char *label = from[field];
         if (!memchr(label, 0, CUI_BRIDGE_PAGINATION_LABEL_BYTES))
@@ -60,7 +60,7 @@ static cui_bridge_status bridge_pagination_copy_labels(const cui_bridge_paginati
 
 cui_bridge_status
 cui_bridge_pagination_configure_v1(cui_bridge_app *app, cui_bridge_node handle,
-                                    const cui_bridge_pagination_config_v1 *config) {
+                                   const cui_bridge_pagination_config_v1 *config) {
     cui_bridge_status status = bridge_pagination_validate_node(app, handle);
     if (status != CUI_BRIDGE_OK)
         return status;
@@ -73,8 +73,8 @@ cui_bridge_pagination_configure_v1(cui_bridge_app *app, cui_bridge_node handle,
                            CUI_BRIDGE_PAGINATION_CHEVRONS | CUI_BRIDGE_PAGINATION_JUMP_MENU;
     if (config->struct_size != sizeof *config ||
         config->schema_version != CUI_BRIDGE_PAGINATION_V1 || (config->flags & ~flags) ||
-        (config->visible_pages && (config->visible_pages < 5 ||
-                                   config->visible_pages > CUI_PAGINATION_MAX_VISIBLE_PAGES)) ||
+        (config->visible_pages &&
+         (config->visible_pages < 5 || config->visible_pages > CUI_PAGINATION_MAX_VISIBLE_PAGES)) ||
         !isfinite(config->available_width) || config->available_width < 0 ||
         config->available_width > 32768)
         return CUI_BRIDGE_INVALID_ARGUMENT;
@@ -107,11 +107,9 @@ cui_bridge_pagination_configure_v1(cui_bridge_app *app, cui_bridge_node handle,
     return CUI_BRIDGE_OK;
 }
 
-cui_bridge_status
-cui_bridge_pagination_get_config_v1(cui_bridge_app *app, cui_bridge_node handle,
-                                     cui_bridge_pagination_config_v1 *out) {
-    if (!out || out->struct_size != sizeof *out ||
-        out->schema_version != CUI_BRIDGE_PAGINATION_V1)
+cui_bridge_status cui_bridge_pagination_get_config_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                      cui_bridge_pagination_config_v1 *out) {
+    if (!out || out->struct_size != sizeof *out || out->schema_version != CUI_BRIDGE_PAGINATION_V1)
         return CUI_BRIDGE_INVALID_ARGUMENT;
     cui_bridge_status status = bridge_pagination_validate_node(app, handle);
     if (status != CUI_BRIDGE_OK)

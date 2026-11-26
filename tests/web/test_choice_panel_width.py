@@ -142,6 +142,11 @@ def command(audit, touch):
     assert opening['row'] > 0 and abs(opening['list'] - opening['row'] - 18) < 1, opening
     dialog = audit.target('Command palette', 17)
     field = audit.target('Command palette', 6)
+    audit.page.keyboard.insert_text('\u00a0ACCÈS\u3000')
+    audit.page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(1)===1')
+    audit.target('Copy path', 14)  # The French alias is a keyword, not the row label.
+    audit.page.keyboard.press('Escape')
+    audit.page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(5)===0')
     audit.page.keyboard.type('sw')
     audit.page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(1)===1')
     row = audit.target('Switch workspace', 14)

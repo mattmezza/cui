@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Command searches UTF-8 labels and keywords using Unicode 17 lowercase and
+  whitespace rules. Custom matching and raw query callbacks keep their contracts.
 - Custom Command rows measure against the current width when a Dialog opens
   or resizes. Growing palettes in fixed-width columns use the same behavior.
 - Retained C, Python, JavaScript, TypeScript, Go and Rust can compose typed Kbd

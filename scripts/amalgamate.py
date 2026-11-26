@@ -170,6 +170,8 @@ def generate(name,sources):
         for include in ['#include "cui_time_field_v1_internal.h"', '#include "../base/cui_time_field_v1_internal.h"']:
             code=code.replace(include, (ROOT/'src/base/cui_time_field_v1_internal.h').read_text(encoding='utf-8'))
         code=code.replace('#include "cui_unicode_grapheme.h"', (ROOT/'src/core/cui_unicode_grapheme.h').read_text(encoding='utf-8'))
+        for private_name in ['cui_utf8_internal.h', 'cui_command_unicode.inc']:
+            code=code.replace(f'#include "{private_name}"', (ROOT/'src/base'/private_name).read_text(encoding='utf-8'))
         for private_include in ['#include "cui_kbd_internal.h"', '#include "../base/cui_kbd_internal.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_kbd_internal.h').read_text(encoding='utf-8'))
         code=code.replace('#include "cui_shadow_profile_internal.h"', (ROOT/'src/effects/cui_shadow_profile_internal.h').read_text(encoding='utf-8'))

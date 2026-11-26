@@ -44,12 +44,21 @@ capacity. The module limits workspace and supplied items to 4096. Bad model or
 capacity leaves the existing model unchanged. Measurement must produce finite,
 positive outer row heights no greater than one million logical pixels.
 
-Filtering trims whitespace, then matches a case-insensitive substring in the
-label or any keyword. Default folding handles ASCII; supply `options.matches`
-for Unicode case folding or another host search policy. Turning off filterable
-keeps all rows but still reports searchable query changes. Turning off
-searchable hides the Input, retains all rows and suppresses query callbacks,
-including for a programmatically modified hidden editor.
+Default filtering trims Unicode whitespace, lowercases the full UTF-8 query,
+label and keywords using Unicode 17, and matches a substring. For example,
+` PRÉF ` finds `Préférences`. In the gallery, try `ACCÈS` to find **Copy path**
+via its French keyword. Combining marks and accents are significant.
+For fuzzy matching, normalization, full case folding, or locale-specific
+search, supply `options.matches`. Custom matchers still receive the original
+query bytes after the legacy C `isspace` trim. Query callbacks receive the
+raw query in either mode. All matching is allocation-free. Malformed UTF-8
+bytes are treated literally at invalid scalar boundaries in the model helper.
+
+Turning off filterable keeps all rows but still reports searchable query
+changes. Turning off searchable hides the Input, retains all rows and suppresses
+query callbacks, including for a programmatically modified hidden editor.
+The built-in rows in the language bindings use the same matcher as their C
+provider. The Unicode behavior requires a provider built from the updated source.
 
 Original indices survive filtering: all ungrouped items use section zero in
 input order. Groups use their group ordinal, offset by one when any ungrouped

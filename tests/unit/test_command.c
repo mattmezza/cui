@@ -37,6 +37,86 @@ static cui_str command_string(const char *text) {
     return (cui_str){text, strlen(text)};
 }
 #define cui_string command_string
+typedef struct {
+    cui_str raw, trimmed;
+    unsigned match_count, query_count;
+} filter_observation;
+static bool match_original(const cui_command_item *item, cui_str text, void *user) {
+    filter_observation *capture = user;
+    assert(text.data == capture->trimmed.data && text.length == capture->trimmed.length);
+    ++capture->match_count;
+    return item->keyword_count != 0;
+}
+static void query_original(cui_str text, void *user) {
+    filter_observation *capture = user;
+    assert(text.data == capture->raw.data && text.length == capture->raw.length);
+    ++capture->query_count;
+}
+static void test_unicode_filter(void) {
+    const struct {
+        const char *label, *query;
+        bool matches;
+    } cases[] = {
+        {u8"\u00c9diter le profil", u8"\u00a0\u00c9DITER\u3000", true},
+        {u8"\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c", u8"\u0425\u0420\u0410\u041d",
+         true},
+        {u8"\U00010400\U00010401", u8"\U00010429", true},
+        {u8"temperature \u212a", "k", true},
+        {u8"\u0130stanbul", u8"i\u0307s", true},
+        {u8"\u0130stanbul", u8"\u0307s", true},
+        {u8"\u0130stanbul", "is", false},
+        {u8"\u039f\u03a3", u8"\u03bf\u03c2", true},
+        {u8"\u039f\u03a3", u8"\u03bf\u03c3", false},
+        {u8"\u039f\u03a3.\u0391", u8"\u03bf\u03c3.\u03b1", true},
+        {u8"\u039f.\u03a3", u8"\u03bf.\u03c2", true},
+        {u8"\u039f\u03a3 \u0391", u8"\u03bf\u03c2 \u03b1", true},
+        {u8"\u03a3", u8"\u03c3", true},
+        {u8"\u0130\u03a3", u8"i\u0307\u03c2", true},
+        {u8"Stra\u00dfe", "STRASSE", false},
+        {u8"caf\u00e9", u8"cafe\u0301", false},
+        {"label", u8"\t\u202f\xc2\x85\n", true},
+        {"label", u8"\u200blabel", false},
+        {"\xf0\x9f", "\x9f", true},
+        {"\xc3\xa9", "\xa9", false},
+        {"\xf4\x90\x80\x80", "\xf4\x90\x80\x80", true},
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        cui_command_item item = {.label = cui_string(cases[i].label)};
+        assert(cui_command_matches(&item, cui_string(cases[i].query)) == cases[i].matches);
+    }
+    const char bytes[] = {'X', '\0', 'Y'};
+    cui_command_item binary = {.label = (cui_str){bytes, sizeof bytes}};
+    assert(cui_command_matches(&binary, (cui_str){bytes + 1, 2}));
+    assert(!cui_command_matches(&binary, (cui_str){NULL, 1}));
+
+    cui_str keywords[] = {cui_string(u8"PR\u00c9F\u00c9RENCES")};
+    cui_command_entry entries[] = {
+        {.kind = CUI_COMMAND_ITEM, .item = {.label = cui_string("Profile")}},
+        {.kind = CUI_COMMAND_ITEM,
+         .item = {.label = cui_string("Settings"), .keywords = keywords, .keyword_count = 1}},
+    };
+    cui_command_row rows[2];
+    cui_command_state state;
+    cui_command_index index;
+    assert(cui_command_init(&state, rows, 2, NULL));
+    assert(cui_command_rebuild(&state, entries, 2, cui_string(u8"\u3000pr\u00e9f\u00e9\u00a0"),
+                               true, cui_command_default()));
+    assert(state.matched_count == 1 && cui_command_selected(&state, &index));
+    assert(index.section == 0 && index.row == 1);
+
+    filter_observation capture = {.raw = cui_string(u8" \t\u3000Pr\u00e9f\u00e9\u00a0 \n")};
+    capture.trimmed = (cui_str){capture.raw.data + 2, capture.raw.length - 4};
+    cui_command_options opt = cui_command_default();
+    opt.matches = match_original;
+    opt.match_user = &capture;
+    opt.on_query = query_original;
+    opt.user = &capture;
+    assert(cui_command_rebuild(&state, entries, 2, capture.raw, true, opt));
+    assert(capture.match_count == 2 && capture.query_count == 1 && state.matched_count == 1);
+    opt.matches = NULL;
+    assert(cui_command_rebuild(&state, entries, 2, capture.raw, true, opt));
+    assert(capture.match_count == 2 && capture.query_count == 2 && state.matched_count == 1);
+}
 static void test_model(void) {
     cui_edit *edit = NULL;
     cui_command_row rows[16];
@@ -741,6 +821,7 @@ static void test_dialog(void) {
 
 #endif
 int main(void) {
+    test_unicode_filter();
     test_model();
 #ifndef CUI_COMMAND_BASE_ONLY
     test_separator_before_heading();

@@ -306,7 +306,9 @@ before using the wrapper methods. Query after layout. Read
 For a Command palette inside a dialog, set `cui_command_options.width = -1` to fit
 the body. Custom rows measure at the current width in a fixed-width, unclipped
 column, or follow up when layout still needs to allocate width. Reflow keeps
-a fully visible selection in view. See `docs/COMMAND.md`.
+a fully visible selection in view. Default Command search matches Unicode
+lowercase substrings in labels and keywords. The immediate C API supports a
+custom matcher. Query callbacks see the raw input. See `docs/COMMAND.md`.
 For shortcut hints, `cui_kbd_format_stroke` uppercases the first Unicode scalar,
 including expansions. Use `CUI_KBD_TEXT_CAPACITY` for a complete result. Hosts
 own shortcut bindings. Retained C and the five language builders support

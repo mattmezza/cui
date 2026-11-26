@@ -53,6 +53,7 @@ typedef struct {
     float width, max_height;
     cui_str placeholder, empty_message, label;
     const cui_platform *clipboard;
+    /* Custom matching receives the original query with legacy isspace trimming. */
     bool (*matches)(const cui_command_item *, cui_str trimmed_query, void *);
     void *match_user;
     void (*on_select)(cui_command_index, void *);
@@ -79,6 +80,7 @@ cui_command_options cui_command_default(void);
  * Query may be NULL for pure model use; styled rendering requires an editor. */
 bool cui_command_init(cui_command_state *, cui_command_row *, size_t capacity, cui_edit *query);
 bool cui_command_index_equal(cui_command_index, cui_command_index);
+/* Trim Unicode whitespace, then match a UTF-8 substring after default Unicode 17 lowercasing. */
 bool cui_command_matches(const cui_command_item *, cui_str query);
 /* Transactional capacity/geometry validation; rebuild borrows entries until next rebuild.
  * query_changed resets highlight; install preserves an eligible original path. */

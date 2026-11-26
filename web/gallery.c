@@ -4488,9 +4488,13 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 74: {
+        cui_str copy_keywords[] = {cui_string(u8"Copier le chemin d'acc\u00e8s")};
         cui_command_item workspace[] = {
             {.label = cui_string("Switch workspace"), .icon = cui_string("folder")},
-            {.label = cui_string("Copy path"), .icon = cui_string("copy")}};
+            {.label = cui_string("Copy path"),
+             .icon = cui_string("copy"),
+             .keywords = copy_keywords,
+             .keyword_count = 1}};
         cui_command_entry entries[] = {
             {.kind = CUI_COMMAND_ITEM,
              .item = {.label = cui_string("Open file"),

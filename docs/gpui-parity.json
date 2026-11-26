@@ -8104,7 +8104,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Grouped filtering, original item paths, wrapping keyboard selection, pointer confirmation, virtual rows, actual Input/Scroll and Dialog cancellation are tested. Custom heights use current width under fixed-width, unclipped columns and preserve a fully visible selection. Unresolved allocations still take a follow-up and very short lists can estimate a narrower scrollbar gutter differently. Unicode matching, native Action/window lifecycle and deferred callbacks remain open or host responsibilities; see docs/COMMAND.md."
+        "Grouped filtering, original item paths, wrapping keyboard selection, pointer confirmation, virtual rows, actual Input/Scroll and Dialog cancellation are tested. Custom heights use current width under fixed-width, unclipped columns and preserve a fully visible selection. Unresolved allocations still take a follow-up and very short lists can estimate a narrower scrollbar gutter differently. The default filter supports Unicode lowercase substring matching. Native Action/window lifecycle and deferred callbacks remain open or host responsibilities; see docs/COMMAND.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -8115,6 +8115,12 @@
           "evidence": [
             "tests/unit/test_command.c"
           ]
+        },
+        {
+          "name": "Unicode lowercase substring search with trimmed query and keyword matching",
+          "status": "tested",
+          "evidence": ["tests/unit/test_command.c", "docs/COMMAND.md"],
+          "scope": "The Unicode 17 default matcher trims Unicode whitespace, handles contextual sigma and expansions, and preserves raw query callbacks and legacy custom matcher input. Apps can replace the default policy in immediate C."
         },
         {
           "name": "wrapping keyboard and cross-frame pointer actions",

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_edit.h"
+#include "cui_utf8_internal.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3069,38 +3070,7 @@ static cui_edit_result cui_edit_private_present(cui_edit *e, cui_str candidate, 
     return result;
 }
 static bool cui_edit_private_decode(const unsigned char *s, size_t n, size_t *width) {
-    if (!n)
-        return false;
-    unsigned char a = s[0];
-    size_t z;
-    unsigned cp;
-    if (a < 0x80) {
-        *width = 1;
-        return true;
-    }
-    if (a >= 0xc2 && a <= 0xdf) {
-        z = 2;
-        cp = a & 31u;
-    } else if (a >= 0xe0 && a <= 0xef) {
-        z = 3;
-        cp = a & 15u;
-    } else if (a >= 0xf0 && a <= 0xf4) {
-        z = 4;
-        cp = a & 7u;
-    } else
-        return false;
-    if (n < z)
-        return false;
-    for (size_t i = 1; i < z; i++) {
-        if ((s[i] & 0xc0u) != 0x80u)
-            return false;
-        cp = (cp << 6) | (s[i] & 63u);
-    }
-    if ((z == 2 && cp < 0x80) || (z == 3 && cp < 0x800) || (z == 4 && cp < 0x10000) ||
-        cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff))
-        return false;
-    *width = z;
-    return true;
+    return cui_utf8_decode(s, n, width, NULL);
 }
 /* Default extended grapheme clusters, UAX #29 revision 47. */
 static unsigned cui_edit_private_grapheme_property(uint32_t cp) {
@@ -3271,14 +3241,9 @@ static unsigned cui_edit_private_word_property(uint32_t cp) {
 }
 static bool cui_edit_private_word_flags(cui_str text, size_t at, size_t *width, unsigned *flags) {
     const unsigned char *bytes = (const unsigned char *)text.data + at;
-    if (!cui_edit_private_decode(bytes, text.length - at, width))
+    uint32_t cp;
+    if (!cui_utf8_decode(bytes, text.length - at, width, &cp))
         return false;
-    uint32_t cp = bytes[0];
-    if (*width > 1) {
-        cp &= *width == 2 ? 31u : *width == 3 ? 15u : 7u;
-        for (size_t i = 1; i < *width; i++)
-            cp = (cp << 6) | (bytes[i] & 63u);
-    }
     *flags = cui_edit_private_word_property(cp);
     return true;
 }

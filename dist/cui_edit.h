@@ -453,6 +453,51 @@ cui_edit_result cui_edit_apply_events(cui_edit *edit, cui_context *ui, cui_id id
 /* src/base/cui_edit.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_UTF8_INTERNAL_H
+#define CUI_UTF8_INTERNAL_H
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+static inline bool cui_utf8_decode(const unsigned char *s, size_t n, size_t *width,
+                                   uint32_t *scalar) {
+    if (!n)
+        return false;
+    unsigned char first = s[0];
+    size_t count;
+    uint32_t cp;
+    if (first < 0x80) {
+        count = 1;
+        cp = first;
+    } else if (first >= 0xc2 && first <= 0xdf) {
+        count = 2;
+        cp = first & 31u;
+    } else if (first >= 0xe0 && first <= 0xef) {
+        count = 3;
+        cp = first & 15u;
+    } else if (first >= 0xf0 && first <= 0xf4) {
+        count = 4;
+        cp = first & 7u;
+    } else
+        return false;
+    if (n < count)
+        return false;
+    for (size_t i = 1; i < count; ++i) {
+        if ((s[i] & 0xc0u) != 0x80u)
+            return false;
+        cp = (cp << 6) | (s[i] & 63u);
+    }
+    if ((count == 3 && cp < 0x800) || (count == 4 && cp < 0x10000) || cp > 0x10ffff ||
+        (cp >= 0xd800 && cp <= 0xdfff))
+        return false;
+    *width = count;
+    if (scalar)
+        *scalar = cp;
+    return true;
+}
+#endif
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3522,38 +3567,7 @@ static cui_edit_result cui_edit_private_present(cui_edit *e, cui_str candidate, 
     return result;
 }
 static bool cui_edit_private_decode(const unsigned char *s, size_t n, size_t *width) {
-    if (!n)
-        return false;
-    unsigned char a = s[0];
-    size_t z;
-    unsigned cp;
-    if (a < 0x80) {
-        *width = 1;
-        return true;
-    }
-    if (a >= 0xc2 && a <= 0xdf) {
-        z = 2;
-        cp = a & 31u;
-    } else if (a >= 0xe0 && a <= 0xef) {
-        z = 3;
-        cp = a & 15u;
-    } else if (a >= 0xf0 && a <= 0xf4) {
-        z = 4;
-        cp = a & 7u;
-    } else
-        return false;
-    if (n < z)
-        return false;
-    for (size_t i = 1; i < z; i++) {
-        if ((s[i] & 0xc0u) != 0x80u)
-            return false;
-        cp = (cp << 6) | (s[i] & 63u);
-    }
-    if ((z == 2 && cp < 0x80) || (z == 3 && cp < 0x800) || (z == 4 && cp < 0x10000) ||
-        cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff))
-        return false;
-    *width = z;
-    return true;
+    return cui_utf8_decode(s, n, width, NULL);
 }
 /* Default extended grapheme clusters, UAX #29 revision 47. */
 static unsigned cui_edit_private_grapheme_property(uint32_t cp) {
@@ -3724,14 +3738,9 @@ static unsigned cui_edit_private_word_property(uint32_t cp) {
 }
 static bool cui_edit_private_word_flags(cui_str text, size_t at, size_t *width, unsigned *flags) {
     const unsigned char *bytes = (const unsigned char *)text.data + at;
-    if (!cui_edit_private_decode(bytes, text.length - at, width))
+    uint32_t cp;
+    if (!cui_utf8_decode(bytes, text.length - at, width, &cp))
         return false;
-    uint32_t cp = bytes[0];
-    if (*width > 1) {
-        cp &= *width == 2 ? 31u : *width == 3 ? 15u : 7u;
-        for (size_t i = 1; i < *width; i++)
-            cp = (cp << 6) | (bytes[i] & 63u);
-    }
     *flags = cui_edit_private_word_property(cp);
     return true;
 }

@@ -1,12 +1,17 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui_command_events_private.h"
+#include "cui_command_unicode.inc"
+#include "cui_utf8_internal.h"
 #include <ctype.h>
 #include <math.h>
 #include <string.h>
+
+enum { CUI_COMMAND_CASED = 1, CUI_COMMAND_CASE_IGNORABLE = 2, CUI_COMMAND_SPACE = 4 };
+
 static bool cui_command_str_valid(cui_str s) {
     return !s.length || s.data;
 }
-static cui_str cui_command_trim(cui_str q) {
+static cui_str cui_command_trim_custom(cui_str q) {
     while (q.length && isspace((unsigned char)*q.data)) {
         ++q.data;
         --q.length;
@@ -15,36 +20,179 @@ static cui_str cui_command_trim(cui_str q) {
         --q.length;
     return q;
 }
-static unsigned char cui_command_lower(unsigned char c) {
-    return c >= 'A' && c <= 'Z' ? (unsigned char)(c + ('a' - 'A')) : c;
+static unsigned cui_command_scalar_properties(uint32_t scalar) {
+    if (scalar < 128)
+        return cui_command_ascii_properties[scalar];
+    size_t lo = 0, hi = sizeof cui_command_properties / sizeof cui_command_properties[0];
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (scalar < cui_command_properties[mid].first)
+            hi = mid;
+        else if (scalar > cui_command_properties[mid].last)
+            lo = mid + 1;
+        else
+            return cui_command_properties[mid].flags;
+    }
+    return 0;
 }
-static bool cui_command_contains(cui_str s, cui_str q) {
-    if (!q.length)
-        return true;
-    if (!cui_command_str_valid(s) || s.length < q.length)
+static cui_str cui_command_trim(cui_str q) {
+    size_t width;
+    uint32_t scalar;
+    while (cui_utf8_decode((const unsigned char *)q.data, q.length, &width, &scalar) &&
+           (cui_command_scalar_properties(scalar) & CUI_COMMAND_SPACE)) {
+        q.data += width;
+        q.length -= width;
+    }
+    while (q.length) {
+        size_t at = q.length - 1;
+        while (at && q.length - at < 4 && ((unsigned char)q.data[at] & 0xc0u) == 0x80u)
+            --at;
+        if (!cui_utf8_decode((const unsigned char *)q.data + at, q.length - at, &width, &scalar) ||
+            width != q.length - at || !(cui_command_scalar_properties(scalar) & CUI_COMMAND_SPACE))
+            break;
+        q.length = at;
+    }
+    return q;
+}
+static uint32_t cui_command_ascii_lower(uint32_t scalar) {
+    return scalar >= 'A' && scalar <= 'Z' ? scalar + ('a' - 'A') : scalar;
+}
+static uint32_t cui_command_simple_lower(uint32_t scalar) {
+    if (scalar < 128)
+        return cui_command_ascii_lower(scalar);
+    size_t lo = 0, hi = sizeof cui_command_lowercase / sizeof cui_command_lowercase[0];
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (scalar < cui_command_lowercase[mid].first)
+            hi = mid;
+        else if (scalar > cui_command_lowercase[mid].last)
+            lo = mid + 1;
+        else if ((scalar - cui_command_lowercase[mid].first) % cui_command_lowercase[mid].step == 0)
+            return (uint32_t)((int32_t)scalar + cui_command_lowercase[mid].delta);
+        else
+            break;
+    }
+    return scalar;
+}
+static uint32_t cui_command_take_scalar(cui_str *s) {
+    const unsigned char *data = (const unsigned char *)s->data;
+    size_t width;
+    uint32_t scalar;
+    if (!cui_utf8_decode(data, s->length, &width, &scalar)) {
+        /* Keep malformed bytes distinct from valid scalars and from each other. */
+        scalar = 0x110000u + data[0];
+        width = 1;
+    }
+    s->data += width;
+    s->length -= width;
+    return scalar;
+}
+
+typedef struct {
+    cui_str remaining;
+    uint32_t pending;
+    bool preceded_by_cased;
+} cui_command_lowercase_cursor;
+
+static bool cui_command_cased_after(cui_str remaining) {
+    while (remaining.length) {
+        unsigned flags = cui_command_scalar_properties(cui_command_take_scalar(&remaining));
+        if (!(flags & CUI_COMMAND_CASE_IGNORABLE))
+            return (flags & CUI_COMMAND_CASED) != 0;
+    }
+    return false;
+}
+static uint32_t cui_command_lower_next(cui_command_lowercase_cursor *cursor) {
+    if (cursor->pending) {
+        uint32_t scalar = cursor->pending;
+        cursor->pending = 0;
+        return scalar;
+    }
+    uint32_t scalar = cui_command_take_scalar(&cursor->remaining);
+    unsigned props = cui_command_scalar_properties(scalar);
+    bool final_sigma =
+        scalar == 0x3a3 && cursor->preceded_by_cased && !cui_command_cased_after(cursor->remaining);
+    if (!(props & CUI_COMMAND_CASE_IGNORABLE))
+        cursor->preceded_by_cased = (props & CUI_COMMAND_CASED) != 0;
+    if (final_sigma)
+        return 0x3c2;
+    if (scalar == 0x130) {
+        cursor->pending = 0x307;
+        return 'i';
+    }
+    return cui_command_simple_lower(scalar);
+}
+static bool cui_command_lower_has_next(cui_command_lowercase_cursor cursor) {
+    return cursor.remaining.length || cursor.pending;
+}
+static bool cui_command_is_ascii(cui_str text) {
+    uint64_t block;
+    while (text.length >= sizeof block) {
+        memcpy(&block, text.data, sizeof block);
+        if (block & UINT64_C(0x8080808080808080))
+            return false;
+        text.data += sizeof block;
+        text.length -= sizeof block;
+    }
+    for (size_t at = 0; at < text.length; ++at)
+        if ((unsigned char)text.data[at] >= 128)
+            return false;
+    return true;
+}
+static bool cui_command_contains_ascii(cui_str s, cui_str q) {
+    if (s.length < q.length)
         return false;
-    for (size_t i = 0; i <= s.length - q.length; ++i) {
-        size_t j = 0;
-        while (j < q.length && cui_command_lower((unsigned char)s.data[i + j]) ==
-                                   cui_command_lower((unsigned char)q.data[j]))
+    uint32_t first = cui_command_ascii_lower((unsigned char)q.data[0]);
+    for (size_t at = 0; at <= s.length - q.length; ++at) {
+        if (cui_command_ascii_lower((unsigned char)s.data[at]) != first)
+            continue;
+        size_t j = 1;
+        while (j < q.length && cui_command_ascii_lower((unsigned char)s.data[at + j]) ==
+                                   cui_command_ascii_lower((unsigned char)q.data[j]))
             ++j;
         if (j == q.length)
             return true;
     }
     return false;
 }
-bool cui_command_matches(const cui_command_item *i, cui_str q) {
-    if (!i || !cui_command_str_valid(q))
+static bool cui_command_contains(cui_str s, cui_str q, bool ascii_query) {
+    if (!q.length)
+        return true;
+    if (!cui_command_str_valid(s))
         return false;
-    q = cui_command_trim(q);
-    if (cui_command_contains(i->label, q))
+    if (ascii_query && cui_command_is_ascii(s))
+        return cui_command_contains_ascii(s, q);
+    /* Copy cursors, so each candidate keeps its full-string casing context and may start
+       within a lowercase expansion. No proportional storage or NUL terminators are required. */
+    cui_command_lowercase_cursor needle = {.remaining = q};
+    uint32_t first = cui_command_lower_next(&needle);
+    for (cui_command_lowercase_cursor text = {.remaining = s}; cui_command_lower_has_next(text);) {
+        if (cui_command_lower_next(&text) != first)
+            continue;
+        cui_command_lowercase_cursor rest = text, query = needle;
+        for (;;) {
+            if (!cui_command_lower_has_next(query))
+                return true;
+            if (!cui_command_lower_has_next(rest) ||
+                cui_command_lower_next(&query) != cui_command_lower_next(&rest))
+                break;
+        }
+    }
+    return false;
+}
+static bool cui_command_matches_trimmed(const cui_command_item *i, cui_str q) {
+    bool ascii = cui_command_is_ascii(q);
+    if (cui_command_contains(i->label, q, ascii))
         return true;
     if (i->keyword_count && !i->keywords)
         return false;
     for (size_t k = 0; k < i->keyword_count; ++k)
-        if (cui_command_contains(i->keywords[k], q))
+        if (cui_command_contains(i->keywords[k], q, ascii))
             return true;
     return false;
+}
+bool cui_command_matches(const cui_command_item *i, cui_str q) {
+    return i && cui_command_str_valid(q) && cui_command_matches_trimmed(i, cui_command_trim(q));
 }
 cui_command_options cui_command_default(void) {
     return (cui_command_options){
@@ -77,7 +225,7 @@ static bool cui_command_item_valid(const cui_command_item *i) {
 }
 static bool cui_command_match(const cui_command_item *i, cui_str q, cui_command_options o) {
     return !o.searchable || !o.filterable ||
-           (o.matches ? o.matches(i, q, o.match_user) : cui_command_matches(i, q));
+           (o.matches ? o.matches(i, q, o.match_user) : cui_command_matches_trimmed(i, q));
 }
 static cui_component_event_metadata
 cui_command_events_private_metadata(const cui_command_events_private_observer *observer,
@@ -147,7 +295,7 @@ bool cui_command_events_private_rebuild(cui_command_state *s, const cui_command_
     size_t count = 0, matched = 0, group = ungrouped ? 1 : 0, item = 0;
     bool separator = false;
     cui_str raw_query = q;
-    q = cui_command_trim(q);
+    q = o.matches ? cui_command_trim_custom(q) : cui_command_trim(q);
     for (size_t e = 0; e < n; ++e) {
         const cui_command_entry *v = &entries[e];
         if (v->kind == CUI_COMMAND_SEPARATOR) {

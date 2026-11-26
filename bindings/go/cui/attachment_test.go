@@ -98,3 +98,96 @@ func TestAttachmentPresentation(t *testing.T) {
 		t.Fatal("cleared a removed Attachment")
 	}
 }
+
+func TestAttachmentActions(t *testing.T) {
+	a := app(t)
+	file := Attachment("report", "Report.pdf", "Ready to review").VisualSize(220, 0).
+		AttachmentStatus(AttachmentComplete).AttachmentActions(AttachmentAllActions)
+	button := Button("other").Text("Refresh")
+	root := Column("root").GapUnits(3).Children(file, button)
+	supported, err := a.SupportsAttachmentActions()
+	check(t, err)
+	if supported == (os.Getenv("CUI_TEST_LEGACY_ATTACHMENT") == "1") {
+		t.Fatalf("unexpected capability: %t", supported)
+	}
+	if !supported {
+		if err := a.Mount(root); !errors.Is(err, ErrAttachmentActionsUnavailable) {
+			t.Fatalf("old provider mount: %v", err)
+		}
+		check(t, file.SetAttachmentActions(0))
+	}
+	check(t, a.Mount(root))
+	check(t, a.Step(.016))
+	click := func(node *Node) {
+		t.Helper()
+		bounds, err := a.Bounds(node)
+		check(t, err)
+		for _, phase := range []PointerPhase{PointerDown, PointerUp} {
+			check(t, a.QueuePointer(phase, bounds.X+bounds.Width/2, bounds.Y+bounds.Height/2))
+		}
+	}
+	press := func(key Key) {
+		t.Helper()
+		check(t, a.QueueKey(KeyDown, key, 0, false))
+		check(t, a.QueueKey(KeyUp, key, 0, false))
+	}
+	click(button)
+	check(t, a.Step(.016))
+	if !supported {
+		if _, ok, err := a.PollComponentNotificationV1(); ok || !errors.Is(err, ErrAttachmentActionsUnavailable) {
+			t.Fatalf("old provider typed poll: ok=%t err=%v", ok, err)
+		}
+		got, ok, err := a.PollValueNotificationV1()
+		check(t, err)
+		if !ok || got.Kind != ValueNotificationActivationV1 || got.Node != button {
+			t.Fatalf("unsupported poll consumed legacy event: %+v", got)
+		}
+		return
+	}
+	got, ok, err := a.PollComponentNotificationV1()
+	check(t, err)
+	if !ok || got.Value == nil || got.Value.Kind != ValueNotificationActivationV1 || got.Value.Node != button || got.AttachmentAction != nil {
+		t.Fatalf("ordinary event: %+v", got)
+	}
+	click(file)
+	check(t, a.Step(.016))
+	got, ok, err = a.PollComponentNotificationV1()
+	check(t, err)
+	opened := got.AttachmentAction
+	if !ok || got.Value != nil || opened == nil || opened.Action != AttachmentOpen ||
+		opened.Part != AttachmentPartCard || opened.Source != AttachmentSourcePointer ||
+		opened.EventIndex == nil || *opened.EventIndex != 1 || opened.Frame == 0 || opened.Node != file {
+		t.Fatalf("typed Open: %+v", opened)
+	}
+	if err := file.SetAttachmentActions(AttachmentActions(8)); err == nil {
+		t.Fatal("accepted unknown action bit")
+	}
+	press(Enter)
+	check(t, a.Step(.016))
+	legacy, ok, err := a.PollValueNotificationV1()
+	check(t, err)
+	if !ok || legacy.Kind != ValueNotificationLegacyV1 || legacy.Legacy.Value != float64(AttachmentOpen) {
+		t.Fatalf("older value API: %+v", legacy)
+	}
+	press(Tab)
+	check(t, a.Step(.016))
+	press(Enter)
+	check(t, a.Step(.016))
+	got, ok, err = a.PollComponentNotificationV1()
+	check(t, err)
+	discard := got.AttachmentAction
+	if !ok || discard == nil || discard.Action != AttachmentRemove || discard.Part != AttachmentPartRemove ||
+		discard.Source != AttachmentSourceKeyboard || discard.EventIndex == nil || *discard.EventIndex != 0 {
+		t.Fatalf("typed Remove: %+v", discard)
+	}
+	check(t, file.SetAttachmentActions(0))
+	click(file)
+	check(t, a.Step(.016))
+	if _, ok, err := a.PollComponentNotificationV1(); ok || err != nil {
+		t.Fatalf("cleared actions: ok=%t err=%v", ok, err)
+	}
+	check(t, file.Remove())
+	if opened.Action != AttachmentOpen || *opened.EventIndex != 1 || opened.Handle != discard.Handle || opened.Frame >= discard.Frame {
+		t.Fatal("polling, clearing or removing changed copied evidence")
+	}
+}

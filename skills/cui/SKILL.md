@@ -545,9 +545,10 @@ presentation and previews. Retained progress uses a fraction. See
 for calls and runnable examples. Retained C can opt into built-in Open, Remove
 and Retry with `cui_bridge_attachment_set_actions_v1`. Request
 `CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1` when polling. The actions request app
-work and never change transfer status. Language builders currently cover
-presentation and previews. Custom slots use immediate C. See
-`docs/ATTACHMENT_EVENTS.md#retained-actions`.
+work and never change transfer status. Python, JS/TS, Go and Rust support the
+independent actions through optional builders and manual component notification
+polls. Manual polling and ordinary dispatch share one queue. Custom slots use
+immediate C. See `docs/ATTACHMENT_EVENTS.md#retained-actions-from-language-builders`.
 
 For a pinned navigation header/footer with body-only scrolling, use
 `cui_sidebar` with a persistent measurement cache. Tab and accessibility focus

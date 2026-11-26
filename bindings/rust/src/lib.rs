@@ -1,7 +1,9 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
 mod attachment;
 pub use attachment::{
-    AttachmentOptions, AttachmentTextStyle, AttachmentTextWeight, AttachmentTypography,
+    AttachmentAction, AttachmentActionNotificationV1, AttachmentActionPart, AttachmentActionSource,
+    AttachmentActions, AttachmentOptions, AttachmentTextStyle, AttachmentTextWeight,
+    AttachmentTypography,
 };
 mod disclosure;
 pub use disclosure::{
@@ -20,7 +22,6 @@ mod slider_model;
 mod stepper_fill;
 mod time_localized;
 mod virtual_list;
-pub use virtual_list::VirtualListRow;
 pub use icon_resources::{
     BadgeConfig, BadgeResult, BadgeSize, BadgeVariant, IconAlign, IconAvailability, IconBitmap,
     IconBoxStyle, IconCatalogEntry, IconConfig, IconConstraints, IconError, IconInfo, IconLimits,
@@ -45,6 +46,7 @@ use std::{
 pub use time_localized::{
     TimeCycle, TimeFieldChange, TimeFieldConfig, TimeFieldResult, TimePrecision,
 };
+pub use virtual_list::VirtualListRow;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash)]
@@ -144,6 +146,7 @@ union NotificationValueRawV1 {
     selected: RawNode,
     table: TableNotificationRawV1,
     surface: u32,
+    attachment: attachment::ActionRawV1,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -232,6 +235,14 @@ pub enum ValueNotificationV1 {
 pub struct SelectionChangeV1 {
     pub handle: RawHandle,
     pub node: Option<Node>,
+}
+/// Owning projection of the ordinary event queue with opt-in component actions.
+/// Each successful poll removes one event from that queue.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub enum ComponentNotificationV1 {
+    Value(ValueNotificationV1),
+    AttachmentAction(AttachmentActionNotificationV1),
 }
 /// Text capacity policy is 1 MiB including NUL; this error leaves the live event queued.
 pub const NOTIFICATION_PAYLOAD_LIMIT: Error = Error(0x10001);
@@ -1483,9 +1494,8 @@ impl App {
             .retain(|node, _| *node != raw && read_data_table_state(app, *node).is_ok());
         self.legacy_radio_nodes.retain(|node, _| {
             let mut required = 0;
-            let status = unsafe {
-                cui_bridge_get_text(app, *node, std::ptr::null_mut(), 0, &mut required)
-            };
+            let status =
+                unsafe { cui_bridge_get_text(app, *node, std::ptr::null_mut(), 0, &mut required) };
             status == 0 || status == 5
         });
         self.slider_removed(raw);
@@ -2468,6 +2478,31 @@ impl App {
     /// Opt-in manual owning values on the same queue; no fallback drain or callbacks.
     /// Static builds pair with their bundled bridge; dynamic exports are optional.
     pub fn poll_value_notification_v1(&mut self) -> Result<Option<ValueNotificationV1>> {
+        let Some((raw, text)) = self.read_value_notification_v1(false)? else {
+            return Ok(None);
+        };
+        self.decode_value_notification_v1(raw, text).map(Some)
+    }
+
+    /// Poll the shared queue with typed Attachment actions enabled. Requires
+    /// the optional action producer. Existing poll and dispatch paths are unchanged.
+    pub fn poll_component_notification_v1(&mut self) -> Result<Option<ComponentNotificationV1>> {
+        let Some((raw, text)) = self.read_value_notification_v1(true)? else {
+            return Ok(None);
+        };
+        if raw.payload_kind == attachment::ACTION_PAYLOAD_V1 {
+            let action = attachment::decode_action(raw, self.value_metadata_v1(raw, text))?;
+            return Ok(Some(ComponentNotificationV1::AttachmentAction(action)));
+        }
+        self.decode_value_notification_v1(raw, text)
+            .map(ComponentNotificationV1::Value)
+            .map(Some)
+    }
+
+    fn read_value_notification_v1(
+        &self,
+        with_attachment: bool,
+    ) -> Result<Option<(NotificationRawV1, String)>> {
         let (size, versions, categories, poll) =
             value_notification_functions_v1().ok_or(Error(9))?;
         if unsafe { versions() } & 1 == 0 {
@@ -2476,7 +2511,17 @@ impl App {
         if unsafe { size() } as usize != std::mem::size_of::<NotificationRawV1>() {
             return Err(NOTIFICATION_PROTOCOL_ERROR);
         }
-        let enabled = unsafe { categories() } & 28;
+        let mut mask = 28;
+        let categories = unsafe { categories() };
+        if with_attachment {
+            if !attachment::action_setter_available()
+                || categories & attachment::ACTION_MASK_V1 == 0
+            {
+                return Err(Error::ATTACHMENT_ACTIONS_UNAVAILABLE);
+            }
+            mask |= attachment::ACTION_MASK_V1;
+        }
+        let enabled = categories & mask;
         if enabled == 0 {
             return Err(Error(9));
         }
@@ -2516,21 +2561,19 @@ impl App {
             || raw.legacy.kind != raw.kind
             || !(1..=3).contains(&raw.kind)
             || ((raw.flags & 1 != 0) != (raw.frame != 0))
-            || ((2..=4).contains(&raw.payload_kind) && enabled & (1 << raw.payload_kind) == 0)
+            || (((2..=4).contains(&raw.payload_kind)
+                || raw.payload_kind == attachment::ACTION_PAYLOAD_V1)
+                && enabled & (1 << raw.payload_kind) == 0)
         {
             return Err(NOTIFICATION_PROTOCOL_ERROR);
         }
         let text =
             String::from_utf8(text[..raw.text_length as usize].to_vec()).map_err(|_| Error(7))?;
-        self.decode_value_notification_v1(raw, text).map(Some)
+        Ok(Some((raw, text)))
     }
-    fn decode_value_notification_v1(
-        &self,
-        raw: NotificationRawV1,
-        text: String,
-    ) -> Result<ValueNotificationV1> {
+    fn value_metadata_v1(&self, raw: NotificationRawV1, text: String) -> MetadataV1 {
         let old = raw.legacy;
-        let meta = MetadataV1 {
+        MetadataV1 {
             handle: raw.node.into(),
             node: self.value_notification_node_v1(raw.node),
             node_kind: raw.node_kind,
@@ -2545,7 +2588,15 @@ impl App {
                 text,
                 selected_handle: old.selected.into(),
             },
-        };
+        }
+    }
+    fn decode_value_notification_v1(
+        &self,
+        raw: NotificationRawV1,
+        text: String,
+    ) -> Result<ValueNotificationV1> {
+        let old = raw.legacy;
+        let meta = self.value_metadata_v1(raw, text);
         match raw.payload_kind {
             0 if raw.kind == 1 => Ok(ValueNotificationV1::Activation(meta)),
             1 if raw.kind == 2 => {

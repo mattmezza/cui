@@ -901,10 +901,16 @@ class App {
       default: return Object.freeze({...common, kind: 'legacy', selectedNode: this.nodes.get(keyFor(selectedHandle))});
     }
   }
-  poll_value_notification_v1() {
+  supports_attachment_actions() { this._alive(); return typeof native.attachmentActions === "function" && native.attachmentActions(this.handle); }
+  poll_component_notification_v1() {
+    if (!this.supports_attachment_actions()) throw new Error("Attachment actions unavailable");
+    return this._poll_value_notification_v1(true);
+  }
+  poll_value_notification_v1() { return this._poll_value_notification_v1(false); }
+  _poll_value_notification_v1(actions) {
     this._alive();
     if (typeof native.pollValueNotificationV1 !== 'function') throw new Error('V1 notification addon unavailable');
-    const raw = native.pollValueNotificationV1(this.handle);
+    const raw = actions ? native.pollComponentNotificationV1(this.handle) : native.pollValueNotificationV1(this.handle);
     if (raw === undefined) return undefined;
     const handle = Object.freeze({slot: raw.slot, generation: raw.generation});
     const selectedHandle = Object.freeze({slot: raw.selectedSlot, generation: raw.selectedGeneration});
@@ -913,6 +919,11 @@ class App {
     const common = {schemaVersion: 1, handle, node: this.nodes.get(keyFor(handle)),
       frame: raw.frame, hasFrame: raw.hasFrame, nodeKind: raw.nodeKind, legacy};
     switch (raw.payloadKind) {
+      case 8: return Object.freeze({...common, kind: 'attachment-action',
+        action: {1:'open',2:'remove',4:'retry'}[raw.action],
+        part: ['unknown','card','remove','media-retry','description-retry'][raw.part],
+        source: raw.actionFlags & 4 ? {2:'pointer',3:'keyboard',4:'accessibility'}[raw.source] : undefined,
+        eventIndex: raw.actionFlags & 2 ? raw.eventIndex : undefined});
       case 0: return Object.freeze({...common, kind: 'activation'});
       case 1: return Object.freeze({...common, kind: 'boolean-change', value: raw.booleanValue});
       case 2: return Object.freeze({...common, kind: 'scalar-change', value: raw.value});

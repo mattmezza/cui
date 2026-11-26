@@ -1,6 +1,8 @@
 # Retained Attachment action checkpoint
 
-Status at this checkpoint is proposed. The baseline is `06551a0c`.
+The baseline at this design checkpoint was `06551a0c`. The first two slices
+are implemented. See the [current API guide](../ATTACHMENT_EVENTS.md#retained-actions)
+for the C and language APIs. The tables below describe the original baseline.
 The [component event contract](COMPONENT_EVENTS_CONTRACT.md) and
 [notification checkpoint](BRIDGE_VALUE_NOTIFICATIONS_SLICE.md) establish the
 existing ownership and compatibility rules.

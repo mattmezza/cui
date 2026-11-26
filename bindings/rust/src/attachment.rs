@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
-//! Optional retained Attachment presentation and decoded previews.
-use crate::{check, App, AttachmentStatus, Builder, Error, Node, RawNode, Result};
+//! Optional retained Attachment presentation, decoded previews and actions.
+use crate::{
+    check, value_notification_functions_v1, App, AttachmentStatus, Builder, Error, Kind,
+    MetadataV1, Node, NotificationRawV1, RawNode, Result, NOTIFICATION_PROTOCOL_ERROR,
+};
 use std::{ffi::c_void, mem, ptr, sync::OnceLock};
 
 /// Metadata font weight.
@@ -119,6 +122,128 @@ impl AttachmentOptions {
     }
 }
 
+/// Independently enabled actions. Default disables all three.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct AttachmentActions {
+    pub open: bool,
+    pub remove: bool,
+    pub retry: bool,
+}
+
+impl AttachmentActions {
+    pub const ALL: Self = Self {
+        open: true,
+        remove: true,
+        retry: true,
+    };
+
+    fn wire(self) -> u32 {
+        u32::from(self.open) | (u32::from(self.remove) << 1) | (u32::from(self.retry) << 2)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AttachmentAction {
+    Open,
+    Remove,
+    Retry,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AttachmentActionPart {
+    Card,
+    Remove,
+    MediaRetry,
+    DescriptionRetry,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AttachmentActionSource {
+    Pointer,
+    Keyboard,
+    Accessibility,
+}
+
+/// Copied action and input evidence. An unknown or ambiguous origin has no evidence.
+#[derive(Clone, Debug)]
+pub struct AttachmentActionNotificationV1 {
+    pub metadata: MetadataV1,
+    pub action: AttachmentAction,
+    pub part: Option<AttachmentActionPart>,
+    pub source: Option<AttachmentActionSource>,
+    /// Index in the triggering C frame, meaningful with `metadata.frame`.
+    pub event_index: Option<u32>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(crate) struct ActionRawV1 {
+    action: u32,
+    part: u32,
+    source: u32,
+    flags: u32,
+    event_index: u32,
+}
+
+const _: () = assert!(mem::size_of::<ActionRawV1>() == 20);
+pub(crate) const ACTION_PAYLOAD_V1: u32 = 8;
+pub(crate) const ACTION_MASK_V1: u32 = 1 << ACTION_PAYLOAD_V1;
+
+pub(crate) fn decode_action(
+    raw: NotificationRawV1,
+    metadata: MetadataV1,
+) -> Result<AttachmentActionNotificationV1> {
+    let action_wire = unsafe { raw.payload.attachment };
+    let old = raw.legacy;
+    if raw.kind != 1
+        || raw.node_kind != Kind::Attachment as u32
+        || raw.frame == 0
+        || raw.node.slot == 0
+        || raw.node.generation == 0
+        || raw.text_length != 0
+        || old.checked != 0
+        || old.selected.slot != 0
+        || old.selected.generation != 0
+        || old.value != f64::from(action_wire.action)
+        || action_wire.flags & !6 != 0
+    {
+        return Err(NOTIFICATION_PROTOCOL_ERROR);
+    }
+    let action = match action_wire.action {
+        1 => AttachmentAction::Open,
+        2 => AttachmentAction::Remove,
+        4 => AttachmentAction::Retry,
+        _ => return Err(NOTIFICATION_PROTOCOL_ERROR),
+    };
+    let part = match (action, action_wire.part) {
+        (_, 0) => None,
+        (AttachmentAction::Open, 1) => Some(AttachmentActionPart::Card),
+        (AttachmentAction::Remove, 2) => Some(AttachmentActionPart::Remove),
+        (AttachmentAction::Retry, 3) => Some(AttachmentActionPart::MediaRetry),
+        (AttachmentAction::Retry, 4) => Some(AttachmentActionPart::DescriptionRetry),
+        _ => return Err(NOTIFICATION_PROTOCOL_ERROR),
+    };
+    let source = match (action_wire.flags & 4 != 0, action_wire.source) {
+        (false, 0) => None,
+        (true, 2) => Some(AttachmentActionSource::Pointer),
+        (true, 3) => Some(AttachmentActionSource::Keyboard),
+        (true, 4) => Some(AttachmentActionSource::Accessibility),
+        _ => return Err(NOTIFICATION_PROTOCOL_ERROR),
+    };
+    let has_index = action_wire.flags & 2 != 0;
+    if !has_index && action_wire.event_index != 0 {
+        return Err(NOTIFICATION_PROTOCOL_ERROR);
+    }
+    Ok(AttachmentActionNotificationV1 {
+        metadata,
+        action,
+        part,
+        source,
+        event_index: has_index.then_some(action_wire.event_index),
+    })
+}
+
+type SetActions = unsafe extern "C" fn(*mut c_void, RawNode, u32) -> u32;
 type Configure = unsafe extern "C" fn(*mut c_void, RawNode, *const OptionsRaw) -> u32;
 type Preview = unsafe extern "C" fn(*mut c_void, RawNode, *const u8, u32, u32, u32, u32) -> u32;
 
@@ -126,6 +251,7 @@ type Preview = unsafe extern "C" fn(*mut c_void, RawNode, *const u8, u32, u32, u
 struct AttachmentApi {
     configure: Option<Configure>,
     preview: Option<Preview>,
+    set_actions: Option<SetActions>,
 }
 
 fn api() -> &'static AttachmentApi {
@@ -136,6 +262,7 @@ fn api() -> &'static AttachmentApi {
 #[cfg(cui_bridge_static)]
 fn resolve() -> AttachmentApi {
     extern "C" {
+        fn cui_bridge_attachment_set_actions_v1(app: *mut c_void, node: RawNode, mask: u32) -> u32;
         fn cui_bridge_attachment_configure_v1(
             app: *mut c_void,
             node: RawNode,
@@ -154,6 +281,7 @@ fn resolve() -> AttachmentApi {
     AttachmentApi {
         configure: Some(cui_bridge_attachment_configure_v1),
         preview: Some(cui_bridge_attachment_set_preview_rgba_v1),
+        set_actions: Some(cui_bridge_attachment_set_actions_v1),
     }
 }
 
@@ -164,7 +292,11 @@ fn resolve() -> AttachmentApi {
             crate::notification_symbol_v1(c"cui_bridge_attachment_configure_v1".as_ptr());
         let preview =
             crate::notification_symbol_v1(c"cui_bridge_attachment_set_preview_rgba_v1".as_ptr());
+        let set_actions =
+            crate::notification_symbol_v1(c"cui_bridge_attachment_set_actions_v1".as_ptr());
         AttachmentApi {
+            set_actions: (!set_actions.is_null())
+                .then(|| mem::transmute::<*mut c_void, SetActions>(set_actions)),
             configure: (!configure.is_null())
                 .then(|| mem::transmute::<*mut c_void, Configure>(configure)),
             preview: (!preview.is_null()).then(|| mem::transmute::<*mut c_void, Preview>(preview)),
@@ -177,12 +309,47 @@ fn resolve() -> AttachmentApi {
     AttachmentApi::default()
 }
 
+pub(crate) fn action_setter_available() -> bool {
+    api().set_actions.is_some()
+}
+
 impl Error {
     /// The bridge lacks the requested Attachment V1 operation.
     pub const ATTACHMENT_OPTIONS_UNAVAILABLE: Self = Self(9);
+    /// The bridge lacks the Attachment action producer or its V1 queue view.
+    pub const ATTACHMENT_ACTIONS_UNAVAILABLE: Self = Self(9);
 }
 
 impl App {
+    /// Whether the loaded bridge can configure and poll typed Attachment actions.
+    pub fn supports_attachment_actions(&self) -> bool {
+        action_setter_available()
+            && value_notification_functions_v1().is_some_and(
+                |(size, versions, payloads, _)| unsafe {
+                    versions() & 1 != 0
+                        && size() as usize == mem::size_of::<NotificationRawV1>()
+                        && payloads() & ACTION_MASK_V1 != 0
+                },
+            )
+    }
+
+    /// Enable independent actions. The application owns file operations and lifecycle.
+    pub fn set_attachment_actions(
+        &mut self,
+        node: Node,
+        actions: AttachmentActions,
+    ) -> Result<&mut Self> {
+        let node = self.valid(node)?;
+        if !self.supports_attachment_actions() {
+            return Err(Error::ATTACHMENT_ACTIONS_UNAVAILABLE);
+        }
+        let set_actions = api()
+            .set_actions
+            .ok_or(Error::ATTACHMENT_ACTIONS_UNAVAILABLE)?;
+        check(unsafe { set_actions(self.raw, node, actions.wire()) })?;
+        Ok(self)
+    }
+
     pub fn supports_attachment_options(&self) -> bool {
         api().configure.is_some()
     }
@@ -249,6 +416,11 @@ impl App {
 }
 
 impl Builder<'_> {
+    pub fn attachment_actions(self, actions: AttachmentActions) -> Result<Self> {
+        self.app.set_attachment_actions(self.node, actions)?;
+        Ok(self)
+    }
+
     pub fn attachment_options(self, options: &AttachmentOptions) -> Result<Self> {
         self.app.configure_attachment(self.node, Some(options))?;
         Ok(self)

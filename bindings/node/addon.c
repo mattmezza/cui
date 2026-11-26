@@ -953,6 +953,13 @@ static napi_value notification_object(napi_env env, const cui_bridge_notificatio
     if (napi_create_uint32(env, (uint32_t)(value), &x) != napi_ok ||                               \
         napi_set_named_property(env, result, name, x) != napi_ok)                                  \
     return NULL
+    if (event->payload_kind == CUI_BRIDGE_PAYLOAD_ATTACHMENT_ACTION) {
+        NOTIFY_UINT("action", event->payload.attachment_action.action);
+        NOTIFY_UINT("part", event->payload.attachment_action.part);
+        NOTIFY_UINT("source", event->payload.attachment_action.source);
+        NOTIFY_UINT("actionFlags", event->payload.attachment_action.flags);
+        NOTIFY_UINT("eventIndex", event->payload.attachment_action.event_index);
+    }
     NOTIFY_UINT("payloadKind", event->payload_kind);
     NOTIFY_UINT("type", event->legacy.type);
     NOTIFY_UINT("slot", event->node.slot);
@@ -1090,7 +1097,49 @@ static bool strict_utf8(const char *text, uint32_t length) {
     }
     return true;
 }
-static napi_value poll_value_notification_v1(napi_env env, napi_callback_info info) {
+static int optional_bridge_symbol(void *target, size_t size, const char *name);
+static bool attachment_actions_supported(void) {
+    uint32_t (*size)(void) = NULL, (*versions)(void) = NULL, (*payloads)(void) = NULL;
+    cui_bridge_status (*set)(cui_bridge_app *, cui_bridge_node, uint32_t) = NULL;
+    void (*poll)(void) = NULL;
+    return optional_bridge_symbol(&set, sizeof set, "cui_bridge_attachment_set_actions_v1") &&
+           optional_bridge_symbol(&size, sizeof size, "cui_bridge_notification_v1_size") &&
+           optional_bridge_symbol(&versions, sizeof versions, "cui_bridge_notification_versions") &&
+           optional_bridge_symbol(&payloads, sizeof payloads,
+                                  "cui_bridge_notification_value_payloads_v1") &&
+           optional_bridge_symbol(&poll, sizeof poll, "cui_bridge_poll_value_notification_v1") &&
+           size() == sizeof(cui_bridge_notification_v1) && (versions() & 1u) &&
+           (payloads() & CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1);
+}
+static napi_value attachment_actions(napi_env env, napi_callback_info info) {
+    napi_value v[3], result;
+    js_app *app;
+    if (!args(env, info, 1, v) || !app_arg(env, v[0], &app))
+        return NULL;
+    size_t count = 3;
+    if (napi_get_cb_info(env, info, &count, v, NULL, NULL) != napi_ok)
+        return NULL;
+    if (count == 1)
+        return napi_get_boolean(env, attachment_actions_supported(), &result) == napi_ok ? result
+                                                                                         : NULL;
+    if (!attachment_actions_supported())
+        return fail(env, "Attachment actions unavailable");
+    js_node *node;
+    uint32_t mask;
+    if (count != 3 || !node_arg(env, v[1], app, &node) || !uint_arg(env, v[2], &mask))
+        return NULL;
+    if (mask & ~(CUI_BRIDGE_ATTACHMENT_OPEN_V1 | CUI_BRIDGE_ATTACHMENT_REMOVE_V1 |
+                 CUI_BRIDGE_ATTACHMENT_RETRY_V1))
+        return fail(env, "invalid Attachment action mask");
+    cui_bridge_status (*set)(cui_bridge_app *, cui_bridge_node, uint32_t) = NULL;
+    if (!optional_bridge_symbol(&set, sizeof set, "cui_bridge_attachment_set_actions_v1"))
+        return fail(env, "Attachment actions unavailable");
+    cui_bridge_status code = set(app->bridge, node->node, mask);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value poll_component_values(napi_env env, napi_callback_info info, bool actions) {
+    if (actions && !attachment_actions_supported())
+        return fail(env, "Attachment actions unavailable");
     napi_value args_value[1];
     js_app *app;
     if (!args(env, info, 1, args_value) || !app_arg(env, args_value[0], &app))
@@ -1124,8 +1173,11 @@ static napi_value poll_value_notification_v1(napi_env env, napi_callback_info in
     memcpy(&poll_query, &poll_symbol, sizeof poll_query);
     if (!(versions_query() & 1u) || size_query() != sizeof(cui_bridge_notification_v1))
         return fail(env, "V1 notification capability/layout mismatch");
-    uint32_t enabled = payloads_query() & 28u;
-    if (!enabled)
+    uint32_t enabled =
+        payloads_query() &
+        ((CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 | CUI_BRIDGE_VALUE_SELECTION_V1) |
+         (actions ? CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1 : 0u));
+    if (!enabled || (actions && !(enabled & CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1)))
         return fail(env, "V1 value notification categories unavailable");
     uint32_t capacity = 4097, required = 0;
     char *text = malloc(capacity);
@@ -1170,7 +1222,8 @@ static napi_value poll_value_notification_v1(napi_env env, napi_callback_info in
         event.legacy.node.generation != event.node.generation ||
         event.legacy.frame_sequence != event.frame_sequence ||
         event.legacy.text_length != event.text_length ||
-        event.payload_kind > CUI_BRIDGE_PAYLOAD_LEGACY ||
+        event.payload_kind >
+            (actions ? CUI_BRIDGE_PAYLOAD_ATTACHMENT_ACTION : CUI_BRIDGE_PAYLOAD_LEGACY) ||
         (event.payload_kind >= 2u && event.payload_kind <= 4u &&
          !(enabled & (1u << event.payload_kind))) ||
         (event.payload_kind == 0u && event.kind != 1u) ||
@@ -1190,9 +1243,47 @@ static napi_value poll_value_notification_v1(napi_env env, napi_callback_info in
         free(text);
         return fail(env, "invalid V1 notification output");
     }
+    if (event.payload_kind == CUI_BRIDGE_PAYLOAD_ATTACHMENT_ACTION) {
+        const cui_bridge_attachment_action_v1 a = event.payload.attachment_action;
+        bool part_ok = a.part == CUI_BRIDGE_ATTACHMENT_ACTION_PART_UNKNOWN_V1 ||
+                       (a.action == CUI_BRIDGE_ATTACHMENT_OPEN_V1 &&
+                        a.part == CUI_BRIDGE_ATTACHMENT_ACTION_PART_CARD_V1) ||
+                       (a.action == CUI_BRIDGE_ATTACHMENT_REMOVE_V1 &&
+                        a.part == CUI_BRIDGE_ATTACHMENT_ACTION_PART_REMOVE_V1) ||
+                       (a.action == CUI_BRIDGE_ATTACHMENT_RETRY_V1 &&
+                        (a.part == CUI_BRIDGE_ATTACHMENT_ACTION_PART_MEDIA_RETRY_V1 ||
+                         a.part == CUI_BRIDGE_ATTACHMENT_ACTION_PART_DESCRIPTION_RETRY_V1));
+        bool source_ok = a.source == CUI_BRIDGE_ACTIVATION_SOURCE_POINTER_V1 ||
+                         a.source == CUI_BRIDGE_ACTIVATION_SOURCE_KEYBOARD_V1 ||
+                         a.source == CUI_BRIDGE_ACTIVATION_SOURCE_ACCESSIBILITY_V1;
+        if (!(enabled & CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1) ||
+            event.kind != CUI_BRIDGE_NOTIFY_ACTIVATE || event.node_kind != CUI_BRIDGE_ATTACHMENT ||
+            !event.node.slot || !event.node.generation || !event.frame_sequence ||
+            event.text_length || event.legacy.checked || event.legacy.selected.slot ||
+            event.legacy.selected.generation ||
+            (a.action != CUI_BRIDGE_ATTACHMENT_OPEN_V1 &&
+             a.action != CUI_BRIDGE_ATTACHMENT_REMOVE_V1 &&
+             a.action != CUI_BRIDGE_ATTACHMENT_RETRY_V1) ||
+            event.legacy.value != a.action || !part_ok ||
+            (a.flags &
+             ~(CUI_BRIDGE_ACTIVATION_HAS_SOURCE_V1 | CUI_BRIDGE_ACTIVATION_HAS_INDEX_V1)) ||
+            ((a.flags & CUI_BRIDGE_ACTIVATION_HAS_SOURCE_V1) != 0) != source_ok ||
+            (!(a.flags & CUI_BRIDGE_ACTIVATION_HAS_SOURCE_V1) &&
+             a.source != CUI_BRIDGE_ACTIVATION_SOURCE_UNKNOWN_V1) ||
+            (!(a.flags & CUI_BRIDGE_ACTIVATION_HAS_INDEX_V1) && a.event_index != 0)) {
+            free(text);
+            return fail(env, "invalid Attachment action evidence");
+        }
+    }
     napi_value result = notification_object(env, &event, text);
     free(text);
     return result;
+}
+static napi_value poll_value_notification_v1(napi_env env, napi_callback_info info) {
+    return poll_component_values(env, info, false);
+}
+static napi_value poll_component_notification_v1(napi_env env, napi_callback_info info) {
+    return poll_component_values(env, info, true);
 }
 #ifdef CUI_NODE_NOTIFICATION_TESTS
 /* Conversion-only fixture: roundtrip a uint64, without inventing UI evidence. */
@@ -1346,7 +1437,6 @@ static napi_value get_plot(napi_env env, napi_callback_info info) {
         return NULL;
     return result;
 }
-static int optional_bridge_symbol(void *target, size_t size, const char *name);
 typedef cui_bridge_status (*stepper_fill_fn)(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t,
                                              float, float);
 static stepper_fill_fn stepper_fill_symbol(void) {
@@ -2598,6 +2688,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("poll", poll, 0);
     EXPORT("pollNotificationV1", poll_notification_v1, 0);
     EXPORT("pollValueNotificationV1", poll_value_notification_v1, 0);
+    EXPORT("pollComponentNotificationV1", poll_component_notification_v1, 0);
+    EXPORT("attachmentActions", attachment_actions, 0);
 #ifdef CUI_NODE_NOTIFICATION_TESTS
     EXPORT("testNotificationFrame", notification_frame_fixture, 0);
 #endif

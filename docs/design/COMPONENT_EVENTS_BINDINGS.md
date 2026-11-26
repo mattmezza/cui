@@ -20,6 +20,9 @@ checkpoint baseline, not an assertion that later additions are absent.
 No Python, JavaScript/TypeScript, Go or Rust wrapper for these synchronous
 handlers is implemented; owning manual queued views were added later. See the
 current dated snapshot below. Original sections retain their historical scope.
+The later [retained Attachment action API](../ATTACHMENT_EVENTS.md#retained-actions-from-language-builders)
+provides a negotiated manual queue view in C, Python, JS/TS, Go and Rust.
+It carries one copied activation per action category per card and frame.
 
 ## What exists at the C boundary
 

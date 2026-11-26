@@ -105,3 +105,114 @@ fn retained_attachment_presentation() {
     app.remove(node).unwrap();
     assert!(app.clear_attachment_preview(node).is_err());
 }
+
+#[test]
+fn retained_attachment_actions() {
+    use cui_builders::{
+        AttachmentAction, AttachmentActionPart, AttachmentActionSource, AttachmentActions,
+        ComponentNotificationV1, Key, Phase, ValueNotificationV1,
+    };
+    let mut app = App::headless(430., 300.).unwrap();
+    let want = std::env::var("CUI_TEST_LEGACY_ATTACHMENT").as_deref() != Ok("1");
+    assert_eq!(app.supports_attachment_actions(), want);
+    let root = app.root(Kind::Column, "root").unwrap();
+    let file = app
+        .build_child(root, Kind::Attachment, "file")
+        .unwrap()
+        .text("Report.pdf")
+        .unwrap()
+        .detail_text("Ready to review")
+        .unwrap()
+        .visual_size(220., 0.)
+        .unwrap()
+        .attachment_status(AttachmentStatus::Complete)
+        .unwrap()
+        .finish();
+    let button = app
+        .build_child(root, Kind::Button, "refresh")
+        .unwrap()
+        .text("Refresh")
+        .unwrap()
+        .finish();
+    let click = |app: &mut App, node| {
+        let b = app.bounds(node).unwrap();
+        for phase in [Phase::Down, Phase::Up] {
+            app.pointer(phase, b.x + b.width / 2., b.y + b.height / 2.)
+                .unwrap();
+        }
+    };
+    let key = |app: &mut App, code| {
+        app.key(true, code, 0, false).unwrap();
+        app.key(false, code, 0, false).unwrap();
+    };
+    if !want {
+        assert_eq!(
+            app.set_attachment_actions(file, AttachmentActions::ALL)
+                .err(),
+            Some(Error::ATTACHMENT_ACTIONS_UNAVAILABLE)
+        );
+    } else {
+        app.set_attachment_actions(file, AttachmentActions::ALL)
+            .unwrap();
+    }
+    app.step(0.016).unwrap();
+    click(&mut app, button);
+    app.step(0.016).unwrap();
+    if !want {
+        assert_eq!(
+            app.poll_component_notification_v1().err(),
+            Some(Error::ATTACHMENT_ACTIONS_UNAVAILABLE)
+        );
+        assert!(matches!(
+            app.poll_value_notification_v1().unwrap(),
+            Some(ValueNotificationV1::Activation(meta)) if meta.node == Some(button)
+        ));
+        return;
+    }
+    assert!(matches!(
+        app.poll_component_notification_v1().unwrap(),
+        Some(ComponentNotificationV1::Value(ValueNotificationV1::Activation(meta)))
+            if meta.node == Some(button)
+    ));
+    click(&mut app, file);
+    app.step(0.016).unwrap();
+    let Some(ComponentNotificationV1::AttachmentAction(opened)) =
+        app.poll_component_notification_v1().unwrap()
+    else {
+        panic!("expected typed Open")
+    };
+    assert_eq!(opened.action, AttachmentAction::Open);
+    assert_eq!(opened.part, Some(AttachmentActionPart::Card));
+    assert_eq!(opened.source, Some(AttachmentActionSource::Pointer));
+    assert_eq!(opened.event_index, Some(1));
+    assert_eq!(opened.metadata.node, Some(file));
+    assert!(opened.metadata.frame > 0);
+    key(&mut app, Key::Enter);
+    app.step(0.016).unwrap();
+    assert!(matches!(
+        app.poll_value_notification_v1().unwrap(),
+        Some(ValueNotificationV1::Legacy(meta)) if meta.legacy.value == 1.
+    ));
+    key(&mut app, Key::Tab);
+    app.step(0.016).unwrap();
+    key(&mut app, Key::Enter);
+    app.step(0.016).unwrap();
+    let Some(ComponentNotificationV1::AttachmentAction(discard)) =
+        app.poll_component_notification_v1().unwrap()
+    else {
+        panic!("expected typed Remove")
+    };
+    assert_eq!(discard.action, AttachmentAction::Remove);
+    assert_eq!(discard.part, Some(AttachmentActionPart::Remove));
+    assert_eq!(discard.source, Some(AttachmentActionSource::Keyboard));
+    assert_eq!(discard.event_index, Some(0));
+    app.set_attachment_actions(file, AttachmentActions::default())
+        .unwrap();
+    click(&mut app, file);
+    app.step(0.016).unwrap();
+    assert!(app.poll_component_notification_v1().unwrap().is_none());
+    app.remove(file).unwrap();
+    assert_eq!(opened.metadata.handle, discard.metadata.handle);
+    assert!(opened.metadata.frame < discard.metadata.frame);
+    assert_eq!(opened.event_index, Some(1));
+}

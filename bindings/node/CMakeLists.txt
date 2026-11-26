@@ -659,3 +659,32 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
    ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/disclosure.test.cjs)
  endif()
 endif()
+
+add_test(NAME node_attachment_actions COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/attachment-actions.test.cjs)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ add_library(cui_node_attachment_action_provider SHARED test/attachment-actions-provider.c)
+ target_include_directories(cui_node_attachment_action_provider PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+ target_compile_options(cui_node_attachment_action_provider PRIVATE -Wall -Wextra -Wpedantic -Werror)
+ foreach(mode valid flags action part source index node frame legacy checked selected index-only source-only)
+  add_test(NAME node_attachment_actions_protocol_${mode} COMMAND ${CMAKE_COMMAND} -E env
+   LD_PRELOAD=$<TARGET_FILE:cui_node_attachment_action_provider> CUI_ATTACHMENT_FIXTURE=${mode}
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+   ${CMAKE_CURRENT_SOURCE_DIR}/test/attachment-actions-protocol.test.cjs)
+ endforeach()
+endif()
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_attachment_actions_types COMMAND ${CUI_NODE_TSC_EXECUTABLE}
+  --strict --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/attachment-actions.types.ts
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/attachment_actions.ts)
+endif()
+if(CUI_NODE_VERSION VERSION_GREATER_EQUAL "22.18")
+ add_test(NAME node_attachment_actions_types_example COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/attachment_actions.ts)
+endif()
+add_test(NAME node_attachment_actions_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/attachment-actions.cjs)

@@ -31,6 +31,8 @@ export class App {
   step_only(dt?: number): this;
   poll_notification_v1(): NotificationV1 | undefined;
   poll_value_notification_v1(): ValueNotificationV1 | undefined;
+  poll_component_notification_v1(): ComponentNotificationV1 | undefined;
+  supports_attachment_actions(): boolean;
 
   constructor(options?: AppOptions);
   set_window_visible(visible: boolean): this;
@@ -862,3 +864,14 @@ export interface App {
   supports_attachment_options(): boolean;
   supports_attachment_preview(): boolean;
 }
+
+export interface AttachmentActions {open?: boolean; remove?: boolean; retry?: boolean}
+export interface Attachment {attachment_actions(options?: AttachmentActions): this}
+export interface AttachmentActionNotificationV1 extends NotificationBaseV1 {
+  readonly kind: 'attachment-action';
+  readonly action: 'open' | 'remove' | 'retry';
+  readonly part: 'unknown' | 'card' | 'remove' | 'media-retry' | 'description-retry';
+  readonly source: 'pointer' | 'keyboard' | 'accessibility' | undefined;
+  readonly eventIndex: number | undefined;
+}
+export type ComponentNotificationV1 = ValueNotificationV1 | AttachmentActionNotificationV1;

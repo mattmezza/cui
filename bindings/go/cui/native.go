@@ -235,8 +235,8 @@ static cui_bridge_status go_poll_notification_v1(cui_bridge_app *app,
 }
 typedef cui_bridge_status (*notification_value_poll_fn)(cui_bridge_app *, uint32_t, uint32_t,
     cui_bridge_notification_v1 *, char *, uint32_t, uint32_t *);
-static cui_bridge_status go_poll_value_notification_v1(cui_bridge_app *app,
-    cui_bridge_notification_v1 *out, char *text, uint32_t capacity, uint32_t *required, uint32_t *enabled_out) {
+static cui_bridge_status go_value_notification_setup(uint32_t wanted, uint32_t required_mask,
+    notification_value_poll_fn *out_poll, uint32_t *enabled_out) {
  notification_query_fn size = NULL, versions = NULL, payloads = NULL;
  notification_value_poll_fn poll = NULL;
 #if defined(CUI_GO_STATIC)
@@ -261,17 +261,31 @@ static cui_bridge_status go_poll_value_notification_v1(cui_bridge_app *app,
  }
  if (!size || !versions || !payloads || !poll || !(versions() & 1u))
   return CUI_BRIDGE_BACKEND_UNAVAILABLE;
- if (size() != sizeof(*out)) return CUI_BRIDGE_INVALID_ARGUMENT;
- uint32_t enabled = payloads() & 28u;
- if (!enabled) return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+ if (size() != sizeof(cui_bridge_notification_v1)) return CUI_BRIDGE_INVALID_ARGUMENT;
+ uint32_t enabled = payloads() & wanted;
+ if (!enabled || (enabled & required_mask) != required_mask) return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+ *out_poll = poll;
  *enabled_out = enabled;
- return poll(app, (uint32_t)sizeof(*out), enabled, out, text, capacity, required);
+ return CUI_BRIDGE_OK;
+}
+static cui_bridge_status go_poll_value_notification_v1(cui_bridge_app *app,
+    cui_bridge_notification_v1 *out, char *text, uint32_t capacity, uint32_t *required,
+    uint32_t required_mask, uint32_t *enabled_out) {
+ notification_value_poll_fn poll;
+ uint32_t wanted = CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 |
+                   CUI_BRIDGE_VALUE_SELECTION_V1 | required_mask;
+ cui_bridge_status status = go_value_notification_setup(wanted, required_mask, &poll, enabled_out);
+ if (status != CUI_BRIDGE_OK) return status;
+ return poll(app, (uint32_t)sizeof(*out), *enabled_out, out, text, capacity, required);
 }
 static double go_notification_scalar(const cui_bridge_notification_v1 *n) { return n->payload.scalar_value; }
 static cui_bridge_node go_notification_selected(const cui_bridge_notification_v1 *n) { return n->payload.selected; }
 static uint32_t go_notification_boolean(const cui_bridge_notification_v1 *n) { return n->payload.boolean_value; }
 static cui_bridge_table_notification_v1 go_notification_table(const cui_bridge_notification_v1 *n) { return n->payload.table; }
 static uint32_t go_notification_surface(const cui_bridge_notification_v1 *n) { return n->payload.surface_result; }
+static cui_bridge_attachment_action_v1 go_notification_attachment(const cui_bridge_notification_v1 *n) {
+ return n->payload.attachment_action;
+}
 static int bridge_initialized;
 _Static_assert(sizeof(cui_bridge_box_shadow_v1)==24, "shadow V1 layer size");
 _Static_assert(sizeof(cui_bridge_box_shadows_v1)==224, "shadow V1 style size");
@@ -646,6 +660,7 @@ static cui_bridge_status (*attachment_configure)(cui_bridge_app *, cui_bridge_no
  const cui_bridge_attachment_config_v1 *);
 static cui_bridge_status (*attachment_preview)(cui_bridge_app *, cui_bridge_node,
  const uint8_t *, uint32_t, uint32_t, uint32_t, uint32_t);
+static cui_bridge_status (*attachment_set_actions)(cui_bridge_app *, cui_bridge_node, uint32_t);
 
 static void go_attachment_initialize(void) {
  if (bridge_lib) {
@@ -653,17 +668,29 @@ static void go_attachment_initialize(void) {
                           "cui_bridge_attachment_configure_v1");
   go_load_optional_symbol(&attachment_preview, sizeof attachment_preview,
                           "cui_bridge_attachment_set_preview_rgba_v1");
+  go_load_optional_symbol(&attachment_set_actions, sizeof attachment_set_actions,
+                          "cui_bridge_attachment_set_actions_v1");
  }
 #if defined(CUI_GO_STATIC)
  else {
   attachment_configure = cui_bridge_attachment_configure_v1;
   attachment_preview = cui_bridge_attachment_set_preview_rgba_v1;
+  attachment_set_actions = cui_bridge_attachment_set_actions_v1;
  }
 #endif
 }
 
 static int go_attachment_configure_supported(void) { return attachment_configure != NULL; }
 static int go_attachment_preview_supported(void) { return attachment_preview != NULL; }
+static int go_attachment_actions_supported(void) {
+ notification_value_poll_fn poll;
+ uint32_t enabled;
+ return attachment_set_actions && go_value_notification_setup(CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1,
+  CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1, &poll, &enabled) == CUI_BRIDGE_OK;
+}
+static cui_bridge_status go_attachment_set_actions(cui_bridge_app *app, cui_bridge_node node, uint32_t mask) {
+ return attachment_set_actions(app, node, mask);
+}
 static cui_bridge_status go_attachment_configure(cui_bridge_app *a, cui_bridge_node n,
  const cui_bridge_attachment_config_v1 *options) {
  return attachment_configure(a, n, options);
@@ -852,6 +879,7 @@ type Node struct {
 	hasAttachmentStatus                  bool
 	attachmentOptions                    *attachmentOptionsWire
 	attachmentPreview                    *attachmentPreview
+	attachmentActions                    AttachmentActions
 	imagePixels                          []byte
 	imageWidth, imageHeight, imageStride uint32
 	timeValue                            Time
@@ -2138,6 +2166,9 @@ func (a *App) Mount(root *Node) error {
 		if n.disclosureDivider != nil && C.go_disclosure_divider_supported() == 0 {
 			return ErrDisclosureOptionsUnavailable
 		}
+		if n.attachmentActions != 0 && C.go_attachment_actions_supported() == 0 {
+			return ErrAttachmentActionsUnavailable
+		}
 		if n.key == "" {
 			n.key = fmt.Sprintf("go-%p", n)
 		}
@@ -2458,6 +2489,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.attachmentOptions != nil {
 			if err := n.applyAttachmentOptions(n.attachmentOptions); err != nil {
+				return err
+			}
+		}
+		if n.attachmentActions != 0 {
+			if err := n.applyAttachmentActions(n.attachmentActions); err != nil {
 				return err
 			}
 		}
@@ -2843,15 +2879,23 @@ type ValueNotificationV1 struct {
 // PollValueNotificationV1 explicitly drains the shared queue without dispatching.
 // It negotiates known value categories; unavailable libraries never fall back.
 func (a *App) PollValueNotificationV1() (ValueNotificationV1, bool, error) {
-	if err := a.check(); err != nil {
+	raw, text, ok, err := a.readValueNotificationV1(0)
+	if !ok || err != nil {
 		return ValueNotificationV1{}, false, err
 	}
+	return a.decodeValueNotificationV1(raw, text)
+}
+
+func (a *App) readValueNotificationV1(requiredMask C.uint32_t) (C.cui_bridge_notification_v1, string, bool, error) {
 	var raw C.cui_bridge_notification_v1
+	if err := a.check(); err != nil {
+		return raw, "", false, err
+	}
 	var requiredCopy uint32
 	var enabled C.uint32_t
 	buffer, err := readNotificationTextV1(func(buffer []byte) (uint32, uint32, error) {
 		var required C.uint32_t
-		code := C.go_poll_value_notification_v1(a.ptr, &raw, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint32_t(len(buffer)), &required, &enabled)
+		code := C.go_poll_value_notification_v1(a.ptr, &raw, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint32_t(len(buffer)), &required, requiredMask, &enabled)
 		if code != C.CUI_BRIDGE_OK && code != C.CUI_BRIDGE_EMPTY && code != C.CUI_BRIDGE_CAPACITY {
 			return 0, 0, result(code)
 		}
@@ -2859,26 +2903,30 @@ func (a *App) PollValueNotificationV1() (ValueNotificationV1, bool, error) {
 		return uint32(code), uint32(required), nil
 	})
 	if err != nil || buffer == nil {
-		return ValueNotificationV1{}, false, err
+		return raw, "", false, err
 	}
 	if raw.struct_size != C.sizeof_cui_bridge_notification_v1 || raw.schema_version != 1 || uint64(raw.text_length) >= uint64(len(buffer)) || buffer[int(raw.text_length)] != 0 || raw.flags & ^C.uint32_t(1) != 0 {
-		return ValueNotificationV1{}, false, errors.New("invalid notification V1 layout/text/flags")
+		return raw, "", false, errors.New("invalid notification V1 layout/text/flags")
 	}
 	if requiredCopy != uint32(raw.text_length)+1 || raw.legacy.text_length != raw.text_length ||
 		raw.legacy.frame_sequence != raw.frame_sequence || raw.legacy.node != raw.node || C.uint32_t(raw.legacy._type) != raw.kind ||
 		raw.kind < 1 || raw.kind > 3 || ((raw.flags&1 != 0) != (raw.frame_sequence != 0)) {
-		return ValueNotificationV1{}, false, errors.New("invalid value notification V1 metadata")
+		return raw, "", false, errors.New("invalid value notification V1 metadata")
+	}
+	if ((raw.payload_kind >= 2 && raw.payload_kind <= 4) || raw.payload_kind == C.CUI_BRIDGE_PAYLOAD_ATTACHMENT_ACTION) && uint32(enabled)&(1<<uint32(raw.payload_kind)) == 0 {
+		return raw, "", false, errors.New("unnegotiated value notification V1 payload")
 	}
 	text := string(buffer[:int(raw.text_length)])
 	if !utf8.ValidString(text) {
-		return ValueNotificationV1{}, false, errors.New("invalid notification V1 UTF-8")
+		return raw, "", false, errors.New("invalid notification V1 UTF-8")
 	}
+	return raw, text, true, nil
+}
+
+func (a *App) decodeValueNotificationV1(raw C.cui_bridge_notification_v1, text string) (ValueNotificationV1, bool, error) {
 	old := raw.legacy
 	out := ValueNotificationV1{Handle: Handle{uint32(raw.node.slot), uint32(raw.node.generation)}, Node: a.nodes[keyID(raw.node)], NodeKind: uint32(raw.node_kind), Frame: uint64(raw.frame_sequence), HasFrame: raw.flags&1 != 0,
 		Legacy: LegacySnapshotV1{Type: uint32(old._type), Handle: Handle{uint32(old.node.slot), uint32(old.node.generation)}, Frame: uint64(old.frame_sequence), CheckedRaw: uint32(old.checked), Value: float64(old.value), Text: text, SelectedHandle: Handle{uint32(old.selected.slot), uint32(old.selected.generation)}}}
-	if raw.payload_kind >= 2 && raw.payload_kind <= 4 && uint32(enabled)&(1<<uint32(raw.payload_kind)) == 0 {
-		return ValueNotificationV1{}, false, errors.New("unnegotiated value notification V1 payload")
-	}
 	switch raw.payload_kind {
 	case C.CUI_BRIDGE_PAYLOAD_NONE:
 		if raw.kind != C.CUI_BRIDGE_NOTIFY_ACTIVATE {
@@ -3763,6 +3811,55 @@ func (a *App) SupportsAttachmentPreview() (bool, error) {
 		return false, err
 	}
 	return C.go_attachment_preview_supported() != 0, nil
+}
+
+// SupportsAttachmentActions reports whether the bridge has the optional producer and V1 queue view.
+func (a *App) SupportsAttachmentActions() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_attachment_actions_supported() != 0, nil
+}
+
+func (n *Node) applyAttachmentActions(actions AttachmentActions) error {
+	ok, err := n.app.SupportsAttachmentActions()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrAttachmentActionsUnavailable
+	}
+	return result(C.go_attachment_set_actions(n.app.ptr, n.handle, C.uint32_t(actions)))
+}
+
+// PollComponentNotificationV1 drains one event from the same queue as Dispatch and
+// PollValueNotificationV1, adding the negotiated AttachmentAction view.
+func (a *App) PollComponentNotificationV1() (ComponentNotificationV1, bool, error) {
+	var notice ComponentNotificationV1
+	ok, err := a.SupportsAttachmentActions()
+	if err != nil {
+		return notice, false, err
+	}
+	if !ok {
+		return notice, false, ErrAttachmentActionsUnavailable
+	}
+	raw, text, ok, err := a.readValueNotificationV1(C.CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1)
+	if !ok || err != nil {
+		return notice, false, err
+	}
+	if raw.payload_kind == C.CUI_BRIDGE_PAYLOAD_ATTACHMENT_ACTION {
+		action, err := decodeAttachmentAction(raw, C.go_notification_attachment(&raw), a.nodes[keyID(raw.node)])
+		if err != nil {
+			return notice, false, err
+		}
+		notice.AttachmentAction = &action
+		return notice, true, nil
+	}
+	value, ok, err := a.decodeValueNotificationV1(raw, text)
+	if ok && err == nil {
+		notice.Value = &value
+	}
+	return notice, ok, err
 }
 
 func (n *Node) applyAttachmentOptions(options *attachmentOptionsWire) error {

@@ -74,10 +74,14 @@ class _DataTableLoadMoreV1(C.Structure):
                  "reserved")]
 
 
+class _AttachmentActionV1(C.Structure):
+    _fields_ = [(name, C.c_uint32) for name in ("action", "part", "source", "flags", "event_index")]
+
+
 class _NotificationValueV1(C.Union):
     _fields_ = [("boolean_value", C.c_uint32), ("scalar_value", C.c_double),
                 ("selected", _Handle), ("table", _TableNotificationV1),
-                ("surface_result", C.c_uint32)]
+                ("surface_result", C.c_uint32), ("attachment_action", _AttachmentActionV1)]
 
 
 class _NotificationV1(C.Structure):
@@ -475,6 +479,18 @@ class SelectionChangeNotificationV1(NotificationV1):
 
 ValueNotificationV1 = (NotificationV1 | ScalarChangeNotificationV1 |
                        TextChangeNotificationV1 | SelectionChangeNotificationV1)
+
+
+@dataclass(frozen=True)
+class AttachmentActionNotificationV1(NotificationV1):
+    action: Literal["open", "remove", "retry"]
+    part: Literal["unknown", "card", "remove", "media-retry", "description-retry"]
+    source: Literal["pointer", "keyboard", "accessibility"] | None
+    event_index: int | None
+    kind: ClassVar[Literal["attachment-action"]] = "attachment-action"
+
+
+ComponentNotificationV1 = ValueNotificationV1 | AttachmentActionNotificationV1
 
 
 class Widget:
@@ -1020,6 +1036,10 @@ class Widget:
         result = C.c_double()
         self._change("get_value",C.byref(result))
         return result.value
+
+    def attachment_actions(self, *, open: bool = False, remove: bool = False, retry: bool = False) -> "Widget":
+        from .attachment_actions import configure
+        return configure(self, open, remove, retry)
 
     def attachment_options(self, options: AttachmentOptions | None) -> "Widget":
         from .attachment_options import configure
@@ -2053,6 +2073,8 @@ class App:
             disclosure_preflight(node, parent, self)
             from .attachment_options import preflight as attachment_preflight
             attachment_preflight(node, self)
+            from .attachment_actions import preflight as actions_preflight
+            actions_preflight(node, self)
             if node.kind == "slider_model":
                 if not isinstance(node, SliderModel):
                     raise TypeError("use slider_model() for the controlled route")
@@ -2206,6 +2228,8 @@ class App:
                     node._change("set_design_size", _SIZE[node._design_size])
                 from .attachment_options import mount as attachment_mount
                 attachment_mount(node)
+                from .attachment_actions import mount as actions_mount
+                actions_mount(node)
                 if node._shadow_style is not None:
                     wire = node._shadow_style._wire(self._api)
                     node._change("set_box_shadows_v1",224,C.byref(wire))
@@ -2450,7 +2474,21 @@ class App:
             else:
                 yield LegacyNotificationV1(*common, self._by_handle.get(selected))
 
+    def supports_attachment_actions(self) -> bool:
+        from .attachment_actions import supported
+        return supported(self)
+
+    def poll_component_notifications_v1(self) -> Iterator[ComponentNotificationV1]:
+        """Consume owned component snapshots from the shared FIFO, without callbacks."""
+        if not self.supports_attachment_actions():
+            raise BridgeError(9, "Attachment actions unavailable")
+        yield from self._poll_value_notifications_v1(True)
+
     def poll_value_notifications_v1(self) -> Iterator[ValueNotificationV1]:
+        """Drain the shared queue using the original V1 value notification types."""
+        yield from self._poll_value_notifications_v1(False)
+
+    def _poll_value_notifications_v1(self, attachment_actions: bool):
         """Owning opt-in value views on the shared queue; never dispatch callbacks.
 
         Requires optional value symbols and exact V1 layout. Requests only known
@@ -2470,8 +2508,9 @@ class App:
             query.restype = C.c_uint32
         if not (versions() & 1) or size() != C.sizeof(_NotificationV1):
             raise BridgeError(8, "V1 value notification capability/layout mismatch")
-        mask = categories() & ((1 << 2) | (1 << 3) | (1 << 4))
-        if not mask:
+        action_category = (1 << 8) if attachment_actions else 0
+        mask = categories() & ((1 << 2) | (1 << 3) | (1 << 4) | action_category)
+        if not mask or (mask & action_category) != action_category:
             raise BridgeError(9, "V1 value notification categories unavailable")
         poll.restype = C.c_int
         poll.argtypes = [C.c_void_p, C.c_uint32, C.c_uint32, C.POINTER(_NotificationV1),
@@ -2515,10 +2554,26 @@ class App:
             tag = raw.payload_kind
             if ((tag == 0 and raw.kind != 1) or
                     (tag in (1, 2, 3, 4, 5) and raw.kind != 2) or
-                    (tag == 6 and raw.kind != 3) or tag not in range(8) or
+                    (tag == 6 and raw.kind != 3) or tag not in range(9 if attachment_actions else 8) or
+                    (tag == 8 and (not mask & (1 << 8) or raw.kind != 1)) or
                     (tag in (2, 3, 4) and not mask & (1 << tag))):
                 raise BridgeError(8, "invalid V1 value notification kind/tag")
-            if tag == 0:
+            if tag == 8:
+                a = raw.payload.attachment_action
+                if (raw.node_kind != 52 or not raw.node.slot or not raw.node.generation or
+                        raw.text_length or raw.legacy.checked or selected != (0, 0) or
+                        not raw.flags & 1 or a.action not in (1, 2, 4) or
+                        raw.legacy.value != a.action or a.part not in range(5) or a.flags & ~6 or
+                        (a.part and a.part not in {1: (1,), 2: (2,), 4: (3, 4)}[a.action]) or
+                        (bool(a.flags & 4) != (a.source in (2, 3, 4))) or
+                        (not a.flags & 4 and a.source != 0) or
+                        (not a.flags & 2 and a.event_index != 0)):
+                    raise BridgeError(8, "invalid Attachment action evidence")
+                yield AttachmentActionNotificationV1(*common, {1: "open", 2: "remove", 4: "retry"}[a.action],
+                    ("unknown", "card", "remove", "media-retry", "description-retry")[a.part],
+                    {2: "pointer", 3: "keyboard", 4: "accessibility"}.get(a.source),
+                    a.event_index if a.flags & 2 else None)
+            elif tag == 0:
                 yield ActivationNotificationV1(*common)
             elif tag == 1:
                 if raw.payload.boolean_value > 1:
@@ -2869,3 +2924,5 @@ __all__ += ["DisclosureTitleState", "DisclosureTitleStyle"]
 
 from .attachment_options import AttachmentOptions, AttachmentTextStyle, AttachmentStatus
 __all__ += ["AttachmentOptions", "AttachmentTextStyle", "AttachmentStatus"]
+
+__all__ += ["AttachmentActionNotificationV1", "ComponentNotificationV1"]

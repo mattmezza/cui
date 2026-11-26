@@ -195,3 +195,125 @@ func (n *Node) ClearAttachmentPreview() error {
 	n.attachmentPreview = nil
 	return nil
 }
+
+// AttachmentActions enables independent Open, Remove and Retry controls.
+// Each notification carries exactly one of these bits.
+type AttachmentActions uint32
+
+const (
+	AttachmentOpen       AttachmentActions = C.CUI_BRIDGE_ATTACHMENT_OPEN_V1
+	AttachmentRemove     AttachmentActions = C.CUI_BRIDGE_ATTACHMENT_REMOVE_V1
+	AttachmentRetry      AttachmentActions = C.CUI_BRIDGE_ATTACHMENT_RETRY_V1
+	AttachmentAllActions                   = AttachmentOpen | AttachmentRemove | AttachmentRetry
+)
+
+// AttachmentActionPart identifies the input control when its origin is known.
+type AttachmentActionPart uint32
+
+const (
+	AttachmentPartUnknown          AttachmentActionPart = C.CUI_BRIDGE_ATTACHMENT_ACTION_PART_UNKNOWN_V1
+	AttachmentPartCard             AttachmentActionPart = C.CUI_BRIDGE_ATTACHMENT_ACTION_PART_CARD_V1
+	AttachmentPartRemove           AttachmentActionPart = C.CUI_BRIDGE_ATTACHMENT_ACTION_PART_REMOVE_V1
+	AttachmentPartMediaRetry       AttachmentActionPart = C.CUI_BRIDGE_ATTACHMENT_ACTION_PART_MEDIA_RETRY_V1
+	AttachmentPartDescriptionRetry AttachmentActionPart = C.CUI_BRIDGE_ATTACHMENT_ACTION_PART_DESCRIPTION_RETRY_V1
+)
+
+// AttachmentActionSource records the source of accepted input, when known.
+type AttachmentActionSource uint32
+
+const (
+	AttachmentSourceUnknown       AttachmentActionSource = C.CUI_BRIDGE_ACTIVATION_SOURCE_UNKNOWN_V1
+	AttachmentSourcePointer       AttachmentActionSource = C.CUI_BRIDGE_ACTIVATION_SOURCE_POINTER_V1
+	AttachmentSourceKeyboard      AttachmentActionSource = C.CUI_BRIDGE_ACTIVATION_SOURCE_KEYBOARD_V1
+	AttachmentSourceAccessibility AttachmentActionSource = C.CUI_BRIDGE_ACTIVATION_SOURCE_ACCESSIBILITY_V1
+)
+
+// AttachmentActionNotificationV1 owns the action and its historical evidence.
+// Node is an optional live reference. EventIndex is local to Frame.
+type AttachmentActionNotificationV1 struct {
+	Handle     Handle
+	Node       *Node
+	Frame      uint64
+	Action     AttachmentActions
+	Part       AttachmentActionPart
+	Source     AttachmentActionSource
+	EventIndex *uint32
+}
+
+// ComponentNotificationV1 is the opt-in view of the shared event queue. For
+// each successfully polled event, exactly one field is nonnil.
+type ComponentNotificationV1 struct {
+	Value            *ValueNotificationV1
+	AttachmentAction *AttachmentActionNotificationV1
+}
+
+var ErrAttachmentActionsUnavailable = errors.New("typed Attachment actions require a newer CUI bridge")
+
+// AttachmentActions enables the specified independent controls in a builder chain.
+func (n *Node) AttachmentActions(actions AttachmentActions) *Node {
+	if n.err == nil {
+		n.err = n.SetAttachmentActions(actions)
+	}
+	return n
+}
+
+// SetAttachmentActions enables these actions or clears them all with zero.
+// File operations and lifecycle state belong to the app.
+func (n *Node) SetAttachmentActions(actions AttachmentActions) error {
+	if n == nil || n.removed || n.kind != C.CUI_BRIDGE_ATTACHMENT {
+		return errors.New("actions require a live Attachment")
+	}
+	if actions & ^AttachmentAllActions != 0 {
+		return errors.New("invalid Attachment action mask")
+	}
+	if n.app != nil {
+		if err := n.applyAttachmentActions(actions); err != nil {
+			return err
+		}
+	}
+	n.attachmentActions = actions
+	return nil
+}
+
+func decodeAttachmentAction(raw C.cui_bridge_notification_v1, wire C.cui_bridge_attachment_action_v1, node *Node) (AttachmentActionNotificationV1, error) {
+	var out AttachmentActionNotificationV1
+	const hasIndex = C.CUI_BRIDGE_ACTIVATION_HAS_INDEX_V1
+	const hasSource = C.CUI_BRIDGE_ACTIVATION_HAS_SOURCE_V1
+	if raw.kind != C.CUI_BRIDGE_NOTIFY_ACTIVATE || raw.node_kind != C.CUI_BRIDGE_ATTACHMENT || raw.frame_sequence == 0 ||
+		raw.node.slot == 0 || raw.node.generation == 0 || raw.text_length != 0 || raw.legacy.checked != 0 ||
+		raw.legacy.selected != (C.cui_bridge_node{}) || float64(raw.legacy.value) != float64(wire.action) ||
+		wire.flags & ^C.uint32_t(hasIndex|hasSource) != 0 {
+		return out, errors.New("invalid Attachment action V1 metadata")
+	}
+	action, part, source := AttachmentActions(wire.action), AttachmentActionPart(wire.part), AttachmentActionSource(wire.source)
+	switch action {
+	case AttachmentOpen:
+		if part != AttachmentPartUnknown && part != AttachmentPartCard {
+			return out, errors.New("invalid Attachment Open part")
+		}
+	case AttachmentRemove:
+		if part != AttachmentPartUnknown && part != AttachmentPartRemove {
+			return out, errors.New("invalid Attachment Remove part")
+		}
+	case AttachmentRetry:
+		if part != AttachmentPartUnknown && part != AttachmentPartMediaRetry && part != AttachmentPartDescriptionRetry {
+			return out, errors.New("invalid Attachment Retry part")
+		}
+	default:
+		return out, errors.New("invalid Attachment action V1 value")
+	}
+	hasKnownSource := source >= AttachmentSourcePointer && source <= AttachmentSourceAccessibility
+	if (wire.flags&hasSource != 0 && !hasKnownSource) || (wire.flags&hasSource == 0 && source != AttachmentSourceUnknown) ||
+		(wire.flags&hasIndex == 0 && wire.event_index != 0) {
+		return out, errors.New("invalid Attachment action V1 evidence")
+	}
+	out = AttachmentActionNotificationV1{
+		Handle: Handle{uint32(raw.node.slot), uint32(raw.node.generation)}, Node: node,
+		Frame: uint64(raw.frame_sequence), Action: action, Part: part, Source: source,
+	}
+	if wire.flags&hasIndex != 0 {
+		index := uint32(wire.event_index)
+		out.EventIndex = &index
+	}
+	return out, nil
+}

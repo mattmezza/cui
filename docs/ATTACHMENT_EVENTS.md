@@ -127,7 +127,53 @@ Extended views carry the numeric action code in `legacy.value` or
 `cui_bridge_event_ex.value`.
 
 For dynamic loading, check the setter and
-`CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1` separately. Older language helpers know
-their existing notification categories. The new action setter and typed
-Attachment payload are available directly through C. Language authoring,
-custom retained slots, and physical accessibility verification remain open.
+`CUI_BRIDGE_VALUE_ATTACHMENT_ACTION_V1` separately. The existing V1 record
+retains its layout. Custom retained slots and physical accessibility
+verification remain open.
+
+## Retained actions from language builders
+
+Probe `supports_attachment_actions()` in Python, JS/TS or Rust, or
+`SupportsAttachmentActions()` in Go. The probe checks the writer and the
+shared queue's layout, version and Attachment category. On an older bridge,
+leave the card passive and use the existing value poll or dispatch. The new
+poll reports unavailable before touching the queue.
+
+| Language | Enable actions on the card | Read the event after stepping |
+| --- | --- | --- |
+| Python | `card.attachment_actions(open=True, remove=True, retry=True)` | `app.poll_component_notifications_v1()` yields values and `AttachmentActionNotificationV1` records. |
+| JS/TS | `card.attachment_actions({ open: true, remove: true, retry: true })` | `app.poll_component_notification_v1()` returns an ordinary value or a record with `kind === 'attachment-action'`, or `undefined` when empty. |
+| Go | `card.AttachmentActions(cui.AttachmentAllActions)` | `app.PollComponentNotificationV1()` returns the event, presence and error. Inspect `AttachmentAction` or `Value`. |
+| Rust | `builder.attachment_actions(AttachmentActions::ALL)?` | `app.poll_component_notification_v1()?` returns `Option<ComponentNotificationV1>` with `AttachmentAction` or `Value`. |
+
+Each call replaces the three choices. Use `card.attachment_actions()` in
+Python and JavaScript, `card.SetAttachmentActions(0)` in Go, or
+`app.set_attachment_actions(card, AttachmentActions::default())?` in Rust to
+clear them. Do this between frames. Polling returns copied action evidence and
+a historical frame and handle. A resolved node is a reference to a live object.
+An ambiguous input has no source or event index. JavaScript and TypeScript
+carry the full frame as `bigint`.
+
+Use `app.step()` in Python, `app.step_only()` in JavaScript and TypeScript,
+`app.Step(dt)` in Go, or `app.step(dt)?` in Rust to advance the UI without
+consuming its event queue. Then drain the component poll and handle ordinary
+app events there too. Existing automatic dispatch consumes the same records.
+Keep each side effect in one path. The built-in language runners continue to
+use the existing dispatch contract. Typed reads belong to a manually stepped
+loop. The examples below inject input headlessly and apply file actions after
+polling. They show how the app can update status or remove a card.
+
+Build the bridge and, for JavaScript and TypeScript, the Node addon. Set the
+paths for your platform from the [language-builder instructions](BRIDGE_COMPONENTS.md#show-an-attachment-preview-in-a-language-builder). Then run the examples from the repository root on Linux.
+
+```sh
+PYTHONPATH=bindings/python python bindings/python/examples/attachment_actions.py
+node bindings/node/examples/attachment-actions.cjs
+node bindings/typescript/examples/attachment_actions.ts
+(cd bindings/go && go run -tags cui_dynamic ./examples/attachment_actions)
+cargo run --manifest-path bindings/rust/Cargo.toml --example attachment_actions
+```
+
+Use Node with built-in TypeScript stripping for the TypeScript example. The
+[TypeScript type check](../bindings/node/test/attachment-actions.types.ts)
+shows how to narrow the union. It uses the same runtime as the JavaScript example.

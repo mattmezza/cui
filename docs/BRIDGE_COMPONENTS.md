@@ -649,6 +649,9 @@ on supported hosts. For a native SDL window, use a bridge built with SDL support
 and pass `--font /path/to/font.ttf` to the Go example or
 `-- /path/to/font.ttf` after the Rust example name.
 
+See [retained Attachment actions](ATTACHMENT_EVENTS.md#retained-actions-from-language-builders)
+for optional Open, Remove and Retry builders and runnable event examples.
+
 ### Style retained Accordion and Collapsible from C
 
 Create an Accordion with direct Item children and place each panel's content

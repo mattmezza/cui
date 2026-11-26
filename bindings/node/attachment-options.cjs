@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 'use strict';
 module.exports = function(native, Node, key, statuses) {
+  const actions = Symbol('Attachment actions');
   const config = Symbol('Attachment configuration');
   const preview = Symbol('Attachment preview');
   const little = require('node:os').endianness() === 'LE';
@@ -146,9 +147,27 @@ module.exports = function(native, Node, key, statuses) {
     return this;
   };
 
+  Node.prototype.attachment_actions = function(options = {}) {
+    target(this);
+    if (!options || typeof options !== 'object' || Array.isArray(options) ||
+        Object.keys(options).some(key => !['open','remove','retry'].includes(key))) throw new TypeError('invalid Attachment actions');
+    let mask = 0;
+    ['open','remove','retry'].forEach((name, index) => {
+      const value = Object.hasOwn(options,name) ? options[name] : false;
+      if (typeof value !== 'boolean') throw new TypeError('Attachment choices must be boolean');
+      if (value) mask |= 1 << index;
+    });
+    if (this.owner) {
+      if (!this.owner.supports_attachment_actions()) throw new Error('Attachment actions unavailable');
+      native.attachmentActions(this.owner.handle, this[key], mask);
+    }
+    this[actions] = mask || undefined;
+    return this;
+  };
   return {
     supports,
     preflight(app, node) {
+      if (node[actions] !== undefined && !app.supports_attachment_actions()) throw new Error("Attachment actions unavailable");
       for (const [field, pixels] of [[config, false], [preview, true]]) {
         if (node[field] && !supports(app, pixels)) {
           throw new Error('Attachment requires optional bridge symbol');
@@ -157,6 +176,7 @@ module.exports = function(native, Node, key, statuses) {
       for (const child of node.childrenValue) this.preflight(app, child);
     },
     mount(app, node) {
+      if (node[actions] !== undefined) native.attachmentActions(app.handle,node[key],node[actions]);
       if (node[config]) apply(node, node[config]);
       if (node[preview]) apply(node, node[preview], true);
     },

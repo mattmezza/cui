@@ -87,3 +87,19 @@ Localized TimeField authoring is documented in
 [the dedicated guide](../../docs/NODE_TIME_FIELD_LOCALIZED.md), with complete
 English/Arabic JS and TS UI examples. This unreleased optional group passed the focused Linux worker gates; root
 integration and generated resources remain pending. Legacy `time_field()` remains unchanged.
+
+Retained Attachment built-in actions are optional. Check
+`app.supports_attachment_actions()` before mounting a card configured with
+`.attachment_actions({open: true, remove: true, retry: true})`. Each call replaces
+the choices; `.attachment_actions()` clears them, including on a live card.
+These actions are independent of presentation options and previews.
+
+Use `app.step_only()` and manually drain `app.poll_component_notification_v1()`.
+This owned shared-FIFO view includes all existing value notifications and
+`kind: 'attachment-action'` with typed `action`, `part`, optional `source` and
+`eventIndex`. Its common `frame` is a BigInt and `handle` includes slot and
+generation. Perform application file work once after polling. Legacy polls
+consume the same FIFO and downgrade actions; `run`, `step` and callback dispatch
+keep their existing behavior. Unsupported typed calls fail without draining.
+Try `CUI_NODE_ADDON=/path/to/cui.node node bindings/node/examples/attachment-actions.cjs`
+from the repository root for real keyboard actions in a headless authored UI.

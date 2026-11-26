@@ -163,10 +163,36 @@ int main(void) {
     page_is(app, pager, 13, true);
     assert(!semantic(app, CUI_ROLE_MENU, "Pages suivantes"));
 
+    float custom = -1;
+    assert(cui_bridge_pagination_get_custom_size(app, pager, &custom) == CUI_BRIDGE_OK &&
+           custom == 0);
+    assert(cui_bridge_pagination_set_custom_size(app, root, 45.5f) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_pagination_get_custom_size(app, root, &custom) == CUI_BRIDGE_INVALID_STATE &&
+           custom == 0);
+    assert(cui_bridge_pagination_get_custom_size(app, pager, NULL) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_pagination_set_custom_size(app, pager, 45.5f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_pagination_set_custom_size(app, pager, NAN) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_pagination_set_custom_size(app, pager, 513) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_pagination_get_custom_size(app, pager, &custom) == CUI_BRIDGE_OK &&
+           custom == 45.5f);
+    cui_bridge_pagination_config_v1 copied_config = empty_config();
+    assert(cui_bridge_pagination_get_config_v1(app, pager, &copied_config) == CUI_BRIDGE_OK);
+    assert(!memcmp(&copied_config, &out, sizeof out));
+    step(app);
+    assert(part(app, pager, 3).height == 45.5f);
+    page_is(app, pager, 13, false);
+    press(app, part(app, pager, 3));
+    step(app);
+    page_is(app, pager, 14, true);
+
+    assert(cui_bridge_pagination_set_custom_size(app, pager, 0) == CUI_BRIDGE_OK);
+    step(app);
+    assert(part(app, pager, 3).height == 56);
+    page_is(app, pager, 14, false);
     press(app, part(app, pager, 3));
     assert(cui_bridge_set_disabled(app, pager, 1) == CUI_BRIDGE_OK);
     step(app);
-    page_is(app, pager, 13, false);
+    page_is(app, pager, 14, false);
     assert(cui_bridge_set_disabled(app, pager, 0) == CUI_BRIDGE_OK);
     assert(cui_bridge_pagination_configure_v1(app, pager, NULL) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_design_size(app, pager, CUI_BRIDGE_SIZE_INHERIT) == CUI_BRIDGE_OK);
@@ -176,13 +202,22 @@ int main(void) {
     step(app);
     assert(semantic(app, CUI_ROLE_BUTTON, "Previous") && semantic(app, CUI_ROLE_BUTTON, "First"));
 
+    assert(cui_bridge_pagination_set_custom_size(app, pager, 48) == CUI_BRIDGE_OK);
+    step(app);
+    assert(part(app, pager, 3).height == 48); /* No V1 configuration required. */
+    assert(cui_bridge_pagination_get_config_v1(app, pager, &out) == CUI_BRIDGE_EMPTY);
+    page_is(app, pager, 14, false);
     assert(cui_bridge_pagination_configure_v1(app, pager, &out) == CUI_BRIDGE_OK);
     assert(cui_bridge_node_remove(app, pager) == CUI_BRIDGE_OK);
+    assert(cui_bridge_pagination_get_custom_size(app, pager, &custom) == CUI_BRIDGE_STALE_HANDLE &&
+           custom == 45.5f);
     assert(!bridge_pagination_node(app, pager.slot));
     assert(cui_bridge_pagination_get_config_v1(app, pager, &out) == CUI_BRIDGE_STALE_HANDLE);
     cui_bridge_node replacement = create(app, root, CUI_BRIDGE_PAGINATION, "pager");
     assert(replacement.slot == pager.slot && replacement.generation != pager.generation);
     assert(cui_bridge_pagination_get_config_v1(app, replacement, &out) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_pagination_get_custom_size(app, replacement, &custom) == CUI_BRIDGE_OK &&
+           custom == 0);
     assert(cui_bridge_pagination_configure_v1(app, replacement, &out) == CUI_BRIDGE_OK);
     cui_bridge_destroy(app);
     return 0;

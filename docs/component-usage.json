@@ -722,12 +722,14 @@
         "cui_base_pagination_events_ex",
         "cui_pagination_visible_items",
         "cui_bridge_pagination_configure_v1",
-        "cui_bridge_pagination_get_config_v1"
+        "cui_bridge_pagination_get_config_v1",
+        "cui_bridge_pagination_set_custom_size",
+        "cui_bridge_pagination_get_custom_size"
       ],
       "state_types": [],
       "state_ownership": "Caller retains size_t page.",
       "interaction": "Returns the page-change result and optionally notifies a synchronous aggregate observer.",
-      "usage": "Use cui_pagination_ex with cui_pagination_options for shared sizes, responsive rows, a numbered window with optional jump menus, localized labels and hover hints for chevrons.",
+      "usage": "Use cui_pagination_ex with cui_pagination_options for named or custom control heights, responsive rows, a numbered window with optional jump menus, localized labels and hover hints for chevrons.",
       "docs": [
         "docs/NUMERIC.md",
         "docs/NUMERIC_SELECTION_EVENTS.md",

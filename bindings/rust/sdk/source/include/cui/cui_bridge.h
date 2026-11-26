@@ -244,6 +244,14 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_pagination_configure_v1(
 /* Caller initializes size and schema. EMPTY if no override. Errors leave out untouched. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_pagination_get_config_v1(
     cui_bridge_app *, cui_bridge_node, cui_bridge_pagination_config_v1 *);
+/* Optional entry points, independent of the V1 wire and named design size.
+ * Owner thread outside step. Set [1,512] logical px to override named sizing,
+ * or zero to restore it. No change event. Get returns zero when cleared;
+ * errors leave out untouched. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_pagination_set_custom_size(cui_bridge_app *,
+                                                                       cui_bridge_node, float);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_pagination_get_custom_size(cui_bridge_app *,
+                                                                       cui_bridge_node, float *);
 /* Unreleased controlled Slider V1. Independent request FIFO; old Slider scalar
  * setters/events/CHANGE/autocommit are unchanged. All records own their values,
  * contain no pointers and require exact size/schema1/reserved0. New language

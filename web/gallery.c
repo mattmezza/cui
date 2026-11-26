@@ -1934,6 +1934,7 @@ static double number = 42;
 static size_t page_number = 3, current_step;
 static unsigned pagination_mode, pagination_visible_pages = 5;
 static bool pagination_french;
+static float pagination_custom_size;
 static const cui_pagination_labels pagination_labels_fr = {
     .group = CUI_STR("Pages de résultats"),
     .first = CUI_STR("Première"),
@@ -6756,6 +6757,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_pagination_ex(ui, cui_id_from(ui, "pagination"), &t, &page_number, 20,
                           (cui_pagination_options){
                               .compact = pagination_mode == 0,
+                              .custom_size = pagination_custom_size,
                               .disabled = disabled,
                               .design_size = design_size,
                               .available_width = fmaxf(1, width - 48),
@@ -8083,10 +8085,16 @@ int gallery_checkbox_state(int state) {
         check_state = (cui_check_state)state;
     return check_state;
 }
-void gallery_pagination_options(unsigned mode, unsigned visible_pages, bool french) {
+void gallery_pagination_options(unsigned mode, unsigned visible_pages, bool french,
+                                float custom_size) {
     pagination_mode = mode <= 3 ? mode : 0;
     pagination_visible_pages = visible_pages;
     pagination_french = french;
+    pagination_custom_size = isfinite(custom_size) &&
+                                     custom_size >= CUI_PAGINATION_MIN_CUSTOM_SIZE &&
+                                     custom_size <= CUI_PAGINATION_MAX_CUSTOM_SIZE
+                                 ? custom_size
+                                 : 0;
 }
 void gallery_design_options(int size, int radius, float spacing) {
     design_size = size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL ? (cui_design_size)size

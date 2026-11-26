@@ -28,3 +28,5 @@
 
 .video-host-status{margin:0;padding:12px 20px;color:var(--muted);font-size:.875rem;overflow-wrap:anywhere}
 #video-player-stage:fullscreen{width:100vw;height:100dvh;margin:0;padding:0;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center}#video-player-stage:fullscreen canvas{width:100%;height:100%;max-width:none}
+
+#pagination-height{width:5.5em;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--text)}

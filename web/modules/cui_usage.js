@@ -4,7 +4,8 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
  'CUI_DESIGN_2XL', 'CUI_DESIGN_3XL', 'CUI_DESIGN_4XL', 'CUI_DESIGN_5XL',
  'CUI_DESIGN_6XL', 'CUI_DESIGN_7XL', 'CUI_DESIGN_8XL', 'CUI_DESIGN_9XL'];
 
-export function paginationUsage(size, disabled = false, mode = 0, visiblePages = 5, french = false) {
+export function paginationUsage(size, disabled = false, mode = 0, visiblePages = 5, french = false, customSize = 0) {
+ const custom = customSize ? `,\n                                 .custom_size = ${Number.isInteger(customSize) ? customSize.toFixed(1) : customSize}f` : '';
  const numbered = mode === 1 || mode === 3;
  const arrows = mode === 2 || mode === 3;
  const layout = mode === 2 ? '.icon_only = true' :
@@ -27,7 +28,7 @@ bool draw_results_pages(cui_context *ui, cui_id id, const cui_theme *theme,
     return cui_pagination_ex(ui, id, theme, page, total_pages,
         (cui_pagination_options){${layout}, .disabled = ${disabled},
                                  .design_size = ${sizes[size] || 'CUI_DESIGN_BASE'},
-                                 .available_width = content_width${navigation}${tooltip}${french ? ',\n                                 .labels = &labels' : ''}});
+                                 .available_width = content_width${custom}${navigation}${tooltip}${french ? ',\n                                 .labels = &labels' : ''}});
 }`;
 }
 

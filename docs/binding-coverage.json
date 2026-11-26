@@ -320,7 +320,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The retained C V1 bridge and all five language bindings expose design and navigation options. Retained bindings dispatch the scalar event after the frame. Synchronous typed aggregate observation is available in immediate C."
+        "The retained C V1 bridge and all five language bindings expose named sizes and navigation options. Numeric custom height is available in immediate C, the retained C bridge and the WASM gallery. Retained bindings dispatch the scalar event after the frame. Synchronous typed aggregate observation is available in immediate C."
       ]
     },
     {

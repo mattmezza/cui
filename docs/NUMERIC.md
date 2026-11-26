@@ -30,6 +30,8 @@ Set `.icon_only = true` to show just Previous and Next with SVG chevrons. Both b
 
 Use `cui_pagination_ex` with `cui_pagination_options` for the shared XS through 9XL sizing and single-line labels. BASE and MD are equivalent. INHERIT uses theme metrics. A positive `available_width` wraps between whole items in navigation order. Supply the current container's inner width in logical pixels each frame. Zero keeps one row. An item wider than the available width keeps its natural width, so provide a sufficiently wide or horizontally scrollable parent for extreme sizes and long page counts. The counter aligns with the controls in its row.
 
+Use `.custom_size = 52.5f` for an exact logical-pixel control height. Zero uses the supplied named size or the theme. Valid custom heights are 1 through 512, including fractions, with the BASE proportions for text, icon, padding and gap. The custom height is independent of theme density. Icon-only arrows and interactive ellipses are square. Wrapping uses the resulting natural item sizes. Invalid height or design size omits the pager without normalizing the page or dispatching a change. Base-only layouts ignore this visual option. The gallery offers **Custom height** from 20 to 160 px and restores the selected named size when cleared.
+
 ```c
 #include <cui/cui_numeric.h>
 

@@ -131,6 +131,7 @@ typedef struct {
     bridge_settings_owned *settings;
     cui_bridge_app *owner;
     uint32_t own_slot;
+    float pagination_custom_size;
 } cui_bridge_node_record;
 typedef struct {
     uint32_t node_kind, payload_kind;

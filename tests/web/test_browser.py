@@ -48,11 +48,79 @@ def verify_pagination_tooltips(page):
     page.wait_for_function(f'(hint) => !({semantic_bounds})(hint)', arg=hint)
 
 
+def verify_pagination_custom_size(browser, url):
+    """Custom height survives modes, narrow scrolling and real touch activation."""
+    context = browser.new_context(has_touch=True, viewport={'width':390,'height':844})
+    page = context.new_page()
+    page.goto(url + '#Pagination')
+    page.wait_for_function('window.cuiGallery && cuiGallery.renderedComponent === "Pagination"')
+    metric = """(name) => {
+        const e = cuiGallery.exports, decode = new TextDecoder();
+        for (let i = 0; i < e.gallery_semantic_count(); i++) {
+            const label = decode.decode(new Uint8Array(e.memory.buffer,
+                e.gallery_semantic_name(i), e.gallery_semantic_length(i)));
+            if (label === name)
+                return [1,2,3,4,5,8].map(f => e.gallery_semantic(i, f));
+        }
+        return null;
+    }"""
+    page.locator('#design-size').select_option('5')
+    page.locator('#pagination-mode').select_option('2')
+    page.wait_for_function(f'(name) => (b => b && b[3] === 40)(({metric})(name))', arg='Next')
+    page.locator('#pagination-custom').check()
+    page.wait_for_function(f'(name) => (b => b && b[2] === 52 && b[3] === 52)(({metric})(name))', arg='Next')
+    assert '.custom_size = 52.0f' in page.locator('#snippet').text_content()
+    assert page.locator('#design-size').input_value() == '5'
+    assert page.locator('#design-size').is_disabled()
+    canvas = page.locator('canvas')
+    canvas.scroll_into_view_if_needed()
+    # Use the actual C group value to check each tap commits exactly one page.
+    for name, expected_page in [('Previous', 2), ('Previous', 1), ('Next', 2)]:
+        x, y, width, height, _, _ = page.evaluate(metric, name)
+        canvas.tap(position={'x':x + width / 2,'y':y + height / 2})
+        page.wait_for_function(f'value => (b => b && b[5] === value)(({metric})("Pagination"))',
+                               arg=expected_page)
+    for mode in ('0', '1', '3', '2'):
+        page.locator('#pagination-mode').select_option(mode)
+        page.wait_for_function(f'(name) => (b => b && b[3] === 52)(({metric})(name))', arg='Next')
+    page.locator('#pagination-height').fill('159.5')
+    page.wait_for_function(f'(name) => (b => b && b[2] === 159.5 && b[3] === 159.5)(({metric})(name))',
+                           arg='Next')
+    assert '.custom_size = 159.5f' in page.locator('#snippet').text_content()
+    previous = page.evaluate(metric, 'Previous')
+    next_arrow = page.evaluate(metric, 'Next')
+    assert next_arrow[1] >= previous[1] + previous[3]
+    page.locator('#pagination-mode').select_option('3')
+    page.locator('#pagination-language').select_option('fr')
+    page.wait_for_function(f'(name) => (b => b && b[3] === 159.5)(({metric})(name))', arg='Suivante')
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+    assert page.evaluate("document.querySelector('.canvas-wrap').scrollWidth > document.querySelector('.canvas-wrap').clientWidth")
+    assert page.evaluate("getComputedStyle(document.querySelector('canvas')).touchAction") == 'pan-x'
+    for name in ('Précédente', 'Suivante'):
+        x, y, width, height, _, _ = page.evaluate(metric, name)
+        assert x >= 0 and y >= 0
+        assert x + width <= canvas.evaluate('(c) => c.clientWidth')
+        assert y + height <= canvas.evaluate('(c) => c.clientHeight')
+    page.locator('#pagination-mode').select_option('2')
+    page.locator('#pagination-language').select_option('en')
+    page.locator('#pagination-custom').uncheck()
+    page.wait_for_function(f'(name) => (b => b && b[2] === 40 && b[3] === 40)(({metric})(name))', arg='Next')
+    assert '.custom_size' not in page.locator('#snippet').text_content()
+    assert page.locator('#design-size').is_enabled()
+    assert page.locator('#pagination-height-control').is_hidden()
+    page.evaluate('location.hash = "Button"')
+    page.wait_for_function('cuiGallery.renderedComponent === "Button"')
+    assert page.locator('#pagination-custom-control').is_hidden()
+    assert page.locator('#pagination-height-control').is_hidden()
+    context.close()
+
+
 def main():
     subprocess.run([sys.executable, str(Path(__file__).with_name('test_snippets.py'))], check=True)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=Path('build/web'))
     parser.add_argument('--chromium', help='Optional installed Chromium executable')
+    parser.add_argument('--pagination-only', action='store_true', help='Run focused Pagination checks only')
     args = parser.parse_args()
     root = args.directory.resolve()
     # Mount as /cui/ to exercise the same URL shape as GitHub project Pages.
@@ -72,6 +140,10 @@ def main():
             if args.chromium:
                 options['executable_path'] = args.chromium
             browser = p.chromium.launch(**options)
+            if args.pagination_only:
+                verify_pagination_custom_size(browser, f'http://127.0.0.1:{server.server_port}/cui/')
+                browser.close()
+                return
             page = browser.new_page(viewport={'width': 1280, 'height': 900}, device_scale_factor=2, permissions=['clipboard-read', 'clipboard-write'])
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
@@ -3059,6 +3131,7 @@ def main():
             page.evaluate('location.hash="%"')
             page.wait_for_timeout(60)
             assert page.locator('#name').inner_text() == 'Button'
+            verify_pagination_custom_size(browser, f'http://127.0.0.1:{server.server_port}/cui/')
             verify_pagination_tooltips(page)
             assert not errors, errors
             # Direct project-Pages URLs must initialize CUI, survive reloads and

@@ -30,7 +30,8 @@ const standalone = {
     HoverCard: [0, 1, 2].flatMap(mode => [0, 1, 2].map(preview => hoverCardUsage(mode, preview))),
     TimeField: [snippets.TimeField, timeFieldUsage(3, true)],
     Pagination: [snippets.Pagination, paginationUsage(14, true, 2), paginationUsage(3, false, 1, 10),
-                 paginationUsage(7, false, 3, 5, true)],
+                 paginationUsage(7, false, 3, 5, true), paginationUsage(3, false, 0, 5, false, 52),
+                 paginationUsage(14, false, 2, 5, true, 512)],
 };
 delete snippets.TimeField; // Compile complete sources as separate translation units.
 delete snippets.Pagination;

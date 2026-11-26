@@ -67,7 +67,12 @@ typedef struct {
 /* One-based pages. radius <= 3; max output count is 11. Out-of-range current is clamped. */
 size_t cui_pagination_items(size_t current, size_t total, unsigned radius,
                             cui_page_item output[11]);
-enum { CUI_PAGINATION_MAX_VISIBLE_PAGES = 32, CUI_PAGINATION_MAX_ITEMS = 34 };
+enum {
+    CUI_PAGINATION_MAX_VISIBLE_PAGES = 32,
+    CUI_PAGINATION_MAX_ITEMS = 34,
+    CUI_PAGINATION_MIN_CUSTOM_SIZE = 1,
+    CUI_PAGINATION_MAX_CUSTOM_SIZE = 512
+};
 /* Positive visible_pages is clamped to 5..32 numbered buttons, including
  * first/last. Up to two additional items mark omitted ranges. Zero uses the
  * legacy radius-two model. Pass space for CUI_PAGINATION_MAX_ITEMS items. */
@@ -104,6 +109,9 @@ typedef struct {
     /* Styled chevrons only. Positive logical viewport dimensions enable the
      * localized hover labels after pointer motion. Independent of jump menus. */
     cui_rect tooltip_viewport;
+    /* Styled only. Zero keeps design_size. A positive height in [1,512]
+     * logical pixels scales the BASE proportions and overrides a valid design_size. */
+    float custom_size;
 } cui_pagination_options;
 /* Same owner and result as cui_base_pagination. Uses navigation and labels for
  * button availability and semantics. Styled metrics, menus and tooltips are ignored. */

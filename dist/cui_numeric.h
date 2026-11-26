@@ -68,7 +68,12 @@ typedef struct {
 /* One-based pages. radius <= 3; max output count is 11. Out-of-range current is clamped. */
 size_t cui_pagination_items(size_t current, size_t total, unsigned radius,
                             cui_page_item output[11]);
-enum { CUI_PAGINATION_MAX_VISIBLE_PAGES = 32, CUI_PAGINATION_MAX_ITEMS = 34 };
+enum {
+    CUI_PAGINATION_MAX_VISIBLE_PAGES = 32,
+    CUI_PAGINATION_MAX_ITEMS = 34,
+    CUI_PAGINATION_MIN_CUSTOM_SIZE = 1,
+    CUI_PAGINATION_MAX_CUSTOM_SIZE = 512
+};
 /* Positive visible_pages is clamped to 5..32 numbered buttons, including
  * first/last. Up to two additional items mark omitted ranges. Zero uses the
  * legacy radius-two model. Pass space for CUI_PAGINATION_MAX_ITEMS items. */
@@ -105,6 +110,9 @@ typedef struct {
     /* Styled chevrons only. Positive logical viewport dimensions enable the
      * localized hover labels after pointer motion. Independent of jump menus. */
     cui_rect tooltip_viewport;
+    /* Styled only. Zero keeps design_size. A positive height in [1,512]
+     * logical pixels scales the BASE proportions and overrides a valid design_size. */
+    float custom_size;
 } cui_pagination_options;
 /* Same owner and result as cui_base_pagination. Uses navigation and labels for
  * button availability and semantics. Styled metrics, menus and tooltips are ignored. */
@@ -1388,15 +1396,26 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
                                   size_t total, cui_pagination_options options, bool legacy,
                                   const cui_pagination_event_handler *handler,
                                   size_t *change_count) {
-    if (!t || !page || !isfinite(options.available_width) || options.available_width < 0)
+    float custom_size = options.custom_size;
+    if (!t || !page || !isfinite(options.available_width) || options.available_width < 0 ||
+        options.design_size < CUI_DESIGN_INHERIT || options.design_size > CUI_DESIGN_9XL ||
+        !isfinite(custom_size) ||
+        (custom_size != 0 && (custom_size < CUI_PAGINATION_MIN_CUSTOM_SIZE ||
+                              custom_size > CUI_PAGINATION_MAX_CUSTOM_SIZE)))
         return false;
     cui_design_metrics metrics = {.font_size = t->font_size,
                                   .control_height = t->control_height,
                                   .padding_x = t->padding,
                                   .gap = t->gap,
                                   .indicator_size = t->font_size};
-    if (options.design_size != CUI_DESIGN_INHERIT &&
-        !cui_design_measure(options.design_size, t->font_size / 16, &metrics))
+    cui_design_size size = options.design_size;
+    float density = t->font_size / 16;
+    if (custom_size > 0) {
+        size = CUI_DESIGN_BASE;
+        /* BASE is 32 logical pixels high at density 1. */
+        density = custom_size / 32;
+    }
+    if (size != CUI_DESIGN_INHERIT && !cui_design_measure(size, density, &metrics))
         return false;
     bool icon = options.icon_only, disabled = options.disabled;
     bool ends = cui_pagination_has_end_buttons(options);

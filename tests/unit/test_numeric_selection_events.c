@@ -87,15 +87,20 @@ static cui_numeric_selection_event_result page_frame(fixture *f, bool styled, bo
     assert(cui_last_error(f->ui) == CUI_OK);
     return r;
 }
-static cui_numeric_selection_event_result sized_page_frame(fixture *f,
-                                                           cui_pagination_options options) {
-    assert(cui_begin_frame(f->ui, 220, 800, .016f));
+static cui_numeric_selection_event_result
+sized_page_frame_with_font(fixture *f, cui_pagination_options options, float theme_font_size) {
+    assert(cui_begin_frame(f->ui, 640, 800, .016f));
     cui_theme theme = cui_theme_light();
+    theme.font_size = theme_font_size;
     cui_numeric_selection_event_result r = cui_pagination_events_ex(
         f->ui, 2, &theme, &f->value, 20, options, (cui_pagination_event_handler){page_changed, f});
     f->draw = cui_end_frame(f->ui);
     assert(cui_last_error(f->ui) == CUI_OK);
     return r;
+}
+static cui_numeric_selection_event_result sized_page_frame(fixture *f,
+                                                           cui_pagination_options options) {
+    return sized_page_frame_with_font(f, options, 16);
 }
 static void sized_pagination(void) {
     fixture f = make();
@@ -120,6 +125,82 @@ static void sized_pagination(void) {
     r = sized_page_frame(&f, options);
     assert(!r.control && !r.change_count && f.calls == 2 && f.value == 22);
     assert(cui_bounds(f.ui, cui_numeric_part_id(2, 4)).h == 0);
+    cui_destroy(f.ui);
+}
+static void custom_sized_pagination(void) {
+    fixture f = make();
+    f.value = 3;
+    cui_pagination_options options = {.design_size = CUI_DESIGN_LG,
+                                      .available_width = 105,
+                                      .icon_only = true,
+                                      .custom_size = 52.5f};
+    cui_id previous_id = cui_numeric_part_id(2, 2), next_id = cui_numeric_part_id(2, 3);
+
+    /* An explicit height overrides the named size and the theme font density. */
+    assert(!sized_page_frame_with_font(&f, options, 24).control);
+    cui_rect previous = cui_bounds(f.ui, previous_id), next = cui_bounds(f.ui, next_id);
+    assert(previous.w == 52.5f && previous.h == 52.5f && next.w == 52.5f && next.h == 52.5f);
+    assert(previous.x == next.x && next.y > previous.y + previous.h);
+    cui_rect icon = cui_bounds(f.ui, cui_numeric_part_id(next_id, 0));
+    assert(icon.w == 26.25f && icon.h == 26.25f);
+    size_t icons = 0;
+    for (size_t i = 0; i < f.draw.count; ++i) {
+        const cui_draw_command *command = &f.draw.commands[i];
+        if (command->type == CUI_DRAW_IMAGE) {
+            /* The reusable SVG cache rounds bitmap paint bounds outward. */
+            assert(command->bounds.w == 27 && command->bounds.h == 27 &&
+                   command->bitmap.bitmap.pixels);
+            ++icons;
+        }
+    }
+    assert(icons == 2);
+    click(&f, 3, .75f);
+    assert(sized_page_frame_with_font(&f, options, 24).change_count == 1 && f.value == 4 &&
+           f.calls == 1);
+
+    /* Zero restores the supplied named size at the current theme density. */
+    options.custom_size = 0;
+    assert(!sized_page_frame_with_font(&f, options, 24).control && f.calls == 1);
+    assert(cui_bounds(f.ui, next_id).h == 60);
+
+    /* Invalid metrics do not reduce input, normalize the page or dispatch. */
+    activate(&f, 2);
+    f.value = 22;
+    const float invalid_sizes[] = {-4, .5f, 513, INFINITY, NAN};
+    for (size_t i = 0; i < sizeof invalid_sizes / sizeof invalid_sizes[0]; ++i) {
+        options.custom_size = invalid_sizes[i];
+        assert(!sized_page_frame(&f, options).control && f.value == 22 && f.calls == 1);
+        assert(cui_bounds(f.ui, previous_id).h == 0);
+        assert(f.draw.count == 0);
+    }
+    options.custom_size = 52;
+    options.design_size = (cui_design_size)(CUI_DESIGN_9XL + 1);
+    assert(!sized_page_frame(&f, options).control && f.value == 22 && f.calls == 1);
+    assert(cui_bounds(f.ui, next_id).h == 0);
+
+    /* Counter text remains centered inside the custom-height button row. */
+    f.value = 4;
+    options = (cui_pagination_options){.compact = true, .custom_size = 52};
+    assert(!sized_page_frame(&f, options).control && f.calls == 1);
+    next = cui_bounds(f.ui, next_id);
+    bool found_counter = false;
+    for (size_t i = 0; i < f.draw.count; ++i) {
+        const cui_draw_command *command = &f.draw.commands[i];
+        if (command->type != CUI_DRAW_TEXT || command->text.length != 6 ||
+            memcmp(command->text.data, "4 / 20", 6))
+            continue;
+        assert(command->font_size == 26 && next.h == 52);
+        assert(fabsf(command->bounds.y + command->bounds.h / 2 - (next.y + next.h / 2)) < 1);
+        found_counter = true;
+    }
+    assert(found_counter);
+
+    /* Both documented bounds admit exact logical geometry. */
+    options =
+        (cui_pagination_options){.icon_only = true, .custom_size = CUI_PAGINATION_MIN_CUSTOM_SIZE};
+    assert(!sized_page_frame(&f, options).control && cui_bounds(f.ui, next_id).h == 1);
+    options.custom_size = CUI_PAGINATION_MAX_CUSTOM_SIZE;
+    assert(!sized_page_frame(&f, options).control && cui_bounds(f.ui, next_id).h == 512);
     cui_destroy(f.ui);
 }
 static void pagination_modes(void) {
@@ -411,8 +492,10 @@ static void pagination_ellipsis_menu(void) {
     cui_id popup_id = panel->id;
     cui_rect initial_trigger = cui_bounds(f.ui, later);
     options.available_width = 164;
+    options.custom_size = 48.5f;
     assert(!ellipsis_frame(&f, 400, options, false, false).control);
     cui_rect moved_trigger = cui_bounds(f.ui, later);
+    assert(moved_trigger.w == 48.5f && moved_trigger.h == 48.5f);
     assert(initial_trigger.x != moved_trigger.x || initial_trigger.y != moved_trigger.y);
     assert(cui_needs_redraw(f.ui));
     assert(!ellipsis_frame(&f, 400, options, false, false).control);
@@ -847,6 +930,7 @@ static void paired_input(bool styled) {
 }
 int main(void) {
     sized_pagination();
+    custom_sized_pagination();
     pagination_modes();
     pagination_localized_navigation();
     pagination_arrow_tooltips();

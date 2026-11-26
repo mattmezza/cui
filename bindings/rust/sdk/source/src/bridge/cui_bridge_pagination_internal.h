@@ -121,14 +121,41 @@ cui_bridge_status cui_bridge_pagination_get_config_v1(cui_bridge_app *app, cui_b
     return CUI_BRIDGE_OK;
 }
 
+cui_bridge_status cui_bridge_pagination_set_custom_size(cui_bridge_app *app, cui_bridge_node handle,
+                                                        float size) {
+    cui_bridge_status status = bridge_pagination_validate_node(app, handle);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!isfinite(size) || (size != 0 && (size < CUI_PAGINATION_MIN_CUSTOM_SIZE ||
+                                          size > CUI_PAGINATION_MAX_CUSTOM_SIZE)))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    cui_bridge_node_record *node = &app->nodes[handle.slot];
+    if (node->pagination_custom_size != size) {
+        node->pagination_custom_size = size;
+        cui_invalidate(app->ui);
+    }
+    return CUI_BRIDGE_OK;
+}
+cui_bridge_status cui_bridge_pagination_get_custom_size(cui_bridge_app *app, cui_bridge_node handle,
+                                                        float *out) {
+    if (!out)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    cui_bridge_status status = bridge_pagination_validate_node(app, handle);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    *out = app->nodes[handle.slot].pagination_custom_size;
+    return CUI_BRIDGE_OK;
+}
+
 static bool bridge_pagination_draw(cui_bridge_app *app, const cui_bridge_node_record *node,
                                    size_t *page) {
     const cui_bridge_pagination_config_v1 *config = bridge_pagination_node(app, node->own_slot);
-    if (!config && node->size == CUI_BRIDGE_SIZE_INHERIT)
+    if (!config && node->size == CUI_BRIDGE_SIZE_INHERIT && !node->pagination_custom_size)
         return cui_pagination(app->ui, node->id, &app->theme, page, node->total, false,
                               node->disabled);
     cui_pagination_options options = {.disabled = node->disabled,
-                                      .design_size = (cui_design_size)node->size};
+                                      .design_size = (cui_design_size)node->size,
+                                      .custom_size = node->pagination_custom_size};
     cui_pagination_labels labels = {0};
     if (config) {
         uint32_t flags = config->flags;

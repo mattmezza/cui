@@ -157,7 +157,7 @@ jobs:
           node-version: '25.8.0'
       - run: cmake -S bindings/node -B build-node -DCUI_BUILD_NATIVE=OFF
       # The standalone build excludes the root project from the default target set.
-      - run: cmake --build build-node --parallel 2 --target all test_bridge_part_shadows test_bridge_shadows test_bridge_avatar_style test_bridge_stepper_visual test_bridge_radio_motion
+      - run: cmake --build build-node --parallel 2 --target all test_bridge_part_shadows test_bridge_shadows test_bridge_avatar_style test_bridge_stepper_visual test_bridge_radio_motion test_bridge_rating
       - run: python scripts/test_local.py --build-dir build-node -R '^(bridge_|node_)'
       - run: node bindings/node/examples/save.cjs --headless
       - run: node bindings/node/examples/workspace.cjs --headless

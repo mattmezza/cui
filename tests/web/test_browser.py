@@ -671,6 +671,9 @@ def verify_attachment_metadata(browser, url):
         page.wait_for_function(metric, arg='Inspected')
         assert len(image_bounds()) == 2
         configure(False, '3')
+        # The overlay uses the last completed media bounds. An orientation
+        # change can request another paint once the new bounds are available.
+        page.wait_for_function('!cuiGallery.exports.gallery_redraw()')
         restored = image_bounds()
         assert len(restored) == len(painted), (restored, painted)
         assert all(abs(actual-expected)<.5

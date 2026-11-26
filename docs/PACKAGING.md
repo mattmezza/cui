@@ -1,13 +1,12 @@
 # Install local alpha binding artifacts
 
-The commands below build alpha.5 artifacts from the current checkout
-(`0.1.0-alpha.6`, Python `0.1.0a6`). See [RELEASING.md](RELEASING.md) for
+The commands below build alpha.7 artifacts from the current checkout
+(`0.1.0-alpha.7`, Python `0.1.0a7`). See [RELEASING.md](RELEASING.md) for
 published releases and the source freeze checklist.
 
-
-The packages expose the [tested binding subset](BRIDGE_COMPONENTS.md), not full
-GPUI feature parity. Commands below build and consume local files; no registry
-publication or public Go tag is assumed. npm is `private: true` and Cargo has
+The packages expose the [tested binding subset](BRIDGE_COMPONENTS.md).
+Commands below build and consume local files without contacting a registry or
+fetching a public Go tag. npm is `private: true` and Cargo has
 `publish = false`. Linux x86_64 is validated; registry ownership, public release
 versions, other platforms and native runtime bundling remain release work.
 
@@ -81,7 +80,7 @@ CUI_PACKAGE_NATIVE=1 python scripts/package_bindings.py node --prebuilt --output
 mkdir -p /tmp/cui-node-consumer
 cd /tmp/cui-node-consumer
 npm init -y
-CUI_PACKAGE_NATIVE=1 npm install /tmp/cui-node-native/cui-native-0.1.0-alpha.6.tgz
+CUI_PACKAGE_NATIVE=1 npm install /tmp/cui-node-native/cui-native-0.1.0-alpha.7.tgz
 ```
 
 Save this as `/tmp/cui-node-consumer/counter.cjs`:
@@ -132,7 +131,7 @@ mkdir -p /tmp/cui-go-consumer
 cp tests/packaging/go_smoke.go /tmp/cui-go-consumer/main.go
 cd /tmp/cui-go-consumer
 go mod init example.local/cui-counter
-go mod edit -require=github.com/mattmezza/cui/bindings/go@v0.1.0-alpha.6
+go mod edit -require=github.com/mattmezza/cui/bindings/go@v0.1.0-alpha.7
 GOPROXY=file:///tmp/cui-go-artifacts GOSUMDB=off go mod tidy
 GOPROXY=file:///tmp/cui-go-artifacts GOSUMDB=off go build -o counter .
 ./counter
@@ -165,7 +164,7 @@ new process.
 
 Go resolves this public repository directly; it needs no Go registry account.
 A repository commit or `@main` becomes fetchable when those files are published.
-The example resolves `v0.1.0-alpha.6` from the local proxy built above. Public
+The example resolves `v0.1.0-alpha.7` from the local proxy built above. Public
 module retrieval uses the separately published Go subdirectory tag.
 
 ## Rust: local crate and statically linked executable
@@ -176,12 +175,12 @@ At the repository root:
 python scripts/package_bindings.py rust --output /tmp/cui-rust-artifacts
 mkdir -p /tmp/cui-rust-consumer/vendor
 cp tests/packaging/rust_smoke.rs /tmp/cui-rust-main.rs
-tar -xzf /tmp/cui-rust-artifacts/cui-builders-0.1.0-alpha.6.crate -C /tmp/cui-rust-consumer/vendor
+tar -xzf /tmp/cui-rust-artifacts/cui-builders-0.1.0-alpha.7.crate -C /tmp/cui-rust-consumer/vendor
 cd /tmp/cui-rust-consumer
 cargo init --name cui-counter
 cp /tmp/cui-rust-main.rs src/main.rs
 cat >> Cargo.toml <<'TOML'
-cui-builders = { path = "vendor/cui-builders-0.1.0-alpha.6" }
+cui-builders = { path = "vendor/cui-builders-0.1.0-alpha.7" }
 TOML
 cargo build --offline
 ./target/debug/cui-counter

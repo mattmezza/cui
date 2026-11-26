@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.6**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.6) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
 | Public website | Interactive WASM gallery and docs at alpha.6. The Pages deployment from `d3711979` serves the same native starter bytes as the GitHub release. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45732688558) |
-| Working source | The integration branch adds responsive Pagination, accessible Notification dismissal, fitted Attachment metadata, and Sidebar focus reveal with consistent scrollbar geometry. These changes await the next release. |
+| Working source | The alpha.7 candidate adds responsive Pagination, accessible Notification dismissal, fitted Attachment metadata, and Sidebar focus reveal with consistent scrollbar geometry. It still needs exact-revision release qualification. |
 | Packages | Alpha.6 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green

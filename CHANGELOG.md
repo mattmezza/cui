@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.0-alpha.7
+
+- Pagination wraps its controls at the available width and keeps the page
+  counter on one centered line. It supports shared size presets, fractional
+  custom heights, configurable page budgets, localized arrow hints, and
+  ellipsis jump menus. Retained C, Python, JS/TS, Go and Rust expose the
+  extended configuration through the existing page-change event.
+- Responsive Notification cards wrap titles and messages and reserve a
+  separate Close target. Persistent notices support Tab and touch dismissal,
+  and a long notice can place its action on a separate row. The new presenter
+  is available in C and the gallery.
+- C Attachment cards have an opt-in presenter for independently styled
+  filenames and descriptions. Long text ellipsizes at grapheme boundaries
+  while accessibility retains the full name. The gallery shows the same
+  behavior with images and independent actions.
+- Sidebar reveals newly focused rows within its scrollable body. The header
+  and footer stay pinned, and the body reserves the configured scrollbar
+  width only when a visible bar can overflow.
+- Release qualification runs on branch pushes. Library and Go version tags
+  reference the already-qualified commit without scheduling duplicate builds.
+
+All 78 catalog families have tested subsets. Full-family verification,
+physical device checks and registry publication remain open.
+
 ## 0.1.0-alpha.6
 
 - The localized TimeField offers an opt-in single Tab stop with internal

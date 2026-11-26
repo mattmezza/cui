@@ -10,6 +10,9 @@ from cui_bridge import (
 from cui_bridge.disclosure import Config, Style, bind_api
 
 
+from test_disclosure_heading import HeadingTests
+
+
 class DisclosureTests(unittest.TestCase):
     def test_validation_and_probe(self):
         self.assertEqual(C.sizeof(Config), 172)

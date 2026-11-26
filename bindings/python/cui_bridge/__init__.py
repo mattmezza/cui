@@ -882,6 +882,20 @@ class Widget:
         self._detail = text
         return self
 
+    def set_disclosure_heading(
+        self, layer: DisclosureHeadingLayer, style: DisclosureHeading | None
+    ) -> "Widget":
+        """Copy a heading layer. Pass None to restore inheritance."""
+        from .disclosure import heading
+        heading(self, layer, style)
+        return self
+
+    def set_disclosure_divider(self, style: DisclosureDivider | None) -> "Widget":
+        """Copy an Accordion divider. Pass None to restore the themed divider."""
+        from .disclosure import divider
+        divider(self, style)
+        return self
+
     def disclosure_configure(self, config: DisclosureConfig | None) -> "Widget":
         """Copy presentation to an Accordion or Collapsible. None clears it."""
         from .disclosure import configure
@@ -2550,6 +2564,16 @@ class App:
         from .pagination_options import custom_supported
         return custom_supported(self)
 
+    def supports_disclosure_heading(self) -> bool:
+        """Return whether the optional retained heading setter is available."""
+        from .disclosure import supports_optional
+        return supports_optional(self, "disclosure_heading")
+
+    def supports_disclosure_divider(self) -> bool:
+        """Return whether the optional retained divider setter is available."""
+        from .disclosure import supports_optional
+        return supports_optional(self, "disclosure_divider")
+
     def supports_disclosure_presentation(self) -> bool:
         """Return whether both optional retained disclosure setters are available."""
         from .disclosure import supported
@@ -2787,3 +2811,7 @@ __all__ += _icon_exports
 
 from .disclosure import DisclosureConfig, DisclosureTriggerStyle
 __all__ += ["DisclosureConfig", "DisclosureTriggerStyle"]
+
+from .disclosure import DisclosureHeadingLayer, DisclosureHeading, DisclosureHeadingBox, DisclosureTypography, DisclosureDivider
+
+__all__ += ["DisclosureHeadingLayer", "DisclosureHeading", "DisclosureHeadingBox", "DisclosureTypography", "DisclosureDivider"]

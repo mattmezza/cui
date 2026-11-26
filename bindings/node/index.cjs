@@ -988,6 +988,8 @@ class App {
     return typeof native.supportsRadioTooltip === 'function' &&
       typeof native.setRadioTooltip === 'function' && native.supportsRadioTooltip();
   }
+  supports_disclosure_heading() { return disclosures.supportsHeading(this); }
+  supports_disclosure_divider() { return disclosures.supportsDivider(this); }
   supports_disclosure_presentation() { return disclosures.supports(this); }
   supports_rating_options() { return ratingOptions.supports(this); }
   supports_pagination_options() { return paginationOptions.supports(this); }

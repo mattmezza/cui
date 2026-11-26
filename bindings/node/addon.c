@@ -2681,6 +2681,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("paginationOptions", pagination_options, 0);
     EXPORT("ratingOptions", rating_options, 0);
     EXPORT("disclosureOptions", disclosure_options, 0);
+    EXPORT("disclosureHeadingOptions", disclosure_heading_options, 0);
     EXPORT("virtualRowsOptions", virtual_rows_options, 0);
     EXPORT("paginationCustomSize", pagination_custom_size, 0);
     EXPORT("iconResource", icon_resource, 0);

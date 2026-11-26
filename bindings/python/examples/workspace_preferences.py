@@ -1,6 +1,7 @@
 """Workspace preferences. Pass --font FONT.ttf to open a native SDL window."""
 import argparse
-from cui_bridge import App, DisclosureConfig, DisclosureTriggerStyle
+from cui_bridge import (App, DisclosureConfig, DisclosureTriggerStyle, DisclosureHeading,
+                        DisclosureHeadingBox, DisclosureTypography, DisclosureHeadingLayer, DisclosureDivider)
 from cui_bridge import accordion, collapsible, column, item, label
 
 
@@ -30,6 +31,13 @@ def main():
             ))
             editor.set_trigger_style(DisclosureTriggerStyle(hover_rgba=0x4879e02b, cursor="pointer"))
             advanced.disclosure_configure(DisclosureConfig(width=360, borderless=True))
+        if app.supports_disclosure_heading():
+            sections.set_disclosure_heading(DisclosureHeadingLayer.NORMAL, DisclosureHeading(
+                box=DisclosureHeadingBox(width=-1, height=44, padding=12, gap=8),
+                typography=DisclosureTypography(font_size=16, weight=2), title_rgba=0x23354aff))
+            editor.set_disclosure_heading(DisclosureHeadingLayer.EXPANDED, DisclosureHeading(title_rgba=0x275dccff))
+        if app.supports_disclosure_divider():
+            sections.set_disclosure_divider(DisclosureDivider(thickness=1, inset_left=12, inset_right=12, color_rgba=0xc8d0daff))
         app.mount(column("workspace").gap(12).children(label("Workspace preferences"), sections, advanced, status))
         if args.font:
             app.run()

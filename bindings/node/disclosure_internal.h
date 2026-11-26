@@ -54,3 +54,56 @@ static napi_value disclosure_options(napi_env env, napi_callback_info info) {
                                  : set_style(app->bridge, node->node, clear ? NULL : &record.style);
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
+
+_Static_assert(sizeof(cui_bridge_disclosure_heading_v1) == 76, "heading ABI");
+_Static_assert(sizeof(cui_bridge_disclosure_divider_v1) == 32, "divider ABI");
+typedef cui_bridge_status (*heading_fn)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                                        const cui_bridge_disclosure_heading_v1 *);
+typedef cui_bridge_status (*divider_fn)(cui_bridge_app *, cui_bridge_node,
+                                        const cui_bridge_disclosure_divider_v1 *);
+static napi_value disclosure_heading_options(napi_env env, napi_callback_info info) {
+    napi_value argv[5];
+    js_app *app;
+    uint32_t operation, layer;
+    if (!args(env, info, 2, argv) || !app_arg(env, argv[0], &app) ||
+        !uint_arg(env, argv[1], &operation))
+        return NULL;
+    heading_fn heading = NULL;
+    divider_fn divider = NULL;
+    bool supported = operation < 2 ? optional_bridge_symbol(&heading, sizeof heading,
+                                                            "cui_bridge_disclosure_set_heading_v1")
+                                   : optional_bridge_symbol(&divider, sizeof divider,
+                                                            "cui_bridge_disclosure_set_divider_v1");
+    if (operation == 0 || operation == 2) {
+        napi_value result;
+        return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
+    }
+    if (!supported)
+        return fail(env, "disclosure requires optional bridge symbol");
+    if (operation != 1 && operation != 3)
+        return fail(env, "invalid disclosure operation");
+    js_node *node;
+    napi_valuetype type;
+    if (!args(env, info, 5, argv) || !node_arg(env, argv[2], app, &node) ||
+        !uint_arg(env, argv[3], &layer) || napi_typeof(env, argv[4], &type) != napi_ok)
+        return NULL;
+    union {
+        cui_bridge_disclosure_heading_v1 heading;
+        cui_bridge_disclosure_divider_v1 divider;
+    } record;
+    bool clear = type == napi_null;
+    if (!clear) {
+        bool buffer = false;
+        void *data;
+        size_t size;
+        if (napi_is_buffer(env, argv[4], &buffer) != napi_ok || !buffer ||
+            napi_get_buffer_info(env, argv[4], &data, &size) != napi_ok ||
+            size != (operation == 1 ? sizeof record.heading : sizeof record.divider))
+            return fail(env, "invalid disclosure record");
+        memcpy(&record, data, size);
+    }
+    cui_bridge_status code =
+        operation == 1 ? heading(app->bridge, node->node, layer, clear ? NULL : &record.heading)
+                       : divider(app->bridge, node->node, clear ? NULL : &record.divider);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}

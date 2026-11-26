@@ -52,3 +52,5 @@ test('typed disclosure preserves expansion and queued events across a presentati
     app.dispose();
   }
 });
+
+require('./disclosure-heading.test.cjs');

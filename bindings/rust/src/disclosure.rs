@@ -84,6 +84,79 @@ pub struct DisclosureTriggerStyle {
     pub cursor: Option<DisclosureCursor>,
 }
 
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DisclosureHeadingLayer {
+    #[default]
+    Normal,
+    Expanded,
+    Disabled,
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DisclosureWeight {
+    #[default]
+    Normal,
+    Medium,
+    Semibold,
+    Bold,
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DisclosureAlignment {
+    #[default]
+    Left,
+    Center,
+    Right,
+}
+
+/// Title metrics in logical pixels. Set a positive font_size. Zero line_height
+/// uses natural metrics. Nonzero letter_spacing requires host support.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DisclosureTypography {
+    pub font_size: f32,
+    pub line_height: f32,
+    pub letter_spacing: f32,
+    pub weight: DisclosureWeight,
+    pub align: DisclosureAlignment,
+    pub wrap: bool,
+    pub italic: bool,
+    pub monospace: bool,
+}
+
+/// Complete, vertically centered trigger row. Width -1 fills, and zero
+/// width or height fits.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DisclosureHeadingBox {
+    pub width: f32,
+    pub height: f32,
+    pub padding: f32,
+    pub gap: f32,
+    pub radius: f32,
+    pub border_width: f32,
+    pub background_rgba: u32,
+    pub border_rgba: u32,
+}
+
+/// One style layer. None inherits and Some(0) selects a transparent title.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DisclosureHeading {
+    pub box_style: Option<DisclosureHeadingBox>,
+    pub typography: Option<DisclosureTypography>,
+    pub title_rgba: Option<u32>,
+}
+
+/// A joined Accordion separator. Zero thickness removes its layout space.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DisclosureDivider {
+    pub thickness: f32,
+    pub inset_left: f32,
+    pub inset_right: f32,
+    pub color_rgba: u32,
+}
+
 const JOINED: u32 = 1 << 0;
 const BORDERED: u32 = 1 << 1;
 const SINGLE: u32 = 1 << 2;
@@ -123,13 +196,57 @@ struct StyleRaw {
     cursor: u32,
 }
 
+#[repr(C)]
+#[derive(Default)]
+struct HeadingRaw {
+    struct_size: u32,
+    schema_version: u32,
+    fields: u32,
+    reserved: u32,
+    font_size: f32,
+    line_height: f32,
+    letter_spacing: f32,
+    weight: u32,
+    align: u32,
+    text_flags: u32,
+    title_rgba: u32,
+    width: f32,
+    height: f32,
+    padding: f32,
+    gap: f32,
+    radius: f32,
+    border_width: f32,
+    background_rgba: u32,
+    border_rgba: u32,
+}
+
+#[repr(C)]
+struct DividerRaw {
+    struct_size: u32,
+    schema_version: u32,
+    reserved: [u32; 2],
+    thickness: f32,
+    inset_left: f32,
+    inset_right: f32,
+    color_rgba: u32,
+}
+
 const _: () = {
     assert!(mem::size_of::<ConfigRaw>() == 172);
     assert!(mem::offset_of!(ConfigRaw, width) == 16);
     assert!(mem::offset_of!(ConfigRaw, collapsed_icon) == 44);
     assert!(mem::size_of::<StyleRaw>() == 40);
     assert!(mem::offset_of!(StyleRaw, cursor) == 36);
+    assert!(mem::size_of::<HeadingRaw>() == 76);
+    assert!(mem::offset_of!(HeadingRaw, font_size) == 16);
+    assert!(mem::offset_of!(HeadingRaw, width) == 44);
+    assert!(mem::size_of::<DividerRaw>() == 32);
+    assert!(mem::offset_of!(DividerRaw, thickness) == 16);
 };
+
+fn dimension(value: f32) -> bool {
+    (0. ..=4096.).contains(&value)
+}
 
 fn icon_name(name: &str) -> Result<[u8; 64]> {
     let value = name.as_bytes();
@@ -143,12 +260,11 @@ fn icon_name(name: &str) -> Result<[u8; 64]> {
 
 impl DisclosureConfig<'_> {
     fn wire(&self) -> Result<ConfigRaw> {
-        let valid = |value| (0. ..=4096.).contains(&value);
         let card = self.card.unwrap_or_default();
-        if !(self.width == -1. || valid(self.width))
+        if !(self.width == -1. || dimension(self.width))
             || ![card.radius, card.border_width, card.padding, card.gap]
                 .into_iter()
-                .all(valid)
+                .all(dimension)
         {
             return Err(Error(3));
         }
@@ -198,16 +314,95 @@ impl DisclosureTriggerStyle {
     }
 }
 
+impl DisclosureHeading {
+    fn wire(&self) -> Result<HeadingRaw> {
+        let mut heading = HeadingRaw {
+            struct_size: mem::size_of::<HeadingRaw>() as u32,
+            schema_version: 1,
+            ..Default::default()
+        };
+        if let Some(b) = self.box_style {
+            if !(b.width == -1. || dimension(b.width))
+                || ![b.height, b.padding, b.gap, b.radius, b.border_width]
+                    .into_iter()
+                    .all(dimension)
+            {
+                return Err(Error(3));
+            }
+            heading.fields |= 1 << 0;
+            heading.width = b.width;
+            heading.height = b.height;
+            heading.padding = b.padding;
+            heading.gap = b.gap;
+            heading.radius = b.radius;
+            heading.border_width = b.border_width;
+            heading.background_rgba = b.background_rgba;
+            heading.border_rgba = b.border_rgba;
+        }
+        if let Some(t) = self.typography {
+            if t.font_size <= 0.
+                || !dimension(t.font_size)
+                || !dimension(t.line_height)
+                || !dimension(t.letter_spacing.abs())
+            {
+                return Err(Error(3));
+            }
+            heading.fields |= 1 << 1;
+            heading.font_size = t.font_size;
+            heading.line_height = t.line_height;
+            heading.letter_spacing = t.letter_spacing;
+            heading.weight = t.weight as u32;
+            heading.align = t.align as u32;
+            heading.text_flags =
+                u32::from(t.wrap) | (u32::from(t.italic) << 1) | (u32::from(t.monospace) << 2);
+        }
+        if let Some(rgba) = self.title_rgba {
+            heading.fields |= 1 << 2;
+            heading.title_rgba = rgba;
+        }
+        Ok(heading)
+    }
+}
+
+impl DisclosureDivider {
+    fn wire(&self) -> Result<DividerRaw> {
+        if ![self.thickness, self.inset_left, self.inset_right]
+            .into_iter()
+            .all(dimension)
+        {
+            return Err(Error(3));
+        }
+        Ok(DividerRaw {
+            struct_size: mem::size_of::<DividerRaw>() as u32,
+            schema_version: 1,
+            reserved: [0; 2],
+            thickness: self.thickness,
+            inset_left: self.inset_left,
+            inset_right: self.inset_right,
+            color_rgba: self.color_rgba,
+        })
+    }
+}
+
 type Configure = unsafe extern "C" fn(*mut c_void, RawNode, *const ConfigRaw) -> u32;
 type SetStyle = unsafe extern "C" fn(*mut c_void, RawNode, *const StyleRaw) -> u32;
+type SetHeading = unsafe extern "C" fn(*mut c_void, RawNode, u32, *const HeadingRaw) -> u32;
+type SetDivider = unsafe extern "C" fn(*mut c_void, RawNode, *const DividerRaw) -> u32;
 
-fn api() -> Option<(Configure, SetStyle)> {
-    static API: OnceLock<Option<(Configure, SetStyle)>> = OnceLock::new();
-    *API.get_or_init(resolve)
+#[derive(Default)]
+struct DisclosureApi {
+    presentation: Option<(Configure, SetStyle)>,
+    heading: Option<SetHeading>,
+    divider: Option<SetDivider>,
+}
+
+fn api() -> &'static DisclosureApi {
+    static API: OnceLock<DisclosureApi> = OnceLock::new();
+    API.get_or_init(resolve)
 }
 
 #[cfg(cui_bridge_static)]
-fn resolve() -> Option<(Configure, SetStyle)> {
+fn resolve() -> DisclosureApi {
     extern "C" {
         fn cui_bridge_disclosure_configure_v1(
             a: *mut c_void,
@@ -219,43 +414,67 @@ fn resolve() -> Option<(Configure, SetStyle)> {
             n: RawNode,
             s: *const StyleRaw,
         ) -> u32;
+        fn cui_bridge_disclosure_set_heading_v1(
+            a: *mut c_void,
+            n: RawNode,
+            layer: u32,
+            heading: *const HeadingRaw,
+        ) -> u32;
+        fn cui_bridge_disclosure_set_divider_v1(
+            a: *mut c_void,
+            n: RawNode,
+            divider: *const DividerRaw,
+        ) -> u32;
     }
-    Some((
-        cui_bridge_disclosure_configure_v1,
-        cui_bridge_disclosure_set_trigger_style_v1,
-    ))
+    DisclosureApi {
+        presentation: Some((
+            cui_bridge_disclosure_configure_v1,
+            cui_bridge_disclosure_set_trigger_style_v1,
+        )),
+        heading: Some(cui_bridge_disclosure_set_heading_v1),
+        divider: Some(cui_bridge_disclosure_set_divider_v1),
+    }
 }
 
 #[cfg(all(not(cui_bridge_static), any(unix, windows)))]
-fn resolve() -> Option<(Configure, SetStyle)> {
+fn resolve() -> DisclosureApi {
     unsafe {
         let config = crate::notification_symbol_v1(c"cui_bridge_disclosure_configure_v1".as_ptr());
         let style =
             crate::notification_symbol_v1(c"cui_bridge_disclosure_set_trigger_style_v1".as_ptr());
-        if config.is_null() || style.is_null() {
-            return None;
+        let heading =
+            crate::notification_symbol_v1(c"cui_bridge_disclosure_set_heading_v1".as_ptr());
+        let divider =
+            crate::notification_symbol_v1(c"cui_bridge_disclosure_set_divider_v1".as_ptr());
+        DisclosureApi {
+            presentation: (!config.is_null() && !style.is_null()).then(|| {
+                (
+                    mem::transmute::<*mut c_void, Configure>(config),
+                    mem::transmute::<*mut c_void, SetStyle>(style),
+                )
+            }),
+            heading: (!heading.is_null())
+                .then(|| mem::transmute::<*mut c_void, SetHeading>(heading)),
+            divider: (!divider.is_null())
+                .then(|| mem::transmute::<*mut c_void, SetDivider>(divider)),
         }
-        Some((
-            mem::transmute::<*mut c_void, Configure>(config),
-            mem::transmute::<*mut c_void, SetStyle>(style),
-        ))
     }
 }
 
 #[cfg(not(any(cui_bridge_static, unix, windows)))]
-fn resolve() -> Option<(Configure, SetStyle)> {
-    None
+fn resolve() -> DisclosureApi {
+    DisclosureApi::default()
 }
 
 impl Error {
-    /// The provider lacks one or both retained disclosure setters.
+    /// The provider lacks the requested retained disclosure operation.
     pub const DISCLOSURE_OPTIONS_UNAVAILABLE: Self = Self(9);
 }
 
 impl App {
     /// Probe both Disclosure V1 symbols. Older providers retain ordinary controls.
     pub fn supports_disclosure_presentation(&self) -> bool {
-        api().is_some()
+        api().presentation.is_some()
     }
 
     /// Copy Accordion or Collapsible options, or clear them with None.
@@ -265,7 +484,9 @@ impl App {
         config: Option<&DisclosureConfig<'_>>,
     ) -> Result<&mut Self> {
         let node = self.valid(node)?;
-        let (configure, _) = api().ok_or(Error::DISCLOSURE_OPTIONS_UNAVAILABLE)?;
+        let (configure, _) = api()
+            .presentation
+            .ok_or(Error::DISCLOSURE_OPTIONS_UNAVAILABLE)?;
         let raw = config.map(DisclosureConfig::wire).transpose()?;
         check(unsafe {
             configure(
@@ -285,10 +506,63 @@ impl App {
         style: Option<&DisclosureTriggerStyle>,
     ) -> Result<&mut Self> {
         let node = self.valid(node)?;
-        let (_, set_style) = api().ok_or(Error::DISCLOSURE_OPTIONS_UNAVAILABLE)?;
+        let (_, set_style) = api()
+            .presentation
+            .ok_or(Error::DISCLOSURE_OPTIONS_UNAVAILABLE)?;
         let raw = style.map(DisclosureTriggerStyle::wire);
         check(unsafe {
             set_style(
+                self.raw,
+                node,
+                raw.as_ref().map_or(ptr::null(), ptr::from_ref),
+            )
+        })?;
+        Ok(self)
+    }
+
+    /// Probe the optional retained heading setter independently.
+    pub fn supports_disclosure_heading(&self) -> bool {
+        api().heading.is_some()
+    }
+
+    /// Probe the optional joined divider setter independently.
+    pub fn supports_disclosure_divider(&self) -> bool {
+        api().divider.is_some()
+    }
+
+    /// Copy one heading layer onto Accordion, Collapsible or a direct Accordion
+    /// Item. None or a style with no fields clears that layer.
+    pub fn set_disclosure_heading(
+        &mut self,
+        node: Node,
+        layer: DisclosureHeadingLayer,
+        style: Option<&DisclosureHeading>,
+    ) -> Result<&mut Self> {
+        let node = self.valid(node)?;
+        let set_heading = api().heading.ok_or(Error::DISCLOSURE_OPTIONS_UNAVAILABLE)?;
+        let raw = style.map(DisclosureHeading::wire).transpose()?;
+        check(unsafe {
+            set_heading(
+                self.raw,
+                node,
+                layer as u32,
+                raw.as_ref().map_or(ptr::null(), ptr::from_ref),
+            )
+        })?;
+        Ok(self)
+    }
+
+    /// Copy a joined Accordion divider. None restores the themed divider.
+    pub fn set_disclosure_divider(
+        &mut self,
+        node: Node,
+        style: Option<&DisclosureDivider>,
+    ) -> Result<&mut Self> {
+        let node = self.valid(node)?;
+        let set_divider = api().divider.ok_or(Error::DISCLOSURE_OPTIONS_UNAVAILABLE)?;
+        let raw = style.map(DisclosureDivider::wire).transpose()?;
+        check(unsafe {
+            set_divider(
                 self.raw,
                 node,
                 raw.as_ref().map_or(ptr::null(), ptr::from_ref),
@@ -309,6 +583,23 @@ impl Builder<'_> {
     pub fn disclosure_style(self, style: &DisclosureTriggerStyle) -> Result<Self> {
         self.app
             .set_disclosure_trigger_style(self.node, Some(style))?;
+        Ok(self)
+    }
+
+    /// Apply heading style to the mounted child during a builder chain.
+    pub fn disclosure_heading(
+        self,
+        layer: DisclosureHeadingLayer,
+        style: &DisclosureHeading,
+    ) -> Result<Self> {
+        self.app
+            .set_disclosure_heading(self.node, layer, Some(style))?;
+        Ok(self)
+    }
+
+    /// Apply a joined divider to the mounted Accordion during a builder chain.
+    pub fn disclosure_divider(self, style: &DisclosureDivider) -> Result<Self> {
+        self.app.set_disclosure_divider(self.node, Some(style))?;
         Ok(self)
     }
 }

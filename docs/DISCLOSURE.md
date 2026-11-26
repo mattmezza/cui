@@ -214,9 +214,10 @@ are read during submission. Invalid typography or joined divider
 measurements reject the presentation before it changes expansion.
 
 The WASM gallery's **Styled headings** option demonstrates wrapping,
-active title typography and inset dividers. Retained C can copy heading
-typography, title colors, row boxes and divider styles. See the bridge
-guide for the supported box and font options. [Retained headings and dividers](BRIDGE_COMPONENTS.md#style-retained-headings-and-dividers)
+active title typography and inset dividers. Retained C and the language
+builders can copy heading typography, title colors, row boxes and divider
+styles. [Retained C](BRIDGE_COMPONENTS.md#style-retained-headings-and-dividers) ·
+[Language builders](BRIDGE_COMPONENTS.md#style-heading-layers-and-dividers-from-language-builders)
 
 ### Measured reveal
 

@@ -113,7 +113,7 @@ export function collapsible(key?: string, text?: string): Disclosure & Disclosur
 export function alert(key?: string, text?: string): Alert;
 export function radio_group(key?: string): Group & RadioPaintStyled & RadioSelectionMotion & RadioTabOrder & PartShadowStyled<0>;
 export function tabs(key?: string): Group;
-export function accordion(key?: string): Composite & DisclosureConfigured;
+export function accordion(key?: string): Composite & DisclosureConfigured & DisclosureDividerStyled;
 export function item(key?: string, text?: string): Item;
 
 export interface Select extends Group, Label {detail(text: string): this}
@@ -805,3 +805,33 @@ export interface DisclosureTriggerStyled {
 export interface App {
   supports_disclosure_presentation(): boolean;
 }
+
+export type DisclosureHeadingLayer = "normal" | "expanded" | "disabled";
+export interface DisclosureHeadingBox {
+  width?: number; height?: number; padding?: number; gap?: number;
+  radius?: number; borderWidth?: number; backgroundRgba?: number; borderRgba?: number;
+}
+export interface DisclosureTypography {
+  /** Positive logical pixels; required when typography is supplied. */
+  fontSize: number;
+  lineHeight?: number;
+  letterSpacing?: number;
+  weight?: 0 | 1 | 2 | 3; align?: 0 | 1 | 2;
+  wrap?: boolean; italic?: boolean; monospace?: boolean;
+}
+export interface DisclosureHeading {
+  box?: DisclosureHeadingBox | null; typography?: DisclosureTypography | null; titleRgba?: number | null;
+}
+export interface DisclosureDivider { thickness?: number; insetLeft?: number; insetRight?: number; colorRgba?: number; }
+export interface DisclosureConfigured {
+  set_disclosure_heading(layer: DisclosureHeadingLayer, style: DisclosureHeading | null): this;
+}
+export interface DisclosureTriggerStyled {
+  set_disclosure_heading(layer: DisclosureHeadingLayer, style: DisclosureHeading | null): this;
+}
+export interface App {
+  supports_disclosure_heading(): boolean;
+  supports_disclosure_divider(): boolean;
+}
+
+export interface DisclosureDividerStyled { set_disclosure_divider(style: DisclosureDivider | null): this; }

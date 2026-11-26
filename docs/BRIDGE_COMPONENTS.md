@@ -691,10 +691,54 @@ do not change expansion or replay notifications. Older providers load and
 run ordinary controls. Requesting an extended setter on an unsupported
 provider reports an error.
 
+#### Style heading layers and dividers from language builders
+
+Python, JavaScript, TypeScript, Go and Rust support the three heading layers.
+Set them on an Accordion for shared styles, its direct Item for per-field
+overrides, or a Collapsible for its own heading. Probe heading and divider
+support independently before configuring a provider. A divider belongs to
+an Accordion and appears when its presentation uses `joined`.
+
+| Language | App probes | Apply or reset |
+| --- | --- | --- |
+| Python | `supports_disclosure_heading()`, `supports_disclosure_divider()` | `widget.set_disclosure_heading(DisclosureHeadingLayer.NORMAL, heading)`, `group.set_disclosure_divider(divider)`. Pass `None` to clear. |
+| JavaScript and TypeScript | `supports_disclosure_heading()`, `supports_disclosure_divider()` | `node.set_disclosure_heading("normal", heading)`, `group.set_disclosure_divider(divider)`. Pass `null` to clear. |
+| Go | `SupportsDisclosureHeading()`, `SupportsDisclosureDivider()` | `node.SetDisclosureHeading(cui.DisclosureHeadingNormal, &heading)`, `group.SetDisclosureDivider(&divider)`. Pass `nil` to clear. Draft builders also provide `DisclosureHeading(layer, heading)` and `DisclosureDivider(divider)`. |
+| Rust | `supports_disclosure_heading()`, `supports_disclosure_divider()` | `app.set_disclosure_heading(node, DisclosureHeadingLayer::Normal, Some(&heading))`, `app.set_disclosure_divider(group, Some(&divider))`. Pass `None` to clear. Mounted builders also provide `disclosure_heading(layer, &heading)` and `disclosure_divider(&divider)`. |
+
+A heading can carry a `DisclosureTypography`, a `DisclosureHeadingBox`,
+and a title color. Include a positive font size when supplying typography.
+Wrap needs a bounded width. Set the font size and line height independently
+for each layer, or omit typography to inherit it. An explicit zero title
+color is transparent. Pass a divider with zero thickness to remove its
+layout space. Clear the divider to restore the themed one-pixel line.
+
+```python
+from cui_bridge import (
+    DisclosureDivider, DisclosureHeading, DisclosureHeadingLayer, DisclosureTypography,
+)
+
+# Apply to the joined sections from the previous example.
+if app.supports_disclosure_heading():
+    sections.set_disclosure_heading(
+        DisclosureHeadingLayer.NORMAL,
+        DisclosureHeading(typography=DisclosureTypography(font_size=17, line_height=24, wrap=True)),
+    )
+    sections.set_disclosure_heading(
+        DisclosureHeadingLayer.EXPANDED,
+        DisclosureHeading(typography=DisclosureTypography(font_size=19, line_height=26, weight=3, wrap=True)),
+    )
+if app.supports_disclosure_divider():
+    sections.set_disclosure_divider(DisclosureDivider(
+        thickness=2, inset_left=12, inset_right=12, color_rgba=0x4D80C0AA,
+    ))
+```
+
 Build your provider and follow the language setup guides to set the Python
 import path, bridge library, or Node addon location. Go and Rust use bundled
 sources by default. Run from the repository root without a font for a
-headless click and a visible-in-app status update.
+headless click and an in-app status update. The five examples apply the heading
+styles and divider when supported by the provider.
 
 ```sh
 PYTHONPATH=bindings/python python bindings/python/examples/workspace_preferences.py
@@ -711,10 +755,8 @@ Add `--features native` before the Cargo example name when building the
 bundled native provider. [Python, JS and TS setup](BINDING_BUILDERS.md) ·
 [Go setup](GO_BUILDERS.md) · [Rust setup](RUST_BUILDERS.md)
 
-The language builders currently expose the display configuration and trigger
-feedback settings above. Heading layers and divider styling are available
-from retained C. Immediate C also provides custom headers, measured reveal
-and synchronous observers. [Immediate C guide](DISCLOSURE.md)
+Immediate C also provides custom headers, measured reveal, application-defined
+font families and synchronous observers. [Immediate C guide](DISCLOSURE.md)
 
 ### Configure a retained Rating from C
 

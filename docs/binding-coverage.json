@@ -26,7 +26,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The immediate and retained C presenters have shared sizes, SVG indicators, joined cards and per-trigger styles. Python, JS/TS, Go and Rust expose the copied display configuration, trigger feedback and queued checked changes. The retained C bridge also offers inherited heading typography, state-specific row boxes and divider styling. Those setters still need language bindings. Custom headers, measured reveal and synchronous observers are immediate C APIs. Physical accessibility still needs validation."
+        "The immediate and retained C presenters have shared sizes, SVG indicators, joined cards and per-trigger styles. Python, JS/TS, Go and Rust expose copied display configuration, trigger feedback, inherited heading typography, state-specific row boxes, divider styling and queued checked changes. Retained typography uses host default or monospace faces. Custom headers, measured reveal and synchronous observers are immediate C APIs. Physical accessibility still needs validation."
       ]
     },
     {
@@ -135,7 +135,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The immediate and retained C presenters have shared sizes, SVG indicators, outer styles and per-trigger styles. Python, JS/TS, Go and Rust expose the copied display configuration, trigger feedback and queued checked changes. The retained C bridge also offers state-specific heading typography and row boxes. The heading setter still needs language bindings. Custom headers, measured reveal and synchronous observers are immediate C APIs. Physical accessibility still needs validation."
+        "The immediate and retained C presenters have shared sizes, SVG indicators, outer styles and per-trigger styles. Python, JS/TS, Go and Rust expose copied display configuration, trigger feedback, state-specific heading typography and row boxes, and queued checked changes. Retained typography uses host default or monospace faces. Custom headers, measured reveal and synchronous observers are immediate C APIs. Physical accessibility still needs validation."
       ]
     },
     {

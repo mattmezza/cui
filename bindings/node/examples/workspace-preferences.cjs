@@ -29,6 +29,16 @@ try {
     editor.set_trigger_style({hoverRgba: 0x4879e02b, cursor: 'pointer'});
     advanced.disclosure_configure({width: 360, borderless: true});
   }
+  if (app.supports_disclosure_heading()) {
+    sections.set_disclosure_heading('normal', {
+      box: {width: -1, height: 44, padding: 12, gap: 8},
+      typography: {fontSize: 16, weight: 2}, titleRgba: 0x23354aff,
+    });
+    editor.set_disclosure_heading('expanded', {titleRgba: 0x275dccff});
+  }
+  if (app.supports_disclosure_divider()) {
+    sections.set_disclosure_divider({thickness: 1, insetLeft: 12, insetRight: 12, colorRgba: 0xc8d0daff});
+  }
   app.mount(column().key('workspace').gap(12).children(label('Workspace preferences'), sections, advanced, status));
   if (fontPath) {
     app.run();

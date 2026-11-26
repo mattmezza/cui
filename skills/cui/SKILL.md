@@ -88,9 +88,10 @@ styles, probe `supports_disclosure_presentation` (`SupportsDisclosurePresentatio
 in Go), then copy a `DisclosureConfig`. Read queued `checked` events after
 a frame. See `docs/BRIDGE_COMPONENTS.md` for typed settings, independent
 resets and the runnable workspace preferences examples in all five languages.
-Retained C also copies heading layers and joined dividers with
-`cui_bridge_disclosure_set_heading_v1` and `cui_bridge_disclosure_set_divider_v1`.
-The language builders currently expose the original presentation and feedback setters.
+For retained heading layers and joined dividers, probe
+`supports_disclosure_heading` and `supports_disclosure_divider` independently.
+Go uses `SupportsDisclosureHeading` and `SupportsDisclosureDivider`. Each
+language's workspace preferences example shows the typed setters.
 
 Use `cui_rating_present` for shared Rating sizes, custom SVG masks, colors and
 outline-only preview. The app owns the numeric value. Set

@@ -17,7 +17,7 @@
       ],
       "state_ownership": "Caller retains bool expansion values and optional per-panel cui_disclosure_motion arrays.",
       "interaction": "Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.",
-      "usage": "Submit stable item IDs and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width and SVG indicators. Set joined for one outer card and use appearance for inherited titles, trigger boxes and divider styles. Retain motion through end_frame. Retained C copies heading layers and divider styles through optional bridge setters and keeps queued change records.",
+      "usage": "Submit stable item IDs and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width and SVG indicators. Set joined for one outer card and use appearance for inherited titles, trigger boxes and divider styles. Retain motion through end_frame. Retained C and the language builders copy heading layers and divider styles through optional setters and deliver queued change records.",
       "docs": [
         "docs/DISCLOSURE.md",
         "docs/DISCLOSURE_EVENTS.md",
@@ -353,7 +353,7 @@
       ],
       "state_ownership": "Caller retains bool expansion values and optional per-panel cui_disclosure_motion arrays.",
       "interaction": "Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.",
-      "usage": "Submit a stable ID and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width, SVG indicators and trigger feedback. Pass appearance for responsive title typography and state-specific boxes. Retain motion through end_frame. Retained C copies heading layers through an optional bridge setter and keeps queued change records.",
+      "usage": "Submit a stable ID and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width, SVG indicators and trigger feedback. Pass appearance for responsive title typography and state-specific boxes. Retain motion through end_frame. Retained C and the language builders copy heading layers through optional setters and deliver queued change records.",
       "docs": [
         "docs/DISCLOSURE.md",
         "docs/DISCLOSURE_EVENTS.md",

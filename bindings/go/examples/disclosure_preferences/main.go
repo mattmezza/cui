@@ -40,6 +40,23 @@ func main() {
 		color, cursor := uint32(0x4879e02b), cui.DisclosureCursorPointer
 		must(editor.SetDisclosureTriggerStyle(&cui.DisclosureTriggerStyle{HoverRGBA: &color, Cursor: &cursor}))
 	}
+	headings, err := app.SupportsDisclosureHeading()
+	must(err)
+	if headings {
+		must(sections.SetDisclosureHeading(cui.DisclosureHeadingNormal, &cui.DisclosureHeading{
+			Typography: &cui.DisclosureTypography{FontSize: 17, LineHeight: 24, Weight: cui.DisclosureWeightMedium, Wrap: true},
+		}))
+		must(sections.SetDisclosureHeading(cui.DisclosureHeadingExpanded, &cui.DisclosureHeading{
+			Typography: &cui.DisclosureTypography{FontSize: 19, LineHeight: 26, Weight: cui.DisclosureWeightBold, Wrap: true},
+		}))
+	}
+	dividers, err := app.SupportsDisclosureDivider()
+	must(err)
+	if dividers {
+		must(sections.SetDisclosureDivider(&cui.DisclosureDivider{
+			Thickness: 2, InsetLeft: 12, InsetRight: 12, ColorRGBA: 0x4d80c0aa,
+		}))
+	}
 	must(app.Mount(cui.Column("workspace").GapUnits(3).Children(
 		cui.Label("Workspace preferences"), sections, advanced, status,
 	)))

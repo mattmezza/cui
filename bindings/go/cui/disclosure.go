@@ -64,8 +64,67 @@ type DisclosureTriggerStyle struct {
 	Cursor                                                        *DisclosureCursor
 }
 
+type DisclosureHeadingLayer uint32
+
+const (
+	DisclosureHeadingNormal DisclosureHeadingLayer = iota
+	DisclosureHeadingExpanded
+	DisclosureHeadingDisabled
+)
+
+type DisclosureWeight uint32
+
+const (
+	DisclosureWeightNormal DisclosureWeight = iota
+	DisclosureWeightMedium
+	DisclosureWeightSemibold
+	DisclosureWeightBold
+)
+
+type DisclosureAlignment uint32
+
+const (
+	DisclosureAlignLeft DisclosureAlignment = iota
+	DisclosureAlignCenter
+	DisclosureAlignRight
+)
+
+// DisclosureTypography uses logical pixels. FontSize is required. Zero
+// LineHeight selects natural metrics. Nonzero LetterSpacing requires host support.
+type DisclosureTypography struct {
+	FontSize, LineHeight, LetterSpacing float32
+	Weight                              DisclosureWeight
+	Align                               DisclosureAlignment
+	Wrap, Italic, Monospace             bool
+}
+
+// DisclosureHeadingBox replaces the complete, vertically centered trigger row.
+// Width -1 fills, width 0 fits, and height 0 fits.
+type DisclosureHeadingBox struct {
+	Width, Height, Padding, Gap, Radius, BorderWidth float32
+	BackgroundRGBA, BorderRGBA                       uint32
+}
+
+// DisclosureHeading refines one state. Nil fields inherit, and a TitleRGBA
+// pointer to zero selects transparent. The builder copies the pointed-to values.
+type DisclosureHeading struct {
+	Box        *DisclosureHeadingBox
+	Typography *DisclosureTypography
+	TitleRGBA  *uint32
+}
+
+// DisclosureDivider customizes the separator in a joined Accordion. Zero
+// Thickness omits the divider. Insets are measured in logical pixels.
+type DisclosureDivider struct {
+	Thickness, InsetLeft, InsetRight float32
+	ColorRGBA                        uint32
+}
+
 type disclosureConfigWire = C.cui_bridge_disclosure_config_v1
 type disclosureStyleWire = C.cui_bridge_disclosure_trigger_style_v1
+type disclosureHeadingWire = C.cui_bridge_disclosure_heading_v1
+type disclosureDividerWire = C.cui_bridge_disclosure_divider_v1
+type disclosureHeadingLayers [DisclosureHeadingDisabled + 1]*disclosureHeadingWire
 
 func disclosureExtent(v float32) bool { return v >= 0 && v <= 4096 }
 
@@ -150,6 +209,58 @@ func (s DisclosureTriggerStyle) wire() (disclosureStyleWire, error) {
 	return wire, nil
 }
 
+func (s DisclosureHeading) wire() (disclosureHeadingWire, error) {
+	wire := disclosureHeadingWire{struct_size: C.sizeof_cui_bridge_disclosure_heading_v1, schema_version: 1}
+	if box := s.Box; box != nil {
+		if (box.Width != -1 && !disclosureExtent(box.Width)) || !disclosureExtent(box.Height) ||
+			!disclosureExtent(box.Padding) || !disclosureExtent(box.Gap) ||
+			!disclosureExtent(box.Radius) || !disclosureExtent(box.BorderWidth) {
+			return wire, errors.New("invalid disclosure heading box")
+		}
+		wire.fields |= C.CUI_BRIDGE_DISCLOSURE_HEADING_BOX
+		wire.width, wire.height = C.float(box.Width), C.float(box.Height)
+		wire.padding, wire.gap = C.float(box.Padding), C.float(box.Gap)
+		wire.radius, wire.border_width = C.float(box.Radius), C.float(box.BorderWidth)
+		wire.background_rgba, wire.border_rgba = C.uint32_t(box.BackgroundRGBA), C.uint32_t(box.BorderRGBA)
+	}
+	if title := s.Typography; title != nil {
+		if title.FontSize <= 0 || !disclosureExtent(title.FontSize) ||
+			!disclosureExtent(title.LineHeight) || !(title.LetterSpacing >= -4096 && title.LetterSpacing <= 4096) ||
+			title.Weight > DisclosureWeightBold || title.Align > DisclosureAlignRight {
+			return wire, errors.New("invalid disclosure heading typography")
+		}
+		wire.fields |= C.CUI_BRIDGE_DISCLOSURE_HEADING_TYPOGRAPHY
+		wire.font_size, wire.line_height = C.float(title.FontSize), C.float(title.LineHeight)
+		wire.letter_spacing = C.float(title.LetterSpacing)
+		wire.weight, wire.align = C.uint32_t(title.Weight), C.uint32_t(title.Align)
+		if title.Wrap {
+			wire.text_flags |= C.CUI_BRIDGE_DISCLOSURE_TITLE_WRAP
+		}
+		if title.Italic {
+			wire.text_flags |= C.CUI_BRIDGE_DISCLOSURE_TITLE_ITALIC
+		}
+		if title.Monospace {
+			wire.text_flags |= C.CUI_BRIDGE_DISCLOSURE_TITLE_MONOSPACE
+		}
+	}
+	if s.TitleRGBA != nil {
+		wire.fields |= C.CUI_BRIDGE_DISCLOSURE_HEADING_COLOR
+		wire.title_rgba = C.uint32_t(*s.TitleRGBA)
+	}
+	return wire, nil
+}
+
+func (s DisclosureDivider) wire() (disclosureDividerWire, error) {
+	if !disclosureExtent(s.Thickness) || !disclosureExtent(s.InsetLeft) || !disclosureExtent(s.InsetRight) {
+		return disclosureDividerWire{}, errors.New("invalid disclosure divider geometry")
+	}
+	return disclosureDividerWire{
+		struct_size: C.sizeof_cui_bridge_disclosure_divider_v1, schema_version: 1,
+		thickness: C.float(s.Thickness), inset_left: C.float(s.InsetLeft), inset_right: C.float(s.InsetRight),
+		color_rgba: C.uint32_t(s.ColorRGBA),
+	}, nil
+}
+
 // DisclosureOptions applies copied presentation in a builder chain.
 func (n *Node) DisclosureOptions(config DisclosureConfig) *Node {
 	if n.err == nil {
@@ -211,5 +322,73 @@ func (n *Node) SetDisclosureTriggerStyle(style *DisclosureTriggerStyle) error {
 		}
 	}
 	n.disclosureStyle = wire
+	return nil
+}
+
+// DisclosureHeading applies a copied heading layer in a builder chain.
+func (n *Node) DisclosureHeading(layer DisclosureHeadingLayer, style DisclosureHeading) *Node {
+	if n.err == nil {
+		n.err = n.SetDisclosureHeading(layer, &style)
+	}
+	return n
+}
+
+// DisclosureDivider applies a copied joined divider in a builder chain.
+func (n *Node) DisclosureDivider(style DisclosureDivider) *Node {
+	if n.err == nil {
+		n.err = n.SetDisclosureDivider(&style)
+	}
+	return n
+}
+
+// SetDisclosureHeading copies one layer onto Accordion, Collapsible, or a direct
+// Accordion Item. Nil or an empty style clears that layer.
+func (n *Node) SetDisclosureHeading(layer DisclosureHeadingLayer, style *DisclosureHeading) error {
+	if n == nil || n.removed ||
+		(n.kind != C.CUI_BRIDGE_ACCORDION && n.kind != C.CUI_BRIDGE_COLLAPSIBLE && n.kind != C.CUI_BRIDGE_ITEM) {
+		return errors.New("heading style requires a live Accordion, Collapsible or Accordion Item")
+	}
+	if layer > DisclosureHeadingDisabled {
+		return errors.New("invalid disclosure heading layer")
+	}
+	var wire *disclosureHeadingWire
+	if style != nil {
+		record, err := style.wire()
+		if err != nil {
+			return err
+		}
+		if record.fields != 0 {
+			wire = &record
+		}
+	}
+	if n.app != nil {
+		if err := n.setDisclosureHeading(layer, wire); err != nil {
+			return err
+		}
+	}
+	n.disclosureHeadings[layer] = wire
+	return nil
+}
+
+// SetDisclosureDivider copies a joined Accordion divider. Nil restores the
+// theme divider. A zero thickness explicitly removes the divider.
+func (n *Node) SetDisclosureDivider(style *DisclosureDivider) error {
+	if n == nil || n.removed || n.kind != C.CUI_BRIDGE_ACCORDION {
+		return errors.New("divider style requires a live Accordion")
+	}
+	var wire *disclosureDividerWire
+	if style != nil {
+		record, err := style.wire()
+		if err != nil {
+			return err
+		}
+		wire = &record
+	}
+	if n.app != nil {
+		if err := n.setDisclosureDivider(wire); err != nil {
+			return err
+		}
+	}
+	n.disclosureDivider = wire
 	return nil
 }

@@ -33,7 +33,7 @@ function(cui_rust_disclosure_test name target legacy)
   WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/rust" RUN_SERIAL TRUE TIMEOUT 600)
 endfunction()
 
-set(_disclosure_go_test test ./cui -count=1 -run "^TestDisclosurePresentation$")
+set(_disclosure_go_test test ./cui -count=1 -run "^TestDisclosure(Presentation|HeadingAndDivider)$")
 set(_disclosure_rust_test ${CUI_DISCLOSURE_CARGO} test --offline --locked -j1 --test disclosure)
 set(_disclosure_rust_shared CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>)
 set(_disclosure_rust_dynamic "${CUI_RUST_SKELETON_TARGET_DIR}")

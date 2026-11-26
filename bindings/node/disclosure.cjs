@@ -4,11 +4,16 @@ const {endianness} = require('node:os');
 const nativeOrder = endianness() === 'BE' ? 'BE' : 'LE';
 const CONFIG = Symbol('disclosure config');
 const STYLE = Symbol('disclosure style');
-const flags = ['joined', 'bordered', 'single', 'allowCollapse', 'customCard', 'clipCard', 'borderless'];
+const HEADINGS = Symbol('disclosure headings');
+const DIVIDER = Symbol('disclosure divider');
+const flags =
+    ['joined', 'bordered', 'single', 'allowCollapse', 'customCard', 'clipCard', 'borderless'];
 const dimensions = ['width', 'cardRadius', 'cardBorderWidth', 'cardPadding', 'cardGap'];
 const colors = ['hoverRgba', 'pressedRgba', 'expandedRgba', 'disabledRgba', 'focusRgba'];
-const cursors = ['default', 'pointer', 'text', 'resize_horizontal', 'resize_vertical', 'move',
-  'not_allowed', 'crosshair', 'grab', 'grabbing', 'zoom_in', 'zoom_out', 'wait', 'help'];
+const cursors = [
+  'default', 'pointer', 'text', 'resize_horizontal', 'resize_vertical', 'move', 'not_allowed',
+  'crosshair', 'grab', 'grabbing', 'zoom_in', 'zoom_out', 'wait', 'help'
+];
 
 function writeUInt(record, value, offset) {
   record[`writeUInt32${nativeOrder}`](value, offset);
@@ -82,14 +87,90 @@ function encodeStyle(value) {
   return mask ? record : null;
 }
 
+function exact(value, fields) {
+  if (!value || typeof value !== 'object' ||
+      ![Object.prototype, null].includes(Object.getPrototypeOf(value)) ||
+      Reflect.ownKeys(value).some(k => !fields.includes(k)))
+    throw new TypeError('expected exact disclosure record');
+}
+function dimension(v, minimum = 0) {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < minimum || v > 4096)
+    throw new RangeError('invalid disclosure dimension');
+  return v;
+}
+function encodeHeading(value) {
+  if (value === null) return null;
+  exact(value, ['box', 'typography', 'titleRgba']);
+  const r = wire(value, 76);
+  let mask = 0;
+  if (value.box != null) {
+    const names = [
+      'width', 'height', 'padding', 'gap', 'radius', 'borderWidth', 'backgroundRgba', 'borderRgba'
+    ];
+    exact(value.box, names);
+    mask |= 1;
+    names.forEach((n, i) => {
+      const v = value.box[n] === undefined ? 0 : value.box[n];
+      if (i < 6) {
+        if (!(n === 'width' && v === -1)) dimension(v);
+        r[`writeFloat${nativeOrder}`](v, 44 + i * 4);
+      } else
+        writeUInt(r, color(v), 44 + i * 4);
+    });
+  }
+  if (value.typography != null) {
+    const t = value.typography;
+    exact(t, [
+      'fontSize', 'lineHeight', 'letterSpacing', 'weight', 'align', 'wrap', 'italic', 'monospace'
+    ]);
+    mask |= 2;
+    ['fontSize', 'lineHeight', 'letterSpacing'].forEach((n, i) => {
+      const v = t[n] === undefined && i !== 0 ? 0 : t[n];
+      dimension(v, i === 2 ? -4096 : 0);
+      if (i === 0 && Math.fround(v) <= 0) throw new RangeError('fontSize must be positive');
+      r[`writeFloat${nativeOrder}`](v, 16 + i * 4);
+    });
+    ['weight', 'align'].forEach((n, i) => {
+      const v = t[n] === undefined ? 0 : t[n];
+      if (!Number.isInteger(v) || v < 0 || v > (i === 0 ? 3 : 2))
+        throw new RangeError('invalid typography enum');
+      writeUInt(r, v, 28 + i * 4);
+    });
+    let flags = 0;
+    ['wrap', 'italic', 'monospace'].forEach((n, i) => {
+      if (t[n] !== undefined && typeof t[n] !== 'boolean')
+        throw new TypeError('typography flags must be boolean');
+      if (t[n]) flags |= 1 << i;
+    });
+    writeUInt(r, flags, 36);
+  }
+  if (value.titleRgba != null) {
+    mask |= 4;
+    writeUInt(r, color(value.titleRgba), 40);
+  }
+  writeUInt(r, mask, 8);
+  return mask ? r : null;
+}
+function encodeDivider(value) {
+  if (value === null) return null;
+  exact(value, ['thickness', 'insetLeft', 'insetRight', 'colorRgba']);
+  const r = wire(value, 32);
+  ['thickness', 'insetLeft', 'insetRight'].forEach(
+      (n, i) => r[`writeFloat${nativeOrder}`](
+          dimension(value[n] === undefined ? 0 : value[n]), 16 + i * 4));
+  writeUInt(r, color(value.colorRgba === undefined ? 0 : value.colorRgba), 28);
+  return r;
+}
 module.exports = (native, Node, handle, sizes) => {
   function supports(app) {
     app._alive();
-    return typeof native.disclosureOptions === 'function' && native.disclosureOptions(app.handle, 0);
+    return typeof native.disclosureOptions === 'function' &&
+        native.disclosureOptions(app.handle, 0);
   }
 
   function requireSupport(app) {
-    if (!supports(app)) throw new Error('disclosure presentation requires both optional bridge symbols');
+    if (!supports(app))
+      throw new Error('disclosure presentation requires both optional bridge symbols');
   }
 
   function apply(app, node, operation, record) {
@@ -97,7 +178,7 @@ module.exports = (native, Node, handle, sizes) => {
     native.disclosureOptions(app.handle, operation, node[handle], record);
   }
 
-  Node.prototype.disclosure_configure = function (config) {
+  Node.prototype.disclosure_configure = function(config) {
     if (this.kind !== 15 && this.kind !== 19)
       throw new TypeError('disclosure configuration requires Accordion or Collapsible');
     const record = encodeConfig(config, sizes);
@@ -110,7 +191,7 @@ module.exports = (native, Node, handle, sizes) => {
     return this;
   };
 
-  Node.prototype.set_trigger_style = function (style) {
+  Node.prototype.set_trigger_style = function(style) {
     if (this.kind !== 15 && this.kind !== 20)
       throw new TypeError('trigger style requires Collapsible or direct Accordion Item');
     const record = encodeStyle(style);
@@ -119,12 +200,52 @@ module.exports = (native, Node, handle, sizes) => {
     return this;
   };
 
+  function supportsOptional(app, divider = false) {
+    app._alive();
+    return typeof native.disclosureHeadingOptions === 'function' &&
+        native.disclosureHeadingOptions(app.handle, divider ? 2 : 0);
+  }
+  function applyOptional(app, node, record, layer = 0, divider = false) {
+    if (!supportsOptional(app, divider))
+      throw new Error('disclosure requires optional bridge symbol');
+    native.disclosureHeadingOptions(app.handle, divider ? 3 : 1, node[handle], layer, record);
+  }
+  Node.prototype.set_disclosure_heading = function(layer, value) {
+    if (!['normal', 'expanded', 'disabled'].includes(layer))
+      throw new RangeError('invalid heading layer');
+    if (![15, 19, 20].includes(this.kind)) throw new TypeError('invalid heading target');
+    const r = encodeHeading(value);
+    const index = ['normal', 'expanded', 'disabled'].indexOf(layer);
+    if (this.owner) applyOptional(this.owner, this, r, index);
+    if (r === null) {
+      this[HEADINGS]?.delete(index);
+    } else {
+      (this[HEADINGS] ??= new Map()).set(index, r);
+    }
+    return this;
+  };
+  Node.prototype.set_disclosure_divider = function(value) {
+    if (this.kind !== 19) throw new TypeError('divider requires Accordion');
+    const r = encodeDivider(value);
+    if (this.owner) applyOptional(this.owner, this, r, 0, true);
+    this[DIVIDER] = r;
+    return this;
+  };
   return {
     supports,
+    supportsHeading: app => supportsOptional(app),
+    supportsDivider: app => supportsOptional(app, true),
     preflight(app, root) {
       const pending = [root];
       while (pending.length) {
         const node = pending.pop();
+        if (node[HEADINGS]?.size) {
+          if (!supportsOptional(app)) throw new Error('heading requires optional bridge symbol');
+          if (node.kind === 20 && node.parent?.kind !== 19)
+            throw new TypeError('heading Item must be direct Accordion child');
+        }
+        if (node[DIVIDER] && !supportsOptional(app, true))
+          throw new Error('divider requires optional bridge symbol');
         if (node[CONFIG] || node[STYLE]) requireSupport(app);
         if (node[STYLE] && node.kind === 20 && node.parent?.kind !== 19)
           throw new TypeError('styled Item must be a direct Accordion child');
@@ -132,6 +253,9 @@ module.exports = (native, Node, handle, sizes) => {
       }
     },
     mount(app, node) {
+      for (const [layer, r] of node[HEADINGS] ?? [])
+        if (r) applyOptional(app, node, r, layer);
+      if (node[DIVIDER]) applyOptional(app, node, node[DIVIDER], 0, true);
       if (node[CONFIG]) apply(app, node, 1, node[CONFIG]);
       if (node[STYLE]) apply(app, node, 2, node[STYLE]);
     },

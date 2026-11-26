@@ -113,8 +113,12 @@ static void kinds_and_pixels(void) {
                 assert(matched_text < text_count);
                 const cui_draw_command *a = &text[matched_text++], *b = &list.commands[i];
                 assert(!memcmp(&a->bounds, &b->bounds, sizeof a->bounds));
-                assert(a->font_size == b->font_size &&
-                       !memcmp(&a->text_style, &b->text_style, sizeof a->text_style));
+                assert(a->font_size == b->font_size);
+                assert(a->text_style.weight == b->text_style.weight &&
+                       a->text_style.italic == b->text_style.italic &&
+                       a->text_style.monospace == b->text_style.monospace &&
+                       a->text_style.family == b->text_style.family &&
+                       a->text_style.letter_spacing == b->text_style.letter_spacing);
                 assert(a->text.length == b->text.length &&
                        !memcmp(text_bytes[matched_text - 1], b->text.data, a->text.length));
                 assert(!memcmp(&a->color, &b->color, sizeof a->color));

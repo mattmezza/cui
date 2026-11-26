@@ -2697,7 +2697,7 @@
           ]
         },
         {
-          "name": "retained Radio and RadioGroup motion in C, Python, JavaScript, TypeScript and Go",
+          "name": "retained Radio and RadioGroup motion in C, Python, JavaScript, TypeScript, Go and Rust",
           "status": "tested",
           "evidence": [
             "tests/unit/test_bridge_radio_motion.c",
@@ -2708,11 +2708,14 @@
             "bindings/typescript/examples/radio_delivery.ts",
             "bindings/go/cui/radio_motion_test.go",
             "bindings/go/examples/radio_delivery/main.go",
+            "bindings/rust/tests/radio_motion.rs",
+            "bindings/rust/examples/radio_delivery.rs",
+            "docs/RUST_BUILDERS.md",
             "docs/GO_BUILDERS.md",
             "docs/BRIDGE_COMPONENTS.md"
           ],
           "limitations": [
-            "Optional C bridge configuration with Python, JavaScript, TypeScript and Go builder settings. Existing standalone CHANGE and group selected Item payloads retain their timing. Rust authoring and OS preference observation remain open."
+            "Optional C bridge configuration with Python, JavaScript, TypeScript, Go and Rust builder settings. Existing standalone CHANGE and group selected Item payloads retain their timing. Automatic observation of native reduced-motion preferences remains open."
           ]
         }
       ],

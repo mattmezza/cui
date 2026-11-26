@@ -1,0 +1,86 @@
+//! Run headless by default, or pass --font /path/to/font.ttf for a native window.
+use cui_builders::*;
+use std::{cell::Cell, rc::Rc};
+fn main() -> Result<()> {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let smoke = args.iter().any(|arg| arg == "--smoke");
+    let font = args.iter().position(|arg| arg == "--font").map(|index| {
+        args.get(index + 1)
+            .expect("--font requires a path")
+            .as_str()
+    });
+    if smoke {
+        assert!(
+            font.is_some() && std::env::var("CUI_TEST_VIRTUAL_DISPLAY").as_deref() == Ok("1"),
+            "--smoke requires a font and the private display from scripts/test_local.py"
+        );
+    }
+    let mut app = if let Some(path) = font {
+        App::sdl_with_window_options(
+            320.,
+            240.,
+            "Delivery options",
+            path,
+            WindowOptions {
+                initially_hidden: smoke,
+            },
+        )?
+    } else {
+        App::headless(320., 240.)?
+    };
+    let root = app.build_root(Kind::Column, "root")?.gap_px(12.)?.finish();
+    app.build_child(root, Kind::Label, "title")?
+        .text("Delivery service")?
+        .finish();
+    let motion = app.supports_radio_motion();
+    let group = app
+        .build_child(root, Kind::RadioGroup, "delivery")?
+        .animate_selection(motion)?
+        .finish();
+    let standard = app
+        .build_child(group, Kind::Item, "standard")?
+        .text("Standard")?
+        .finish();
+    let priority = app
+        .build_child(group, Kind::Item, "priority")?
+        .text("Priority")?
+        .finish();
+    app.select(group, standard)?;
+    let summary = app
+        .build_child(root, Kind::Label, "summary")?
+        .text("Estimated arrival: Friday")?
+        .finish();
+    let selected = Rc::new(Cell::new(None));
+    let captured = selected.clone();
+    let changes = Rc::new(Cell::new(0));
+    let count = changes.clone();
+    app.on_change_event(group, move |event| {
+        captured.set(event.selected);
+        count.set(count.get() + 1);
+    })?;
+    let apply_selection = |app: &mut App| -> Result<()> {
+        if let Some(item) = selected.take() {
+            let arrival = if item == priority {
+                "Wednesday"
+            } else {
+                "Friday"
+            };
+            app.text(summary, &format!("Estimated arrival: {arrival}"))?;
+        }
+        Ok(())
+    };
+    if font.is_none() || smoke {
+        app.step(0.016)?;
+        let b = app.bounds(priority)?;
+        app.pointer(Phase::Down, b.x + b.width / 2., b.y + b.height / 2.)?;
+        app.pointer(Phase::Up, b.x + b.width / 2., b.y + b.height / 2.)?;
+        assert_eq!(app.frame(0.016)?, 1);
+        assert_eq!(changes.get(), 1);
+        assert_eq!(app.selected(group)?, Some(priority));
+        apply_selection(&mut app)?;
+        assert_eq!(app.editable_text(summary)?, "Estimated arrival: Wednesday");
+    } else {
+        app.run_with(apply_selection)?;
+    }
+    Ok(())
+}

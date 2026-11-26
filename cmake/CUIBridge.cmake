@@ -606,6 +606,49 @@ if(CUI_GO_RADIO_MOTION_TESTS)
  endif()
 endif()
 
+option(CUI_RUST_RADIO_MOTION_TESTS "Check retained Radio motion with Rust on Linux" OFF)
+if(CUI_RUST_RADIO_MOTION_TESTS)
+ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "Rust Radio motion provider tests currently support Linux only")
+ endif()
+ find_program(CUI_RUST_RADIO_MOTION_CARGO cargo REQUIRED)
+ set(CUI_RUST_RADIO_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/rust-radio-shared" CACHE PATH "Cargo targets for shared Radio motion tests")
+ set(CUI_RUST_RADIO_STATIC_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/rust-radio-static" CACHE PATH "Cargo targets for bundled Radio motion tests")
+ function(cui_rust_radio_motion_test suffix target env supported)
+  add_test(NAME bridge_rust_radio_motion_${suffix} COMMAND ${CMAKE_COMMAND} -E env
+   --unset=CUI_BRIDGE_LIB_DIR --unset=LD_LIBRARY_PATH
+   CARGO_TARGET_DIR=${target} RUSTFLAGS=-Dwarnings SDL_RENDER_DRIVER=software
+   CUI_TEST_RADIO_MOTION=${supported} ${env}
+   ${CUI_RUST_RADIO_MOTION_CARGO} ${ARGN})
+  set_tests_properties(bridge_rust_radio_motion_${suffix} PROPERTIES
+   WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/rust" RUN_SERIAL TRUE TIMEOUT 600)
+ endfunction()
+ set(_radio_shared
+  "CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>;LD_LIBRARY_PATH=$<TARGET_FILE_DIR:cui_bridge>")
+ cui_rust_radio_motion_test(dynamic "${CUI_RUST_RADIO_TARGET_DIR}" "${_radio_shared}" 1
+  test --offline --locked -j1 --test radio_motion)
+ cui_rust_radio_motion_test(static "${CUI_RUST_RADIO_STATIC_TARGET_DIR}" "" 1
+  test --offline --locked -j1 --test radio_motion)
+ cui_rust_radio_motion_test(example "${CUI_RUST_RADIO_STATIC_TARGET_DIR}" "" 1
+  run --offline --locked -j1 --example radio_delivery)
+ set(CUI_RUST_RADIO_LEGACY_LIBRARY "" CACHE FILEPATH "Optional bridge without retained Radio motion")
+ if(CUI_RUST_RADIO_LEGACY_LIBRARY)
+  if(NOT EXISTS "${CUI_RUST_RADIO_LEGACY_LIBRARY}" OR IS_DIRECTORY "${CUI_RUST_RADIO_LEGACY_LIBRARY}")
+   message(FATAL_ERROR "CUI_RUST_RADIO_LEGACY_LIBRARY must name an existing provider")
+  endif()
+  set(_radio_legacy "${CMAKE_CURRENT_BINARY_DIR}/rust-radio-legacy")
+  file(MAKE_DIRECTORY "${_radio_legacy}")
+  file(CREATE_LINK "${CUI_RUST_RADIO_LEGACY_LIBRARY}" "${_radio_legacy}/libcui_bridge.so" SYMBOLIC)
+  cui_rust_radio_motion_test(legacy "${CUI_RUST_RADIO_TARGET_DIR}"
+   "CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>;LD_LIBRARY_PATH=${_radio_legacy}" 0
+   test --offline --locked -j1 --test radio_motion)
+ endif()
+ if(CUI_BRIDGE_NATIVE_TESTS)
+  cui_rust_radio_motion_test(native "${CUI_RUST_RADIO_TARGET_DIR}" "${_radio_shared}" 1
+   run --offline --locked -j1 --example radio_delivery -- --font ${CUI_TEST_FONT} --smoke)
+ endif()
+endif()
+
 add_test(NAME bridge_python_slider_model COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_slider_model.py)

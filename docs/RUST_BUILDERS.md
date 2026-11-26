@@ -93,6 +93,32 @@ Dock composes Item panels with optional child content; `dock_activate`, `dock_mo
 
 Settings composes Item pages, nested Item groups, and Switch/Checkbox/Input/NumberInput fields. `settings_query` filters pages (up to 256 bytes), `settings_page`/`settings_set_page` control navigation, `settings_field_bounds` locates visible fields, and `settings_reset_page` restores first-frame defaults with copied field events. The page/group schema freezes after the first frame; Input and NumberInput titles use `detail_text`. All fallible setters return the bridge status as `Error(code)`.
 
+## Animate Radio selection from Rust
+
+Use `app.supports_radio_motion()` to read the provider capability. Pass that
+flag to `Builder::animate_selection(enabled)` on a Radio or RadioGroup child.
+On a mounted node, use `app.animate_selection(node, enabled)` to change the
+setting. A RadioGroup applies it across its options. Pass false to preserve
+immediate presentation, including when loading an earlier provider. An
+explicit opt-in with an earlier provider returns the backend-unavailable
+error.
+
+`app.selected(group)` reflects the current choice after `step`. The
+`on_change_event` handler receives the selected Item during `dispatch` or
+the native runner. Standalone Radio reports a checked boolean through the
+same callback API. The delivery form applies the callback's selected Item
+on the UI thread in both its interactive and headless modes.
+[Complete delivery example](../bindings/rust/examples/radio_delivery.rs)
+
+Run from the repository root with Rust and a C11 toolchain. Native mode also
+uses SDL3, FreeType and HarfBuzz.
+
+```sh
+cargo run --locked --manifest-path bindings/rust/Cargo.toml --example radio_delivery
+cargo run --locked --manifest-path bindings/rust/Cargo.toml --features native \
+  --example radio_delivery -- --font third_party/inter/Inter-Regular.otf
+```
+
 ## Configure Pagination from Rust
 
 Build a detached `PaginationOptions` when you want the bridge capability and record size checked before creating a retained child. Ordinary `Kind::Pagination` still works with earlier providers. `app.supports_pagination_options()` reports whether the extended API is available.

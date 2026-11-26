@@ -177,6 +177,11 @@ Go builders opt in with `AnimateSelection(enabled)` after checking
 update or a fallback directly. The Go delivery form can run headlessly or open
 an SDL window. [Go guide and runnable form](GO_BUILDERS.md#animate-radio-selection-from-go)
 
+Rust uses `app.supports_radio_motion()` and `Builder::animate_selection(enabled)`.
+Use `app.animate_selection(node, enabled)` to update a mounted control. Its
+delivery form also supports headless and native execution.
+[Rust guide and runnable form](RUST_BUILDERS.md#animate-radio-selection-from-rust)
+
 ### Configure a retained pager from C
 
 The bridge keeps the page on a `CUI_BRIDGE_PAGINATION` node. Set its total and initial value through `cui_bridge_set_total` and `cui_bridge_set_value`. Use the shared design-size setter for XS through 9XL and the V1 configuration for navigation and labels. For a dynamically loaded provider, probe the optional Pagination V1 symbols and check the version bit and exact layout size before using the extended options. A configured pager or one with an explicit design size or custom height uses the extended theme paint, including the current-page outline and pointer feedback. The default retained pager keeps the original paint.

@@ -1,6 +1,7 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
 mod icon_resources;
 mod pagination_options;
+mod radio_motion;
 mod shadows;
 mod skeleton_presentation;
 mod slider_model;
@@ -1227,6 +1228,8 @@ pub struct App {
     id: u64,
     callbacks: HashMap<(RawNode, u32), Rc<RefCell<Callback>>>,
     data_table_capacities: HashMap<RawNode, u32>,
+    // Older providers lack the setter's kind check. Match their live Radio handles locally.
+    radio_nodes: std::collections::HashSet<RawNode>,
     running: bool,
     slider: Option<slider_model::State>,
     time_localized: Option<time_localized::State>,
@@ -1419,6 +1422,7 @@ impl App {
             id,
             callbacks: HashMap::new(),
             data_table_capacities: HashMap::new(),
+            radio_nodes: std::collections::HashSet::new(),
             running: false,
             slider: None,
             time_localized: None,
@@ -1446,6 +1450,9 @@ impl App {
         let key = string(key)?;
         let mut raw = RawNode::default();
         check(unsafe { cui_bridge_node_create(self.raw, p, kind as u32, key.as_ptr(), &mut raw) })?;
+        if matches!(kind, Kind::Radio | Kind::RadioGroup) && !self.supports_radio_motion() {
+            self.radio_nodes.insert(raw);
+        }
         Ok(Node {
             raw,
             app_id: self.id,
@@ -1460,6 +1467,13 @@ impl App {
         // every tracked table so a recycled slot cannot inherit a capacity.
         self.data_table_capacities
             .retain(|node, _| *node != raw && read_data_table_state(app, *node).is_ok());
+        self.radio_nodes.retain(|node| {
+            let mut required = 0;
+            let status = unsafe {
+                cui_bridge_get_text(app, *node, std::ptr::null_mut(), 0, &mut required)
+            };
+            status == 0 || status == 5
+        });
         self.slider_removed(raw);
         if let Some(state) = &mut self.time_localized {
             let app = self.raw;

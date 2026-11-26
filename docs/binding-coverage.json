@@ -968,7 +968,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "The five builders support the built-in command rows. Custom row content and measurement callbacks are available through the immediate C API."
+      ]
     },
     {
       "name": "DataTable",

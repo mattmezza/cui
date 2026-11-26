@@ -93,8 +93,11 @@ the estimated available row width and font size and returns the complete outer
 height. A growing palette starts with the default width scaled by density
 and uses the previous allocation thereafter. If the allocation changes, it
 requests a follow-up frame to update custom heights. The row width itself
-already follows the current allocation. Keep measurement consistent with the
-content callback. Every flattened row is measured each submission; only visible
+already follows the current allocation. When heights change, the virtual
+list keeps a previously fully visible selection in view. Scrolling the
+selection out of view leaves the viewport under the user's control, subject
+to the usual content bounds. Reflow emits no new selection callback. Keep
+measurement consistent with the content callback. Every flattened row is measured each submission; only visible
 rows invoke content and submit semantic/paint nodes. This has bounded O(n)
 measurement and avoids drawing all offscreen children, but does not reproduce
 GPUI's typography/action-binding row measurement cache.

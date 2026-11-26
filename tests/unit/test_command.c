@@ -429,6 +429,64 @@ static void test_grow_custom_measure(void) {
     cui_destroy(ui);
 }
 
+static void test_custom_height_reflow_keeps_visible_selection(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    char buffer[32] = {0};
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_command_state state;
+    cui_command_row rows[12];
+    cui_command_entry entries[10];
+    float measured_width = 0;
+    for (size_t i = 0; i < 10; ++i)
+        entries[i] = (cui_command_entry){.kind = CUI_COMMAND_ITEM,
+                                         .item = {.label = cui_string("Wrapped entry"),
+                                                  .measure = measure_width,
+                                                  .content_user = &measured_width}};
+    cui_command_options options = cui_command_default();
+    options.width = -1;
+    options.searchable = false;
+    options.max_height = 100;
+    options.on_select = selection;
+    options.user = order;
+    order_count = 0;
+    assert(ui && edit && cui_command_init(&state, rows, 12, edit));
+
+    cui_command_index target = {0, 7}, selected;
+    cui_id target_id = cui_command_row_id(42, target);
+    grow_panel(ui, &state, entries, 10, 520, options, false);
+    grow_panel(ui, &state, entries, 10, 520, options, false);
+    assert(cui_command_select(&state, target, true, options));
+    grow_panel(ui, &state, entries, 10, 520, options, false);
+    assert(state.scroll.y == 160 && cui_bounds(ui, target_id).h == 32);
+
+    grow_panel(ui, &state, entries, 10, 260, options, false);
+    assert(cui_needs_redraw(ui) && state.scroll.y == 160);
+    grow_panel(ui, &state, entries, 10, 260, options, false);
+    cui_rect viewport = cui_bounds(ui, cui_command_list_id(42));
+    const cui_semantic *item = semantic(ui, target_id);
+    assert(item && item->checked && item->bounds.h == 60);
+    assert(item->bounds.y >= viewport.y &&
+           item->bounds.y + item->bounds.h <= viewport.y + viewport.h);
+    assert(state.scroll.y == 384 && !cui_needs_redraw(ui));
+    assert(order_count == 1);
+    assert(cui_command_selected(&state, &selected) && cui_command_index_equal(selected, target));
+
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = viewport.x + 20,
+                                           .y = viewport.y + 20,
+                                           .dy = 344,
+                                           .scroll_precise = true}));
+    grow_panel(ui, &state, entries, 10, 260, options, false);
+    assert(cui_event_consumed(ui, 0) && state.scroll.y == 40 && !semantic(ui, target_id));
+    grow_panel(ui, &state, entries, 10, 520, options, false);
+    grow_panel(ui, &state, entries, 10, 520, options, false);
+    assert(state.scroll.y == 40 && !semantic(ui, target_id) && order_count == 1);
+    assert(cui_command_selected(&state, &selected) && cui_command_index_equal(selected, target));
+
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+
 static void test_virtual_geometry(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     assert(ui);
@@ -646,6 +704,7 @@ int main(void) {
     test_panel_width();
     test_grow_panel_width();
     test_grow_custom_measure();
+    test_custom_height_reflow_keeps_visible_selection();
     test_dialog();
     test_slots_and_loading();
 #endif

@@ -1139,7 +1139,7 @@ The gallery custom tooltip toggle uses `cui_chart_tooltip_build_fn` with copied 
 
 **Interaction:** on_select/on_query/on_confirm/on_cancel observe synchronous interaction; command item action invokes application work.
 
-**Usage:** Initialize bounded query/row storage, submit entries each frame, and execute actions only from confirmation/action events. Set width=-1 to grow inside a Dialog or other bounded parent.
+**Usage:** Initialize bounded query/row storage, submit entries each frame, and execute actions only from confirmation/action events. Set width=-1 to grow inside a Dialog or other bounded parent. Custom row heights settle on a follow-up frame, keeping a fully visible selection in view.
 
 API: `cui_command_init`, `cui_command`. [Public header](../include/cui/cui_command.h); [guide](COMMAND.md).
 

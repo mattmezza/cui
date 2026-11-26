@@ -8059,16 +8059,18 @@
         "cui_command_confirm"
       ],
       "public_header": "include/cui/cui_command.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_command.c"
+        "tests/unit/test_command.c",
+        "tests/web/test_choice_panel_width.py"
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Grouped filtering, original item paths, wrapping keyboard selection, pointer confirmation, virtual rows, actual Input/Scroll and Dialog cancellation are tested. Unicode matching, arbitrary intrinsic wrapping, native Action/window lifecycle and deferred callbacks remain explicit host boundaries; see docs/COMMAND.md."
+        "Grouped filtering, original item paths, wrapping keyboard selection, pointer confirmation, virtual rows, actual Input/Scroll and Dialog cancellation are tested. Width-dependent custom heights follow on a second frame and preserve a fully visible selection. Same-frame intrinsic wrapping, Unicode matching, native Action/window lifecycle and deferred callbacks remain open or host responsibilities; see docs/COMMAND.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -8110,6 +8112,14 @@
           "limitations": [
             "Built-in row widths follow current layout. Width-dependent custom heights use an estimate and settle on a follow-up frame."
           ]
+        },
+        {
+          "name": "preserve visible selection when virtual custom rows reflow",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_command.c"
+          ],
+          "scope": "C grow-width layout keeps a fully visible selection in view as custom heights change. A wheel scroll away from the selected row remains authoritative. Resize and scroll emit no selection callback."
         }
       ],
       "upstream_doc": {

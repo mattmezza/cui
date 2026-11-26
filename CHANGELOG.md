@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A growing Command palette keeps a fully visible selection in view when
+  custom row heights change. Scrolling away from the selection remains
+  effective across a resize.
+
 ## 0.1.0-alpha.12
 
 - Carousel can size slides to their content on either axis. Immediate C, the

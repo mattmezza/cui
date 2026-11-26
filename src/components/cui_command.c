@@ -127,13 +127,24 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
     cui_str q = cui_edit_get_text(s->query);
     uint64_t hash = cui_command_hash(q);
     bool changed = s->initialized && hash != s->query_hash;
+    bool grow_width = o.width < 0;
+    cui_id list = cui_command_list_id(id);
+    cui_command_index previous_selection = {0};
+    float previous_bottom_in_view = 0;
+    if (grow_width && !changed && s->initialized && s->rows && s->selected < s->row_count &&
+        s->selected < s->capacity) {
+        const cui_command_row *row = &s->rows[s->selected];
+        if (row->height > 0 && row->offset >= s->scroll.y) {
+            previous_bottom_in_view = row->offset - s->scroll.y + row->height;
+            previous_selection = row->index;
+        }
+    }
     if (!cui_command_events_private_rebuild(s, entries, n, q, changed, o, observer))
         return false;
     s->query_hash = hash;
     float density = t->font_size / 16;
     if (!isfinite(density) || density <= 0)
         return false;
-    bool grow_width = o.width < 0;
     float width = grow_width ? cui_bounds(ui, id).w : o.width;
     if (width <= 0)
         width = 380 * density;
@@ -153,6 +164,12 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
                                   : 76 * density;
     if (viewport > o.max_height)
         viewport = o.max_height;
+    /* A selected row can move outside the virtual slice when custom heights
+     * are recalculated. Preserve its visibility if it was fully in view. */
+    if (custom_measure && previous_bottom_in_view > 0 && s->selected < s->row_count &&
+        cui_command_index_equal(s->rows[s->selected].index, previous_selection) &&
+        previous_bottom_in_view <= cui_bounds(ui, list).h)
+        s->pending_scroll = true;
     cui_command_scroll_selection(s, viewport, total);
     if (!cui_begin_focus_scope(ui, id, false))
         return false;
@@ -235,7 +252,6 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
             cui_command_scroll_selection(s, viewport, total);
         }
     }
-    cui_id list = cui_command_list_id(id);
     scroll.height = viewport;
     scroll.content_height = s->row_count ? total : viewport;
     bool list_open = grow_width

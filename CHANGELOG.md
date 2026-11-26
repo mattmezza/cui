@@ -19,8 +19,8 @@
   Items into a bounded set of decorative children while keeping one focus and
   selection target for the row.
 - Standalone Radio and RadioGroup options can show delayed hover and focus
-  tooltips in immediate C and the retained C bridge. The WASM gallery shows a
-  hint on the Priority option.
+  tooltips in immediate C, the retained C bridge and Python. The WASM
+  gallery and Python delivery form show a hint on the Priority option.
 
 ## 0.1.0-alpha.7
 

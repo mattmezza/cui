@@ -294,8 +294,16 @@ its accessible description. Tooltip visibility adds no queued notifications
 and leaves the existing selection callback and payload intact.
 
 For a dynamically loaded bridge, check for the optional
-`cui_bridge_radio_set_tooltip_v1` symbol. Python, JavaScript, TypeScript, Go and
-Rust do not yet expose this setter.
+`cui_bridge_radio_set_tooltip_v1` symbol.
+
+In Python, check `app.supports_radio_tooltip()` and call
+`priority.radio_tooltip("Track your parcel online", delay_ms=350)`. You can
+set or clear the hint before mounting or between steps. Pass `None` or an
+empty string to clear it. On earlier providers, skip the optional hint so the
+same form mounts normally. The runnable delivery example uses this pattern.
+[Python delivery form](../bindings/python/examples/radio_delivery.py)
+
+JavaScript, TypeScript, Go and Rust do not yet expose this setter.
 
 ### Configure a retained pager from C
 

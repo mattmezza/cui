@@ -151,6 +151,67 @@ class Components(unittest.TestCase):
             with App(library=legacy) as app:
                 self.check_provider_without_radio_decoration(app)
 
+    def test_radio_tooltip_is_optional_and_keeps_selection_events(self):
+        with self.assertRaises(ValueError):
+            checkbox("check").radio_tooltip("Wrong control")
+        with self.assertRaises(ValueError):
+            radio("radio").radio_tooltip("é" * 129)
+        with self.assertRaises(ValueError):
+            radio("radio").radio_tooltip("Bad\0hint")
+        for delay in (-1, 10_001, True, 350.5):
+            with self.subTest(delay=delay), self.assertRaises(ValueError):
+                radio("radio").radio_tooltip("Hint", delay_ms=delay)
+        with App() as app:
+            bad = tabs("tabs").children(item("tab").radio_tooltip("Wrong parent"))
+            with self.assertRaisesRegex(ValueError, "direct RadioGroup Item"):
+                app.mount(column().children(bad))
+            self.assertTrue(app.supports_radio_tooltip())
+            standard = item("first", "Standard")
+            priority = item("second", "Priority").radio_tooltip("Suivre le colis", delay_ms=0)
+            alternate = radio("alternate", "Also send a copy").radio_tooltip("Email a receipt")
+            changes = []
+            group = radio_group("delivery").children(standard, priority).select(standard)
+            app.mount(column().children(group.on_change(changes.append),
+                                        alternate.on_change(changes.append))).step()
+            x, y, w, h = app.bounds(priority)
+            app.queue_pointer("move", x + w / 2, y + h / 2)
+            app.step()
+            self.assertEqual(app.dispatch(), 0)
+            self.press(app, priority)
+            self.assertIs(group.selected(), priority)
+            self.assertEqual(app.dispatch(), 1)
+            priority.radio_tooltip("Track shipment", delay_ms=0)
+            alternate.radio_tooltip(None)
+            app.step()
+            self.assertEqual(app.dispatch(), 0)
+            self.press(app, alternate)
+            self.assertTrue(alternate.is_checked())
+            self.assertEqual(app.dispatch(), 1)
+            self.assertEqual([event.node for event in changes], [group, alternate])
+
+    def check_provider_without_radio_tooltip(self, app):
+        self.assertFalse(app.supports_radio_tooltip())
+        choice = radio("choice", "Choice").radio_tooltip("A hint")
+        root = column().children(choice)
+        with self.assertRaisesRegex(RuntimeError, "cui_bridge_radio_set_tooltip_v1"):
+            app.mount(root)
+        self.assertIsNone(root._handle)
+        choice.radio_tooltip(None)
+        app.mount(root).step()
+        with self.assertRaisesRegex(RuntimeError, "cui_bridge_radio_set_tooltip_v1"):
+            choice.radio_tooltip("A hint")
+        choice.radio_tooltip("")
+        self.press(app, choice)
+        self.assertTrue(choice.is_checked())
+
+    def test_older_provider_keeps_radio_selection_without_tooltip(self):
+        with App() as app, patch.object(app._api, "radio_set_tooltip", None):
+            self.check_provider_without_radio_tooltip(app)
+        legacy = os.environ.get("CUI_RADIO_LEGACY_LIBRARY")
+        if legacy:
+            with App(library=legacy) as app:
+                self.check_provider_without_radio_tooltip(app)
+
     def test_numeric_ranges_and_static(self):
         with App(width=800,height=800) as app:
             s=slider('slider').range(10,100,5).value(30)

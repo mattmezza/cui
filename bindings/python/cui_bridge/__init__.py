@@ -155,6 +155,10 @@ class _API:
         if hasattr(lib, "cui_bridge_radio_item_set_content_v1"):
             self.radio_item_set_content = bind("radio_item_set_content_v1", C.c_int,
                                                C.c_void_p, _Handle, C.c_uint32)
+        self.radio_set_tooltip = None
+        if hasattr(lib, "cui_bridge_radio_set_tooltip_v1"):
+            self.radio_set_tooltip = bind("radio_set_tooltip_v1", C.c_int, C.c_void_p,
+                                          _Handle, C.c_char_p, C.c_uint32)
         self.clipboard_set = bind("clipboard_set",C.c_int,C.c_void_p,C.c_char_p)
         self.clipboard_get = bind("clipboard_get",C.c_int,C.c_void_p,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
         self.theme_count = bind("theme_preset_count", C.c_uint32)
@@ -469,6 +473,7 @@ class Widget:
         self._checked = False
         self._radio_motion = False
         self._radio_content = False
+        self._radio_tooltip: tuple[bytes, int] | None = None
         self._detail = ""
         self._open = False
         self._open_set = False
@@ -716,6 +721,27 @@ class Widget:
             if self._app.supports_radio_item_content():
                 self._change("radio_item_set_content", int(enabled))
         self._radio_content = enabled
+        return self
+
+    def radio_tooltip(self, text: str | None, *, delay_ms: int = 350) -> "Widget":
+        """Set a short hint on a Radio or direct RadioGroup Item. None or empty clears it."""
+        if self.kind not in {"radio", "item"}:
+            raise ValueError("radio_tooltip requires Radio or a direct RadioGroup Item")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        encoded = None if text is None else _utf8(text, limit=256)
+        if encoded:
+            if type(delay_ms) is not int or not 0 <= delay_ms <= 10000:
+                raise ValueError("delay_ms must be an integer from 0 to 10000")
+            config = (encoded, delay_ms)
+        else:
+            config = None
+        if self._app is not None:
+            if config is not None:
+                self._app._require_radio_tooltip()
+            if self._app.supports_radio_tooltip():
+                self._change("radio_set_tooltip", *(config or (None, 0)))
+        self._radio_tooltip = config
         return self
 
     def is_checked(self) -> bool:
@@ -1690,6 +1716,15 @@ class App:
         if not self.supports_radio_item_content():
             raise RuntimeError("Radio decoration requires cui_bridge_radio_item_set_content_v1")
 
+    def supports_radio_tooltip(self) -> bool:
+        """Report whether the loaded bridge can attach a hint to a radio option."""
+        self._ensure_open()
+        return self._api.radio_set_tooltip is not None
+
+    def _require_radio_tooltip(self) -> None:
+        if not self.supports_radio_tooltip():
+            raise RuntimeError("Radio tooltips require cui_bridge_radio_set_tooltip_v1")
+
     def data_table_max_row_capacity(self) -> int | None:
         """Return the opt-in row limit usable by Python, or None on older providers."""
         self._ensure_open()
@@ -1761,6 +1796,10 @@ class App:
                 if parent is None or parent.kind != "radio_group":
                     raise ValueError("decorate_content requires a direct RadioGroup Item")
                 self._require_radio_item_content()
+            if node._radio_tooltip is not None:
+                if node.kind == "item" and (parent is None or parent.kind != "radio_group"):
+                    raise ValueError("radio_tooltip requires a direct RadioGroup Item")
+                self._require_radio_tooltip()
             if isinstance(node, ConfiguredIcon):
                 node._preflight_icon(self)
             if node.kind == "configured_badge":
@@ -1822,6 +1861,8 @@ class App:
                     node._change("radio_set_motion", 1)
                 if node._radio_content:
                     node._change("radio_item_set_content", 1)
+                if node._radio_tooltip is not None:
+                    node._change("radio_set_tooltip", *node._radio_tooltip)
                 if node.kind in {"slider", "number_input"}:
                     node._change("set_range", *node._range)
                 if node.kind in {"pagination", "rating"}:

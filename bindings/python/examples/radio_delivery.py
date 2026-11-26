@@ -28,6 +28,8 @@ def main():
         group.animate_selection(app.supports_radio_motion())
         decorated = app.supports_radio_item_content()
         priority.decorate_content(decorated)
+        if app.supports_radio_tooltip():
+            priority.radio_tooltip("Track your parcel online")
         app.mount(column("checkout").gap(12).children(label("Delivery service"), group, summary))
         if args.font:
             app.run()

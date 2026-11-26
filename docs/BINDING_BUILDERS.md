@@ -41,6 +41,9 @@ Node import library discovery and macOS Node linker settings are provided. See t
 
 ## Python: build and launch
 
+The [Attachment guide](BRIDGE_COMPONENTS.md#show-an-attachment-preview-in-a-language-builder)
+shows fitted file labels and copied RGBA previews in a runnable example.
+
 The [Icon and Badge guide](PYTHON_ICON_BADGE.md) shows how to share custom SVG
 artwork, wrap controls in typed Badge indicators, and update them from callbacks.
 
@@ -263,6 +266,9 @@ setting the same bridge and import paths as above. The example grows to
 response. Add `--font /path/to/font.ttf` for the interactive SDL inbox.
 
 ## JavaScript and TypeScript: build and launch
+
+The [Attachment guide](BRIDGE_COMPONENTS.md#show-an-attachment-preview-in-a-language-builder)
+shows fitted file labels and copied RGBA previews in a runnable example.
 
 ```sh
 cmake -S bindings/node -B build-node -G Ninja

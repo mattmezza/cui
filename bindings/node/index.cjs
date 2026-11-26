@@ -10,6 +10,7 @@ const native = require(addonPath);
 const {BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,ShadowPart,canonicalPart}=require('./shadows.cjs')(native);
 const designSizes = Object.freeze({inherit:0,xs:1,sm:2,base:3,md:4,lg:5,xl:6,"2xl":7,"3xl":8,"4xl":9,"5xl":10,"6xl":11,"7xl":12,"8xl":13,"9xl":14});
 const NODE = Symbol('CUI node');
+const attachmentStatuses = Object.freeze({pending:0, uploading:1, processing:2, failed:3, complete:4});
 let nextKey = 1;
 const disabledKinds = new Set([4,5,6,7,8,9,12,13,14,15,17,18,19,20,21,22,23,28,29,40,41,42,43,44,48,54,55,56,57,58,59,60,61,65,66,67,68,69,71,73,74,75,77,78,79]);
 const surfaces = new Set([24,25,26,27,62]);
@@ -241,7 +242,7 @@ class Node {
   design_size(value) {
     if (this.kind === 4) return this.size(value);
     const names = designSizes;
-    if (![30,42,44].includes(this.kind) || typeof value !== 'string' || !Object.hasOwn(names,value)) throw new TypeError('design_size requires Button, Avatar, Pagination or Stepper and a supported size');
+    if (![30,42,44,52].includes(this.kind) || typeof value !== 'string' || !Object.hasOwn(names,value)) throw new TypeError('design_size requires Button, Avatar, Pagination, Stepper or Attachment and a supported size');
     if (this.owner && this.kind === 42 && !paginationOptions.supports(this.owner))
       throw new Error('Pagination V1 requires a complete, compatible bridge symbol group');
     if (this.owner) native.setDesignSize(this.owner.handle,this[NODE],names[value]);
@@ -377,7 +378,7 @@ class Node {
   scroll_extent(width,height) {if(this.kind!==46||![width,height].every(x=>Number.isFinite(x)&&x>=0&&x<=32768))throw new TypeError('invalid scroll extent');if(this.owner)native.setScrollExtent(this.owner.handle,this[NODE],width,height);this.extentValue=[width,height];return this;}
   scroll_offset() {if(![46,64,74,80].includes(this.kind))throw new Error('component has no scroll offset');return this.owner?native.getValue(this.owner.handle,this[NODE]):0;}
   attachment_status(value) {
-    const names={pending:0,uploading:1,processing:2,failed:3,complete:4};
+    const names=attachmentStatuses;
     if(this.kind!==52 || !Object.hasOwn(names,value))throw new TypeError('invalid attachment status');
     if(this.owner)native.setAttachmentStatus(this.owner.handle,this[NODE],names[value]);
     this.attachmentValue=names[value];return this;
@@ -727,6 +728,7 @@ containers.add(iconBadges.badgeKind);
 const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
 const paginationOptions = require('./pagination-options.cjs')(native, Node, NODE);
 const ratingOptions = require('./rating-options.cjs')(native, Node, NODE, icons, designSizes);
+const attachments = require('./attachment-options.cjs')(native, Node, NODE, attachmentStatuses);
 const disclosures = require('./disclosure.cjs')(native, Node, NODE, designSizes);
 class App {
   constructor(options = {}) {
@@ -758,6 +760,7 @@ class App {
     paginationOptions.preflight(this, root);
     ratingOptions.preflight(this, root);
     disclosures.preflight(this, root);
+    attachments.preflight(this, root);
     sliderModels.preflight(this, root);
     localizedTimes.preflight(this, root);
     iconBadges.preflight(this, root);
@@ -796,6 +799,7 @@ class App {
       paginationOptions.mount(this, node);
       ratingOptions.mount(this, node);
       disclosures.mount(this, node);
+      attachments.mount(this, node);
       iconBadges.mount(this, node);
       if([57,58].includes(node.kind))native.setDate(this.handle,node[NODE],...node.dateValue);
       if(node.kind===56)native.setColor(this.handle,node[NODE],node.colorValue);
@@ -832,7 +836,9 @@ class App {
     try { attach(root, null);
       for(const node of this.nodes.values())if(node.anchorValue){if(node.anchorValue.owner!==this)throw new Error('foreign/unmounted anchor');native.setAnchor(this.handle,node[NODE],node.anchorValue[NODE]);}
       for(const node of this.nodes.values()){if((surfaces.has(node.kind)||[58,63].includes(node.kind))&&node.openValue)native.setOpen(this.handle,node[NODE],1);if(node.selectedValue)native.setSelected(this.handle,node[NODE],node.selectedValue[NODE]);}
-      this.root = root; } catch (error) { this.dispose(); throw error; }
+      this.root = root;
+      for (const node of this.nodes.values()) attachments.finishMount(node);
+    } catch (error) { this.dispose(); throw error; }
     return this;
   }
   _remove(node) {
@@ -992,6 +998,8 @@ class App {
   supports_disclosure_heading() { return disclosures.supportsHeading(this); }
   supports_disclosure_divider() { return disclosures.supportsDivider(this); }
   supports_disclosure_presentation() { return disclosures.supports(this); }
+  supports_attachment_options() { return attachments.supports(this); }
+  supports_attachment_preview() { return attachments.supports(this,true); }
   supports_rating_options() { return ratingOptions.supports(this); }
   supports_pagination_options() { return paginationOptions.supports(this); }
   supports_skeleton_presentation() { return skeletons.supports(this); }

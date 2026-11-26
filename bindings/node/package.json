@@ -40,7 +40,9 @@
     "rating-options.cjs",
     "disclosure.cjs",
     "disclosure_internal.h",
-    "rating_options_internal.h"
+    "rating_options_internal.h",
+    "attachment-options.cjs",
+    "attachment_options_internal.h"
   ],
   "os": [
     "linux"

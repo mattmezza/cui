@@ -157,6 +157,8 @@ class _API:
         bind_rating_api(self, bind)
         from .disclosure import bind_api as bind_disclosure_api
         bind_disclosure_api(self, bind)
+        from .attachment_options import bind_api as bind_attachment_api
+        bind_attachment_api(self, bind)
         bind_radio_paint(self, bind, _Handle)
         self.radio_set_motion = None
         if hasattr(lib, "cui_bridge_radio_set_motion_v1"):
@@ -637,6 +639,9 @@ class Widget:
             raise ValueError("label belongs to text or button")
         if not isinstance(text, str):
             raise TypeError("label must be a string")
+        if self.kind == "attachment" and getattr(self, "_attachment_options", None) is not None:
+            from .attachment_options import single_line
+            single_line(text)
         self._change("set_text", _utf8(text))
         self._text = text
         return self
@@ -668,11 +673,11 @@ class Widget:
         return self
 
     def design_size(self, value: DesignSize) -> "Widget":
-        """Shared scale: currently Button, Avatar and Stepper."""
+        """Shared scale for Button, Avatar, Stepper and Attachment."""
         if self.kind == "button":
             return self.size(value)
-        if self.kind not in {"avatar", "stepper"} or value not in _SIZE:
-            raise ValueError("design_size requires Button, Avatar or Stepper and a supported size")
+        if self.kind not in {"avatar", "stepper", "attachment"} or value not in _SIZE:
+            raise ValueError("design_size requires Button, Avatar, Stepper or Attachment and a supported size")
         self._change("set_design_size", _SIZE[value])
         self._design_size = value
         return self
@@ -878,6 +883,9 @@ class Widget:
     def detail(self, text: str) -> "Widget":
         if self.kind not in _DETAIL:
             raise ValueError("detail belongs to alert")
+        if self.kind == "attachment" and getattr(self, "_attachment_options", None) is not None:
+            from .attachment_options import single_line
+            single_line(text)
         self._change("set_detail", _utf8(text))
         self._detail = text
         return self
@@ -1013,12 +1021,24 @@ class Widget:
         self._change("get_value",C.byref(result))
         return result.value
 
-    def attachment_status(self, status: str) -> "Widget":
-        names = {"pending": 0, "uploading": 1, "processing": 2, "failed": 3, "complete": 4}
-        if self.kind != "attachment" or status not in names:
+    def attachment_options(self, options: AttachmentOptions | None) -> "Widget":
+        from .attachment_options import configure
+        return configure(self, options)
+
+    def attachment_preview_rgba(self, pixels, width: int, height: int, stride: int | None = None) -> "Widget":
+        from .attachment_options import preview
+        return preview(self, pixels, width, height, stride)
+
+    def clear_attachment_preview(self) -> "Widget":
+        from .attachment_options import clear
+        return clear(self)
+
+    def attachment_status(self, status: AttachmentStatus) -> "Widget":
+        from .attachment_options import STATUSES
+        if self.kind != "attachment" or not isinstance(status, str) or status not in STATUSES:
             raise ValueError("invalid attachment status")
-        self._change("set_attachment", names[status])
-        self._attachment = names[status]
+        self._change("set_attachment", STATUSES[status])
+        self._attachment = STATUSES[status]
         return self
 
     def stepper_visual(self, enabled: bool = True, vertical: bool = False, density: str = "md") -> "Widget":
@@ -2031,6 +2051,8 @@ class App:
                 raise ValueError("widget belongs to a disposed App")
             seen.add(id(node))
             disclosure_preflight(node, parent, self)
+            from .attachment_options import preflight as attachment_preflight
+            attachment_preflight(node, self)
             if node.kind == "slider_model":
                 if not isinstance(node, SliderModel):
                     raise TypeError("use slider_model() for the controlled route")
@@ -2182,6 +2204,8 @@ class App:
                     node._change("set_stepper_visual", *node._stepper_visual)
                 if node._design_size is not None:
                     node._change("set_design_size", _SIZE[node._design_size])
+                from .attachment_options import mount as attachment_mount
+                attachment_mount(node)
                 if node._shadow_style is not None:
                     wire = node._shadow_style._wire(self._api)
                     node._change("set_box_shadows_v1",224,C.byref(wire))
@@ -2219,6 +2243,9 @@ class App:
             self._by_handle.clear()
             raise
         self._root = tree
+        from .attachment_options import finish_mount as attachment_finish_mount
+        for node, _, _ in order:
+            attachment_finish_mount(node)
         return self
 
     def step(self, dt: float = 1 / 60) -> None:
@@ -2592,6 +2619,14 @@ class App:
         from .disclosure import supported
         return supported(self)
 
+    def supports_attachment_options(self) -> bool:
+        from .attachment_options import supported
+        return supported(self)
+
+    def supports_attachment_preview(self) -> bool:
+        from .attachment_options import supported
+        return supported(self, True)
+
     def supports_rating_options(self) -> bool:
         from .rating_options import supported
         return supported(self)
@@ -2831,3 +2866,6 @@ __all__ += ["DisclosureHeadingLayer", "DisclosureHeading", "DisclosureHeadingBox
 
 from .disclosure import DisclosureTitleState, DisclosureTitleStyle
 __all__ += ["DisclosureTitleState", "DisclosureTitleStyle"]
+
+from .attachment_options import AttachmentOptions, AttachmentTextStyle, AttachmentStatus
+__all__ += ["AttachmentOptions", "AttachmentTextStyle", "AttachmentStatus"]

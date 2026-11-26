@@ -446,3 +446,10 @@ whole-group naming and separate reset are explicit parts of that contract.
 
 The [responsive Skeleton guide](GO_SKELETON.md) includes a native profile UI
 that replaces decorative placeholders with loaded content.
+
+
+## Display a file preview in an upload card
+
+The upload example uses the retained Attachment builder, a decoded RGBA
+preview and an application button that completes the transfer. Headless
+mode verifies the button callback. [Build and run the upload example](BRIDGE_COMPONENTS.md#show-an-attachment-preview-in-a-language-builder)

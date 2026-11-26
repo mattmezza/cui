@@ -642,6 +642,37 @@ static cui_bridge_status go_disclosure_title(cui_bridge_app *app, cui_bridge_nod
 static cui_bridge_status go_disclosure_divider(cui_bridge_app *app, cui_bridge_node node,
  const cui_bridge_disclosure_divider_v1 *style) { return disclosure_divider(app, node, style); }
 
+static cui_bridge_status (*attachment_configure)(cui_bridge_app *, cui_bridge_node,
+ const cui_bridge_attachment_config_v1 *);
+static cui_bridge_status (*attachment_preview)(cui_bridge_app *, cui_bridge_node,
+ const uint8_t *, uint32_t, uint32_t, uint32_t, uint32_t);
+
+static void go_attachment_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&attachment_configure, sizeof attachment_configure,
+                          "cui_bridge_attachment_configure_v1");
+  go_load_optional_symbol(&attachment_preview, sizeof attachment_preview,
+                          "cui_bridge_attachment_set_preview_rgba_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else {
+  attachment_configure = cui_bridge_attachment_configure_v1;
+  attachment_preview = cui_bridge_attachment_set_preview_rgba_v1;
+ }
+#endif
+}
+
+static int go_attachment_configure_supported(void) { return attachment_configure != NULL; }
+static int go_attachment_preview_supported(void) { return attachment_preview != NULL; }
+static cui_bridge_status go_attachment_configure(cui_bridge_app *a, cui_bridge_node n,
+ const cui_bridge_attachment_config_v1 *options) {
+ return attachment_configure(a, n, options);
+}
+static cui_bridge_status go_attachment_preview(cui_bridge_app *a, cui_bridge_node n,
+ const uint8_t *pixels, uint32_t w, uint32_t h, uint32_t stride, uint32_t length) {
+ return attachment_preview(a, n, pixels, w, h, stride, length);
+}
+
 static int bridge_open(const char *path) {
  if (bridge_initialized) return 0;
 #if defined(CUI_GO_STATIC)
@@ -661,6 +692,7 @@ static int bridge_open(const char *path) {
  go_stepper_fill_initialize();
  go_virtual_list_initialize();
  go_disclosure_initialize();
+ go_attachment_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -699,6 +731,7 @@ static int bridge_open(const char *path) {
  go_stepper_fill_initialize();
  go_virtual_list_initialize();
  go_disclosure_initialize();
+ go_attachment_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -817,6 +850,8 @@ type Node struct {
 	hasScrollExtent                      bool
 	attachmentStatus                     int
 	hasAttachmentStatus                  bool
+	attachmentOptions                    *attachmentOptionsWire
+	attachmentPreview                    *attachmentPreview
 	imagePixels                          []byte
 	imageWidth, imageHeight, imageStride uint32
 	timeValue                            Time
@@ -1580,6 +1615,9 @@ func (n *Node) SetText(v string) error {
 	if n.removed {
 		return errors.New("removed node")
 	}
+	if err := n.validateAttachmentLabel(v); err != nil {
+		return err
+	}
 	if n.iconConfig != nil || n.kind == configuredBadgeKind {
 		return errors.New("use configuration to set Icon or Badge text")
 	}
@@ -1742,7 +1780,7 @@ func (n *Node) StepperFill(vertical bool, density StepperDensity, width, height 
 	return n
 }
 
-// DesignSize applies the shared scale to Button, Avatar, Pagination and Stepper.
+// DesignSize applies the shared scale to Button, Avatar, Pagination, Stepper and Attachment.
 func (n *Node) DesignSize(v DesignSize) *Node {
 	if n.kind == 4 {
 		return n.Size(v)
@@ -1750,8 +1788,8 @@ func (n *Node) DesignSize(v DesignSize) *Node {
 	if n.err != nil {
 		return n
 	}
-	if (n.kind != 30 && n.kind != 42 && n.kind != 44) || v < Inherit || v > Size9XL {
-		n.err = errors.New("design size requires Button, Avatar, Pagination or Stepper and a supported size")
+	if (n.kind != 30 && n.kind != 42 && n.kind != 44 && n.kind != C.CUI_BRIDGE_ATTACHMENT) || v < Inherit || v > Size9XL {
+		n.err = errors.New("design size requires Button, Avatar, Pagination, Stepper or Attachment and a supported size")
 		return n
 	}
 	if n.app != nil {
@@ -2145,6 +2183,7 @@ func (a *App) Mount(root *Node) error {
 	if e := a.sliderPreflight(root); e != nil {
 		return e
 	}
+	var mountedAttachmentPreviews []*Node
 	var add func(*Node, C.cui_bridge_node) error
 	add = func(n *Node, p C.cui_bridge_node) error {
 		key := cs(n.key)
@@ -2417,6 +2456,17 @@ func (a *App) Mount(root *Node) error {
 				return e
 			}
 		}
+		if n.attachmentOptions != nil {
+			if err := n.applyAttachmentOptions(n.attachmentOptions); err != nil {
+				return err
+			}
+		}
+		if n.attachmentPreview != nil {
+			if err := n.applyAttachmentPreview(n.attachmentPreview); err != nil {
+				return err
+			}
+			mountedAttachmentPreviews = append(mountedAttachmentPreviews, n)
+		}
 		if n.hasOpen && (n.kind < 24 || n.kind == 58 || n.kind == 62 || n.kind == 63 || n.kind == 75) {
 			if e := result(C.go_set_open(a.ptr, h, C.uint32_t(btoi(n.opened)))); e != nil {
 				return e
@@ -2542,6 +2592,9 @@ func (a *App) Mount(root *Node) error {
 	if e := surfaces(root); e != nil {
 		rollback()
 		return e
+	}
+	for _, node := range mountedAttachmentPreviews {
+		node.attachmentPreview = nil
 	}
 	a.root = root
 	return nil
@@ -3352,6 +3405,10 @@ func (n *Node) Detail(v string) *Node {
 		n.err = err
 		return n
 	}
+	if err := n.validateAttachmentLabel(v); err != nil {
+		n.err = err
+		return n
+	}
 	n.detail = v
 	if n.app != nil {
 		if e := n.app.check(); e != nil {
@@ -3691,6 +3748,49 @@ func (n *Node) AttachmentStatus(v AttachmentState) *Node {
 	}
 	return n
 }
+
+// SupportsAttachmentOptions reports whether the loaded bridge supports fitted metadata.
+func (a *App) SupportsAttachmentOptions() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_attachment_configure_supported() != 0, nil
+}
+
+// SupportsAttachmentPreview reports whether the loaded bridge accepts RGBA previews.
+func (a *App) SupportsAttachmentPreview() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_attachment_preview_supported() != 0, nil
+}
+
+func (n *Node) applyAttachmentOptions(options *attachmentOptionsWire) error {
+	ok, err := n.app.SupportsAttachmentOptions()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrAttachmentOptionsUnavailable
+	}
+	return result(C.go_attachment_configure(n.app.ptr, n.handle, options))
+}
+
+func (n *Node) applyAttachmentPreview(preview *attachmentPreview) error {
+	ok, err := n.app.SupportsAttachmentPreview()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrAttachmentPreviewUnavailable
+	}
+	if preview == nil {
+		return result(C.go_attachment_preview(n.app.ptr, n.handle, nil, 0, 0, 0, 0))
+	}
+	return result(C.go_attachment_preview(n.app.ptr, n.handle, (*C.uint8_t)(unsafe.Pointer(&preview.pixels[0])),
+		C.uint32_t(preview.width), C.uint32_t(preview.height), C.uint32_t(preview.stride), C.uint32_t(len(preview.pixels))))
+}
+
 func Image(key, description string) *Node { return &Node{kind: 53, key: key, text: description} }
 func TimeField(key string) *Node          { return &Node{kind: 55, key: key} }
 func ColorPicker(key string) *Node        { return &Node{kind: 56, key: key} }
@@ -4703,6 +4803,12 @@ func (a *App) Time(n *Node) (Time, error) {
 	}
 	return Time{uint32(v.hour), uint32(v.minute), uint32(v.second)}, nil
 }
+func validRGBALength(length int, width, height, stride uint32) bool {
+	count := uint64(stride) * uint64(height)
+	return width > 0 && height > 0 && width <= 2048 && height <= 2048 &&
+		stride >= width*4 && count <= 16*1024*1024 && uint64(length) == count
+}
+
 func (n *Node) RGBA(pixels []byte, width, height, stride uint32) *Node {
 	if n.err != nil {
 		return n
@@ -4717,8 +4823,7 @@ func (n *Node) SetRGBA(pixels []byte, width, height, stride uint32) error {
 	if n.removed {
 		return errors.New("removed image")
 	}
-	count := uint64(stride) * uint64(height)
-	if width == 0 || height == 0 || width > 2048 || height > 2048 || stride < uint32(uint64(width)*4) || count > 16777216 || uint64(len(pixels)) != count {
+	if !validRGBALength(len(pixels), width, height, stride) {
 		return errors.New("invalid RGBA dimensions or data length")
 	}
 	copyPixels := append([]byte(nil), pixels...)

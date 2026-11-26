@@ -842,3 +842,23 @@ export interface App {
 }
 
 export interface DisclosureDividerStyled { set_disclosure_divider(style: DisclosureDivider | null): this; }
+
+/** Optional copied retained Attachment presentation. Width uses visual_size. */
+export interface AttachmentTextStyle {
+  fontSize?: number; weight?: 0 | 1 | 2 | 3; letterSpacing?: number;
+  italic?: boolean; monospace?: boolean; colorRgba?: number;
+}
+export interface AttachmentOptions {
+  vertical?: boolean; media?: boolean; indeterminate?: boolean; mediaAspect?: number;
+  titleStatus?: AttachmentStatus; descriptionStatus?: AttachmentStatus;
+  title?: AttachmentTextStyle; description?: AttachmentTextStyle;
+}
+export interface Attachment extends DesignSized {
+  attachment_options(options: AttachmentOptions | null): this;
+  attachment_preview_rgba(pixels: Uint8Array | Uint8ClampedArray, width: number, height: number, stride?: number): this;
+  clear_attachment_preview(): this;
+}
+export interface App {
+  supports_attachment_options(): boolean;
+  supports_attachment_preview(): boolean;
+}

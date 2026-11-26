@@ -6,8 +6,9 @@
   keyboard-focus and press typography and color in immediate C, retained C,
   Python, JavaScript, TypeScript, Go and Rust. The gallery demonstrates all
   three states with copyable examples.
-- Retained C Attachment supports fitted metadata, shared sizes, vertical
-  previews and copied RGBA images. A progress fraction of 0.4 displays 40%.
+- Retained Attachment supports fitted metadata, shared sizes, vertical
+  previews and copied RGBA images in C, Python, JavaScript, TypeScript, Go and
+  Rust. A progress fraction of 0.4 displays 40%.
   Media-only cards respect the preview aspect at explicit widths.
 
 ## 0.1.0-alpha.10

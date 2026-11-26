@@ -2479,6 +2479,7 @@ static void wire_big_out(unsigned char *wire, const void *record, size_t at) {
 #include "icon_resources_internal.h"
 #include "icon_badge_internal.h"
 #include "rating_options_internal.h"
+#include "attachment_options_internal.h"
 #include "disclosure_internal.h"
 // clang-format on
 
@@ -2680,6 +2681,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("skeletonPresentation", skeleton_presentation, 0);
     EXPORT("paginationOptions", pagination_options, 0);
     EXPORT("ratingOptions", rating_options, 0);
+    EXPORT("attachmentOptions", attachment_options, 0);
     EXPORT("disclosureOptions", disclosure_options, 0);
     EXPORT("disclosureHeadingOptions", disclosure_heading_options, 0);
     EXPORT("virtualRowsOptions", virtual_rows_options, 0);

@@ -56,7 +56,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | TitleBar | `cui_title_bar` | Item text labels, retained title state | No native window host controls |
 | Icon | `cui_icon_named`, optional `cui_icon` | Legacy catalog name and dimensions, or a shared owned resource and full copied Icon options | An unknown legacy name fails the frame. A configured Icon reports its own artwork error separately. [C presentation guide](BRIDGE_ICON_PRESENTATION.md). |
 | Message | `cui_message` | Copied body/header, width | Incoming filled bubble, one body |
-| Attachment | `cui_attachment` | Copied title/description, status, progress, width. Optional retained C sizing, typography, lifecycle refinements and decoded previews | File transport and action controls remain application-owned. Language builders expose the original metadata chip. |
+| Attachment | `cui_attachment` | Copied labels, transfer status and fractional progress. Optional named sizes, metadata styles, axis and decoded previews in C and the language builders | File transport and retained action controls remain application-owned. [Presentation and examples](#configure-a-retained-attachment-from-c). |
 | Image | `cui_image` | Owned RGBA8 pixels, revision, description, size | At most 16 MiB; no path, URI, animated loader |
 | Tree | `cui_tree` | 64 flat Item records with preorder depth, expansion and selected Item events | Item step status is depth 0..63; no custom row content |
 | TimeField | `cui_time_field` | HH:MM:SS state, keyboard change, copied event text, disabled | 24-hour fixed format |
@@ -574,9 +574,78 @@ orientation. Preview ownership and named size are independent.
 Probe `cui_bridge_attachment_configure_v1` and
 `cui_bridge_attachment_set_preview_rgba_v1` separately when loading a bridge
 dynamically. Call the setters between steps on the owner thread. The
-application owns file selection, decoding, transfer state and retry. Language
-builders currently offer copied labels, status, progress and width.
+application owns file selection, decoding, transfer state and retry.
 [Immediate C Attachment](MEDIA.md#fit-file-names-and-descriptions)
+
+### Show an attachment preview in a language builder
+
+Python, JavaScript and TypeScript use `attachment_options` to apply the copied
+presentation and `attachment_preview_rgba` to install a decoded image. Set a
+logical width with `visual_size` and choose a named size with `design_size`.
+The bridge keeps the full labels for accessibility even when it paints an
+ellipsis. With an older provider, probe `supports_attachment_options()`
+before applying the new presentation or named size and probe
+`supports_attachment_preview()` separately before setting pixels.
+
+```python
+from cui_bridge import App, AttachmentOptions, AttachmentTextStyle, attachment, column
+
+with App(width=440, height=360) as app:
+    upload = (attachment("hero", "Workspace landing page.png")
+              .detail("Uploading").attachment_status("uploading")
+              .value(.4).visual_size(240, 0))
+    if app.supports_attachment_options():
+        upload.design_size("lg").attachment_options(AttachmentOptions(
+            vertical=True, media=True, media_aspect=16 / 9,
+            title=AttachmentTextStyle(weight=2),
+        ))
+    if app.supports_attachment_preview():
+        pixels = bytes([38, 84, 166, 255, 87, 187, 170, 255])
+        upload.attachment_preview_rgba(pixels, 2, 1)
+    app.mount(column().children(upload))
+    app.step()
+```
+
+Use `attachment_options(None)` in Python or `attachment_options(null)` in
+JavaScript and TypeScript to restore the earlier metadata and orientation.
+`clear_attachment_preview()` releases the pixels while keeping the
+presentation. `media=True` or `media: true` reserves a slot even when the
+pixels are cleared. Reset and replacement preserve progress and status.
+
+Go exposes the fluent `AttachmentOptions` and `AttachmentPreviewRGBA` methods.
+Use `SetAttachmentOptions(nil)` to reset and `ClearAttachmentPreview` to clear.
+Rust offers `attachment_options` and `attachment_preview_rgba` on the mounted
+builder and `App::configure_attachment` and `App::clear_attachment_preview`
+for updates. The Go and Rust upload examples include an application-owned
+button that completes the transfer. Retained Attachment itself emits no action
+events. Use the immediate C slots and observers for built-in remove and retry.
+
+From the repository root, build the headless C bridge and Node addon,
+then run the examples:
+
+```sh
+cmake -S . -B build-bridge -G Ninja -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
+cmake --build build-bridge --target cui_bridge
+cmake -S bindings/node -B build-node -G Ninja -DCUI_BUILD_NATIVE=OFF
+cmake --build build-node --target cui_node_bindings
+
+export CUI_BRIDGE_LIBRARY="$PWD/build-bridge/libcui_bridge.so"
+export CUI_BRIDGE_LIB_DIR="$PWD/build-bridge"
+export CUI_NODE_ADDON="$PWD/build-node/cui.node"
+PYTHONPATH=bindings/python python bindings/python/examples/attachment_options.py
+node bindings/node/examples/attachment-options.cjs
+node bindings/typescript/examples/attachment_options.ts
+(cd bindings/go && go run ./examples/attachment_upload)
+cargo run --manifest-path bindings/rust/Cargo.toml --example attachment_upload
+```
+
+The TypeScript command uses Node 25's built-in type stripping. The shared
+library paths above are for Linux. See the [builder setup](BINDING_BUILDERS.md)
+for prerequisites and platform-specific paths.
+Omit the C bridge environment variables to use the bundled Go or Rust provider
+on supported hosts. For a native SDL window, use a bridge built with SDL support
+and pass `--font /path/to/font.ttf` to the Go example or
+`-- /path/to/font.ttf` after the Rust example name.
 
 ### Style retained Accordion and Collapsible from C
 

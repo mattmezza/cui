@@ -377,7 +377,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Immediate and retained C have opt-in styled end ellipsis. Retained C supports named sizes, axis, media aspect, child status overrides and copied RGBA previews. Language facades for these options, retained actions, encoded file/network decoding, shared resource cache, fully inherited styling and platform accessibility remain open."
+        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Immediate and retained C have opt-in styled end ellipsis. Retained C and all five language facades support named sizes, axis, media aspect, child status overrides and copied RGBA previews. Retained actions, encoded file/network decoding, shared resource cache, fully inherited styling and platform accessibility remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -399,7 +399,7 @@
             "tests/web/test_browser.py",
             "docs/MEDIA.md"
           ],
-          "scope": "Immediate C and WASM examples. Full label semantics, grapheme boundaries, title weight, progress and retry keep separate roles. Platform accessibility and foreign metadata authoring are open."
+          "scope": "Immediate C and WASM examples. Full label semantics, grapheme boundaries, title weight, progress and retry keep separate roles. Platform accessibility remains open. See the retained entries for foreign metadata authoring."
         },
         {
           "name": "retained C fitted labels, axis and decoded cover preview",
@@ -409,7 +409,20 @@
             "tests/unit/test_media.c",
             "docs/BRIDGE_COMPONENTS.md"
           ],
-          "scope": "Headless draw geometry, copy and replacement, media aspect, status overrides, normalized progress and accessible full labels. Language facades and composed actions are pending."
+          "scope": "Headless draw geometry, copy and replacement, media aspect, status overrides, normalized progress and accessible full labels. Retained composed actions are pending."
+        },
+        {
+          "name": "retained Attachment in language builders",
+          "status": "tested",
+          "evidence": [
+            "bindings/python/test_attachment_options.py",
+            "bindings/node/test/attachment-options.test.cjs",
+            "bindings/node/test/attachment-options.types.ts",
+            "bindings/go/cui/attachment_test.go",
+            "bindings/rust/tests/attachment.rs",
+            "docs/BRIDGE_COMPONENTS.md"
+          ],
+          "scope": "Fitted metadata, axis, shared sizes, lifecycle refinements and copied previews in Python, JavaScript/TypeScript, Go and Rust. Headless geometry, replacement and optional-symbol handling. Retained composed actions remain open."
         },
         {
           "name": "preview/remove actions",

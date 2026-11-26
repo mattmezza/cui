@@ -131,7 +131,7 @@
       ],
       "state_ownership": "Caller retains cui_attachment_state and owns attachment model, metadata and resource lifetime.",
       "interaction": "cui_attachment_result reports actions; cui_attachment_action_fn receives remove/retry activation.",
-      "usage": "Submit transfer status and progress. Handle removal and retry in action callbacks. Use cui_attachment_with_metadata for one-line grapheme ellipsis, full labels and typography in immediate C. Retained C can copy layout and text options and a decoded RGBA8 preview through separate bridge capabilities. Retained progress is a fraction in [0,1].",
+      "usage": "Submit transfer status and progress. Handle removal and retry in action callbacks. Use cui_attachment_with_metadata for one-line grapheme ellipsis, full labels and typography in immediate C. Retained C and the Python, JavaScript, TypeScript, Go and Rust builders can copy layout and text options and a decoded RGBA8 preview through separate bridge capabilities. Retained progress is a fraction in [0,1].",
       "docs": [
         "docs/MEDIA.md",
         "docs/ATTACHMENT_EVENTS.md",

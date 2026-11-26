@@ -1,4 +1,8 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
+mod attachment;
+pub use attachment::{
+    AttachmentOptions, AttachmentTextStyle, AttachmentTextWeight, AttachmentTypography,
+};
 mod disclosure;
 pub use disclosure::{
     DisclosureAlignment, DisclosureCard, DisclosureConfig, DisclosureCursor, DisclosureDivider,
@@ -1191,7 +1195,7 @@ pub enum Size {
     X8l = 13,
     X9l = 14,
 }
-/// Shared design scale; supported components include Button, Avatar and Pagination.
+/// Shared design scale for supported components, including Attachment.
 pub type DesignSize = Size;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Rounding {

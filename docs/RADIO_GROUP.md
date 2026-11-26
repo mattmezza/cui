@@ -157,8 +157,8 @@ frame lifetime. Distinct tooltips need distinct IDs and state. Local tooltip
 ID conflicts and missing text or state reject the submission before selection.
 Global ID conflicts follow the normal composition error contract.
 
-The WASM gallery shows the Priority hint. This option is currently available
-through immediate C.
+The WASM gallery shows the Priority hint. Retained C applications can use
+the copied [bridge tooltip setter](BRIDGE_COMPONENTS.md#add-tooltips-to-retained-radio-options).
 
 ## Animate the marks
 

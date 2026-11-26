@@ -264,6 +264,39 @@ for the provider capability. [Runnable Go delivery form](GO_BUILDERS.md#compose-
 For arbitrary frame-local decorative drawing, use the
 [immediate C presenter](RADIO_GROUP.md#add-descriptions-and-custom-content).
 
+### Add tooltips to retained radio options
+
+Pass a standalone Radio or a direct RadioGroup Item to
+`cui_bridge_radio_set_tooltip_v1`. The bridge copies the UTF-8 hint and keeps
+its hover state. A short hint about the Priority delivery option can be added
+after creating the Item.
+
+```c
+#include <cui/cui_bridge.h>
+
+cui_bridge_status add_priority_hint(cui_bridge_app *app, cui_bridge_node priority) {
+    return cui_bridge_radio_set_tooltip_v1(app, priority, "Track your parcel online", 350);
+}
+```
+
+The text limit is 256 UTF-8 bytes. Use a brief label that fits in a compact
+tooltip. The delay is in milliseconds, with zero opening on the first eligible
+frame and 10,000 the maximum. Pass NULL or empty text to clear the hint.
+Setting new text preserves the current open state and updates any pending
+delay. Errors leave the previous hint in place. Call from the app's owner
+thread between steps. The bridge frees the hint when cleared or when its
+option is removed.
+
+The tooltip follows hover or keyboard focus. A tap can also open it when the
+host focuses the option. Escape and disabled state dismiss it. Placement uses
+the current window bounds. An Item's explicit detail text takes precedence as
+its accessible description. Tooltip visibility adds no queued notifications
+and leaves the existing selection callback and payload intact.
+
+For a dynamically loaded bridge, check for the optional
+`cui_bridge_radio_set_tooltip_v1` symbol. Python, JavaScript, TypeScript, Go and
+Rust do not yet expose this setter.
+
 ### Configure a retained pager from C
 
 The bridge keeps the page on a `CUI_BRIDGE_PAGINATION` node. Set its total and initial value through `cui_bridge_set_total` and `cui_bridge_set_value`. Use the shared design-size setter for XS through 9XL and the V1 configuration for navigation and labels. For a dynamically loaded provider, probe the optional Pagination V1 symbols and check the version bit and exact layout size before using the extended options. A configured pager or one with an explicit design size or custom height uses the extended theme paint, including the current-page outline and pointer feedback. The default retained pager keeps the original paint.

@@ -971,6 +971,16 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_set_motion_v1(cui_bridge_app *
 CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_item_set_content_v1(cui_bridge_app *,
                                                                       cui_bridge_node item,
                                                                       uint32_t enabled);
+/* Optional short hint on a Radio or direct RadioGroup Item. Copies up to 256
+ * UTF-8 bytes before returning. NULL or empty text clears it. Opening delay is
+ * 0–10000 ms and is ignored on clear. Follows hover and focus, dismisses on
+ * Escape, and uses the current window bounds. An Item's explicit detail text
+ * keeps precedence for its accessible description. No additional bridge
+ * event or input target. Errors preserve the previous hint. Set from the
+ * app's owner thread outside a bridge step. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_set_tooltip_v1(cui_bridge_app *, cui_bridge_node,
+                                                                 const char *text_utf8,
+                                                                 uint32_t open_delay_ms);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *, cui_bridge_node,
                                                          uint32_t disabled);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_value(cui_bridge_app *, cui_bridge_node,

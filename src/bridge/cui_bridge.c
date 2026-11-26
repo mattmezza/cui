@@ -489,6 +489,84 @@ cui_bridge_status cui_bridge_radio_item_set_content_v1(cui_bridge_app *app, cui_
     cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
+
+struct bridge_radio_hint {
+    cui_radio_tooltip descriptor;
+    cui_radio_tooltip_state state;
+    char text[];
+};
+
+static void bridge_radio_tooltip_remove(cui_bridge_app *app, uint32_t slot) {
+    if (app && app->radio_tooltips) {
+        free(app->radio_tooltips[slot]);
+        app->radio_tooltips[slot] = NULL;
+    }
+}
+
+cui_bridge_status cui_bridge_radio_set_tooltip_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                  const char *text_utf8, uint32_t open_delay_ms) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_RADIO &&
+        !(node->kind == CUI_BRIDGE_ITEM && node->parent &&
+          app->nodes[node->parent].kind == CUI_BRIDGE_RADIO_GROUP))
+        return CUI_BRIDGE_INVALID_STATE;
+
+    bridge_radio_hint *previous = app->radio_tooltips ? app->radio_tooltips[handle.slot] : NULL;
+    if (!text_utf8 || !*text_utf8) {
+        if (previous) {
+            bridge_radio_tooltip_remove(app, handle.slot);
+            cui_invalidate(app->ui);
+        }
+        return CUI_BRIDGE_OK;
+    }
+    if (open_delay_ms > 10000)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    size_t length;
+    status = bridge_utf8_limit(text_utf8, 256, &length);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!previous && app->next_id == UINT64_MAX)
+        return CUI_BRIDGE_CAPACITY;
+    float delay = (float)open_delay_ms / 1000.0f;
+    if (previous && previous->descriptor.options.open_delay == delay &&
+        previous->descriptor.text.length == length && !memcmp(previous->text, text_utf8, length))
+        return CUI_BRIDGE_OK;
+
+    bridge_radio_hint *hint = calloc(1, sizeof *hint + length + 1);
+    if (!hint)
+        return CUI_BRIDGE_OUT_OF_MEMORY;
+    if (!app->radio_tooltips) {
+        app->radio_tooltips = calloc((size_t)app->max_nodes + 1, sizeof *app->radio_tooltips);
+        if (!app->radio_tooltips) {
+            free(hint);
+            return CUI_BRIDGE_OUT_OF_MEMORY;
+        }
+    }
+    memcpy(hint->text, text_utf8, length + 1);
+    hint->descriptor = (cui_radio_tooltip){
+        .id = previous ? previous->descriptor.id : app->next_id++,
+        .state = &hint->state,
+        .text = {hint->text, length},
+        .options = {.side = CUI_POPUP_BELOW, .width = 240, .gap = 6, .open_delay = delay}};
+    if (previous)
+        hint->state = previous->state;
+    app->radio_tooltips[handle.slot] = hint;
+    free(previous);
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+
+static const cui_radio_tooltip *bridge_radio_tooltip(cui_bridge_app *app, uint32_t slot) {
+    bridge_radio_hint *hint = app->radio_tooltips ? app->radio_tooltips[slot] : NULL;
+    if (!hint)
+        return NULL;
+    hint->descriptor.options.viewport = (cui_rect){0, 0, app->width, app->height};
+    return &hint->descriptor;
+}
+
 _Static_assert(sizeof(cui_bridge_box_shadow_v1) == 24, "shadow layer V1 ABI");
 _Static_assert(sizeof(cui_bridge_box_shadows_v1) == 224, "shadow style V1 ABI");
 _Static_assert(offsetof(cui_bridge_box_shadows_v1, layers) == 32, "shadow layers offset");
@@ -944,6 +1022,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
         free(node->owner->radio_motions[node->own_slot]);
         node->owner->radio_motions[node->own_slot] = NULL;
     }
+    bridge_radio_tooltip_remove(node->owner, node->own_slot);
     free(node->part_shadows);
     free(node->key);
     free(node->text);
@@ -1521,6 +1600,7 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app->skeletons);
     free(app->pagination);
     free(app->radio_motions);
+    free(app->radio_tooltips);
     free(app);
 }
 cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
@@ -3915,9 +3995,12 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
         cui_selection_indicator_parts parts[64];
         cui_radio_group_content content[CUI_RADIO_GROUP_MAX] = {0};
         bool has_content = false, named = false, authored = node->shadows.schema_version != 0;
+        bool has_tooltip = false;
         for (size_t i = 0; i < count; ++i) {
             cui_bridge_node_record *item = &app->nodes[scratch->binding.slots[i]];
             content[i].description = cui_string(item->detail);
+            content[i].tooltip = bridge_radio_tooltip(app, item->own_slot);
+            has_tooltip |= content[i].tooltip != NULL;
             if (item->radio_item_content && item->first_child) {
                 content[i].content = bridge_item_content;
                 content[i].content_user = item;
@@ -3927,6 +4010,7 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
             named |= bridge_target_style(item, CUI_BRIDGE_SHADOW_INDICATOR) != NULL;
             authored |= item->shadows.schema_version != 0;
         }
+        has_content |= has_tooltip;
         cui_radio_group_options options = {.vertical = true, .disabled = node->disabled};
         cui_radio_group_presentation presentation = {.motion = bridge_radio_motion(app, slot),
                                                      .parts = named ? parts : NULL,
@@ -3937,7 +4021,8 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                 &node->radio_group_state, options, presentation, has_content ? content : NULL,
                 has_content ? count : 0, (cui_selection_handler){0})
                 .legacy;
-        if (!result.valid && (named || authored) && app->frame_error == CUI_BRIDGE_OK)
+        if (!result.valid && (named || authored || has_tooltip) &&
+            app->frame_error == CUI_BRIDGE_OK)
             app->frame_error = CUI_BRIDGE_CORE_ERROR;
         if (result.valid) {
             bridge_apply_parts(app, node);
@@ -5427,7 +5512,8 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         }
     } else if (node->kind == CUI_BRIDGE_RADIO) {
         int value = node->checked ? 1 : 0;
-        cui_radio_presentation presentation = {.motion = bridge_radio_motion(app, slot)};
+        cui_radio_presentation presentation = {.motion = bridge_radio_motion(app, slot),
+                                               .tooltip = bridge_radio_tooltip(app, slot)};
         if (bridge_target_style(node, CUI_BRIDGE_SHADOW_INDICATOR))
             presentation.parts.indicator = bridge_indicator_id(node);
         bool changed =

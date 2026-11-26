@@ -88,6 +88,123 @@ static bool drew_text(const char *value) {
     return false;
 }
 
+static bool describes(cui_bridge_app *app, cui_bridge_node handle, const char *description) {
+    size_t count;
+    const cui_semantic *sem = cui_semantics(app->ui, &count);
+    size_t length = strlen(description);
+    for (size_t i = 0; i < count; i++)
+        if (sem[i].id == app->nodes[handle.slot].id) {
+            cui_str text = sem[i].details.description;
+            return sem[i].role == CUI_ROLE_RADIO && text.length == length &&
+                   (!length || !memcmp(text.data, description, length));
+        }
+    return false;
+}
+
+static void test_tooltips(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_SDL,
+                                  .width = 260,
+                                  .height = 200,
+                                  .max_nodes = 12};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = node(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root");
+    cui_bridge_node radio = node(app, root, CUI_BRIDGE_RADIO, "radio");
+    cui_bridge_node group = node(app, root, CUI_BRIDGE_RADIO_GROUP, "group");
+    cui_bridge_node first = node(app, group, CUI_BRIDGE_ITEM, "first");
+    cui_bridge_node second = node(app, group, CUI_BRIDGE_ITEM, "second");
+    cui_bridge_node picks = node(app, root, CUI_BRIDGE_RADIO_GROUP, "unrelated");
+
+    assert(cui_bridge_set_text(app, radio, "Save a copy") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, first, "Standard") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, second, "Priority") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_detail_text(app, second, "Arrives tomorrow") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_selected(app, group, first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_tooltip_v1(app, group, "Group", 0) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_radio_set_tooltip_v1(app, radio, NULL, UINT32_MAX) == CUI_BRIDGE_OK);
+    assert(!app->radio_tooltips);
+    cui_id next_id = app->next_id;
+    for (unsigned fail = 1; fail <= 2; fail++) {
+        allocations_until_failure = fail;
+        assert(cui_bridge_radio_set_tooltip_v1(app, radio, "Local file", 40) ==
+               CUI_BRIDGE_OUT_OF_MEMORY);
+        assert(!app->radio_tooltips && app->next_id == next_id);
+    }
+    char hint[] = "Local file";
+    assert(cui_bridge_radio_set_tooltip_v1(app, radio, hint, 40) == CUI_BRIDGE_OK);
+    hint[0] = 'X';
+    assert(cui_bridge_radio_set_tooltip_v1(app, radio, "\xff", 40) == CUI_BRIDGE_INVALID_UTF8);
+    char too_long[258];
+    memset(too_long, 'x', sizeof too_long - 1);
+    too_long[sizeof too_long - 1] = 0;
+    assert(cui_bridge_radio_set_tooltip_v1(app, radio, too_long, 40) == CUI_BRIDGE_CAPACITY);
+    assert(cui_bridge_radio_set_tooltip_v1(app, radio, "New hint", 10001) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    allocations_until_failure = 1;
+    assert(cui_bridge_radio_set_tooltip_v1(app, radio, "New hint", 40) == CUI_BRIDGE_OUT_OF_MEMORY);
+    assert(cui_bridge_radio_set_tooltip_v1(app, first, "Most affordable", 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_tooltip_v1(app, second, "Track shipment", 40) == CUI_BRIDGE_OK);
+
+    step(app);
+    cui_bridge_rect box = bounds(app, radio);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_MOVE, box.x + box.width / 2,
+                                    box.y + box.height / 2) == CUI_BRIDGE_OK);
+    step(app);
+    assert(!drew_text("Local file") && cui_needs_redraw(app->ui));
+    step(app);
+    assert(!drew_text("Local file"));
+    step(app);
+    assert(drew_text("Local file") && !drew_text(hint) && describes(app, radio, "Local file"));
+    const cui_radio_tooltip *descriptor = bridge_radio_tooltip(app, radio.slot);
+    cui_id panel = descriptor->id;
+    cui_rect hint_bounds = cui_bounds(app->ui, panel);
+    assert(hint_bounds.w > 0 && hint_bounds.x >= 0 &&
+           hint_bounds.x + hint_bounds.w <= options.width);
+    assert(cui_bridge_radio_set_tooltip_v1(app, radio, "Disk file", 40) == CUI_BRIDGE_OK);
+    step(app);
+    assert(drew_text("Disk file") && !drew_text("Local file") &&
+           bridge_radio_tooltip(app, radio.slot)->id == panel);
+    assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, CUI_BRIDGE_KEY_ESCAPE, 0, 0) ==
+           CUI_BRIDGE_OK);
+    step(app);
+    assert(!drew_text("Disk file"));
+    step(app);
+    assert(!drew_text("Disk file"));
+    uint32_t checked;
+    cui_bridge_notification_v1 event;
+    assert(cui_bridge_get_checked(app, radio, &checked) == CUI_BRIDGE_OK && !checked);
+    assert(poll(app, &event) == CUI_BRIDGE_EMPTY);
+
+    cui_focus(app->ui, app->nodes[first.slot].id);
+    step(app);
+    assert(drew_text("Most affordable") && describes(app, first, "Most affordable"));
+    assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, CUI_BRIDGE_KEY_DOWN_ARROW, 0, 0) ==
+           CUI_BRIDGE_OK);
+    step(app);
+    assert(!drew_text("Most affordable") && !drew_text("Track shipment"));
+    assert(poll(app, &event) == CUI_BRIDGE_OK && event.kind == CUI_BRIDGE_NOTIFY_CHANGE &&
+           event.node.slot == group.slot && event.payload.selected.slot == second.slot);
+    step(app);
+    step(app);
+    assert(drew_text("Track shipment") && describes(app, second, "Arrives tomorrow"));
+    assert(poll(app, &event) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_set_disabled(app, group, 1) == CUI_BRIDGE_OK);
+    step(app);
+    assert(!drew_text("Track shipment") && poll(app, &event) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_radio_set_tooltip_v1(app, radio, "", 0) == CUI_BRIDGE_OK);
+    assert(!bridge_radio_tooltip(app, radio.slot));
+    assert(cui_bridge_node_remove(app, group) == CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_tooltip_v1(app, first, NULL, 0) == CUI_BRIDGE_STALE_HANDLE);
+    assert(!app->radio_tooltips[first.slot] && !app->radio_tooltips[second.slot]);
+    cui_bridge_node replacement = node(app, picks, CUI_BRIDGE_ITEM, "replacement");
+    assert(cui_bridge_radio_set_tooltip_v1(app, replacement, "Another hint", 0) == CUI_BRIDGE_OK);
+    assert(bridge_radio_tooltip(app, replacement.slot)->id != panel);
+    cui_bridge_destroy(app);
+}
+
 int main(void) {
     cui_bridge_options options = {.struct_size = sizeof options,
                                   .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -225,4 +342,5 @@ int main(void) {
     cui_bridge_node next = node(app, root, CUI_BRIDGE_RADIO, "replacement");
     assert(next.slot == group.slot && !bridge_radio_motion(app, next.slot));
     cui_bridge_destroy(app);
+    test_tooltips();
 }

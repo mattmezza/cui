@@ -19,7 +19,12 @@ assert.equal(app.supports_disclosure_presentation(), true, 'installed bridge lac
 assert.equal(app.supports_disclosure_heading(), true, 'installed bridge lacks disclosure headings');
 assert.equal(app.supports_disclosure_divider(), true, 'installed bridge lacks disclosure dividers');
 assert.equal(app.supportsVirtualListRows(), true, 'installed bridge lacks VirtualList live rows');
-app.mount(cui.row().children(widget)); app.step();
+assert.equal(app.supports_carousel_basis(), true, 'installed bridge lacks fractional Carousel slides');
+const overview = cui.item('overview', 'Overview').carousel_basis(0.5);
+const activity = cui.item('activity', 'Activity').carousel_basis(0.5);
+const slides = cui.carousel('slides').visual_size(240, 100).children(overview, activity);
+app.mount(cui.column().children(widget, slides)); app.step();
+assert.equal(activity.bounds().x - overview.bounds().x, 128);
 const bounds = widget.bounds();
 assert(bounds.width > 0 && bounds.height > 0);
 app.pointer('down', bounds.x + bounds.width/2, bounds.y + bounds.height/2);

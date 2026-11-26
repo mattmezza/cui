@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.10**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.10) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
 | Public website | Interactive WASM gallery and docs at alpha.10. The Pages deployment from `363f014c` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45852900242) |
-| Latest local work | Attachment slot composition and viewport-relative Carousel slides in C and the five bindings. The WASM gallery has live examples for both. Pending integration and release. |
+| Candidate | **v0.1.0-alpha.11** combines Accordion and Collapsible title states, retained Attachment composition and actions, and viewport-relative Carousel slides. Release qualification is in progress. |
 | Packages | Alpha.10 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green

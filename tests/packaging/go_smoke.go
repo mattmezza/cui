@@ -37,13 +37,24 @@ func main() {
 	if supported, err := app.SupportsDisclosureDivider(); err != nil || !supported {
 		panic(fmt.Sprintf("installed bridge lacks disclosure dividers: %v", err))
 	}
+	if supported, err := app.SupportsCarouselBasis(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks fractional Carousel slides: %v", err))
+	}
 	clicks := 0
 	button := cui.Button("save").Text("Save ✓").OnClick(func(cui.Event) { clicks++ })
-	if err := app.Mount(cui.Row("root").Children(button)); err != nil {
+	overview := cui.Item("overview", "Overview").CarouselBasis(0.5)
+	activity := cui.Item("activity", "Activity").CarouselBasis(0.5)
+	slides := cui.Carousel("slides").VisualSize(240, 100).Children(overview, activity)
+	if err := app.Mount(cui.Column("root").Children(button, slides)); err != nil {
 		panic(err)
 	}
 	if err := app.Step(.016); err != nil {
 		panic(err)
+	}
+	a, firstErr := app.Bounds(overview)
+	b, secondErr := app.Bounds(activity)
+	if firstErr != nil || secondErr != nil || b.X-a.X != 128 {
+		panic("installed Carousel did not lay out fractional slides")
 	}
 	bounds, err := app.Bounds(button)
 	if err != nil || bounds.Width <= 0 || bounds.Height <= 0 {

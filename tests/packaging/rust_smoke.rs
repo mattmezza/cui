@@ -12,12 +12,19 @@ fn main() -> Result<()> {
     assert!(app.supports_disclosure_presentation(), "installed bridge lacks disclosure presentation");
     assert!(app.supports_disclosure_heading(), "installed bridge lacks disclosure headings");
     assert!(app.supports_disclosure_divider(), "installed bridge lacks disclosure dividers");
-    let root = app.build_root(Kind::Row,"root")?.finish();
+    assert!(app.supports_carousel_basis(), "installed bridge lacks fractional Carousel slides");
+    let root = app.build_root(Kind::Column,"root")?.finish();
     let clicked = Rc::new(Cell::new(0));
     let callback = clicked.clone();
     let button = app.build_child(root,Kind::Button,"save")?.text("Save ✓")?
         .on_click(move || callback.set(callback.get()+1))?.finish();
+    let slides = app.build_child(root, Kind::Carousel, "slides")?.visual_size(240., 100.)?.finish();
+    let overview = app.build_child(slides, Kind::Item, "overview")?.text("Overview")?
+        .carousel_basis(0.5)?.finish();
+    let activity = app.build_child(slides, Kind::Item, "activity")?.text("Activity")?
+        .carousel_basis(0.5)?.finish();
     app.step(0.016)?;
+    assert_eq!(app.bounds(activity)?.x - app.bounds(overview)?.x, 128.);
     let bounds = app.bounds(button)?;
     assert!(bounds.width > 0. && bounds.height > 0.);
     app.pointer(Phase::Down,bounds.x+bounds.width/2.,bounds.y+bounds.height/2.)?;

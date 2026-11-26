@@ -179,7 +179,8 @@ def main():
                      clean / "appointments.py")
         subprocess.run([str(python), "appointments.py"], cwd=clean, env=env, check=True)
         for example in ("pagination", "radio_delivery", "rating_options",
-                        "stepper_visual", "virtual_list_inbox", "workspace_preferences"):
+                        "stepper_visual", "virtual_list_inbox", "workspace_preferences",
+                        "attachment_actions", "attachment_slots"):
             filename = f"{example}.py"
             shutil.copy2(ROOT / "bindings/python/examples" / filename, clean / filename)
             subprocess.run([str(python), filename], cwd=clean, env=env, check=True)
@@ -189,7 +190,8 @@ def main():
         shutil.copy2(ROOT / "tests/packaging/node_smoke.cjs", clean / "node_smoke.cjs")
         subprocess.run(["node", "node_smoke.cjs"], cwd=clean, env=env, check=True)
         for example in ("time-field-localized", "pagination-options", "radio-delivery",
-                        "rating-options", "stepper_visual", "virtual-list-inbox", "workspace-preferences"):
+                        "rating-options", "stepper_visual", "virtual-list-inbox", "workspace-preferences",
+                        "attachment-actions", "attachment-slots"):
             filename = f"{example}.cjs"
             code = (ROOT / "bindings/node/examples" / filename).read_text(encoding="utf-8")
             code = code.replace("require('../index.cjs')", "require('@cui/native')")
@@ -199,7 +201,8 @@ def main():
         subprocess.run(["npm", "install", "--save-dev", "--no-audit", "--no-fund", "--ignore-scripts", "typescript@5.8.3"], cwd=clean, env=env, check=True)
         shutil.copy2(ROOT / "tests/packaging/typescript_smoke.cts", clean / "typescript_smoke.cts")
         typed_examples = ("time_field_localized", "pagination_options", "radio_delivery",
-                          "rating_options", "stepper_visual", "virtual_list_inbox", "workspace_preferences")
+                          "rating_options", "stepper_visual", "virtual_list_inbox", "workspace_preferences",
+                          "attachment_actions", "attachment_slots")
         for example in typed_examples:
             code = (ROOT / "bindings/typescript/examples" / f"{example}.ts").read_text(encoding="utf-8")
             code = code.replace("'../../node/index.cjs'", "'@cui/native'")
@@ -207,6 +210,7 @@ def main():
         subprocess.run(["node", "node_modules/typescript/bin/tsc", "--strict", "--module", "NodeNext",
                         "--moduleResolution", "NodeNext", "--target", "ES2022", "typescript_smoke.cts",
                         *(f"typed-{example}.cts" for example in typed_examples)], cwd=clean, env=env, check=True)
+        subprocess.run(["node", "typescript_smoke.cjs"], cwd=clean, env=env, check=True)
         for example in typed_examples:
             subprocess.run(["node", f"typed-{example}.cjs"], cwd=clean, env=env, check=True)
 if __name__ == "__main__":

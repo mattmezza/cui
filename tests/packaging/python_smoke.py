@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 import cui_bridge
-from cui_bridge import App, button, row
+from cui_bridge import App, button, carousel, column, item, row
 assert not os.environ.get("CUI_BRIDGE_LIBRARY")
 assert not os.environ.get("PYTHONPATH")
 backend = os.environ.get("CUI_PACKAGE_SMOKE_BACKEND", "none")
@@ -25,8 +25,13 @@ with App(**kwargs) as app:
     assert app.supports_disclosure_presentation(), "installed bridge lacks disclosure presentation"
     assert app.supports_disclosure_heading(), "installed bridge lacks disclosure headings"
     assert app.supports_disclosure_divider(), "installed bridge lacks disclosure dividers"
-    app.mount(row().children(widget))
+    assert app.supports_carousel_basis(), "installed bridge lacks fractional Carousel slides"
+    overview = item("overview", "Overview").carousel_basis(0.5)
+    activity = item("activity", "Activity").carousel_basis(0.5)
+    slides = carousel("slides").visual_size(240, 100).children(overview, activity)
+    app.mount(column().children(widget, slides))
     app.step()
+    assert app.bounds(activity)[0] - app.bounds(overview)[0] == 128
     x, y, w, h = app.bounds(widget)
     assert w > 0 and h > 0
     if backend == "sdl":

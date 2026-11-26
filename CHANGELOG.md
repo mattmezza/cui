@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.11
+
 - Accordion and Collapsible built-in titles can use separate hover,
   keyboard-focus and press typography and color in immediate C, retained C,
   Python, JavaScript, TypeScript, Go and Rust. The gallery demonstrates all
@@ -16,6 +18,11 @@
 - Retained Attachment cards can host custom preview fallbacks, overlays,
   metadata and action rows in C, Python, JavaScript, TypeScript, Go and Rust.
   Child controls keep their own events and lifetimes.
+- Carousel supports viewport-relative slide sizes. The WASM gallery shows
+  one, two or three slides on either axis. Retained C and all five bindings
+  support horizontal fractional slides with fixed or growing viewports.
+- The installed-binding workflow tests the Rust crate once and exercises both
+  Go package variants.
 
 ## 0.1.0-alpha.10
 

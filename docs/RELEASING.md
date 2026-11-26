@@ -1,3 +1,22 @@
+# Published prerelease v0.1.0-alpha.6
+
+CUI v0.1.0-alpha.6 was published on 2026-11-26 from
+`d3711979e2e7e434c6c622b92797dc21690095a4`. The release includes the native
+starter, source archive, static Linux C bundle and Python, npm, Go and Rust
+packages. The website displays alpha.6 and serves the same starter bytes.
+[GitHub release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.6)
+
+All 16 hosted CI jobs, the native binding callback job, and the three headless
+browser shards passed. Six installed checks covered the extracted starter, C,
+Python, Node, strict TypeScript, Go, Rust, text with real fonts and the paging
+examples. All 11 draft assets matched local staging before publication.
+[Release validation record](validation/alpha6-release.json)
+
+Rebuild C consumers with matching headers and libraries. The Python wheel uses
+`0.1.0a6`. Linux binary assets target x86_64 and require system dependencies.
+Physical device and GPU acceptance, full component verification, and PyPI, npm
+and crates.io publication remain open.
+
 # Published prerelease v0.1.0-alpha.5
 
 [CUI v0.1.0-alpha.5](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.5) is published from `57aeb20bcb405fdb441666374abff0254c9abcd4` on 2026-11-25.

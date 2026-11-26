@@ -11,11 +11,11 @@ use the checklists below to track acceptance and delivery.
 
 | Track | Current status |
 | --- | --- |
-| Public release | **v0.1.0-alpha.5**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.5) |
+| Public release | **v0.1.0-alpha.6**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.6) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
-| Public website | Interactive WASM gallery and docs at alpha.5. The live site reports source revision `3106a5bb`, which passed [Pages verification](https://github.com/mattmezza/cui/actions/runs/45691841974). |
-| Working source | Alpha.6 candidate batches the ordered TimeField, live text geometry, Chart/Plot and navigation fixes. Exact release validation is in progress. |
-| Packages | Alpha.5 GitHub assets and verified Go module. PyPI, npm and crates.io publication remain open. |
+| Public website | Interactive WASM gallery and docs at alpha.6. The Pages deployment from `d3711979` serves the same native starter bytes as the GitHub release. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45732688558) |
+| Working source | Alpha.6 ships ordered TimeField, live text geometry, Chart and Plot refinements, and navigation fixes. [Changelog](CHANGELOG.md) |
+| Packages | Alpha.6 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
 feature test does not establish complete component parity.
@@ -29,7 +29,10 @@ feature test does not establish complete component parity.
 
 ## Release wrap-up
 
-Alpha.5 ships retained Icon and Badge artwork, responsive Skeleton builders, larger paged DataTables, VideoPlayer sound controls and the responsive native starter. The gallery and release assets match the validated source. Component parity and the remaining beta acceptance work continue below.
+Alpha.6 ships the ordered C TimeField with IME and accessible segment focus,
+live-resize Input geometry, Textarea word navigation, Chart and Plot refinements,
+and Carousel and Calendar fixes. The responsive native starter and language
+packages match the validated source. [Release evidence](docs/validation/alpha6-release.json)
 
 ## Next milestones, in order
 
@@ -52,7 +55,7 @@ Alpha.5 ships retained Icon and Badge artwork, responsive Skeleton builders, lar
 | Native starter | Working source switches from a pinned Sidebar to a compact Sheet below MD. Private X11 checks verify intermediate rendering and focused page input across six widths. Headless checks cover navigation focus handoff, pinned account controls, clipped links, held mouse/touch and unsaved edits. Short Settings pages scroll by wheel, touch and form focus. Projects has a resizable list/detail pair and bounded tabs, verified with 48 private-X11 presentations across six widths and headless interaction tests. The extracted alpha.5 starter passes installed checks. Physical drag and other hosts remain open. See the [starter guide](docs/NATIVE_APP_STARTER.md) and [Linux evidence](docs/LINUX_LIVE_RESIZE.md). |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix remains open. Alpha.4 contains the typed model and foreign bridge subsets. The subsequent opt-in Linux C adapter passes native AT-SPI Set Value and headless numeric mailbox checks. Foreign host opt-in, other OS adapters and physical screen-reader acceptance remain open. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; released in alpha.4. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), SDL integration is now covered by focused checks; the other three adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
-| Validation | Alpha.5 hosted and installed checks pass. Native starter, real-font text and installed Python/Node paging are covered. [Release evidence](docs/validation/alpha5-release.json) |
+| Validation | Alpha.6 passed hosted CI, native binding callbacks, all three browser shards and all six installed checks. [Release evidence](docs/validation/alpha6-release.json) |
 
 **Resource rule:** reuse existing build directories, serialize heavy builds, and keep automated windows off the desktop. Remove only confirmed disposable artifacts; preserve source and independently landed work.
 
@@ -115,6 +118,7 @@ Check reported regressions against the current gallery as each slice lands.
 | 5 | Popover / HoverCard | HoverCard has compact, wrapped and near-edge WASM profiles with copyable C, verified live reflow and narrow touch placement. Popover has admitted-only C trigger relationships, explicit focus entry and Escape return, opt-in outside focus handoff, and a right-click toggle that keeps keyboard and tap activation. The gallery maintains a stable canvas while an outside touch closes an overflowing Popover. Alpha.5 deploys these fixes. Foreign builders and native accessibility remain open. |
 | 5 | Select / Combobox / Command | Command grow-width row paint and hit targets follow the parent from the first frame, with a follow-up for width-dependent custom heights. Headless Chromium verifies Select trigger centering and full-width rows, keyboard selection and edge taps across Select, Combobox and Command. Alpha.5 deploys these fixes. Physical-device checks remain open. |
 | 6 | Button / Checkbox / Radio / Switch / Slider | Check the shared size scale and hover, pressed, focus, disabled and loading states where applicable. Extend typed activation and value coverage in the bindings while preserving existing C callback timing. |
+| 6 | Pagination | Headless Chromium verified the counter is centered at desktop 1× and 2×. Touch advances the page at 390px, where the compact counter still wraps across three lines. Add sizing and narrow-layout coverage. |
 | 6 | Input / Textarea | Native regressions cover the caret and IME anchor at a full-width Textarea wrap. Headless Chromium checks Alt+Arrow word movement and selection across wraps. Single-line Input retains its existing Up/Down policy. Growing Input and InputGroup place the caret and selection in the current width. Chromium exercises resize with active preedit. Multiline rewrap and physical IME acceptance remain open. Keep new Editor features lower priority. |
 | 7 | DatePicker / TimeField | Chromium covers localized historical date selection by keyboard and touch, including batches across year pages and popup focus return. The ordered TimeField gallery covers composition, preview-edge navigation and named accessible values. Physical native input and broader accessibility actions remain open. [DatePicker guide](docs/DATE_LOCALE_YEAR.md) · [Focus routing](docs/design/TIME_FIELD_FOCUS_ROUTING.md) |
 | 7 | Chart / Plot | Chromium verifies continuous strokes and optional circular Line markers at desktop/mobile widths and 1×/2× display scales. Plot mouse/touch zoom and slow touch pan pass. Chromium verifies page handoff over disabled, horizontal-only and vertically bounded Plots. Linux headless tests exercise dispatch evidence and the legacy capture policy. Physical touch and native ancestor handoff remain open. |
@@ -184,7 +188,7 @@ Historical source evidence and remaining acceptance:
 | Dialog composition | `ef893a34` idle fix; focused native checks and full browser gate on artifact `f728908e` pass | Broader lifecycle. Alpha.5 deploys the focused behavior and nested-touch checks pass. |
 | Localized TimeField | Integrated `49267cc4`; native/source/ABI checks and keyboard gallery gates pass. Working source covers ordered IME and formatted semantic values. Chromium AX and Linux AT-SPI verify the current time, discrete values and segment focus. Released language artifacts pass headless examples. | Physical IME, assistive-technology editing and screen-reader qualification, and interactive native binding acceptance. |
 
-Receipts travel with their source changes. Use the alpha.5 receipt above for
+Receipts travel with their source changes. Use the alpha.6 receipt above for
 exact-source acceptance and delivery.
 
 Detailed validation receipts live in [docs/validation](docs/validation).

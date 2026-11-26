@@ -145,6 +145,25 @@ their handles. The option keeps one focus stop and the group delivers
 the usual selection event. See the allowed decorative kinds in the
 [bridge composition guide](BRIDGE_COMPONENTS.md#compose-retained-radio-option-content).
 
+## Add Radio tooltips from Rust
+
+Set a hint on a standalone Radio or one Item in a RadioGroup. Pass the
+opening delay in milliseconds and use the provider probe when supporting
+earlier bridge releases.
+
+```rust
+let hint = app.supports_radio_tooltip().then_some("Track your parcel online");
+let priority = app.build_child(group, Kind::Item, "priority")?
+    .text("Priority")?
+    .radio_tooltip(hint, 350)?
+    .finish();
+```
+
+Call `app.radio_tooltip(priority, None, 0)?` to clear an existing hint.
+The mounted setter can also replace the text or delay between frames.
+The complete delivery example enables the hint and updates an arrival estimate
+in the regular selection callback. [Run the delivery form](#animate-radio-selection-from-rust)
+
 ## Configure Pagination from Rust
 
 Build a detached `PaginationOptions` when you want the bridge capability and record size checked before creating a retained child. Ordinary `Kind::Pagination` still works with earlier providers. `app.supports_pagination_options()` reports whether the extended API is available.

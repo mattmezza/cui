@@ -143,3 +143,82 @@ fn optional_item_content_keeps_one_radio_target() {
     app.remove(group).unwrap();
     assert_eq!(app.decorate_content(priority, false).err(), Some(Error(4)));
 }
+
+#[test]
+fn optional_tooltips_preserve_selection_events() {
+    let mut app = App::headless(320., 240.).unwrap();
+    let supported = app.supports_radio_tooltip();
+    assert_eq!(
+        supported,
+        std::env::var("CUI_TEST_RADIO_MOTION").as_deref() != Ok("0")
+    );
+    let root = app.root(Kind::Column, "root").unwrap();
+    let radio = app.child(root, Kind::Radio, "alternate").unwrap();
+    app.text(radio, "Save a copy").unwrap();
+    let group = app.child(root, Kind::RadioGroup, "delivery").unwrap();
+    let standard = app.child(group, Kind::Item, "standard").unwrap();
+    app.text(standard, "Standard").unwrap();
+    let priority = app
+        .build_child(group, Kind::Item, "priority")
+        .unwrap()
+        .text("Priority")
+        .unwrap()
+        .radio_tooltip(supported.then_some("Suivre le colis"), 0)
+        .unwrap()
+        .finish();
+    let tabs = app.child(root, Kind::Tabs, "tabs").unwrap();
+    let tab = app.child(tabs, Kind::Item, "tab").unwrap();
+    assert_eq!(app.radio_tooltip(tab, None, 0).err(), Some(Error(8)));
+    assert_eq!(app.radio_tooltip(group, None, 0).err(), Some(Error(8)));
+    app.select(group, standard).unwrap();
+    if supported {
+        app.radio_tooltip(radio, Some("Local file"), 350).unwrap();
+        assert_eq!(
+            app.radio_tooltip(radio, Some(&"é".repeat(129)), 350).err(),
+            Some(Error(5))
+        );
+        assert_eq!(
+            app.radio_tooltip(radio, Some("Invalid\0hint"), 0).err(),
+            Some(Error(3))
+        );
+        assert_eq!(
+            app.radio_tooltip(radio, Some("Invalid delay"), 10001).err(),
+            Some(Error(3))
+        );
+    } else {
+        assert_eq!(
+            app.radio_tooltip(radio, Some("Local file"), 350).err(),
+            Some(Error(9))
+        );
+        assert_eq!(
+            app.radio_tooltip(priority, Some("Tracking"), 350).err(),
+            Some(Error(9))
+        );
+    }
+    let changes = Rc::new(RefCell::new(Vec::new()));
+    let events = changes.clone();
+    app.on_change_event(group, move |event| events.borrow_mut().push(event.selected))
+        .unwrap();
+    app.step(0.016).unwrap();
+    let b = app.bounds(priority).unwrap();
+    let (x, y) = (b.x + b.width / 2., b.y + b.height / 2.);
+    app.pointer(Phase::Move, x, y).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.dispatch().unwrap(), 0);
+    app.pointer(Phase::Down, x, y).unwrap();
+    app.pointer(Phase::Up, x, y).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.selected(group).unwrap(), Some(priority));
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(&*changes.borrow(), &[Some(priority)]);
+    if supported {
+        app.radio_tooltip(priority, Some("Track shipment"), 350)
+            .unwrap();
+    }
+    app.radio_tooltip(priority, None, u32::MAX).unwrap();
+    app.radio_tooltip(radio, Some(""), u32::MAX).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.dispatch().unwrap(), 0);
+    app.remove(group).unwrap();
+    assert_eq!(app.radio_tooltip(priority, None, 0).err(), Some(Error(4)));
+}

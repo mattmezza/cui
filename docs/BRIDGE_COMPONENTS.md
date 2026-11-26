@@ -316,7 +316,12 @@ if (app.supports_radio_tooltip()) {
 [JavaScript delivery form](../bindings/node/examples/radio-delivery.cjs) ·
 [TypeScript delivery form](../bindings/typescript/examples/radio_delivery.ts)
 
-Go and Rust do not yet expose this setter.
+Rust exposes `Builder::radio_tooltip(text, delay_ms)` and
+`app.radio_tooltip(option, text, delay_ms)`. Supply `Some(text)` to set a
+hint and `None` to clear it. Probe `app.supports_radio_tooltip()` before
+opt-in for older providers. [Rust delivery form](RUST_BUILDERS.md#add-radio-tooltips-from-rust)
+
+Go does not yet expose this setter.
 
 ### Configure a retained pager from C
 

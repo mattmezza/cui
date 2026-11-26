@@ -34,6 +34,9 @@ fn main() -> Result<()> {
         .finish();
     let motion = app.supports_radio_motion();
     let decorate = app.supports_radio_item_content();
+    let hint = app
+        .supports_radio_tooltip()
+        .then_some("Track your parcel online");
     let group = app
         .build_child(root, Kind::RadioGroup, "delivery")?
         .animate_selection(motion)?
@@ -47,6 +50,7 @@ fn main() -> Result<()> {
         .text("Priority")?
         .detail_text("Tracked delivery. Recommended.")?
         .decorate_content(decorate)?
+        .radio_tooltip(hint, 350)?
         .finish();
     let recommendation = app
         .build_child(priority, Kind::Tag, "recommended")?

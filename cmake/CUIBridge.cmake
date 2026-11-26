@@ -626,10 +626,11 @@ if(CUI_RUST_RADIO_MOTION_TESTS)
  endfunction()
  set(_radio_shared
   "CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>;LD_LIBRARY_PATH=$<TARGET_FILE_DIR:cui_bridge>")
+ # The layout engine uses a process-wide current context.
  cui_rust_radio_motion_test(dynamic "${CUI_RUST_RADIO_TARGET_DIR}" "${_radio_shared}" 1
-  test --offline --locked -j1 --test radio_motion)
+  test --offline --locked -j1 --test radio_motion -- --test-threads=1)
  cui_rust_radio_motion_test(static "${CUI_RUST_RADIO_STATIC_TARGET_DIR}" "" 1
-  test --offline --locked -j1 --test radio_motion)
+  test --offline --locked -j1 --test radio_motion -- --test-threads=1)
  cui_rust_radio_motion_test(example "${CUI_RUST_RADIO_STATIC_TARGET_DIR}" "" 1
   run --offline --locked -j1 --example radio_delivery)
  set(CUI_RUST_RADIO_LEGACY_LIBRARY "" CACHE FILEPATH "Optional bridge without retained Radio motion")
@@ -642,7 +643,10 @@ if(CUI_RUST_RADIO_MOTION_TESTS)
   file(CREATE_LINK "${CUI_RUST_RADIO_LEGACY_LIBRARY}" "${_radio_legacy}/libcui_bridge.so" SYMBOLIC)
   cui_rust_radio_motion_test(legacy "${CUI_RUST_RADIO_TARGET_DIR}"
    "CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>;LD_LIBRARY_PATH=${_radio_legacy}" 0
-   test --offline --locked -j1 --test radio_motion)
+   test --offline --locked -j1 --test radio_motion -- --test-threads=1)
+  cui_rust_radio_motion_test(legacy_example "${CUI_RUST_RADIO_TARGET_DIR}"
+   "CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>;LD_LIBRARY_PATH=${_radio_legacy}" 0
+   run --offline --locked -j1 --example radio_delivery)
  endif()
  if(CUI_BRIDGE_NATIVE_TESTS)
   cui_rust_radio_motion_test(native "${CUI_RUST_RADIO_TARGET_DIR}" "${_radio_shared}" 1

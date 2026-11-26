@@ -303,10 +303,26 @@ def verify_attachment_metadata(browser, url):
         for label in (title, description):
             assert page.locator('#accessible').get_by_text(label, exact=True).count() == 1
         assert page.locator('#accessible [role=group]').evaluate_all('(nodes)=>nodes.filter(n=>/^Attachment [1-6]$/.test(n.getAttribute("aria-label"))).length') == 6
+        def configure(vertical, size):
+            # Update both host controls in the same task, then wait for WASM geometry.
+            frame = page.evaluate('''([vertical, size]) => {
+                const frame = cuiGallery.frame;
+                const orientation = document.querySelector('#attachment-vertical');
+                const design = document.querySelector('#design-size');
+                orientation.checked = vertical;
+                design.value = size;
+                for (const control of [orientation, design])
+                    control.dispatchEvent(new Event('change', {bubbles: true}));
+                return frame;
+            }''', [vertical, size])
+            page.wait_for_function('frame=>cuiGallery.frame>frame', arg=frame)
+
+        def geometry():
+            return [page.evaluate(metric, name) for name in ('Attachment 1', title, 'Open')]
+
+        base_geometry = None
         for vertical, size in ((False, '3'), (False, '1'), (True, '1'), (True, '3')):
-            page.locator('#attachment-vertical').set_checked(vertical)
-            page.locator('#design-size').select_option(size)
-            page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+            configure(vertical, size)
             page.wait_for_function('cuiGallery.exports.gallery_error()===0')
             # Metadata semantics keep the original string while paint has a single ellipsized line.
             for text, weight in ((title, 1), (description, 0)):
@@ -340,8 +356,14 @@ def verify_attachment_metadata(browser, url):
                 assert '\n' not in command['text'] and '\ufffd' not in command['text']
             page.wait_for_function('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>e.gallery_command(i,0)===5&&e.gallery_bitmap(i,0)===256&&e.gallery_bitmap(i,1)===144&&e.gallery_bitmap_revision(i,0)===1);}')
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-        page.locator('#attachment-vertical').uncheck()
-        page.locator('#design-size').select_option('3')
+            if not vertical and size == '3':
+                base_geometry = geometry()
+        configure(False, '3')
+        restored = geometry()
+        assert all(base_geometry) and all(restored)
+        assert all(abs(a-b)<.5 for before, after in zip(base_geometry, restored)
+                   for a, b in zip(before, after)), (base_geometry, restored)
+
         def click(name, *, touch=False):
             x,y,w,h = page.wait_for_function(metric, arg=name).json_value()
             position = {'x':x+w/2, 'y':y+h/2}

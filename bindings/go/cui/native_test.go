@@ -1256,6 +1256,55 @@ func TestCarouselAxis(t *testing.T) {
 	}
 }
 
+func TestCarouselLooping(t *testing.T) {
+	a := app(t)
+	supported, err := a.SupportsCarouselLooping()
+	check(t, err)
+	legacy := os.Getenv("CUI_TEST_LEGACY_CAROUSEL_LOOPING") == "1"
+	if supported == legacy {
+		t.Fatalf("Carousel looping capability = %t, legacy test = %t", supported, legacy)
+	}
+	first, second := Item("first", "First"), Item("second", "Second")
+	rail := Carousel("loop").CarouselLooping(true).Children(first, second)
+	root := Column("root").Children(rail)
+	var selected *Node
+	rail.OnChange(func(event Event) { selected = event.Selected })
+	if legacy {
+		if err := a.Mount(root); err != ErrCarouselLoopingUnavailable {
+			t.Fatalf("expected unavailable before mounting, got %v", err)
+		}
+		check(t, rail.CarouselLooping(false).Err())
+	}
+	check(t, a.Mount(root))
+	check(t, a.Step(.016))
+	area, err := a.Bounds(rail)
+	check(t, err)
+	check(t, a.QueueScroll(area.X+30, area.Y+30, 1, 0))
+	check(t, a.Step(.016))
+	count, err := a.Dispatch()
+	check(t, err)
+	if legacy {
+		if count != 0 {
+			t.Fatal("legacy carousel unexpectedly wrapped")
+		}
+		return
+	}
+	if count != 1 || selected != second {
+		t.Fatal("expected one wrapped selection of the second slide")
+	}
+	check(t, rail.CarouselLooping(false).Err())
+	check(t, a.Step(.016))
+	check(t, a.QueueScroll(area.X+30, area.Y+30, -1, 0))
+	check(t, a.Step(.016))
+	count, err = a.Dispatch()
+	check(t, err)
+	current, err := a.Selected(rail)
+	check(t, err)
+	if count != 0 || current != second {
+		t.Fatal("disabling looping must preserve the selection and stop edge wraps")
+	}
+}
+
 func TestResizable(t *testing.T) {
 	a := app(t)
 	first := Item("first", "First panel").PanelSize(240)

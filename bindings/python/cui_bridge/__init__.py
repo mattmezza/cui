@@ -299,6 +299,10 @@ class _API:
         self.get_selected = bind("get_selected", C.c_int, C.c_void_p, _Handle, C.POINTER(_Handle))
         self.get_open = bind("get_open", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_uint32))
         self.set_anchor = bind("set_anchor", C.c_int, C.c_void_p, _Handle, _Handle)
+        self.set_carousel_looping = None
+        if hasattr(lib, "cui_bridge_set_carousel_looping_v1"):
+            self.set_carousel_looping = bind("set_carousel_looping_v1", C.c_int,
+                                             C.c_void_p, _Handle, C.c_uint32)
         self.set_carousel_axis = None
         if hasattr(lib, "cui_bridge_set_carousel_axis_v1"):
             self.set_carousel_axis = bind("set_carousel_axis_v1", C.c_int,
@@ -548,6 +552,7 @@ class Widget:
         self._anchor: Widget | None = None
         self._extent: tuple[float, float] | None = None
         self._carousel_axis = "horizontal"
+        self._carousel_looping = False
         self._carousel_basis = 0.0
         self._visual: tuple[float, float] | None = None
         self._total = 5 if kind == "rating" else 6 if kind == "otp_input" else 10
@@ -1034,6 +1039,21 @@ class Widget:
                 raise RuntimeError("Carousel axis requires cui_bridge_set_carousel_axis_v1")
             self._change("set_carousel_axis", int(axis == "vertical"))
         self._carousel_axis = axis
+        return self
+
+    def carousel_looping(self, enabled: bool = True) -> "Widget":
+        """Enable edge wrapping when the Carousel track is long enough."""
+        if self.kind != "carousel":
+            raise ValueError("carousel_looping requires a Carousel")
+        if not isinstance(enabled, bool):
+            raise TypeError("enabled must be a boolean")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is not None and enabled != self._carousel_looping:
+            if not self._app.supports_carousel_looping():
+                raise RuntimeError("Carousel looping requires cui_bridge_set_carousel_looping_v1")
+            self._change("set_carousel_looping", int(enabled))
+        self._carousel_looping = enabled
         return self
 
     def carousel_basis(self, fraction: float) -> "Widget":
@@ -2042,6 +2062,10 @@ class App:
         self._ensure_open()
         return self._api.set_carousel_axis is not None
 
+    def supports_carousel_looping(self) -> bool:
+        self._ensure_open()
+        return self._api.set_carousel_looping is not None
+
     def supports_carousel_basis(self) -> bool:
         self._ensure_open()
         return self._api.set_carousel_basis is not None
@@ -2182,6 +2206,8 @@ class App:
                 self._require_stepper_fill()
             if node._carousel_axis == "vertical" and not self.supports_carousel_axis():
                 raise RuntimeError("Carousel axis requires cui_bridge_set_carousel_axis_v1")
+            if node._carousel_looping and not self.supports_carousel_looping():
+                raise RuntimeError("Carousel looping requires cui_bridge_set_carousel_looping_v1")
             if node._carousel_basis:
                 if parent is None or parent.kind != "carousel":
                     raise ValueError("carousel_basis requires a direct Carousel Item")
@@ -2269,6 +2295,8 @@ class App:
                     node._change("set_checked", int(node._checked))
                 if node._carousel_axis == "vertical":
                     node._change("set_carousel_axis", 1)
+                if node._carousel_looping:
+                    node._change("set_carousel_looping", 1)
                 if node._carousel_basis:
                     node._change("set_carousel_basis", node._carousel_basis)
                 if node._radio_motion:

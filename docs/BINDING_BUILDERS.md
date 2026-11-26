@@ -684,6 +684,8 @@ its initial frame. Carousel contains Item slides and provides `select` and
 Check `app.supports_carousel_basis()` before using this with an older bridge.
 Use `carousel_axis("vertical")` on the Carousel after checking
 `app.supports_carousel_axis()`. Vertical fractions use the visual height.
+Call `carousel_looping()` after checking `app.supports_carousel_looping()` to let
+Carousels with enough slides wrap at the ends.
 Use `visual_size(0, height)` for a growing fractional Carousel. See the
 [retained Carousel example](CAROUSEL.md#retained-slides).
 Resizable contains Item panels with `panel_size(100..4096)` widths;

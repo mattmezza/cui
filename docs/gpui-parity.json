@@ -5796,7 +5796,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes and fractional sizing. Intrinsic sizing from arbitrary slide content, the first growing-width estimate and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
+        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Retained C and language builders support both axes, fractional sizing and geometry-supported wrapping. Custom retained controls, intrinsic sizing from arbitrary slide content, the first growing-width estimate and host gesture/tooltip services remain open. See docs/CAROUSEL.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5824,6 +5824,20 @@
             "docs/CAROUSEL.md"
           ],
           "scope": "Immediate C and the WASM gallery cover both axes, mixed extents, clipping, silent resizing and touch snapping. The C bridge and five language builders cover both axes, fractional layout, axis-specific navigation, stable selection and silent reconfiguration. Optional symbols allow older bridges to keep their previous layout."
+        },
+        {
+          "name": "retained edge wrapping and short-track fallback",
+          "status": "tested",
+          "evidence": [
+            "bindings/bridge/tests/test_bridge_components.c",
+            "bindings/python/test_model_components.py",
+            "bindings/node/test/models.test.cjs",
+            "bindings/typescript/components.typecheck.ts",
+            "bindings/go/cui/native_test.go",
+            "bindings/rust/tests/builders.rs",
+            "docs/CAROUSEL.md"
+          ],
+          "scope": "Opt-in wrapping on both axes with a geometry guard. Setting changes cancel the active gesture, preserve selection and emit no selection event. Older providers retain bounded navigation."
         },
         {
           "name": "keyboard, pointer drag and wheel navigation with nested child ownership and cross-axis page handoff",

@@ -2,7 +2,7 @@ use crate::{check, App, Builder, Error, Node, RawNode, Result};
 use std::{ffi::c_void, sync::OnceLock};
 
 type SetBasis = unsafe extern "C" fn(*mut c_void, RawNode, f32) -> u32;
-type SetAxis = unsafe extern "C" fn(*mut c_void, RawNode, u32) -> u32;
+type SetOption = unsafe extern "C" fn(*mut c_void, RawNode, u32) -> u32;
 
 /// The primary direction of a retained Carousel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,13 +43,13 @@ fn resolve() -> Option<SetBasis> {
     None
 }
 
-fn axis_setter() -> Option<SetAxis> {
-    static SETTER: OnceLock<Option<SetAxis>> = OnceLock::new();
+fn axis_setter() -> Option<SetOption> {
+    static SETTER: OnceLock<Option<SetOption>> = OnceLock::new();
     *SETTER.get_or_init(resolve_axis)
 }
 
 #[cfg(cui_bridge_static)]
-fn resolve_axis() -> Option<SetAxis> {
+fn resolve_axis() -> Option<SetOption> {
     extern "C" {
         fn cui_bridge_set_carousel_axis_v1(app: *mut c_void, carousel: RawNode, axis: u32) -> u32;
     }
@@ -57,15 +57,45 @@ fn resolve_axis() -> Option<SetAxis> {
 }
 
 #[cfg(all(not(cui_bridge_static), any(unix, windows)))]
-fn resolve_axis() -> Option<SetAxis> {
+fn resolve_axis() -> Option<SetOption> {
     unsafe {
         let symbol = crate::notification_symbol_v1(c"cui_bridge_set_carousel_axis_v1".as_ptr());
-        (!symbol.is_null()).then(|| std::mem::transmute::<*mut c_void, SetAxis>(symbol))
+        (!symbol.is_null()).then(|| std::mem::transmute::<*mut c_void, SetOption>(symbol))
     }
 }
 
 #[cfg(not(any(cui_bridge_static, unix, windows)))]
-fn resolve_axis() -> Option<SetAxis> {
+fn resolve_axis() -> Option<SetOption> {
+    None
+}
+
+fn looping_setter() -> Option<SetOption> {
+    static SETTER: OnceLock<Option<SetOption>> = OnceLock::new();
+    *SETTER.get_or_init(resolve_looping)
+}
+
+#[cfg(cui_bridge_static)]
+fn resolve_looping() -> Option<SetOption> {
+    extern "C" {
+        fn cui_bridge_set_carousel_looping_v1(
+            app: *mut c_void,
+            carousel: RawNode,
+            looping: u32,
+        ) -> u32;
+    }
+    Some(cui_bridge_set_carousel_looping_v1)
+}
+
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn resolve_looping() -> Option<SetOption> {
+    unsafe {
+        let symbol = crate::notification_symbol_v1(c"cui_bridge_set_carousel_looping_v1".as_ptr());
+        (!symbol.is_null()).then(|| std::mem::transmute::<*mut c_void, SetOption>(symbol))
+    }
+}
+
+#[cfg(not(any(cui_bridge_static, unix, windows)))]
+fn resolve_looping() -> Option<SetOption> {
     None
 }
 
@@ -74,6 +104,8 @@ impl Error {
     pub const CAROUSEL_BASIS_UNAVAILABLE: Self = Self(9);
     /// The loaded bridge lacks the optional Carousel axis setter.
     pub const CAROUSEL_AXIS_UNAVAILABLE: Self = Self(9);
+    /// The loaded bridge lacks the optional Carousel looping setter.
+    pub const CAROUSEL_LOOPING_UNAVAILABLE: Self = Self(9);
 }
 
 impl App {
@@ -87,6 +119,19 @@ impl App {
         let carousel = self.valid(carousel)?;
         let set = axis_setter().ok_or(Error::CAROUSEL_AXIS_UNAVAILABLE)?;
         check(unsafe { set(self.raw, carousel, axis as u32) })?;
+        Ok(self)
+    }
+
+    /// Whether the loaded bridge supports edge wrapping for retained Carousels.
+    pub fn supports_carousel_looping(&self) -> bool {
+        looping_setter().is_some()
+    }
+
+    /// Enable edge wrapping on a track long enough to loop.
+    pub fn carousel_looping(&mut self, carousel: Node, enabled: bool) -> Result<&mut Self> {
+        let carousel = self.valid(carousel)?;
+        let set = looping_setter().ok_or(Error::CAROUSEL_LOOPING_UNAVAILABLE)?;
+        check(unsafe { set(self.raw, carousel, u32::from(enabled)) })?;
         Ok(self)
     }
 
@@ -109,6 +154,12 @@ impl Builder<'_> {
     /// Set the direction of the Carousel being built.
     pub fn carousel_axis(self, axis: CarouselAxis) -> Result<Self> {
         self.app.carousel_axis(self.node, axis)?;
+        Ok(self)
+    }
+
+    /// Enable edge wrapping on the Carousel being built.
+    pub fn carousel_looping(self, enabled: bool) -> Result<Self> {
+        self.app.carousel_looping(self.node, enabled)?;
         Ok(self)
     }
 

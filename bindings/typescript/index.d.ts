@@ -42,6 +42,7 @@ export class App {
   supports_stepper_fill(): boolean;
   /** Whether this app's native bridge supports fractional Carousel slides. */
   supports_carousel_axis(): boolean;
+  supports_carousel_looping(): boolean;
   supports_carousel_basis(): boolean;
   /** Whether this app's native bridge can animate retained Radio selection. */
   supports_radio_motion(): boolean;
@@ -247,7 +248,7 @@ export function focus_trap(key?: string, text?: string): FocusTrap;
 export interface App {font_fallbacks(paths: string[]): this}
 
 export interface MessageScroller extends Label, Composite {visual_size(width: number,height: number): this; scroll_offset(): number; scroll_to(offset: number): this; on_change(callback: (event: ChangeEvent) => void): this}
-export interface Carousel extends Group {carousel_axis(axis: "horizontal" | "vertical"): this; visual_size(width: number,height: number): this}
+export interface Carousel extends Group {carousel_axis(axis: "horizontal" | "vertical"): this; carousel_looping(enabled?: boolean): this; visual_size(width: number,height: number): this}
 export interface Resizable extends Label, Composite {visual_size(width: number,height: number): this; disabled(value?: boolean): this; resizable_handle_bounds(preceding: Item): Bounds}
 export interface Item {panel_size(size: number): this; current_panel_size(): number}
 export interface TextView extends Label {current_text(): string; text_format(format: 'markdown'|'html'|'plain'): this; select_text(anchor: number,cursor: number): this; selection_text(): string; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}

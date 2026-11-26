@@ -126,8 +126,23 @@ Python, JavaScript and TypeScript use `carousel_axis("vertical")`, Go uses
 `carousel_axis(CarouselAxis::Vertical)?`. Query `supports_carousel_axis()`
 (Go `SupportsCarouselAxis()`) before requesting vertical layout on older bridges.
 
+To wrap from the last slide to the first and back, use
+`cui_bridge_set_carousel_looping_v1(app, carousel, 1)`. The default is off.
+Looping requires at least two slides and a measured track, including the closing
+gap, at least as long as the viewport. A shorter track uses bounded navigation.
+Changing the setting cancels any active gesture on the next frame. The selected
+Item stays the same and the configuration itself emits no change event.
+
+Python, JavaScript and TypeScript expose `carousel_looping()` and accept
+`carousel_looping(False)` or `carousel_looping(false)` to turn it off. Go uses
+`CarouselLooping(true)`. In Rust, use `carousel_looping(true)?` on the builder or
+`app.carousel_looping(carousel, true)?` on a mounted Carousel. Call
+`supports_carousel_looping()` (Go `SupportsCarouselLooping()`) before setting the
+option when loading an older bridge. Omitting it keeps bounded navigation.
+
 This Python example mounts a Carousel with two visible slides and a third to
-scroll to. It uses vertical layout when the loaded bridge supports it.
+scroll to. It enables vertical layout and wrapping when the loaded bridge
+supports each option.
 The equivalent JavaScript or TypeScript uses the same builder methods.
 Use the native app constructor and run loop to show the UI in a window. The
 [builder guide](BINDING_BUILDERS.md) shows how to start a native app.
@@ -149,6 +164,9 @@ with cui.App(width=640, height=360) as app:
     vertical = app.supports_carousel_axis()
     if vertical:
         rail.carousel_axis("vertical")
+    looping = app.supports_carousel_looping()
+    if looping:
+        rail.carousel_looping()
     app.mount(cui.column("root").children(rail))
     app.step()
     x, y, _, _ = app.bounds(rail)
@@ -156,10 +174,14 @@ with cui.App(width=640, height=360) as app:
     app.queue_scroll(x + 30, y + 30, dx, dy)
     app.step()
     assert rail.selected() is slides[1]
+    if looping:
+        for _ in range(2):
+            app.queue_scroll(x + 30, y + 30, -dx, -dy)
+            app.step()
+        assert rail.selected() is slides[-1]
 ```
 
-Retained Carousel uses default spacing. Looping and custom controls use the
-immediate C API.
+Retained Carousel uses default spacing. For custom controls, use the immediate C API.
 
 ## Input ownership
 

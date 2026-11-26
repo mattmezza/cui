@@ -707,17 +707,21 @@ static cui_bridge_status go_attachment_preview(cui_bridge_app *a, cui_bridge_nod
 
 static cui_bridge_status (*carousel_set_basis)(cui_bridge_app *, cui_bridge_node, float);
 static cui_bridge_status (*carousel_set_axis)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static cui_bridge_status (*carousel_set_looping)(cui_bridge_app *, cui_bridge_node, uint32_t);
 static void go_carousel_initialize(void) {
  if (bridge_lib) {
   go_load_optional_symbol(&carousel_set_basis, sizeof carousel_set_basis,
                           "cui_bridge_set_carousel_slide_basis_v1");
   go_load_optional_symbol(&carousel_set_axis, sizeof carousel_set_axis,
                           "cui_bridge_set_carousel_axis_v1");
+  go_load_optional_symbol(&carousel_set_looping, sizeof carousel_set_looping,
+                          "cui_bridge_set_carousel_looping_v1");
  }
 #if defined(CUI_GO_STATIC)
  else {
   carousel_set_basis = cui_bridge_set_carousel_slide_basis_v1;
   carousel_set_axis = cui_bridge_set_carousel_axis_v1;
+  carousel_set_looping = cui_bridge_set_carousel_looping_v1;
  }
 #endif
 }
@@ -728,6 +732,11 @@ static cui_bridge_status go_carousel_set_basis(cui_bridge_app *a, cui_bridge_nod
 static int go_carousel_axis_supported(void) { return carousel_set_axis != NULL; }
 static cui_bridge_status go_carousel_set_axis(cui_bridge_app *a, cui_bridge_node carousel, uint32_t axis) {
  return carousel_set_axis(a, carousel, axis);
+}
+
+static int go_carousel_looping_supported(void) { return carousel_set_looping != NULL; }
+static cui_bridge_status go_carousel_set_looping(cui_bridge_app *a, cui_bridge_node carousel, uint32_t enabled) {
+ return carousel_set_looping(a, carousel, enabled);
 }
 
 static int bridge_open(const char *path) {
@@ -916,6 +925,7 @@ type Node struct {
 	attachmentSlotWidth                  float32
 	carouselBasis                        float32
 	carouselAxis                         CarouselAxis
+	carouselLooping                      bool
 	imagePixels                          []byte
 	imageWidth, imageHeight, imageStride uint32
 	timeValue                            Time
@@ -2051,6 +2061,9 @@ func (a *App) Mount(root *Node) error {
 		if n.carouselAxis == CarouselVertical && C.go_carousel_axis_supported() == 0 {
 			return ErrCarouselAxisUnavailable
 		}
+		if n.carouselLooping && C.go_carousel_looping_supported() == 0 {
+			return ErrCarouselLoopingUnavailable
+		}
 		if n.carouselBasis > 0 {
 			if parent == nil || parent.kind != int(C.CUI_BRIDGE_CAROUSEL) {
 				return errors.New("CarouselBasis requires a direct Carousel Item")
@@ -2533,6 +2546,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.carouselBasis > 0 {
 			if err := result(C.go_carousel_set_basis(a.ptr, h, C.float(n.carouselBasis))); err != nil {
+				return err
+			}
+		}
+		if n.carouselLooping {
+			if err := result(C.go_carousel_set_looping(a.ptr, h, 1)); err != nil {
 				return err
 			}
 		}
@@ -4021,6 +4039,43 @@ func (n *Node) CarouselAxis(axis CarouselAxis) *Node {
 		}
 	}
 	n.carouselAxis = axis
+	return n
+}
+
+// ErrCarouselLoopingUnavailable means the loaded bridge lacks Carousel edge wrapping.
+var ErrCarouselLoopingUnavailable = errors.New("Carousel looping requires cui_bridge_set_carousel_looping_v1")
+
+// SupportsCarouselLooping reports whether the loaded bridge supports Carousel edge wrapping.
+func (a *App) SupportsCarouselLooping() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_carousel_looping_supported() != 0, nil
+}
+
+// CarouselLooping enables edge wrapping on a track long enough to loop.
+func (n *Node) CarouselLooping(enabled bool) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != int(C.CUI_BRIDGE_CAROUSEL) || n.removed {
+		n.err = errors.New("CarouselLooping requires a live Carousel")
+		return n
+	}
+	if n.app != nil && enabled != n.carouselLooping {
+		supported, err := n.app.SupportsCarouselLooping()
+		if err != nil {
+			n.err = err
+		} else if !supported {
+			n.err = ErrCarouselLoopingUnavailable
+		} else {
+			n.err = result(C.go_carousel_set_looping(n.app.ptr, n.handle, C.uint32_t(btoi(enabled))))
+		}
+		if n.err != nil {
+			return n
+		}
+	}
+	n.carouselLooping = enabled
 	return n
 }
 

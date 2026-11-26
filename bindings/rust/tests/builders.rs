@@ -992,6 +992,51 @@ fn carousel_axis() {
 }
 
 #[test]
+fn carousel_looping() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let legacy = std::env::var("CUI_TEST_LEGACY_CAROUSEL_LOOPING").as_deref() == Ok("1");
+    assert_eq!(app.supports_carousel_looping(), !legacy);
+    let builder = app.build_child(root, Kind::Carousel, "loop").unwrap();
+    let rail = if legacy {
+        builder.finish()
+    } else {
+        builder.carousel_looping(true).unwrap().finish()
+    };
+    if legacy {
+        assert_eq!(
+            app.carousel_looping(rail, true).err(),
+            Some(Error::CAROUSEL_LOOPING_UNAVAILABLE)
+        );
+    }
+    let first = app.child(rail, Kind::Item, "first").unwrap();
+    let second = app.child(rail, Kind::Item, "second").unwrap();
+    let events = Rc::new(Cell::new(None));
+    let observed = events.clone();
+    app.on_change_event(rail, move |event| observed.set(event.selected))
+        .unwrap();
+    app.step(0.016).unwrap();
+    let area = app.bounds(rail).unwrap();
+    app.scroll(area.x + 30., area.y + 30., 1., 0.).unwrap();
+    app.step(0.016).unwrap();
+    if legacy {
+        assert_eq!(app.dispatch().unwrap(), 0);
+        assert_eq!(app.selected(rail).unwrap(), Some(first));
+        return;
+    }
+    assert_eq!(app.dispatch().unwrap(), 1);
+    assert_eq!(events.get(), Some(second));
+    app.carousel_looping(rail, false).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.dispatch().unwrap(), 0);
+    app.scroll(area.x + 30., area.y + 30., -1., 0.).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.dispatch().unwrap(), 0);
+    assert_eq!(app.selected(rail).unwrap(), Some(second));
+}
+
+#[test]
 fn resizable_panel_drag() {
     let _guard = NATIVE.lock().unwrap();
     let mut app = App::headless(500., 300.).unwrap();

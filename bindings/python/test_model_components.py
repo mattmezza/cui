@@ -144,6 +144,43 @@ class Models(unittest.TestCase):
                 with self.assertRaises(RuntimeError): carousel.carousel_axis("vertical")
                 self.assertEqual(carousel._carousel_axis,"horizontal")
 
+    def test_carousel_looping(self):
+        with self.assertRaises(TypeError):
+            c.carousel("invalid").carousel_looping(1)
+        with self.assertRaises(ValueError):
+            c.item("invalid").carousel_looping()
+        with c.App(width=640) as app:
+            self.assertTrue(app.supports_carousel_looping())
+            events = []
+            first, second = c.item("first"), c.item("second")
+            rail = c.carousel("loop").carousel_looping().children(first, second).on_change(events.append)
+            app.mount(c.column().children(rail))
+            app.step()
+            x, y, _, _ = app.bounds(rail)
+            app.queue_scroll(x + 30, y + 30, 1, 0)
+            app.step()
+            app.dispatch()
+            self.assertIs(rail.selected(), second)
+            self.assertEqual(len(events), 1)
+            rail.carousel_looping(False)
+            app.step()
+            self.assertEqual(app.dispatch(), 0)
+            app.queue_scroll(x + 30, y + 30, -1, 0)
+            app.step()
+            self.assertEqual(app.dispatch(), 0)
+            self.assertIs(rail.selected(), second)
+        with c.App() as app, patch.object(app._api, "set_carousel_looping", None):
+            self.assertFalse(app.supports_carousel_looping())
+            rail = c.carousel("legacy").carousel_looping().children(c.item("first"))
+            root = c.column().children(rail)
+            with self.assertRaisesRegex(RuntimeError, "looping"):
+                app.mount(root)
+            rail.carousel_looping(False)
+            app.mount(root)
+            app.step()
+            with self.assertRaisesRegex(RuntimeError, "looping"):
+                rail.carousel_looping()
+
     def test_carousel_basis(self):
         for value in (-.1, 1.1, float("nan"), float("inf")):
             with self.assertRaises(ValueError): c.item("bad").carousel_basis(value)

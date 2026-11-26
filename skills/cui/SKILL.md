@@ -279,8 +279,10 @@ Carousel Item with `cui_bridge_set_carousel_slide_basis_v1`. In the language
 builders, check `supports_carousel_basis` (`SupportsCarouselBasis` in Go) and
 use `carousel_basis` (`CarouselBasis` in Go) on a direct Item. For vertical
 layout, probe `supports_carousel_axis` (`SupportsCarouselAxis` in Go) before
-configuring the Carousel. Vertical fractions use the viewport height. Read
-`docs/CAROUSEL.md` for layout and examples.
+configuring the Carousel. Vertical fractions use the viewport height. Probe
+`supports_carousel_looping` (`SupportsCarouselLooping` in Go) before enabling
+retained edge wrapping with `carousel_looping` (`CarouselLooping` in Go).
+Read `docs/CAROUSEL.md` for layout and examples.
 For a Command palette inside a dialog, set `cui_command_options.width = -1` to fit
 the body. Rows and hit targets fill the current allocation. Width-dependent
 custom row heights settle on a follow-up frame. See `docs/COMMAND.md`.

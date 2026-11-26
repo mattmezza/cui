@@ -1275,6 +1275,13 @@ enum { CUI_BRIDGE_CAROUSEL_HORIZONTAL, CUI_BRIDGE_CAROUSEL_VERTICAL };
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_axis_v1(cui_bridge_app *,
                                                                  cui_bridge_node carousel,
                                                                  uint32_t axis);
+/* Optional Carousel looping operation. Zero disables looping (the default);
+ * any nonzero value enables wrapping when the track spans the viewport and
+ * contains multiple slides. Short tracks remain finite. Changes apply on the
+ * next submission, end active gestures and preserve selection without events. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_carousel_looping_v1(cui_bridge_app *,
+                                                                    cui_bridge_node carousel,
+                                                                    uint32_t looping);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_total(cui_bridge_app *, cui_bridge_node,
                                                       uint32_t total);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_step_status(cui_bridge_app *, cui_bridge_node item,

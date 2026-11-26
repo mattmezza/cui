@@ -103,7 +103,8 @@ grow with the parent, or set a positive width for a fixed Carousel. Reset an
 Item to the full primary extent with `CarouselBasis(0)`. After checking
 `App.SupportsCarouselAxis()`, use `CarouselAxis(cui.CarouselVertical)` for
 slides that navigate along the visual height. See the
-[retained Carousel guide](CAROUSEL.md#retained-slides).
+[retained Carousel guide](CAROUSEL.md#retained-slides). Enable edge wrapping
+with `CarouselLooping(true)` after checking `App.SupportsCarouselLooping()`.
 
 Resizable accepts up to 64 `Item` panels in a horizontal split. Set an Item's initial width with `PanelSize(100..4096)`, read its live width with `App.Value(item)`, and locate a divider with `App.ResizableHandleBounds(group, precedingItem)`. Dragging a divider emits `OnChange` on the resized Item with numeric `Event.Value`. `VisualSize` configures the group and `Disabled(true)` suppresses dragging.
 

@@ -139,6 +139,12 @@ void fractionalSlide; void hasCarouselBasis;
 
 const verticalCarousel: c.Carousel = c.carousel("axis").carousel_axis("vertical").carousel_axis("horizontal");
 const hasCarouselAxis: boolean = app.supports_carousel_axis();
+const hasCarouselLooping: boolean = app.supports_carousel_looping();
+const loopingCarousel: c.Carousel = c.carousel("loop").carousel_looping().carousel_looping(false);
+// @ts-expect-error A Carousel loop option is boolean.
+c.carousel("bad-loop").carousel_looping(1);
+// @ts-expect-error Only a Carousel can loop.
+c.item("bad-loop-item").carousel_looping();
 // @ts-expect-error unsupported Carousel axis
 c.carousel("bad-axis").carousel_axis("diagonal");
 // @ts-expect-error Carousel axis is not an Item operation

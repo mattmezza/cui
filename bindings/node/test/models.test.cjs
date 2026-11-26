@@ -208,6 +208,41 @@ console.log('PASS native Dock split layout, activation snapshots and metadata fr
 }
 
 {
+ assert.throws(() => c.carousel('invalid').carousel_looping(1), /boolean/);
+ assert.throws(() => c.item('invalid').carousel_looping(), /Carousel/);
+ const app = new c.App({width: 640}), events = [];
+ try {
+   const first = c.item('first'), second = c.item('second');
+   const rail = c.carousel('loop').carousel_looping().children(first, second).on_change(e => events.push(e));
+   assert.equal(app.supports_carousel_looping(), true);
+   app.mount(c.column().children(rail)).step();
+   const {x, y} = rail.bounds();
+   app.scroll(x + 30, y + 30, 1, 0).step();
+   assert.equal(rail.selected(), second);
+   assert.equal(events.length, 1);
+   rail.carousel_looping(false);
+   app.step();
+   app.scroll(x + 30, y + 30, -1, 0).step();
+   assert.equal(rail.selected(), second);
+   assert.equal(events.length, 1);
+ } finally {
+   app.dispose();
+ }
+ const legacy = new c.App();
+ try {
+   legacy.supports_carousel_looping = () => false;
+   const rail = c.carousel('legacy').carousel_looping().children(c.item('first'));
+   const root = c.column().children(rail);
+   assert.throws(() => legacy.mount(root), /unavailable/);
+   rail.carousel_looping(false);
+   legacy.mount(root).step();
+   assert.throws(() => rail.carousel_looping(), /unavailable/);
+ } finally {
+   legacy.dispose();
+ }
+}
+
+{
  for(const value of [null,1,true,'diagonal']) assert.throws(()=>c.carousel('bad').carousel_axis(value));
  assert.throws(()=>c.item('bad').carousel_axis('vertical'));
  const app=new c.App({width:640}),events=[];

@@ -70,7 +70,9 @@ creates a slide that takes half of the viewport. Use
 checking `app.supports_carousel_axis()`, call `carousel_axis(CarouselAxis::Vertical)?`
 on the Carousel builder or use `app.carousel_axis(carousel, CarouselAxis::Vertical)?`.
 Vertical fractions use the visual height. See the
-[retained Carousel guide](CAROUSEL.md#retained-slides).
+[retained Carousel guide](CAROUSEL.md#retained-slides). When
+`app.supports_carousel_looping()` reports support, use `carousel_looping(true)?`
+on the builder or `app.carousel_looping(carousel, true)?` to enable wrapping.
 
 Resizable accepts Item panels with pixel widths in `value`; `resizable_handle_bounds` locates a draggable divider and change events carry new sizes.
 

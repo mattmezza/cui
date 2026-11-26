@@ -741,7 +741,7 @@
         "rust": "tested_subset"
       },
       "limitations": [
-        "All five builders expose optional fractional slide sizing and vertical orientation. Probe supports_carousel_basis and supports_carousel_axis (SupportsCarouselBasis and SupportsCarouselAxis in Go). Older providers keep their horizontal layout and may require full-width slides. Custom controls and looping remain immediate C only."
+        "All five builders expose optional fractional slide sizing, vertical orientation and geometry-supported wrapping. Probe supports_carousel_basis, supports_carousel_axis and supports_carousel_looping (SupportsCarouselBasis, SupportsCarouselAxis and SupportsCarouselLooping in Go). Depending on the provider revision, older libraries may require horizontal, full-width slides with bounded navigation. Custom controls remain immediate C only."
       ]
     },
     {

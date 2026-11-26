@@ -875,3 +875,13 @@ export interface AttachmentActionNotificationV1 extends NotificationBaseV1 {
   readonly eventIndex: number | undefined;
 }
 export type ComponentNotificationV1 = ValueNotificationV1 | AttachmentActionNotificationV1;
+
+/** Structural containers created by the optional retained Attachment slot factory.
+ * Actions require preferred_width in (0,4096]; other roles require zero.
+ * Slots must be direct Attachment children. Descendant controls keep ordinary events. */
+export type AttachmentSlotRole = 'media' | 'overlay' | 'metadata' | 'actions';
+export interface AttachmentSlot extends Container { disabled(value?: boolean): this }
+export function attachment_slot(key: string, role: 'actions', preferred_width: number): AttachmentSlot;
+export function attachment_slot(key: string, role: Exclude<AttachmentSlotRole, 'actions'>, preferred_width?: 0): AttachmentSlot;
+export interface Attachment { children(...items: (AttachmentSlot | AttachmentSlot[])[]): this }
+export interface App { supports_attachment_slots(): boolean }

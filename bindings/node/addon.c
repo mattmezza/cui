@@ -222,8 +222,27 @@ static napi_value dispose(napi_env env, napi_callback_info info) {
     }
     return undefined(env);
 }
+static napi_value expose_node(napi_env env, napi_value app_handle, js_node *node) {
+    napi_value result;
+    cui_bridge_app *app = node->owner->bridge;
+    if (napi_create_reference(env, app_handle, 1, &node->app_ref) != napi_ok) {
+        (void)cui_bridge_node_remove(app, node->node);
+        free(node);
+        return fail(env, "failed to retain app");
+    }
+    if (napi_create_external(env, node, node_final, NULL, &result) != napi_ok) {
+        (void)cui_bridge_node_remove(app, node->node);
+        node_final(env, node, NULL);
+        return NULL;
+    }
+    if (napi_type_tag_object(env, result, &node_tag) != napi_ok) {
+        (void)cui_bridge_node_remove(app, node->node);
+        return fail(env, "failed to tag node");
+    }
+    return result;
+}
 static napi_value make_node(napi_env env, napi_callback_info info) {
-    napi_value v[4], result;
+    napi_value v[4];
     js_app *app;
     js_node *parent = NULL, *node;
     char *key = NULL;
@@ -254,21 +273,55 @@ static napi_value make_node(napi_env env, napi_callback_info info) {
         free(node);
         return status(env, code);
     }
-    if (napi_create_reference(env, v[0], 1, &node->app_ref) != napi_ok) {
-        (void)cui_bridge_node_remove(app->bridge, node->node);
-        free(node);
-        return fail(env, "failed to retain app");
-    }
-    if (napi_create_external(env, node, node_final, NULL, &result) != napi_ok) {
-        (void)cui_bridge_node_remove(app->bridge, node->node);
-        node_final(env, node, NULL);
+    return expose_node(env, v[0], node);
+}
+static int optional_bridge_symbol(void *out, size_t size, const char *name);
+/* Optional symbol keeps addons usable with older bridge providers. */
+static napi_value attachment_slots(napi_env env, napi_callback_info info) {
+    napi_value v[1], result;
+    js_app *app;
+    void (*symbol)(void) = NULL;
+    if (!args(env, info, 1, v) || !app_arg(env, v[0], &app))
         return NULL;
+    bool supported =
+        optional_bridge_symbol(&symbol, sizeof symbol, "cui_bridge_attachment_slot_create_v1");
+    return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
+}
+static napi_value attachment_slot(napi_env env, napi_callback_info info) {
+    napi_value v[5];
+    js_app *app;
+    js_node *parent, *node;
+    char *key = NULL;
+    uint32_t role;
+    double width;
+    cui_bridge_status (*create)(cui_bridge_app *, cui_bridge_node, uint32_t, const char *, float,
+                                cui_bridge_node *) = NULL;
+    if (!args(env, info, 5, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &parent) ||
+        !uint_arg(env, v[2], &role) || !number_arg(env, v[4], &width))
+        return NULL;
+    bool actions = role == CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1;
+    if (role < CUI_BRIDGE_ATTACHMENT_SLOT_MEDIA_V1 ||
+        role > CUI_BRIDGE_ATTACHMENT_SLOT_ACTIONS_V1 ||
+        (actions ? (float)width <= 0 || width > 4096 : width != 0))
+        return fail(env, "invalid Attachment slot role or width");
+    if (!optional_bridge_symbol(&create, sizeof create, "cui_bridge_attachment_slot_create_v1"))
+        return fail(env, "Attachment slots unavailable");
+    if (!string_arg(env, v[3], &key))
+        return NULL;
+    node = calloc(1, sizeof(*node));
+    if (!node) {
+        free(key);
+        return fail(env, "allocation failed");
     }
-    if (napi_type_tag_object(env, result, &node_tag) != napi_ok) {
-        (void)cui_bridge_node_remove(app->bridge, node->node);
-        return fail(env, "failed to tag node");
+    node->owner = app;
+    cui_bridge_status code =
+        create(app->bridge, parent->node, role, key, (float)width, &node->node);
+    free(key);
+    if (code != CUI_BRIDGE_OK) {
+        free(node);
+        return status(env, code);
     }
-    return result;
+    return expose_node(env, v[0], node);
 }
 static napi_value node_id(napi_env env, napi_callback_info info) {
     napi_value v[1], result, x;
@@ -2645,6 +2698,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("create", create, 0);
     EXPORT("dispose", dispose, 0);
     EXPORT("makeNode", make_node, 0);
+    EXPORT("attachmentSlots", attachment_slots, 0);
+    EXPORT("attachmentSlot", attachment_slot, 0);
     EXPORT("nodeId", node_id, 0);
     EXPORT("removeNode", remove_node, 0);
     EXPORT("setText", set_text, 0);

@@ -551,8 +551,11 @@ polls. Manual polling and ordinary dispatch share one queue. Immediate and
 retained C support custom slots. In retained C use
 `cui_bridge_attachment_slot_create_v1` for preview fallback, overlay, metadata
 or an action row. Children keep their own events and are removed with the slot.
-The language builders omit the slot factory. See
-`docs/BRIDGE_COMPONENTS.md#compose-a-retained-attachment-from-c` and
+In Python and JS/TS compose `attachment_slot(key, role, preferred_width)` as
+a direct child of an Attachment and probe `supports_attachment_slots()` for
+older providers. Go and Rust omit slot authoring. See
+`docs/BRIDGE_COMPONENTS.md#compose-a-retained-attachment-from-c`,
+`docs/BRIDGE_COMPONENTS.md#compose-a-retained-attachment-in-python-or-node` and
 `docs/ATTACHMENT_EVENTS.md#retained-actions-from-language-builders`.
 
 For a pinned navigation header/footer with body-only scrolling, use

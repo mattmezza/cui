@@ -688,3 +688,20 @@ endif()
 add_test(NAME node_attachment_actions_example COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/examples/attachment-actions.cjs)
+add_test(NAME node_attachment_slots COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ --test ${CMAKE_CURRENT_SOURCE_DIR}/test/attachment-slots.test.cjs)
+add_test(NAME node_attachment_slots_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/attachment-slots.cjs)
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_attachment_slots_types COMMAND ${CUI_NODE_TSC_EXECUTABLE}
+  --strict --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/attachment-slots.types.ts
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/attachment_slots.ts)
+endif()
+if(CUI_NODE_VERSION VERSION_GREATER_EQUAL "22.18")
+ add_test(NAME node_attachment_slots_types_example COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/attachment_slots.ts)
+endif()

@@ -10,6 +10,7 @@ const native = require(addonPath);
 const {BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,ShadowPart,canonicalPart}=require('./shadows.cjs')(native);
 const designSizes = Object.freeze({inherit:0,xs:1,sm:2,base:3,md:4,lg:5,xl:6,"2xl":7,"3xl":8,"4xl":9,"5xl":10,"6xl":11,"7xl":12,"8xl":13,"9xl":14});
 const NODE = Symbol('CUI node');
+const ATTACHMENT_SLOT = Symbol('Attachment slot');
 const attachmentStatuses = Object.freeze({pending:0, uploading:1, processing:2, failed:3, complete:4});
 let nextKey = 1;
 const disabledKinds = new Set([4,5,6,7,8,9,12,13,14,15,17,18,19,20,21,22,23,28,29,40,41,42,43,44,48,54,55,56,57,58,59,60,61,65,66,67,68,69,71,73,74,75,77,78,79]);
@@ -97,7 +98,7 @@ function requestsRadioMotion(node) {
   return node.radioMotionValue || node.childrenValue.some(requestsRadioMotion);
 }
 const stepperFillUnavailable = 'Stepper Fill requires cui_bridge_set_stepper_fill';
-function preflightNodeOptions(app, node, insideDecoration = false) {
+function preflightNodeOptions(app, node, insideDecoration = false, insideAttachmentSlot = false) {
   if (node.stepperFillValue && !app.supports_stepper_fill()) throw new Error(stepperFillUnavailable);
   if (insideDecoration && !radioContentKinds.has(node.kind))
     throw new TypeError('RadioGroup Item decoration requires passive children');
@@ -116,8 +117,16 @@ function preflightNodeOptions(app, node, insideDecoration = false) {
   }
   if (node.radioTabIndexValue !== null && !app.supports_radio_tab_index())
     throw new Error(radioTabIndexUnavailable);
+  const slot = node[ATTACHMENT_SLOT];
+  if (slot) {
+    if (node.parent?.kind !== 52) throw new TypeError('Attachment slot requires direct Attachment parent');
+    if (!app.supports_attachment_slots()) throw new Error('Attachment slots unavailable');
+  }
+  if (insideAttachmentSlot && node.kind === 62)
+    throw new TypeError('Notifications use the app-wide stack, outside Attachment slots');
   for (const child of node.childrenValue)
-    preflightNodeOptions(app, child, insideDecoration || node.radioContentValue);
+    preflightNodeOptions(app, child, insideDecoration || node.radioContentValue,
+      insideAttachmentSlot || Boolean(slot));
 }
 function keyFor(node) { return `${node.slot}:${node.generation}`; }
 function positive(value, name) {
@@ -208,10 +217,23 @@ class Node {
     this.keyValue = value; return this;
   }
   children(...items) {
-    if (!containers.has(this.kind)) throw new Error('component does not accept children');
+    const isAttachment = this.kind === 52;
+    if (!containers.has(this.kind) && !isAttachment) throw new Error('component does not accept children');
     if (this.owner) throw new Error('children cannot change after mount');
-    for (const item of items.flat()) {
+    const children = items.flat();
+    if (isAttachment) {
+      const roles = new Set(this.childrenValue.map(child => child[ATTACHMENT_SLOT].role));
+      for (const child of children) {
+        if (!(child instanceof Node) || child.parent || child.owner || !child[ATTACHMENT_SLOT])
+          throw new TypeError('Attachment children require unattached attachment_slot nodes');
+        const role = child[ATTACHMENT_SLOT].role;
+        if (roles.has(role)) throw new TypeError('duplicate Attachment slot role');
+        roles.add(role);
+      }
+    }
+    for (const item of children) {
       if (!(item instanceof Node) || item.parent || item.owner) throw new TypeError('child must be an unattached CUI node');
+      if (item[ATTACHMENT_SLOT] && !isAttachment) throw new TypeError('Attachment slot requires direct Attachment parent');
       if(groups.has(this.kind) && item.kind!==20) throw new TypeError('groups require item children');
       item.parent = this; this.childrenValue.push(item);
     }
@@ -281,7 +303,7 @@ class Node {
     if (this.owner) native.setCustomRounding(this.owner.handle, this[NODE], 4, value);
     return this;
   }
-  disabled(value = true) { if (!disabledKinds.has(this.kind)) throw new Error('component does not support disabled'); if (typeof value !== 'boolean') throw new TypeError('disabled must be boolean'); if (this.owner) native.setDisabled(this.owner.handle, this[NODE], value ? 1 : 0); this.disabledValue = value; return this; }
+  disabled(value = true) { if (!disabledKinds.has(this.kind) && !this[ATTACHMENT_SLOT]) throw new Error('component does not support disabled'); if (typeof value !== 'boolean') throw new TypeError('disabled must be boolean'); if (this.owner) native.setDisabled(this.owner.handle, this[NODE], value ? 1 : 0); this.disabledValue = value; return this; }
   checked(value = true) {
     if (!booleans.has(this.kind) || typeof value !== 'boolean') throw new TypeError('checked requires a boolean component and value');
     if(this.owner) native.setChecked(this.owner.handle,this[NODE],value ? 1 : 0);
@@ -691,6 +713,20 @@ function toolbar(key,text="") {const node=new Node(48,text);return key===undefin
 function title_bar(key,text="") {const node=new Node(49,text);return key===undefined?node:node.key(key);}
 function icon(key,text="") {const node=new Node(50,text);return key===undefined?node:node.key(key);}
 function message(key,text="") {const node=new Node(51,text);return key===undefined?node:node.key(key);}
+const attachmentSlotRoles = Object.freeze({media: 1, overlay: 2, metadata: 3, actions: 4});
+function attachment_slot(key, role, preferredWidth = 0) {
+  if (typeof role !== 'string' || !Object.hasOwn(attachmentSlotRoles, role))
+    throw new TypeError('invalid Attachment slot role');
+  const actions = role === 'actions';
+  if (!Number.isFinite(preferredWidth) ||
+      (actions ? Math.fround(preferredWidth) <= 0 || preferredWidth > 4096 : preferredWidth !== 0))
+    throw new RangeError('invalid Attachment slot width');
+  if (typeof key !== 'string' || !key || key.includes('\0') || Buffer.byteLength(key) > 4096)
+    throw new TypeError('invalid Attachment slot key');
+  const node = new Node(actions ? 1 : 2).key(key);
+  node[ATTACHMENT_SLOT] = Object.freeze({role: attachmentSlotRoles[role], width: preferredWidth});
+  return node;
+}
 function attachment(key,text="") {const node=new Node(52,text);return key===undefined?node:node.key(key);}
 function image(key,text="") {const node=new Node(53,text);return key===undefined?node:node.key(key);}
 function tree(key,text="") {const node=new Node(54,text);return key===undefined?node:node.key(key);}
@@ -766,7 +802,9 @@ class App {
     iconBadges.preflight(this, root);
     const attach = (node, parent) => {
       const parentHandle = parent && parent[NODE];
-      if (node.kind === 81) node[NODE] = sliderModels.mount(this, node, parentHandle);
+      const slot = node[ATTACHMENT_SLOT];
+      if (slot) node[NODE] = native.attachmentSlot(this.handle, parentHandle, slot.role, node.keyValue, slot.width);
+      else if (node.kind === 81) node[NODE] = sliderModels.mount(this, node, parentHandle);
       else if (node.kind === iconBadges.badgeKind) node[NODE] = iconBadges.createBadge(this, node, parentHandle);
       else node[NODE] = native.makeNode(this.handle, parentHandle, node.kind, node.keyValue);
       node.owner = this;
@@ -788,7 +826,7 @@ class App {
       if ([9,14].includes(node.kind)) native.setRange(this.handle,node[NODE],...node.rangeValue);
       if([42,43].includes(node.kind))native.setTotal(this.handle,node[NODE],node.totalValue);
       if (numerics.has(node.kind)) native.setValue(this.handle,node[NODE],node.numericValue);
-      if ((node.kind===81 || disabledKinds.has(node.kind)) && (node.kind!==20 || node.disabledValue)) native.setDisabled(this.handle,node[NODE],node.disabledValue ? 1 : 0);
+      if ((node[ATTACHMENT_SLOT] || node.kind===81 || disabledKinds.has(node.kind)) && (node.kind!==20 || node.disabledValue)) native.setDisabled(this.handle,node[NODE],node.disabledValue ? 1 : 0);
       if(node.kind===15 || (node.kind===20 && node.openSet))native.setOpen(this.handle,node[NODE],node.openValue?1:0);
       if(detailKinds.has(node.kind))native.setDetail(this.handle,node[NODE],node.detailValue);
       if(node.kind===52)native.setAttachmentStatus(this.handle,node[NODE],node.attachmentValue);
@@ -1009,6 +1047,11 @@ class App {
   supports_disclosure_heading() { return disclosures.supportsHeading(this); }
   supports_disclosure_divider() { return disclosures.supportsDivider(this); }
   supports_disclosure_presentation() { return disclosures.supports(this); }
+  supports_attachment_slots() {
+    this._alive();
+    return typeof native.attachmentSlots === 'function' && typeof native.attachmentSlot === 'function' &&
+      native.attachmentSlots(this.handle);
+  }
   supports_attachment_options() { return attachments.supports(this); }
   supports_attachment_preview() { return attachments.supports(this,true); }
   supports_rating_options() { return ratingOptions.supports(this); }
@@ -1062,7 +1105,7 @@ class App {
   close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);ratingOptions.release(node);if(node.kind===81)node.requestValue=null;} return this; }
   dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);ratingOptions.release(node);if(node.kind===81)node.requestValue=null;} this.nodes.clear(); } }
 }
-module.exports = {RadioPaintLayer,radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
+module.exports = {RadioPaintLayer,radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,attachment_slot,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
 
 Object.assign(module.exports, sliderModels.exports);
 

@@ -103,3 +103,27 @@ consume the same FIFO and downgrade actions; `run`, `step` and callback dispatch
 keep their existing behavior. Unsupported typed calls fail without draining.
 Try `CUI_NODE_ADDON=/path/to/cui.node node bindings/node/examples/attachment-actions.cjs`
 from the repository root for real keyboard actions in a headless authored UI.
+
+Retained custom Attachment content uses explicit structural slots:
+
+```js
+attachment('file', 'Report.pdf').children(
+  attachment_slot('details', 'metadata').children(label('Reviewed today')),
+  attachment_slot('actions', 'actions', 120).gap(4).children(button('Download'))
+)
+```
+
+Check `app.supports_attachment_slots()` before mounting. Each card accepts one
+slot per role: `media`, `overlay`, `metadata`, `actions`. Slots must be direct
+Attachment children; ordinary cards continue to work with older bridges and
+addons. Actions require a preferred width greater than zero and at most 4096;
+other roles require zero (the default). Gap and disabled use the ordinary builder
+methods. Descendant buttons keep their own ordinary click handlers and handles.
+Removing a card or slot invalidates its descendants as usual. Media supplies a
+fallback; decoded previews and lifecycle feedback can take precedence. Overlay
+content is independent. Notification descendants are unsupported.
+
+Run `CUI_NODE_ADDON=/path/to/cui.node node bindings/node/examples/attachment-slots.cjs`
+for a headless example. Pass `--font /absolute/font.ttf` to opt into its native window; automated tests
+must remain headless. The headless example clicks Inspect using public bounds
+and pointer input and verifies that its ordinary handler updates the sibling summary.

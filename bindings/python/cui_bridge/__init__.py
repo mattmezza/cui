@@ -163,6 +163,11 @@ class _API:
         bind_disclosure_api(self, bind)
         from .attachment_options import bind_api as bind_attachment_api
         bind_attachment_api(self, bind)
+        self.create_attachment_slot = None
+        if hasattr(lib, "cui_bridge_attachment_slot_create_v1"):
+            self.create_attachment_slot = bind("attachment_slot_create_v1", C.c_int, C.c_void_p,
+                                               _Handle, C.c_uint32, C.c_char_p, C.c_float,
+                                               C.POINTER(_Handle))
         bind_radio_paint(self, bind, _Handle)
         self.radio_set_motion = None
         if hasattr(lib, "cui_bridge_radio_set_motion_v1"):
@@ -492,6 +497,9 @@ class AttachmentActionNotificationV1(NotificationV1):
 
 ComponentNotificationV1 = ValueNotificationV1 | AttachmentActionNotificationV1
 
+AttachmentSlotRole = Literal["media", "overlay", "metadata", "actions"]
+_ATTACHMENT_SLOT_ROLES = {"media": 1, "overlay": 2, "metadata": 3, "actions": 4}
+
 
 class Widget:
     def __init__(self, kind: str, key: str | None = None, text: str = ""):
@@ -542,6 +550,7 @@ class Widget:
         self._text_format = 0
         self._panel_size = None
         self._attachment = 0
+        self._attachment_slot: tuple[int, float] | None = None
         self._image = None
         self._time = (0, 0, 0)
         self._date = (2026, 1, 1)
@@ -570,7 +579,8 @@ class Widget:
         app._api.check(fn(app._ptr, self._handle, *args))
 
     def children(self, *children: "Widget") -> "Widget":
-        if self.kind not in _CONTAINER:
+        is_attachment = self.kind == "attachment"
+        if not is_attachment and self.kind not in _CONTAINER:
             raise ValueError("component does not accept children")
         if self._app is not None:
             raise RuntimeError("Mount children before attaching the tree")
@@ -578,6 +588,13 @@ class Widget:
             raise TypeError("children must be widgets")
         if self.kind in _GROUP and any(child.kind != "item" for child in children):
             raise ValueError("groups require item children")
+        if any((child._attachment_slot is not None) != is_attachment for child in children):
+            raise ValueError("use attachment_slot() as a direct child of an Attachment")
+        if is_attachment:
+            roles = [slot[0] for child in (*self._children, *children)
+                     if (slot := child._attachment_slot) is not None]
+            if len(set(roles)) != len(roles):
+                raise ValueError("Attachment accepts one slot per role")
         self._children.extend(children)
         return self
 
@@ -728,7 +745,7 @@ class Widget:
         return self
 
     def disabled(self, value: bool = True) -> "Widget":
-        if self.kind not in _DISABLED:
+        if self.kind not in _DISABLED and self._attachment_slot is None:
             raise ValueError("component does not support disabled")
         if type(value) is not bool:
             raise TypeError("disabled must be a bool")
@@ -1808,6 +1825,24 @@ def attachment(key: str, text: str = "") -> Widget:
     return Widget("attachment", key, text)
 
 
+def attachment_slot(key: str, role: AttachmentSlotRole, preferred_width: float = 0) -> Widget:
+    """Create a preview fallback, overlay, metadata column or action row."""
+    if not _utf8(key):
+        raise ValueError("Attachment slot key must be nonempty")
+    if not isinstance(role, str) or role not in _ATTACHMENT_SLOT_ROLES:
+        raise ValueError("Attachment slot role must be media, overlay, metadata or actions")
+    if type(preferred_width) not in (int, float):
+        raise TypeError("Attachment slot width must be a number")
+    if role == "actions":
+        if not (0 < preferred_width <= 4096) or C.c_float(preferred_width).value == 0:
+            raise ValueError("Attachment actions width must be in (0, 4096] logical pixels")
+    elif preferred_width != 0:
+        raise ValueError("only an Attachment actions slot takes a preferred width")
+    result = Widget("row" if role == "actions" else "column", key)
+    result._attachment_slot = (_ATTACHMENT_SLOT_ROLES[role], preferred_width)
+    return result
+
+
 def image(key: str, text: str = "") -> Widget:
     return Widget("image", key, text)
 
@@ -2075,6 +2110,13 @@ class App:
             attachment_preflight(node, self)
             from .attachment_actions import preflight as actions_preflight
             actions_preflight(node, self)
+            if node._attachment_slot is not None:
+                if parent is None or parent.kind != "attachment":
+                    raise ValueError("Attachment slots require a direct Attachment parent")
+                if not self.supports_attachment_slots():
+                    raise RuntimeError("Attachment slots unavailable in this bridge")
+            if node.kind == "notification" and any(slot._attachment_slot for slot in lineage):
+                raise ValueError("Notifications use the app-wide stack, outside Attachment slots")
             if node.kind == "slider_model":
                 if not isinstance(node, SliderModel):
                     raise TypeError("use slider_model() for the controlled route")
@@ -2145,6 +2187,11 @@ class App:
                     mount_node(self, node, parent_handle, key, handle)
                 elif isinstance(node, ConfiguredBadge):
                     node._create_badge(self, parent_handle, key, handle)
+                elif node._attachment_slot is not None:
+                    role, width = node._attachment_slot
+                    self._api.check(self._api.create_attachment_slot(self._ptr, parent_handle, role,
+                                                                     _utf8(key), width,
+                                                                     C.byref(handle)))
                 else:
                     self._api.check(self._api.node_create(self._ptr, parent_handle, _KIND[node.kind],
                                                            _utf8(key), C.byref(handle)))
@@ -2214,7 +2261,8 @@ class App:
                     node._change("set_scroll_extent", *node._extent)
                 if node._step_status is not None:
                     node._change("set_step_status", node._step_status)
-                if node.kind in _DISABLED and (node.kind != "item" or node._disabled):
+                if ((node.kind in _DISABLED and (node.kind != "item" or node._disabled)) or
+                    node._attachment_slot is not None):
                     node._change("set_disabled", int(node._disabled))
                 if node.kind == "collapsible" or (node.kind == "item" and node._open_set):
                     node._change("set_open", int(node._open))
@@ -2682,6 +2730,10 @@ class App:
         from .attachment_options import supported
         return supported(self, True)
 
+    def supports_attachment_slots(self) -> bool:
+        self._ensure_open()
+        return self._api.create_attachment_slot is not None
+
     def supports_rating_options(self) -> bool:
         from .rating_options import supported
         return supported(self)
@@ -2923,6 +2975,7 @@ from .disclosure import DisclosureTitleState, DisclosureTitleStyle
 __all__ += ["DisclosureTitleState", "DisclosureTitleStyle"]
 
 from .attachment_options import AttachmentOptions, AttachmentTextStyle, AttachmentStatus
-__all__ += ["AttachmentOptions", "AttachmentTextStyle", "AttachmentStatus"]
+__all__ += ["AttachmentOptions", "AttachmentTextStyle", "AttachmentStatus",
+            "AttachmentSlotRole", "attachment_slot"]
 
 __all__ += ["AttachmentActionNotificationV1", "ComponentNotificationV1"]

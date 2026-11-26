@@ -611,8 +611,7 @@ If both fire in a frame, child events can precede file actions. Keep handling
 them through a single chosen queue reader. Disabling a slot or its card makes
 the contents inert and preserves their settings. Removing a slot or its card
 also removes the descendants and retires their unread events. For dynamically
-loaded providers, probe the factory symbol independently. The language
-builders currently expose presentation, previews and built-in actions.
+loaded providers, probe the factory symbol independently.
 
 Build and run the [project files example](../bindings/bridge/examples/attachment_slots.c)
 to verify that Inspect updates the summary from an ordinary Button event.
@@ -625,6 +624,38 @@ cmake --build build-bridge --target bridge_attachment_slots_example
 
 Run that example with a font path and an SDL-enabled bridge to open the
 interactive native window. See [native setup](NATIVE_APP_STARTER.md) for prerequisites.
+
+### Compose a retained Attachment in Python or Node
+
+Python, JavaScript and TypeScript use `attachment_slot(key, role, preferred_width)`
+with `media`, `overlay`, `metadata` or `actions`. Supply a positive width for
+`actions` and leave the other widths at zero. Probe `app.supports_attachment_slots()`
+before composing slots when loading an older provider. Use the child widget's
+usual event handlers. Go and Rust builders cover the card's built-in actions
+and preview options.
+
+```python
+from cui_bridge import attachment, attachment_slot, button, label
+
+summary = label("Select Inspect for file details.")
+inspect = button("inspect").label("Inspect").on_click(
+    lambda event: summary.label("Quarterly report.pdf · Finance team · 1.4 MB"))
+card = (attachment("report", "Quarterly report.pdf").visual_size(380, 0)
+        .detail("1.4 MB").attachment_status("complete").children(
+            attachment_slot("preview", "media").children(label("PDF")),
+            attachment_slot("actions", "actions", 100).children(inspect)))
+```
+
+Build and configure the bridge and addon as shown in the
+[preview setup](#show-an-attachment-preview-in-a-language-builder), then run
+one of these examples from the repository root. The examples run headlessly
+by default and demonstrate a real Inspect activation.
+
+```sh
+PYTHONPATH=bindings/python python bindings/python/examples/attachment_slots.py
+node bindings/node/examples/attachment-slots.cjs
+node bindings/typescript/examples/attachment_slots.ts
+```
 
 ### Show an attachment preview in a language builder
 

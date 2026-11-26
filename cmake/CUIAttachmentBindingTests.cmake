@@ -8,6 +8,12 @@ add_test(NAME bridge_python_attachment_actions COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_attachment_actions_example COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/examples/attachment_actions.py)
+add_test(NAME bridge_python_attachment_slots COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_attachment_slots.py)
+add_test(NAME bridge_python_attachment_slots_example COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/examples/attachment_slots.py)
 
 option(CUI_ATTACHMENT_BINDING_TESTS "Check Go and Rust retained Attachment on Linux" OFF)
 if(NOT CUI_ATTACHMENT_BINDING_TESTS)
@@ -78,4 +84,7 @@ if(CUI_ATTACHMENT_LEGACY_LIBRARY)
  add_test(NAME bridge_python_attachment_actions_legacy COMMAND ${CMAKE_COMMAND} -E env
   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=${CUI_ATTACHMENT_LEGACY_LIBRARY}
   CUI_TEST_LEGACY_ATTACHMENT_ACTIONS=1 ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_attachment_actions.py)
+ add_test(NAME bridge_python_attachment_slots_legacy COMMAND ${CMAKE_COMMAND} -E env
+  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=${CUI_ATTACHMENT_LEGACY_LIBRARY}
+  CUI_TEST_LEGACY_ATTACHMENT_SLOTS=1 ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_attachment_slots.py)
 endif()

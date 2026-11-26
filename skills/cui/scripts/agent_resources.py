@@ -52,6 +52,7 @@ def source_files(root):
                  'bindings/python/cui_bridge/slider_model.py',
                  'bindings/python/cui_bridge/time_field_localized.py',
                  'bindings/python/cui_bridge/skeleton_presentation.py',
+                 'bindings/python/cui_bridge/pagination_options.py',
                  'bindings/node/shadows.cjs', 'bindings/node/slider-model.cjs',
                  'bindings/node/skeleton-presentation.cjs', 'bindings/node/icon-resources.cjs',
                  'bindings/node/icon-badge.cjs',

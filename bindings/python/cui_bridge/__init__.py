@@ -145,6 +145,8 @@ class _API:
         bind_time_api(self, bind)
         from .skeleton_presentation import bind_api as bind_skeleton_api
         bind_skeleton_api(self, bind)
+        from .pagination_options import bind_api as bind_pagination_api
+        bind_pagination_api(self, bind)
         self.clipboard_set = bind("clipboard_set",C.c_int,C.c_void_p,C.c_char_p)
         self.clipboard_get = bind("clipboard_get",C.c_int,C.c_void_p,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
         self.theme_count = bind("theme_preset_count", C.c_uint32)
@@ -1431,8 +1433,8 @@ def menu(key: str, text: str = "") -> Widget:
     return Widget("menu", key, text)
 
 
-def pagination(key: str, text: str = "") -> Widget:
-    return Widget("pagination", key, text)
+def pagination(key: str, text: str = "") -> Pagination:
+    return Pagination(key, text)
 
 
 def rating(key: str, text: str = "") -> Widget:
@@ -1686,6 +1688,8 @@ class App:
                     raise TypeError("use slider_model() for the controlled route")
                 if any(ancestor.kind not in ("row", "column") for ancestor in lineage):
                     raise ValueError("controlled Slider requires Row/Column ancestry")
+            if isinstance(node, Pagination):
+                node._preflight_pagination(self)
             if isinstance(node, ConfiguredIcon):
                 node._preflight_icon(self)
             if node.kind == "configured_badge":
@@ -1746,6 +1750,8 @@ class App:
                     node._change("set_range", *node._range)
                 if node.kind in {"pagination", "rating"}:
                     node._change("set_total", node._total)
+                if isinstance(node, Pagination):
+                    node._mount_pagination()
                 if node.kind in _NUMERIC:
                     node._change("set_value", node._value)
                 if node.kind == "attachment": node._change("set_attachment",node._attachment)
@@ -2169,6 +2175,10 @@ class App:
         from .slider_model import dispatch
         return dispatch(self)
 
+    def supports_pagination_options(self) -> bool:
+        from .pagination_options import supported
+        return supported(self)
+
     def supports_skeleton_presentation(self) -> bool:
         from .skeleton_presentation import supported
         return supported(self)
@@ -2376,6 +2386,9 @@ from .skeleton_presentation import (SkeletonWidth, SkeletonConfig, SkeletonPrese
                                     ResponsiveSkeleton, responsive_skeleton)
 from .skeleton_presentation import __all__ as _skeleton_exports
 __all__ += _skeleton_exports
+
+from .pagination_options import Pagination, PaginationConfig
+__all__ += ["Pagination", "PaginationConfig"]
 
 from .icons import (BadgeConfig, BadgeResult, BadgeSize, BadgeVariant, ConfiguredBadge,
     ConfiguredIcon, IconAlign, IconAvailability, IconBitmap, IconCatalogEntry, IconConfig,

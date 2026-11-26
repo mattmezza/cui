@@ -731,7 +731,8 @@
       "docs": [
         "docs/NUMERIC.md",
         "docs/NUMERIC_SELECTION_EVENTS.md",
-        "docs/BRIDGE_COMPONENTS.md"
+        "docs/BRIDGE_COMPONENTS.md",
+        "docs/BINDING_BUILDERS.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",

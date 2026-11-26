@@ -320,7 +320,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust builders use the numbered single-row layout. The retained C V1 bridge adds copied design and navigation options with the existing scalar event. The immediate C API also offers synchronous typed aggregate observation."
+        "The retained C V1 bridge and Python PaginationConfig expose design and navigation options with the existing scalar event. JavaScript, TypeScript, Go and Rust builders use the numbered single-row layout. Immediate C offers synchronous typed aggregate observation."
       ]
     },
     {

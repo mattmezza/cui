@@ -2334,7 +2334,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. The optional C ellipsis menus expose up to 100 omitted pages per direction. Text and accessible names can be localized. Optional labeled chevrons omit separate First/Last controls. The retained C bridge copies the extended options and emits the existing scalar CHANGE event. Foreign authoring wrappers for V1 and physical-host acceptance remain open."
+        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing, responsive whole-item rows, budgeted numbered pages and icon-only navigation. The optional C ellipsis menus expose up to 100 omitted pages per direction. Text and accessible names can be localized. Optional labeled chevrons omit separate First/Last controls. The retained C bridge copies the extended options and emits the existing scalar CHANGE event. Python has tested opt-in V1 authoring and works with alpha.6 for ordinary paging. JavaScript, TypeScript, Go and Rust option wrappers and physical-host acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2399,6 +2399,14 @@
           "evidence": [
             "tests/unit/test_bridge_pagination.c",
             "tests/unit/test_bridge_value_notifications.c"
+          ]
+        },
+        {
+          "name": "retained Python layout and post-step change callback",
+          "status": "tested",
+          "evidence": [
+            "bindings/python/test_pagination_options.py",
+            "bindings/python/examples/pagination.py"
           ]
         },
         {

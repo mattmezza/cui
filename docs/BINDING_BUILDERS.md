@@ -86,6 +86,32 @@ inside that rectangle, call `app.step()` and then `app.dispatch()`. The checked-
 CUI hit testing. Headless mode computes layout and draw commands; it does not
 paint a window or provide native font metrics.
 
+## Configure Pagination from Python
+
+Use `pagination(key)` to retain the current page and register `on_change` for commits. Extended navigation requires a compatible V1 bridge. Check `app.supports_pagination_options()` before using it with a dynamically selected library. The standard numbered pager works with earlier providers.
+
+```python
+from cui_bridge import PaginationConfig, pagination
+
+pager = pagination("results-pages").configure(PaginationConfig(
+    chevrons=True, jump_menu=True, visible_pages=5, available_width=320,
+    group="Pages de résultats", previous="Précédente", next="Suivante",
+    earlier_pages="Pages précédentes", later_pages="Pages suivantes",
+)).design_size("base")
+pager.total(24).on_change(lambda event: print(f"Loading page {int(event.value)}"))
+```
+
+Supply the current container's inner logical width to wrap between whole controls, or use zero for one row. Copy a revised width into the mounted pager with `configure` on the owner thread. `get_config()` returns the current options, and `configure(None)` clears them. The design size is independent and can be reset with `design_size("inherit")`. Opening, scrolling and dismissing a jump menu leave the selected page unchanged. Callbacks run through normal bridge dispatch after a committed page change.
+
+The [runnable results example](../bindings/python/examples/pagination.py) updates real result labels after a page change. Run it from the repository root with the Python binding and matching bridge available:
+
+```sh
+PYTHONPATH=bindings/python CUI_BRIDGE_LIBRARY="$PWD/build/libcui_bridge.so" \
+  python bindings/python/examples/pagination.py
+```
+
+Append `--font /absolute/path/to/font.ttf` to run the SDL window. Build the bridge with SDL support for that mode.
+
 ## Keep a Python DataTable's scroll position during updates
 
 Use the keyword argument `row_keys` when mounting and updating a DataTable.

@@ -24,18 +24,19 @@ def main():
     Thread(target=server.serve_forever, daemon=True).start()
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(**({'executable_path': args.chromium} if args.chromium else {}))
+            browser = p.chromium.launch(headless=True, **({'executable_path': args.chromium} if args.chromium else {}))
             page = browser.new_page(viewport={'width': 1280, 'height': 900})
             page.goto(f'http://127.0.0.1:{server.server_port}/#Marker')
             def story(name):
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>window.cuiGallery?.renderedComponent===name', arg=name)
-            def text_commands():
-                return page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
+            read_text_commands = '''()=>{const e=cuiGallery.exports,d=new TextDecoder();
                     return Array.from({length:e.gallery_count()},(_,i)=>i)
                     .filter(i=>e.gallery_command(i,0)===2).map(i=>({
                     text:d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i))),
-                    x:e.gallery_command(i,1),y:e.gallery_command(i,2),w:e.gallery_command(i,3),h:e.gallery_command(i,4)}));}''')
+                    x:e.gallery_command(i,1),y:e.gallery_command(i,2),w:e.gallery_command(i,3),h:e.gallery_command(i,4)}));}'''
+            def text_commands():
+                return page.evaluate(read_text_commands)
             story('Marker')
             text = text_commands()
             tasks = [c for c in text if c['text'] == '3 tasks']
@@ -44,6 +45,12 @@ def main():
             assert tasks[0]['x'] >= label['x'] + label['w'] and abs(tasks[0]['y'] - label['y']) < 1, text
             for name in ('Pagination', 'Stepper'):
                 story(name)
+                if name == 'Stepper':
+                    # The Fill layout places titles and descriptions below the indicator.
+                    # Centering against a single button applies to the Buttons layout.
+                    page.locator('#stepper-mode').select_option('0')
+                    page.wait_for_function('() => (' + read_text_commands +
+                                           ")().some(command => command.text.includes('Current'))")
                 semantics = page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
                     return Array.from({length:e.gallery_semantic_count()},(_,i)=>i)
                     .filter(i=>e.gallery_semantic(i,0)===1).map(i=>({

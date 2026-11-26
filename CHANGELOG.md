@@ -11,8 +11,9 @@
 - Rating supports whole and half values, custom SVG marks and hover previews
   that leave the committed value unchanged. The gallery and retained
   builders show the same options.
-- Stepper Fill wraps horizontally at the available width and supports a
-  vertical axis. The gallery and retained builders expose the opt-in layout.
+- Stepper Fill expands the connectors along the available width or height.
+  The gallery switches axis as space changes, and retained builders can select
+  either axis.
 - Retained VirtualList accepts up to 64 live rows and can preserve the
   visible row across inserts and removals using stable keys. The existing
   fixed-row interface remains available.

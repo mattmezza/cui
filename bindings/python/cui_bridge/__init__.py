@@ -151,6 +151,10 @@ class _API:
         if hasattr(lib, "cui_bridge_radio_set_motion_v1"):
             self.radio_set_motion = bind("radio_set_motion_v1", C.c_int, C.c_void_p,
                                          _Handle, C.c_uint32)
+        self.radio_item_set_content = None
+        if hasattr(lib, "cui_bridge_radio_item_set_content_v1"):
+            self.radio_item_set_content = bind("radio_item_set_content_v1", C.c_int,
+                                               C.c_void_p, _Handle, C.c_uint32)
         self.clipboard_set = bind("clipboard_set",C.c_int,C.c_void_p,C.c_char_p)
         self.clipboard_get = bind("clipboard_get",C.c_int,C.c_void_p,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
         self.theme_count = bind("theme_preset_count", C.c_uint32)
@@ -315,6 +319,8 @@ _BOOLEAN = {"checkbox", "radio", "switch", "toggle"}
 _NUMERIC = {"slider", "progress", "number_input", "pagination", "rating"}
 _KIND["slider_model"] = 81
 _KIND["configured_badge"] = 82
+_RADIO_CONTENT_KINDS = {"row", "column", "label", "badge", "avatar", "kbd", "tag",
+                        "icon", "image"}
 _EDITABLE = {"input", "textarea", "number_input", "combobox"}
 _GROUP = {"radio_group", "tabs", "accordion", "select", "combobox", "dropdown_button", "list_view", "menu", "stepper", "description_list", "status_bar", "toolbar", "title_bar"}
 _SURFACE = {"dialog", "alert_dialog", "sheet", "popover"}
@@ -462,6 +468,7 @@ class Widget:
         self._disabled = False
         self._checked = False
         self._radio_motion = False
+        self._radio_content = False
         self._detail = ""
         self._open = False
         self._open_set = False
@@ -693,6 +700,22 @@ class Widget:
             if self._app.supports_radio_motion():
                 self._change("radio_set_motion", int(enabled))
         self._radio_motion = enabled
+        return self
+
+    def decorate_content(self, enabled: bool = True) -> "Widget":
+        """Show or hide a RadioGroup Item's passive children."""
+        if self.kind != "item":
+            raise ValueError("decorate_content requires a RadioGroup Item")
+        if type(enabled) is not bool:
+            raise TypeError("enabled must be a bool")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is not None:
+            if enabled:
+                self._app._require_radio_item_content()
+            if self._app.supports_radio_item_content():
+                self._change("radio_item_set_content", int(enabled))
+        self._radio_content = enabled
         return self
 
     def is_checked(self) -> bool:
@@ -1658,6 +1681,15 @@ class App:
         if not self.supports_radio_motion():
             raise RuntimeError("Radio motion requires cui_bridge_radio_set_motion_v1")
 
+    def supports_radio_item_content(self) -> bool:
+        """Report whether direct RadioGroup Items can paint passive children."""
+        self._ensure_open()
+        return self._api.radio_item_set_content is not None
+
+    def _require_radio_item_content(self) -> None:
+        if not self.supports_radio_item_content():
+            raise RuntimeError("Radio decoration requires cui_bridge_radio_item_set_content_v1")
+
     def data_table_max_row_capacity(self) -> int | None:
         """Return the opt-in row limit usable by Python, or None on older providers."""
         self._ensure_open()
@@ -1703,7 +1735,8 @@ class App:
         seen: set[int] = set()
         keys: set[str] = set()
         order: list[tuple[Widget, Widget | None, str]] = []
-        def validate(node: Widget, parent: Widget | None, path: str, depth: int, lineage=()) -> None:
+        def validate(node: Widget, parent: Widget | None, path: str, depth: int,
+                     lineage=(), radio_content: bool = False) -> None:
             if depth >= 128:
                 raise ValueError("widget tree exceeds 128 levels")
             if id(node) in seen:
@@ -1722,6 +1755,12 @@ class App:
                 node._preflight_pagination(self)
             if node._radio_motion:
                 self._require_radio_motion()
+            if radio_content and node.kind not in _RADIO_CONTENT_KINDS:
+                raise ValueError(f"{node.kind} cannot decorate a RadioGroup Item")
+            if node._radio_content:
+                if parent is None or parent.kind != "radio_group":
+                    raise ValueError("decorate_content requires a direct RadioGroup Item")
+                self._require_radio_item_content()
             if isinstance(node, ConfiguredIcon):
                 node._preflight_icon(self)
             if node.kind == "configured_badge":
@@ -1743,7 +1782,8 @@ class App:
             keys.add(key)
             order.append((node, parent, key))
             for index, child in enumerate(node._children):
-                validate(child, node, f"{path}/{index}", depth + 1, lineage + (node,))
+                validate(child, node, f"{path}/{index}", depth + 1, lineage + (node,),
+                         radio_content or node._radio_content)
         validate(tree, None, "root", 0)
         if any(isinstance(node, ResponsiveSkeleton) for node, _, _ in order):
             from .skeleton_presentation import require_api
@@ -1780,6 +1820,8 @@ class App:
                     node._change("set_checked", int(node._checked))
                 if node._radio_motion:
                     node._change("radio_set_motion", 1)
+                if node._radio_content:
+                    node._change("radio_item_set_content", 1)
                 if node.kind in {"slider", "number_input"}:
                     node._change("set_range", *node._range)
                 if node.kind in {"pagination", "rating"}:

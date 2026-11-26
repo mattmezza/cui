@@ -3,6 +3,7 @@ import os
 import unittest
 from unittest.mock import patch
 from cui_bridge import dropdown_button, select, combobox, collapsible, alert, radio_group, tabs, accordion, item, label, App, column, checkbox, radio, switch, toggle, slider, progress, badge, input, textarea, number_input
+from cui_bridge import BridgeError, button, tag
 
 class Components(unittest.TestCase):
     def press(self, app, node):
@@ -74,6 +75,81 @@ class Components(unittest.TestCase):
         if legacy:
             with App(library=legacy) as app:
                 self.check_radio_provider_without_motion(app)
+
+    def test_radio_decoration_keeps_one_selection_event(self):
+        with self.assertRaises(ValueError):
+            label("Caption").decorate_content()
+        with self.assertRaises(TypeError):
+            item("option").decorate_content(1)
+        with App() as app:
+            self.assertTrue(app.supports_radio_item_content())
+            first = item("first", "Standard")
+            caption = tag("recommendation", "Recommended")
+            second = (item("second", "Priority").detail("Tracked delivery")
+                      .children(column().children(caption)).decorate_content())
+            changes = []
+            group = radio_group("delivery").children(first, second).select(first)
+            app.mount(column().children(group.on_change(changes.append))).step()
+            self.press(app, caption)
+            self.assertIs(group.selected(), second)
+            self.assertEqual(app.dispatch(), 1)
+            self.assertIs(changes[0].node, group)
+            second.decorate_content(False)
+            app.step()
+            with self.assertRaises(BridgeError):
+                app.bounds(caption)
+            self.assertIs(group.selected(), second)
+            second.decorate_content()
+            app.step()
+            self.assertGreater(app.bounds(caption)[2], 0)
+            self.assertEqual(app.dispatch(), 0)
+
+    def test_invalid_radio_decoration_preserves_hidden_children(self):
+        with App() as app:
+            hidden = button("action")
+            option = item("option", "Priority").children(column().children(hidden))
+            group = radio_group("delivery").children(option.decorate_content())
+            root = column().children(group)
+            with self.assertRaisesRegex(ValueError, "button cannot decorate"):
+                app.mount(root)
+            self.assertIsNone(root._handle)
+            option.decorate_content(False)
+            app.mount(root).step()
+            with self.assertRaises(BridgeError):
+                option.decorate_content()
+            with self.assertRaises(BridgeError):
+                app.bounds(hidden)
+
+        with App() as app:
+            wrong_parent = tabs("tabs").children(item("tab").decorate_content())
+            with self.assertRaisesRegex(ValueError, "direct RadioGroup Item"):
+                app.mount(column().children(wrong_parent))
+
+    def check_provider_without_radio_decoration(self, app):
+        self.assertFalse(app.supports_radio_item_content())
+        caption = label("Recommended")
+        option = item("option", "Priority").children(caption).decorate_content()
+        group = radio_group("delivery").children(option)
+        root = column().children(group)
+        with self.assertRaisesRegex(RuntimeError, "cui_bridge_radio_item_set_content_v1"):
+            app.mount(root)
+        self.assertIsNone(root._handle)
+        option.decorate_content(False)
+        app.mount(root).step()
+        with self.assertRaises(BridgeError):
+            app.bounds(caption)
+        self.press(app, option)
+        self.assertIs(group.selected(), option)
+        with self.assertRaisesRegex(RuntimeError, "cui_bridge_radio_item_set_content_v1"):
+            option.decorate_content()
+
+    def test_older_provider_keeps_radio_selection_without_decoration(self):
+        with App() as app, patch.object(app._api, "radio_item_set_content", None):
+            self.check_provider_without_radio_decoration(app)
+        legacy = os.environ.get("CUI_RADIO_LEGACY_LIBRARY")
+        if legacy:
+            with App(library=legacy) as app:
+                self.check_provider_without_radio_decoration(app)
 
     def test_numeric_ranges_and_static(self):
         with App(width=800,height=800) as app:

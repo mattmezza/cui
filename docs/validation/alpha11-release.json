@@ -1,0 +1,201 @@
+{
+  "release": {
+    "isDraft": false,
+    "isPrerelease": true,
+    "publishedAt": "2026-11-26T20:25:27Z",
+    "url": "https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.11"
+  },
+  "source_revision": "85df489c682013a089715456b828257b998e2118",
+  "hosted_gates": {
+    "ci": {
+      "attempt": 1,
+      "conclusion": "success",
+      "headSha": "85df489c682013a089715456b828257b998e2118",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45888310526"
+    },
+    "native_bindings": {
+      "attempt": 1,
+      "conclusion": "success",
+      "headSha": "85df489c682013a089715456b828257b998e2118",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45888310578"
+    },
+    "pages": {
+      "attempt": 1,
+      "conclusion": "success",
+      "headSha": "85df489c682013a089715456b828257b998e2118",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45888310574"
+    }
+  },
+  "website": {
+    "verification": {
+      "source_revision": "85df489c682013a089715456b828257b998e2118",
+      "public_url": "https://matteo.merola.co/cui/",
+      "version": "0.1.0-alpha.11",
+      "native_starter": {
+        "bytes": 2155416,
+        "sha256": "1f3ff0c94dc7e1d2945984ef1afd57222135d683432a536d0b37061c07a30f1e"
+      },
+      "gallery_wasm_cache_key": "88ef65486d02bc3a"
+    },
+    "native_starter": {
+      "file": "cui-0.1.0-alpha.11-native-starter.tar.gz",
+      "bytes": 2155416,
+      "sha256": "1f3ff0c94dc7e1d2945984ef1afd57222135d683432a536d0b37061c07a30f1e"
+    }
+  },
+  "local_validation": {
+    "installed_checks": [
+      "downloaded native starter",
+      "static C",
+      "Python/Node/TypeScript",
+      "Go/Rust",
+      "actual-font text",
+      "installed Attachment actions and slots in Python, JS, TS, Go and Rust",
+      "fractional Carousel layout from installed bindings",
+      "installed DataTable paging in Python and Node"
+    ],
+    "focused_private_display_ctest": "12/12",
+    "vendor_notices": "pass",
+    "gallery": "exact source site, headers, 78 families and starter verified locally",
+    "component_checks": "Disclosure title states, Attachment slots and actions, and Carousel touch, resize and selection have focused evidence.",
+    "compiled_artifact_acceptance": {
+      "native_tested_revision": "c08c3abd128b81d9efc6039f907ee0624ed674a3",
+      "release_revision": "85df489c682013a089715456b828257b998e2118",
+      "verified_archives": {
+        "go-source/github.com/mattmezza/cui/bindings/go/@v/v0.1.0-alpha.11.zip": "890005ea767f44358fa79edcfe31682997ae8e38280db13a8d2b55301fac7113",
+        "go-source/github.com/mattmezza/cui/bindings/go/@v/v0.1.0-alpha.11.mod": "7df695ccf10c5be4bdd39a847a4af58939d01d364afbd380a2a6c283f1db00c8",
+        "rust-source/cui-builders-0.1.0-alpha.11.crate": "7c34d90dbcfbd3e5f77ee4c2afe9fa0a5a78f45d5a03bfa870fa08c8d5ea2977"
+      },
+      "release_diff": [
+        "tests/web/test_browser.py"
+      ],
+      "acceptance": "Reused successful private-display install tests against byte-identical module and crate inputs."
+    },
+    "prior_browser_failure": {
+      "workflow": "https://github.com/mattmezza/cui/actions/runs/45886437603/job/140139338854",
+      "resolution": "Chromium separated the first orientation frame from its scheduled media-bounds redraw. The test now waits for quiescence and still compares both image positions."
+    }
+  },
+  "draft_asset_verification": {
+    "release_tag": "v0.1.0-alpha.11",
+    "source_revision": "85df489c682013a089715456b828257b998e2118",
+    "assets": {
+      "ASSET_MANIFEST.json": {
+        "bytes": 6244,
+        "sha256": "a1d0f92b5c64e9603a5ed6bd46c86254384e2d1b523cfaa5e48fe8caa225ba30"
+      },
+      "RELEASE_NOTES.md": {
+        "bytes": 1648,
+        "sha256": "dc77f83db98692a440051d7ffd93b7b1c61399282ea706d0b0e65d25844f3869"
+      },
+      "SHA256SUMS": {
+        "bytes": 1001,
+        "sha256": "ca76edb7aba1309f3df16602f95aa36c5a05124b28f693e60d3cd4932c8e00c8"
+      },
+      "cui-0.1.0-alpha.11-go-source-proxy.tar.gz": {
+        "bytes": 2416719,
+        "sha256": "724a0e3d1fcda1851c2bb1f20ab7e8502178508145633e3a9cfc3f3bd06aa2c0"
+      },
+      "cui-0.1.0-alpha.11-linux-x86_64-static.tar.gz": {
+        "bytes": 2290027,
+        "sha256": "bc98afc3c71d8c55be7c5a8b6f12711b6679b609036c665da5353bf217ed1417"
+      },
+      "cui-0.1.0-alpha.11-native-starter.tar.gz": {
+        "bytes": 2155416,
+        "sha256": "1f3ff0c94dc7e1d2945984ef1afd57222135d683432a536d0b37061c07a30f1e"
+      },
+      "cui-0.1.0-alpha.11-source.tar.gz": {
+        "bytes": 30938111,
+        "sha256": "046ff389d74081214dca649473eaff9a2ce38a93a3a4900eb5c7922642c23cf1"
+      },
+      "cui-builders-0.1.0-alpha.11.crate": {
+        "bytes": 2138112,
+        "sha256": "7c34d90dbcfbd3e5f77ee4c2afe9fa0a5a78f45d5a03bfa870fa08c8d5ea2977"
+      },
+      "cui-native-0.1.0-alpha.11.tgz": {
+        "bytes": 13156656,
+        "sha256": "8c465ee39367688326b989f911ab87e6314aa3622d169fb424d3de18fe7b97d4"
+      },
+      "cui_bridge-0.1.0a11-py3-none-linux_x86_64.whl": {
+        "bytes": 15884646,
+        "sha256": "b8ee4ade6044bd93a4f3865084bb4a1f9bdd496938714a18065b2ca28bf58943"
+      },
+      "source-artifact-inspection.json": {
+        "bytes": 1360,
+        "sha256": "6c8fab12fdeffe45e7f64c7d164fba5b41c0ae465844f21b65fdbbecc261b913"
+      }
+    }
+  },
+  "public_go_module": {
+    "source_revision": "85df489c682013a089715456b828257b998e2118",
+    "version": "v0.1.0-alpha.11",
+    "endpoint": "https://proxy.golang.org/github.com/mattmezza/cui/bindings/go/@v/v0.1.0-alpha.11",
+    "public_zip_sha256": "731d7176270d8e026ecf66fd4e736edbd7002ea75cc4f6f985cc4cbc0699e8d5",
+    "verified_files": 702,
+    "version_info": {
+      "Version": "v0.1.0-alpha.11",
+      "Time": "2026-11-26T20:04:06Z",
+      "Origin": {
+        "VCS": "git",
+        "URL": "https://github.com/mattmezza/cui",
+        "Subdir": "bindings/go",
+        "Hash": "85df489c682013a089715456b828257b998e2118",
+        "Ref": "refs/tags/bindings/go/v0.1.0-alpha.11"
+      }
+    }
+  },
+  "release_tag_scheduling": {
+    "source_revision": "85df489c682013a089715456b828257b998e2118",
+    "observed_at": "2026-11-26T20:25:09+00:00",
+    "seconds_after_tag_push": 39,
+    "verified_exact_tags": [
+      "v0.1.0-alpha.11",
+      "bindings/go/v0.1.0-alpha.11"
+    ],
+    "push_workflow_runs": [
+      {
+        "conclusion": "success",
+        "createdAt": "2026-11-26T20:04:20Z",
+        "databaseId": 45888310578,
+        "headBranch": "main",
+        "headSha": "85df489c682013a089715456b828257b998e2118",
+        "name": "Native binding callback runners",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-11-26T20:04:20Z",
+        "databaseId": 45888310574,
+        "headBranch": "main",
+        "headSha": "85df489c682013a089715456b828257b998e2118",
+        "name": "WebAssembly gallery and GitHub Pages",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-11-26T20:04:19Z",
+        "databaseId": 45888310526,
+        "headBranch": "main",
+        "headSha": "85df489c682013a089715456b828257b998e2118",
+        "name": "CUI build and evidence",
+        "status": "completed"
+      }
+    ],
+    "release_tag_push_runs_observed": 0,
+    "alpha6_duplicate_baseline": {
+      "runs": 6,
+      "jobs": 38,
+      "summed_job_seconds": 13015,
+      "note": "Sum of per-job durations, separate from elapsed or billed minutes"
+    }
+  },
+  "limitations": [
+    "Native binary packages are Linux x86_64 host artifacts and have no manylinux certification.",
+    "The Go and Rust SDK maps and packaged headers were verified against the frozen source.",
+    "Physical GPU, device and assistive-technology acceptance and full component parity remain open.",
+    "The Python, npm and Rust artifacts are available through GitHub Releases. Registry publication is pending."
+  ]
+}

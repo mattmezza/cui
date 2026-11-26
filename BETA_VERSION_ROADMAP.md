@@ -11,11 +11,11 @@ use the checklists below to track acceptance and delivery.
 
 | Track | Current status |
 | --- | --- |
-| Public release | **v0.1.0-alpha.10**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.10) |
+| Public release | **v0.1.0-alpha.11**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.11) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
-| Public website | Interactive WASM gallery and docs at alpha.10. The Pages deployment from `363f014c` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45852900242) |
-| Candidate | **v0.1.0-alpha.11** combines Accordion and Collapsible title states, retained Attachment composition and actions, and viewport-relative Carousel slides. Release qualification is in progress. |
-| Packages | Alpha.10 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
+| Public website | Interactive WASM gallery and docs at alpha.11. The Pages deployment from `85df489c` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45888310574) |
+| Latest slice | Accordion and Collapsible title states, retained Attachment actions and slots, and viewport-relative Carousel slides. |
+| Packages | Alpha.11 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
 feature test does not establish complete component parity.
@@ -28,6 +28,12 @@ feature test does not establish complete component parity.
 - **Released / deployed:** verified published artifacts, tracked separately from source.
 
 ## Release wrap-up
+
+Alpha.11 ships Accordion and Collapsible title states, retained Attachment
+actions and slots, and viewport-relative Carousel slides. Installed examples
+exercise the retained APIs in all five language builders. The release and
+gallery serve the same native starter.
+[Release evidence](docs/validation/alpha11-release.json)
 
 Alpha.10 ships responsive Accordion and Collapsible sizing and paint,
 the joined Accordion layout and styled headings and dividers. The installed
@@ -212,7 +218,7 @@ Historical source evidence and remaining acceptance:
 | Dialog composition | `ef893a34` idle fix; focused native checks and full browser gate on artifact `f728908e` pass | Broader lifecycle. Alpha.5 deploys the focused behavior and nested-touch checks pass. |
 | Localized TimeField | Integrated `49267cc4`; native/source/ABI checks and keyboard gallery gates pass. Working source covers ordered IME and formatted semantic values. Chromium AX and Linux AT-SPI verify the current time, discrete values and segment focus. Released language artifacts pass headless examples. | Physical IME, assistive-technology editing and screen-reader qualification, and interactive native binding acceptance. |
 
-Receipts travel with their source changes. Use the alpha.10 receipt above for
+Receipts travel with their source changes. Use the alpha.11 receipt above for
 exact-source acceptance and delivery.
 
 Detailed validation receipts live in [docs/validation](docs/validation).

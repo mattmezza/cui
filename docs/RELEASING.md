@@ -1,3 +1,25 @@
+# Published prerelease v0.1.0-alpha.11
+
+CUI v0.1.0-alpha.11 was published on 2026-11-26 from `85df489c682013a089715456b828257b998e2118`. It includes
+the native starter, source archive, static Linux C bundle and Python, npm,
+Go and Rust packages. The gallery and GitHub served identical starter bytes
+at publication. [GitHub release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.11)
+
+All 16 hosted CI jobs, the native binding callback job and all
+three headless browser shards passed. Six installed checks exercised the
+starter, C, native bindings, real-font text and paging. The installed
+Attachment examples and fractional Carousel checks passed in Python,
+JavaScript, TypeScript, Go and Rust. All 11 draft assets matched the staged files
+and all 702 public Go module files matched the tested package.
+The initial browser run sampled an Attachment overlay before its media bounds
+settled. The release test waits for the scheduled repaint and compares both icon
+positions. [Release validation record](validation/alpha11-release.json)
+
+Rebuild C consumers with matching headers and libraries. The Python wheel
+uses `0.1.0a11`. The Linux x86_64 binary assets require system dependencies.
+Physical platform acceptance, full-family verification and PyPI, npm and
+crates.io publication remain open.
+
 # Published prerelease v0.1.0-alpha.10
 
 CUI v0.1.0-alpha.10 was published on 2026-11-26 from `363f014c2be66d701692eb51d6171ef0f4067450`. It includes

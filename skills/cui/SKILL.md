@@ -273,6 +273,9 @@ closing an overlay at a breakpoint. The starter also uses auto-measured
 reveals focused controls in short windows. Its Projects page keeps separate
 Resizable state per axis, sizes a bounded Tabs strip from the detail pane,
 and restores tab focus when the overflow button leaves the layout.
+For multiple visible Carousel slides, use `cui_carousel_with_basis` and pass
+one fraction per slide. See `docs/CAROUSEL.md#show-several-slides-at-once` for
+gap, resize and clipping behavior and the immediate C example.
 For a Command palette inside a dialog, set `cui_command_options.width = -1` to fit
 the body. Rows and hit targets fill the current allocation. Width-dependent
 custom row heights settle on a follow-up frame. See `docs/COMMAND.md`.

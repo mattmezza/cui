@@ -16,18 +16,19 @@ const source=readFileSync(process.argv[1],'utf8');
 const load = name => import('data:text/javascript;base64,' +
     readFileSync(join(process.argv[2], name)).toString('base64'));
 const {paginationUsage, ratingUsage, timeFieldUsage, virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage,
-       radioStyledUsage, radioControlledUsage, disclosureHeadingUsage} =
+       radioStyledUsage, radioControlledUsage, disclosureHeadingUsage, carouselBasisUsage} =
     await load('cui_usage.js');
 const {hoverCardUsage} = await load('cui_hover_card_usage.js');
 const pick=(name)=>{const start=source.indexOf('const '+name+' = {');
  if(start<0)throw Error(name+' missing');
  return source.slice(start,name==='stories'?source.indexOf('};',start)+2:source.indexOf('\n};\nlet wasm',start)+3);};
-const context={paginationUsage,ratingUsage,timeFieldUsage};
+const context={paginationUsage,ratingUsage,timeFieldUsage,carouselBasisUsage};
 runInNewContext(pick('stories')+'\n'+pick('snippets')+'\nglobalThis.data={stories,snippets};',context);
 const {stories, snippets} = context.data;
 const inline = {
     Accordion: [false, true].map(interactive => disclosureHeadingUsage(true, interactive)),
     Collapsible: [false, true].map(interactive => disclosureHeadingUsage(false, interactive)),
+    Carousel: [carouselBasisUsage(2), carouselBasisUsage(3, true, true)],
 };
 const standalone = {
     Attachment: [readFileSync(join(process.argv[2], '..', 'attachment_slots_example.h'), 'utf8')],

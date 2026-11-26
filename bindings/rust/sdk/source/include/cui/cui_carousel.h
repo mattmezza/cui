@@ -92,6 +92,15 @@ typedef struct {
 cui_carousel_options cui_carousel_default(void);
 bool cui_carousel(cui_context *, cui_id, const cui_theme *, cui_carousel_state *,
                   const cui_carousel_item *, size_t, cui_carousel_options);
+/* Optional count-entry array of finite fractions in [0,1], borrowed for the
+ * call. Zero or NULL uses the ordinary extent. A positive basis replaces the
+ * item's extent with a fraction of (viewport + gap), including the leading
+ * gap. It reserves at least one logical pixel after the gap and clips overflow
+ * to the slide. Growing width uses the last layout's frame width and schedules
+ * a follow-up if it changes. */
+bool cui_carousel_with_basis(cui_context *, cui_id, const cui_theme *, cui_carousel_state *,
+                             const cui_carousel_item *, size_t, cui_carousel_options,
+                             const float *basis);
 /* Navigation control: Medium32 by default; caller may select a semantic/custom size,
  * label, appearance and content. Place inside the open Carousel root; positions use retained frame
  * bounds. The built-in control inherits the root's current disabled state. */

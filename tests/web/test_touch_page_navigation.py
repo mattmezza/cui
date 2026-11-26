@@ -188,6 +188,48 @@ def run_cases(a):
     a.case('Carousel', 'horizontal viewport yields vertical pan without changing slides',
            carousel_page_pan)
 
+    def carousel_basis():
+        viewport = a.page.viewport_size
+        a.configure('carousel-visible', 3)
+        try:
+            a.tap(a.target('Go to slide 1', 1))
+            root = a.target('Workflow carousel')
+            first = a.target('Build slide')
+            second = a.target('Preview slide')
+            expected = (root['f'][3] + 16) / 3
+            assert abs(first['f'][3]-expected) < .1, (first, expected)
+            assert abs(second['f'][1]-first['f'][1]-expected) < .1, (first, second)
+            assert 'cui_carousel_with_basis' in a.page.locator('#snippet').inner_text()
+            before = carousel_state()
+            a.drag(root, -expected * .85, 0, rx=.75, ry=.35)
+            assert carousel_state() == [1, before[1] + 1], 'Touch drag did not snap once'
+            assert a.value(a.target('Next slide', 1), 5), 'Last distinct snap did not disable Next'
+
+            frame = a.page.evaluate('cuiGallery.frame')
+            a.page.set_viewport_size({**viewport, 'width': viewport['width'] + 54})
+            a.page.wait_for_function('frame => cuiGallery.frame > frame', arg=frame)
+            root = a.target('Workflow carousel')
+            second = a.target('Preview slide')
+            assert abs(second['f'][3]-(root['f'][3]+16)/3) < .1
+            assert second['f'][3] > expected + 1
+            assert carousel_state() == [1, before[1] + 1], 'Resize changed selection'
+
+            a.configure('carousel-axis', 1)
+            a.configure('carousel-visible', 2)
+            a.tap(a.target('Go to slide 1', 1))
+            first = a.target('Build slide')
+            second = a.target('Preview slide')
+            assert abs(first['f'][4]-108) < .1 and abs(second['f'][2]-first['f'][2]-108) < .1
+            assert 'CUI_ORIENTATION_VERTICAL' in a.page.locator('#snippet').inner_text()
+            a.tap(a.target('Next slide', 1))
+            assert carousel_state()[0] == 1, 'Vertical Next did not use the new snaps'
+        finally:
+            a.configure('carousel-axis', 0)
+            a.configure('carousel-visible', 1)
+            a.page.set_viewport_size(viewport)
+
+    a.case('Carousel', 'relative slides resize and snap with touch in both axes', carousel_basis)
+
     def plot():
         align_canvas(a)
         target = a.target('Projected sine wave', 20)

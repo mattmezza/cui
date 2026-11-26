@@ -93,6 +93,15 @@ typedef struct {
 cui_carousel_options cui_carousel_default(void);
 bool cui_carousel(cui_context *, cui_id, const cui_theme *, cui_carousel_state *,
                   const cui_carousel_item *, size_t, cui_carousel_options);
+/* Optional count-entry array of finite fractions in [0,1], borrowed for the
+ * call. Zero or NULL uses the ordinary extent. A positive basis replaces the
+ * item's extent with a fraction of (viewport + gap), including the leading
+ * gap. It reserves at least one logical pixel after the gap and clips overflow
+ * to the slide. Growing width uses the last layout's frame width and schedules
+ * a follow-up if it changes. */
+bool cui_carousel_with_basis(cui_context *, cui_id, const cui_theme *, cui_carousel_state *,
+                             const cui_carousel_item *, size_t, cui_carousel_options,
+                             const float *basis);
 /* Navigation control: Medium32 by default; caller may select a semantic/custom size,
  * label, appearance and content. Place inside the open Carousel root; positions use retained frame
  * bounds. The built-in control inherits the root's current disabled state. */
@@ -131,6 +140,7 @@ bool cui_carousel_pagination_item(cui_context *, cui_id, const cui_theme *, cui_
 
 #if defined(CUI_CAROUSEL_IMPLEMENTATION) && defined(CUI_CAROUSEL_DECLARATIONS_READY) && !defined(CUI_CAROUSEL_IMPLEMENTATION_ONCE)
 #define CUI_CAROUSEL_IMPLEMENTATION_ONCE
+#include "cui_scroll.h"
 /* src/base/cui_carousel.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -737,8 +747,41 @@ static void cui_carousel_semantics(cui_context *ui, cui_id id, cui_carousel_stat
                     : 0});
     cui_update_semantic(ui, id, false, s->count ? (float)s->selected : -1);
 }
-bool cui_carousel(cui_context *ui, cui_id id, const cui_theme *theme, cui_carousel_state *s,
-                  const cui_carousel_item *items, size_t count, cui_carousel_options o) {
+static bool cui_carousel_build_geometry(cui_carousel_geometry *geometry,
+                                        const cui_carousel_item *items, size_t count,
+                                        const float *basis, float viewport, float gap) {
+    if (!isfinite(viewport) || viewport <= gap)
+        return false;
+    double edge = 0;
+    for (size_t i = 0; i < count; ++i) {
+        float ratio = basis ? basis[i] : 0;
+        if (!isfinite(ratio) || ratio < 0 || ratio > 1)
+            return false;
+        double requested = ratio > 0             ? fmax((double)viewport * ratio, (double)gap + 1)
+                           : items[i].extent > 0 ? items[i].extent
+                                                 : viewport;
+        float start = (float)edge;
+        edge += requested;
+        if (requested <= gap || edge > FLT_MAX)
+            return false;
+        float extent = (float)requested;
+        if (basis) {
+            /* Round shared edges once in proportional layouts. Independent
+             * rounding can overlap slides or create overflow on an exact fit. */
+            float end = (float)edge;
+            extent = end - start;
+            if ((double)start + extent > end)
+                extent = nextafterf(extent, 0);
+        }
+        if (extent <= gap)
+            return false;
+        geometry[i] = (cui_carousel_geometry){.id = items[i].id, .start = start, .extent = extent};
+    }
+    return true;
+}
+bool cui_carousel_with_basis(cui_context *ui, cui_id id, const cui_theme *theme,
+                             cui_carousel_state *s, const cui_carousel_item *items, size_t count,
+                             cui_carousel_options o, const float *basis) {
     if (!ui || !theme || !s || !s->items || count > s->capacity ||
         !cui_carousel_valid(id, items, count, o))
         return false;
@@ -749,16 +792,8 @@ bool cui_carousel(cui_context *ui, cui_id id, const cui_theme *theme, cui_carous
         primary = s->axis == CUI_ORIENTATION_HORIZONTAL ? (o.width > 0 ? o.width : 300) : o.height;
     float track_viewport = primary + o.gap;
     cui_carousel_geometry geometry[CUI_CAROUSEL_ITEM_LIMIT];
-    double start = 0;
-    for (size_t i = 0; i < count; ++i) {
-        float extent = items[i].extent > 0 ? items[i].extent : track_viewport;
-        if (extent <= o.gap || start + extent > FLT_MAX)
-            return false;
-        geometry[i] =
-            (cui_carousel_geometry){.id = items[i].id, .start = (float)start, .extent = extent};
-        start += extent;
-    }
-    if (!cui_carousel_set_count(s, count) ||
+    if (!cui_carousel_build_geometry(geometry, items, count, basis, track_viewport, o.gap) ||
+        !cui_carousel_set_count(s, count) ||
         !cui_carousel_set_geometry(s, geometry, count, track_viewport))
         return false;
     s->frame_width = o.width > 0 ? o.width : s->frame_bounds.w > 0 ? s->frame_bounds.w : 300;
@@ -816,7 +851,17 @@ bool cui_carousel(cui_context *ui, cui_id id, const cui_theme *theme, cui_carous
     for (size_t i = 0; i < count; ++i) {
         float position = cui_carousel_item_position(s, i) - o.gap;
         cui_box item = items[i].custom_box ? items[i].box : (cui_box){0};
+        cui_box content = {.width = -1, .height = -1};
         item.row = s->axis == CUI_ORIENTATION_HORIZONTAL;
+        /* Content may retain its natural minimum size inside a small basis.
+         * Keep that paint and interaction inside the slide's own extent. */
+        if (basis && basis[i] > 0) {
+            item.clip = true;
+            if (item.row)
+                content.max_width = geometry[i].extent - o.gap;
+            else
+                content.max_height = geometry[i].extent - o.gap;
+        }
         cui_rect bounds = s->axis == CUI_ORIENTATION_HORIZONTAL
                               ? (cui_rect){.x = position, .w = geometry[i].extent, .h = -1}
                               : (cui_rect){.y = position, .w = -1, .h = geometry[i].extent};
@@ -833,7 +878,7 @@ bool cui_carousel(cui_context *ui, cui_id id, const cui_theme *theme, cui_carous
                           ? (cui_box){.width = o.gap, .height = 0}
                           : (cui_box){.height = o.gap, .width = 0});
         cui_end_box(ui);
-        cui_begin_box(ui, 0, (cui_box){.width = -1, .height = -1});
+        cui_begin_box(ui, 0, content);
         items[i].render(ui, theme, i, items[i].user);
         cui_end_box(ui);
         cui_end_box(ui);
@@ -853,6 +898,10 @@ bool cui_carousel(cui_context *ui, cui_id id, const cui_theme *theme, cui_carous
     cui_end_box(ui);
     cui_end_focus_scope(ui);
     return true;
+}
+bool cui_carousel(cui_context *ui, cui_id id, const cui_theme *theme, cui_carousel_state *s,
+                  const cui_carousel_item *items, size_t count, cui_carousel_options o) {
+    return cui_carousel_with_basis(ui, id, theme, s, items, count, o, NULL);
 }
 static bool cui_carousel_root_disabled(cui_context *ui, cui_id root) {
     size_t count;

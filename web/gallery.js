@@ -3,7 +3,7 @@ import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
 import {createCuiMeshRenderer} from "./modules/cui_mesh.js";
 import {paintGradientText} from "./modules/cui_text_paint.js";
-import {selectedUsage,paginationUsage,ratingUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage,radioStyledUsage,radioControlledUsage,disclosureHeadingUsage} from "./modules/cui_usage.js";
+import {selectedUsage,paginationUsage,ratingUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage,radioStyledUsage,radioControlledUsage,disclosureHeadingUsage,carouselBasisUsage} from "./modules/cui_usage.js";
 import {resizableUsage} from "./modules/cui_resizable_usage.js";
 import {stepperUsage} from "./modules/cui_stepper_usage.js";
 import {spinnerUsage} from "./modules/cui_spinner_usage.js";
@@ -665,7 +665,7 @@ cui_plot_viewport_bind(ui, id, &viewport, navigation);`,
  Sidebar:'cui_sidebar(ui, id, &theme, &state, entries, count, options);\n/* Compose groups, menu items, header and footer in entry callbacks. */',
  Textarea:'cui_textarea(ui, id, &theme, cui_string("Notes"), edit,\n    &state, (cui_textarea_options){.width = 320, .rows = 4});',
  Settings:'cui_settings_state_init(&state, page_workspace, 2, search);\ncui_settings(ui, id, &theme, pages, 2, &state,\n    (cui_settings_options){.width = 800, .height = 500});',
- Carousel:'cui_carousel_state_init(&state, geometry, 4, 4);\ncui_carousel(ui, id, &theme, &state, slides, 4,\n    (cui_carousel_options){.width = 480, .height = 200,\n        .controls = draw_controls, .pagination = draw_pages});',
+ Carousel:carouselBasisUsage(1),
  Command:'cui_command_init(&state, rows, 32, query);\ncui_command(ui, id, &theme, &state, entries, count, options);',
  Questionnaire:`/* Application owns state, choices and render callbacks.
  * draw_choice_content has cui_questionnaire_choice_render_fn signature. */
@@ -1111,7 +1111,9 @@ function render(){
  wasm.gallery_icon_options(Number($('icon-choice').value),Number($('icon-size').value),Number($('icon-rotate').checked),Number($('icon-color').checked),Number(iconLayoutControl.value));
  wasm.gallery_toolbar_options(Number($('toolbar-size').value),Number($('toolbar-grouped').checked),Number($('toolbar-input').checked));
  wasm.gallery_settings_options(Number($('settings-size').value),Number($('settings-variant').value));
- wasm.gallery_carousel_options(Number($('carousel-axis').value),Number($('carousel-loop').checked));
+ const carouselVisible=Number($('carousel-visible').value);
+ const carouselVertical=$('carousel-axis').value==='1',carouselLooping=$('carousel-loop').checked;
+ wasm.gallery_carousel_options(Number(carouselVertical),Number(carouselLooping),carouselVisible);
  wasm.gallery_command_palette_options(Number($('command-modal').checked),Number($('command-loading').checked),Number($('command-filterable').checked));
  wasm.gallery_text_view_motion(Number($('motion-duration').value),Number($('motion-stagger').value),Number($('motion-easing').value));
  wasm.gallery_text_view_options(Number($('text-view-format').value),Number($('text-view-scroll').checked),Number($('text-view-fade').checked));
@@ -1250,6 +1252,7 @@ function render(){
  if(selected.name==='Spinner')$('snippet').textContent=spinnerUsage(...['size','icon','color','easing','sizing','rem'].map(k=>Number($('spinner-'+k).value)));
  if(timeField)$('snippet').textContent=timeFieldUsage(designScale,orderedTime);
  if(selected.name==='HoverCard')$('snippet').textContent=hoverCardUsage(Number($('hover-policy').value),Number($('hover-preview').value));
+ if(selected.name==='Carousel')$('snippet').textContent=carouselBasisUsage(carouselVisible,carouselVertical,carouselLooping);
  if(selected.name==='Resizable')$('snippet').textContent=resizableUsage($('resizable-nested').checked);
  if(selected.name==='VirtualList')$('snippet').textContent=
   $('virtual-axis').value==='2'?virtualInboxUsage:snippets.VirtualList;
@@ -1567,7 +1570,7 @@ function selectComponent(){
  for(const id of ['message-alignment','message-variant','message-inset','message-avatar-control'])$(id).hidden=selected.name!=='Message';
  $('checkbox-state').hidden=selected.name!=='Checkbox';
  for(const id of ['settings-size','settings-variant'])$(id).hidden=selected.name!=='Settings';
- for(const id of ['carousel-axis','carousel-loop-control'])$(id).hidden=selected.name!=='Carousel';
+ for(const id of ['carousel-axis','carousel-loop-control','carousel-visible'])$(id).hidden=selected.name!=='Carousel';
  for(const id of ['speech-size','speech-unavailable-control'])$(id).hidden=selected.name!=='Speech';
  for(const id of ['questionnaire-presentation','questionnaire-progress','questionnaire-size','questionnaire-shortcuts-control','questionnaire-numbers-control','questionnaire-custom-control'])$(id).hidden=selected.name!=='Questionnaire';
  questionnairePresentationControl.value='0';$('questionnaire-progress').value='0';$('questionnaire-size').value='0';$('questionnaire-shortcuts').checked=true;$('questionnaire-numbers').checked=false;$('questionnaire-custom').checked=false;
@@ -1883,7 +1886,7 @@ $('palette-menu').addEventListener('keydown',event=>{
  if(event.key==='Tab')closePalette();
 });
 document.addEventListener('pointerdown',event=>{if(!event.target.closest('.palette-picker'))closePalette();});
-for(const id of ['image-state','image-fit','image-grayscale','image-opacity','attachment-status','attachment-vertical','attachment-composed'])$(id).addEventListener('change',requestFrame);
+for(const id of ['image-state','image-fit','image-grayscale','image-opacity','attachment-status','attachment-vertical','attachment-composed','carousel-visible'])$(id).addEventListener('change',requestFrame);
 for(const id of ['description-columns','description-size','description-vertical','description-plain','status-right','status-custom','resizable-nested','resizable-vertical','resizable-disabled','icon-choice','icon-size','icon-rotate','icon-color'])$(id).addEventListener('change',requestFrame);
 for(const id of ['toolbar-size','toolbar-grouped','toolbar-input'])$(id).addEventListener('change',requestFrame);
 for(const id of ['title-decoration','title-close','title-fullscreen'])$(id).addEventListener('change',requestFrame);

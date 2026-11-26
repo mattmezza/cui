@@ -5795,7 +5795,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled variable extents, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Caller-supplied outer extents, first growing-width estimate and host gesture/tooltip services remain explicit boundaries; see docs/CAROUSEL.md."
+        "Controlled variable extents, viewport-relative item basis, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Intrinsic sizing from arbitrary slide content, the first growing-width estimate, retained basis authoring and host gesture/tooltip services remain open; see docs/CAROUSEL.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5806,6 +5806,17 @@
           "evidence": [
             "tests/unit/test_carousel.c"
           ]
+        },
+        {
+          "name": "viewport-relative slide basis",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_carousel.c",
+            "tests/web/test_touch_page_navigation.py",
+            "tests/web/test_snippets.py",
+            "docs/CAROUSEL.md"
+          ],
+          "scope": "Immediate C and the WASM gallery. Horizontal and vertical fractions, mixed extents, narrow clipping, silent resize, fractional geometry and touch snapping."
         },
         {
           "name": "keyboard, pointer drag and wheel navigation with nested child ownership and cross-axis page handoff",

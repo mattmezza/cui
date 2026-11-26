@@ -1829,7 +1829,8 @@
     {
       "api_symbols": [
         "cui_carousel_state_init",
-        "cui_carousel"
+        "cui_carousel",
+        "cui_carousel_with_basis"
       ],
       "state_types": [
         "cui_carousel_state",
@@ -1837,7 +1838,7 @@
       ],
       "state_ownership": "Caller retains state, geometry workspace and slide data.",
       "interaction": "cui_carousel_change_fn observes selection; cui_carousel_render_fn composes slides.",
-      "usage": "Initialize capacity once, submit slides each frame and handle selected-index changes separately from slide rendering.",
+      "usage": "Initialize capacity once, submit slides each frame and handle selected-index changes separately from slide rendering. In immediate C, use cui_carousel_with_basis to show several items with viewport-relative slides in either orientation.",
       "docs": [
         "docs/CAROUSEL.md"
       ],

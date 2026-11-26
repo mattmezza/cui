@@ -83,6 +83,8 @@ def generate(name,sources):
         lines += ['#ifndef CUI_SKELETON_PALETTE_IMPLEMENTATION', '#define CUI_SKELETON_PALETTE_IMPLEMENTATION', '#endif', '#include "cui_skeleton_palette.h"']
     if name == "cui_scroll":
         lines += ['#include "cui_scroll_events.h"']
+    if name == "cui_carousel":
+        lines += ['#include "cui_scroll.h"']
     if name == "cui_virtual_scroll":
         lines += ['#include "cui_virtual_events.h"']
     if name == "cui_message":

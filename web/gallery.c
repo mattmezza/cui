@@ -335,7 +335,7 @@ static cui_resizable_state resizable_state;
 static cui_carousel_state carousel_state;
 static cui_carousel_geometry carousel_geometry[4];
 static unsigned carousel_changes;
-static int carousel_axis, carousel_looping;
+static int carousel_axis, carousel_looping, carousel_visible = 1;
 static cui_settings_state settings_state;
 static cui_scroll_state settings_preview_scroll;
 static cui_settings_page_state settings_pages_state[2];
@@ -862,9 +862,10 @@ float gallery_settings_stats(int field) {
            : field == 9 ? (float)settings_mode_menu.menu.overlay.open
                         : 0;
 }
-void gallery_carousel_options(int axis, int looping) {
+void gallery_carousel_options(int axis, int looping, int visible) {
     carousel_axis = axis != 0;
     carousel_looping = looping != 0;
+    carousel_visible = visible == 2 || visible == 3 ? visible : 1;
 }
 float gallery_carousel_stats(int field) {
     return field == 0   ? (float)carousel_state.selected
@@ -4428,8 +4429,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.disabled = disabled != 0;
         options.controls = gallery_carousel_controls;
         options.pagination = gallery_carousel_pagination;
-        cui_carousel(ui, cui_id_from(ui, "carousel-preview"), &t, &carousel_state, items, 4,
-                     options);
+        float fraction = 1.f / carousel_visible;
+        float basis[] = {fraction, fraction, fraction, fraction};
+        cui_carousel_with_basis(ui, cui_id_from(ui, "carousel-preview"), &t, &carousel_state, items,
+                                4, options, carousel_visible == 1 ? NULL : basis);
         cui_end_box(ui);
         break;
     }

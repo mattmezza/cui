@@ -739,7 +739,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "limitations": [
+        "Viewport-relative slide basis is available in immediate C through cui_carousel_with_basis. The retained C bridge and language builders use the existing slide layout."
+      ]
     },
     {
       "name": "DescriptionList",

@@ -110,7 +110,12 @@ Input and NumberInput expose all four source sizes through the gallery size sele
 
 Settings composes two application-owned pages and six fields through `cui_settings`: search, sidebar navigation, Checkbox, Switch, Input, NumberInput and a checked Menu-backed workspace choice. The gallery exposes its three variants and four sizes. Browser checks exercise field changes, menu selection, page navigation and option changes; values remain owned by the sample application.
 
-Carousel uses four real CUI slide items with source controls and pagination. Browser checks step in both axes, select a page, and wrap from the last slide when looping is enabled. Slide selection and its callback count come from the retained C state; animation is driven by the host frame clock and reduced-motion preference.
+Carousel uses four real CUI slide items with controls and pagination. Choose
+one, two or three slides per viewport to try the relative item basis. Browser
+checks step in both axes, select a page, wrap when looping is enabled, and
+exercise touch snapping and resize with multiple slides visible. Slide
+selection and its callback count come from the caller-owned C state. The host
+frame clock and reduced-motion preference drive animation.
 
 Command renders the real inline palette with a retained query editor, filtered virtual rows, icon/shortcut/checked/disabled entries, keyboard navigation and action callbacks. The optional dialog mode hosts the same palette in a CUI Surface. Browser checks filtering, pointer and keyboard confirmation, loading semantics and two-stage Escape behavior: first clear the query, then cancel the dialog.
 

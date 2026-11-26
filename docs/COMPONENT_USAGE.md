@@ -109,7 +109,7 @@ The checkbox updates the application's bool. Controlled Switch/Toggle `on_change
 
 **Interaction:** Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.
 
-**Usage:** Submit stable item IDs and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width and SVG indicators. Set joined for one outer card and use appearance for inherited titles, trigger boxes and divider styles. Retain motion through end_frame. Retained C and the language builders copy heading layers and divider styles through optional setters and deliver queued change records.
+**Usage:** Submit stable item IDs and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width and SVG indicators. Set joined for one outer card and use appearance for inherited titles, trigger boxes and divider styles. Use the title-states presenter for optional hover, keyboard-focus and press title layers. Retained C and the language builders copy title states through a separately probed setter. Retain motion through end_frame. Retained C and the language builders copy heading layers and divider styles through optional setters and deliver queued change records.
 
 API: `cui_accordion`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md); [retained C](BRIDGE_COMPONENTS.md#style-retained-accordion-and-collapsible-from-c).
 
@@ -150,11 +150,11 @@ Direct C `cui_alert_events` and `cui_alert_dismiss_fn` observe the completed bui
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains cui_attachment_state and owns attachment model, metadata and resource lifetime.
+**State:** Immediate C callers retain cui_attachment_state and own resource lifetime. The retained C bridge owns slots and child handles. The application owns file operations and lifecycle state.
 
-**Interaction:** cui_attachment_result reports actions; cui_attachment_action_fn receives remove/retry activation.
+**Interaction:** Immediate C reports actions and can call typed observers. Retained C and the Python, JavaScript, TypeScript, Go and Rust builders opt into Open, Remove and Retry through the shared queue. Language builders read the action and optional evidence through the manual component notification poll. In retained C and all five language builders, slot children keep ordinary control events.
 
-**Usage:** Submit transfer status and progress; perform removal/retry in action callbacks, not render callbacks. Use cui_attachment_with_metadata for one-line grapheme ellipsis, full semantic labels, and optional typography in immediate C.
+**Usage:** Submit transfer status and progress. Handle removal and retry in action callbacks. Use cui_attachment_with_metadata for one-line grapheme ellipsis, full labels and typography in immediate C. The gallery's Custom slots mode copies an immediate C example using media_content, media_overlay, CUI_ATTACHMENT_CUSTOM and actions. Retained C and the Python, JavaScript, TypeScript, Go and Rust builders can copy layout and text options and a decoded RGBA8 preview through separate bridge capabilities. Retained progress is a fraction in [0,1]. Retained C can create preview fallback, overlay, metadata and action containers using cui_bridge_attachment_slot_create_v1. Python, JavaScript and TypeScript expose attachment_slot. Go uses AttachmentSlot. Rust uses App::create_attachment_slot. Each binding probes the provider independently.
 
 API: `cui_attachment`, `cui_attachment_with_metadata`. [Public header](../include/cui/cui_media.h) · [Attachment guide](MEDIA.md#fit-file-names-and-descriptions).
 
@@ -250,7 +250,7 @@ API: `cui_sdl3_clipboard_interface`. [Public header](../include/cui/cui_sdl3.h);
 
 **Interaction:** Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.
 
-**Usage:** Submit a stable ID and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width, SVG indicators and trigger feedback. Pass appearance for responsive title typography and state-specific boxes. Retain motion through end_frame. Retained C and the language builders copy heading layers through optional setters and deliver queued change records.
+**Usage:** Submit a stable ID and caller-owned expansion each frame. Use the presenter for shared sizes, responsive width, SVG indicators and trigger feedback. Pass appearance for responsive title typography and state-specific boxes. Use the title-states presenter for optional hover, keyboard-focus and press title layers. Retained C and the language builders copy title states through a separately probed setter. Retain motion through end_frame. Retained C and the language builders copy heading layers through optional setters and deliver queued change records.
 
 API: `cui_collapsible`, `cui_collapsible_ex`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md); [retained C](BRIDGE_COMPONENTS.md#style-retained-accordion-and-collapsible-from-c).
 
@@ -855,9 +855,9 @@ Ordered dispatch with delegated segment focus uses the direct C route.
 
 **Interaction:** cui_carousel_change_fn observes selection; cui_carousel_render_fn composes slides. A disabled Carousel also disables its built-in arrows and pagination.
 
-**Usage:** Initialize capacity once, submit slides each frame and handle selected-index changes separately from slide rendering.
+**Usage:** Initialize capacity once, submit slides each frame and handle selected-index changes separately from slide rendering. In immediate C, use cui_carousel_with_basis to show several items with viewport-relative slides in either orientation.
 
-API: `cui_carousel_state_init`, `cui_carousel`. [Public header](../include/cui/cui_carousel.h); [guide](CAROUSEL.md).
+API: `cui_carousel_state_init`, `cui_carousel`, `cui_carousel_with_basis`. [Public header](../include/cui/cui_carousel.h); [guide](CAROUSEL.md).
 
 ## DescriptionList
 

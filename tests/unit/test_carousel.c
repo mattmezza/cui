@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: MIT */
+#ifdef CUI_CAROUSEL_DISTRIBUTION
+#define CUI_CAROUSEL_IMPLEMENTATION
+#include "cui_carousel.h"
+#else
 #include "cui/cui_carousel.h"
+#endif
 #ifndef CUI_CAROUSEL_BASE_ONLY
 #include "cui/cui_components.h"
 #include "cui/cui_scroll.h"
@@ -205,7 +210,7 @@ static void test_duplicate_snaps(void) {
     cui_carousel_cancel(&s);
 }
 #ifndef CUI_CAROUSEL_BASE_ONLY
-static unsigned child_clicks, renders[3];
+static unsigned child_clicks, renders[4];
 static void render_item(cui_context *ui, const cui_theme *theme, size_t index, void *user) {
     (void)user;
     renders[index]++;
@@ -256,6 +261,101 @@ static void pagination(cui_context *ui, const cui_theme *theme, cui_carousel_sta
         cui_carousel_pagination_item(ui, 2010 + i, theme, s, root, i,
                                      (cui_carousel_control_options){0});
     cui_carousel_pagination_end(ui);
+}
+static bool basis_frame(cui_context *ui, const cui_theme *theme, cui_carousel_state *state,
+                        cui_carousel_options options, float parent_width, size_t count,
+                        const float *basis) {
+    cui_carousel_item items[] = {{.id = 10, .render = render_item},
+                                 {.id = 11, .render = render_item, .extent = 44},
+                                 {.id = 12, .render = render_item},
+                                 {.id = 13, .render = render_item}};
+    assert(cui_begin_frame(ui, 600, 380, .016f));
+    cui_begin_box(ui, 1, (cui_box){.width = parent_width, .height = 320});
+    bool result = cui_carousel_with_basis(ui, 2, theme, state, items, count, options, basis);
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return result;
+}
+static void test_item_basis(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_carousel_state state;
+    cui_carousel_geometry workspace[8];
+    setup(&state, workspace, 4);
+    memset(renders, 0, sizeof renders);
+    cui_carousel_options options = cui_carousel_default();
+    options.width = 284;
+    options.height = 184;
+    options.reduced_motion = true;
+    const float thirds[] = {1.f / 3, 1.f / 3, 1.f / 3, 1.f / 3};
+    assert(basis_frame(ui, &theme, &state, options, 500, 4, thirds));
+    near(state.viewport, 300);
+    near(state.maximum, 100);
+    for (size_t i = 0; i < 4; ++i) {
+        near(workspace[i].start, i * 100.f);
+        near(find(ui, 10 + i)->bounds.w, 100);
+        assert(renders[i] == 1);
+    }
+    cui_focus(ui, 2);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_RIGHT}));
+    assert(basis_frame(ui, &theme, &state, options, 500, 4, thirds));
+    assert(state.selected == 1 && changes == 1 && last_index == 1 && cui_event_consumed(ui, 0));
+    assert(cui_carousel_navigation(&state, true) == CUI_CAROUSEL_NO_SELECTION);
+
+    /* Fixed extents resolve immediately, including after a fractional resize. */
+    options.width = 355.25f;
+    assert(basis_frame(ui, &theme, &state, options, 500, 4, thirds));
+    near(find(ui, 1001)->bounds.x, 0);
+    near(find(ui, 11)->bounds.w, (355.25f + 16) / 3);
+    assert(state.selected == 1 && changes == 1);
+    assert(basis_frame(ui, &theme, &state, options, 500, 3, thirds));
+    assert(state.maximum == 0 &&
+           cui_carousel_navigation(&state, false) == CUI_CAROUSEL_NO_SELECTION);
+
+    /* Invalid configurations do not commit geometry or render any slide. */
+    unsigned renders_before = renders[0];
+    float viewport_before = state.viewport;
+    float extent_before = workspace[0].extent;
+    const float invalid[][2] = {{.5f, NAN}, {.5f, -1}, {.5f, 1.1f}};
+    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i)
+        assert(!basis_frame(ui, &theme, &state, options, 500, 2, invalid[i]));
+    assert(state.count == 3 && state.selected == 1 && changes == 1);
+    assert(state.viewport == viewport_before && workspace[0].extent == extent_before);
+    assert(renders[0] == renders_before);
+
+    const float mixed[] = {.5f, 0, .001f, 0};
+    assert(cui_carousel_set_axis(&state, CUI_ORIENTATION_VERTICAL));
+    cui_carousel_set_selected(&state, 0);
+    assert(basis_frame(ui, &theme, &state, options, 500, 4, mixed));
+    near(workspace[0].extent, 100);
+    near(workspace[1].extent, 44);
+    near(workspace[2].extent, 17);
+    near(workspace[3].extent, 200);
+    near(find(ui, 12)->bounds.h, 17);
+    assert(find(ui, 12)->details.pos_in_set == 3);
+    cui_rect small_child = find(ui, 1002)->bounds;
+    child_clicks = 0;
+    pointer(ui, CUI_EVENT_POINTER_DOWN, small_child.x + 4, small_child.y + .5f);
+    pointer(ui, CUI_EVENT_POINTER_UP, small_child.x + 4, small_child.y + .5f);
+    assert(basis_frame(ui, &theme, &state, options, 500, 4, mixed));
+    assert(cui_event_target(ui, 0) == 1002 && child_clicks == 1);
+    pointer(ui, CUI_EVENT_POINTER_DOWN, small_child.x + 4, small_child.y + 2);
+    pointer(ui, CUI_EVENT_POINTER_UP, small_child.x + 4, small_child.y + 2);
+    assert(basis_frame(ui, &theme, &state, options, 500, 4, mixed));
+    assert(cui_event_target(ui, 0) != 1002 && child_clicks == 1);
+
+    assert(cui_carousel_set_axis(&state, CUI_ORIENTATION_HORIZONTAL));
+    options.width = -1;
+    assert(basis_frame(ui, &theme, &state, options, 260, 4, thirds));
+    assert(cui_needs_redraw(ui));
+    assert(basis_frame(ui, &theme, &state, options, 260, 4, thirds));
+    near(state.viewport, 276);
+    near(find(ui, 10)->bounds.w, 92);
+    assert(!cui_needs_redraw(ui));
+    assert(changes == 1);
+    cui_destroy(ui);
 }
 static void test_disabled_controls(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
@@ -905,6 +1005,7 @@ int main(void) {
     test_scrollbar_skin();
     test_widget();
     test_controls();
+    test_item_basis();
     test_disabled_controls();
     test_controls_during_motion();
     test_parent_handoff();

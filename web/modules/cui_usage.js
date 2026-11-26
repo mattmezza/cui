@@ -260,6 +260,25 @@ cui_virtual_widget_result draw_virtual_inbox(cui_context *ui, cui_id id, const c
 
 // These are complete C translation units. The application owns their state
 // and calls draw only between begin_frame and end_frame.
+export function carouselBasisUsage(visible, vertical = false, looping = false) {
+    const basis = visible === 2 ? '.5f' : visible === 3 ? '1.f / 3' : null;
+    const frame = basis
+        ? `const float basis[] = {${[basis, basis, basis, basis].join(', ')}};
+cui_carousel_with_basis(ui, id, &theme, &state, slides, 4, options, basis);`
+        : `cui_carousel(ui, id, &theme, &state, slides, 4, options);`;
+    const axis = vertical ? '\ncui_carousel_set_axis(&state, CUI_ORIENTATION_VERTICAL);' : '';
+    const loop = looping ? '\ncui_carousel_set_looping(&state, true);' : '';
+    return `/* Initialize retained state and geometry storage once. */
+cui_carousel_state_init(&state, geometry, 4, 4);${axis}${loop}
+
+/* Submit each frame with four stable slide IDs and render callbacks. */
+cui_carousel_options options = cui_carousel_default();
+options.now_seconds = now_seconds; /* Monotonic host frame clock. */
+options.controls = draw_controls;
+options.pagination = draw_pages;
+${frame}`;
+}
+
 export function selectedUsage(name, mode, size = 3, disabled = false) {
  const design = sizes[size] || 'CUI_DESIGN_BASE';
  if (name === 'Input' && mode === 9) return `#include <cui/cui_components.h>

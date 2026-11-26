@@ -50,11 +50,47 @@ translate source variable widths/heights into explicit extents, or use the pure
 geometry API for separate presentation. This boundary is deliberate and is not
 a claim of arbitrary GPUI style/layout parity.
 
+## Show several slides at once
+
+Pass one fraction per item to `cui_carousel_with_basis`. Three items with
+a basis of `1.f / 3` fill the viewport together. The fraction applies to
+the padded viewport, so the first item aligns with the viewport edge and the
+same `options.gap` appears between items. For a vertical Carousel the
+basis uses the frame height.
+
+```c
+/* Called once. Retain the state and workspace through each frame. */
+cui_carousel_state_init(&state, workspace, 4, 4);
+
+/* Called during a frame. The host provides the available layout width. */
+cui_carousel_options options = cui_carousel_default();
+options.width = available_width;
+options.height = 200;
+options.gap = 12;
+options.now_seconds = now_seconds; /* Monotonic host frame clock. */
+const float basis[] = {1.f / 3, 1.f / 3, 1.f / 3, 1.f / 3};
+cui_carousel_with_basis(ui, id, &theme, &state, slides, 4, options, basis);
+```
+
+Use zero for an item that should keep its absolute `extent` or fill the
+viewport. A positive basis replaces the item's extent, leaves at least one
+logical pixel after the gap, and clips content to the slide. Fractions outside
+`[0,1]` and nonfinite fractions are rejected before writing the state.
+`NULL` keeps the ordinary extent rules. A resize recomputes snaps around the
+selected item without a selection callback. When several indices share the
+final snap, Next and Previous skip the duplicates. Explicit pagination can
+still select any index.
+
+Choose **Two slides** or **Three slides** in the live Carousel gallery to
+try the layout in either orientation. The retained language builders currently
+use their existing slide layout.
+
 Frame bounds are retained through `cui_track_bounds`. Growing width starts with
 a 300px estimate until the first completed layout; fixed width uses its declared
 value. A changed measured frame schedules a follow-up frame and recalculates
 snaps. Geometry changes cancel active gestures and align the current selection.
-The host drives frames until `cui_needs_redraw` clears. `now_seconds` is an
+The host drives frames until `cui_needs_redraw` clears. This also applies to
+responsive items using growing width. `now_seconds` is an
 explicit monotonic host clock; backwards motion timestamps hold their last value.
 The default movement spring has a 280ms response, damping .85 and settling
 precision .5px. Styled rendering uses Theme `spring_move` response/damping;

@@ -7,6 +7,8 @@
   shows the animation with reduced-motion support.
 - Standalone C Radio has an opt-in animated mark and keeps the existing
   shared-integer selection contract.
+- The retained C bridge can animate either Radio variant while preserving its
+  queued selection notifications.
 
 ## 0.1.0-alpha.7
 

@@ -348,8 +348,8 @@
         "go": "tested_subset",
         "rust": "tested_subset"
       },
-      "limitations": [
-        "Standalone Radio and RadioGroup animation is available in immediate C. The retained bridge and five language builders use immediate marks."
+      "omissions": [
+        "Standalone Radio and RadioGroup animation is available in immediate C and the retained C bridge. The five language builders do not expose the optional motion setting."
       ]
     },
     {

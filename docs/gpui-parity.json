@@ -2682,7 +2682,7 @@
             "docs/RADIO_GROUP.md"
           ],
           "limitations": [
-            "The application owns the selected ID and motion storage. Motion shares theme springs and context reduced motion. Retained bindings use immediate marks."
+            "Immediate C callers own the selected ID and motion storage. Motion shares theme springs and context reduced motion. The C bridge provides optional retained motion."
           ]
         },
         {
@@ -2693,7 +2693,18 @@
             "docs/RADIO_GROUP.md"
           ],
           "limitations": [
-            "The immediate C presenter takes optional per-option motion and keeps the shared-integer activation contract. Use RadioGroup for atomic sibling paint and roving focus. Retained bindings use immediate marks."
+            "The immediate C presenter takes optional per-option motion and keeps the shared-integer activation contract. Use RadioGroup for atomic sibling paint and roving focus. The C bridge provides optional retained motion."
+          ]
+        },
+        {
+          "name": "retained C Radio and RadioGroup motion",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_radio_motion.c",
+            "docs/BRIDGE_COMPONENTS.md"
+          ],
+          "limitations": [
+            "Optional C bridge configuration. Existing standalone CHANGE and group selected Item payloads retain their timing. Language builder authoring and OS preference observation remain open."
           ]
         }
       ],

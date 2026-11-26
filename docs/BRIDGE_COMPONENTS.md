@@ -9,7 +9,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Label | `cui_text` | copied UTF-8 text | Text only |
 | Button | `cui_button_ex` | copied text, click | Existing options |
 | Checkbox | `cui_checkbox` | checked, change, disabled | Boolean only |
-| Radio | `cui_radio` | checked, change, disabled | Standalone radio; no group exclusivity |
+| Radio | `cui_radio_present` | checked, change, disabled, optional animated selection | Standalone radio; use RadioGroup for exclusivity |
 | Switch | `cui_switch_ex` | checked, change, disabled | Boolean only |
 | Toggle | `cui_toggle` | checked, change, disabled | Boolean only |
 | Slider | `cui_slider` | value, range, step, change, disabled | Float native precision |
@@ -21,7 +21,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | NumberInput | `cui_number_input` | per-node numeric editor, value, range, step, change, disabled | Finite values; 127-byte draft |
 | Collapsible | `cui_collapsible` | open state, change, disabled | Child subtree is panel |
 | Alert | `cui_alert` | copied title/message | Static informational alert |
-| RadioGroup | `cui_radio_group` | selected Item, change, disabled | Up to 64 Items |
+| RadioGroup | `cui_radio_group_present` | selected Item, change, disabled, optional animated selection | Up to 64 Items |
 | Tabs | `cui_tabs` | selected Item, change, disabled | Up to 64 Items; Item subtree is panel |
 | Accordion | `cui_accordion` | per-Item open state, change, disabled | Up to 64 Items; multiple expansion |
 | Item | Composite descriptor | label, disabled, optional panel children | Must belong to group |
@@ -116,6 +116,30 @@ means no selected row. The legacy setter assigns one-based row keys, so its
 event values keep their original meaning. Columns and sort columns stay
 one-based. The application can supply a reordered matrix after a step to apply
 a sort request.
+
+### Animate retained Radio selection from C
+
+Pass a Radio or RadioGroup handle to `cui_bridge_radio_set_motion_v1` to enable
+the theme spring for the selection mark and circular fill. RadioGroup owns the
+motion for all of its options. The selected handle and its queued change event
+are available on the activation frame. The fade never queues additional events.
+
+```c
+#include <cui/cui_bridge.h>
+
+cui_bridge_status animate_delivery(cui_bridge_app *app, cui_bridge_node radio_group) {
+    return cui_bridge_radio_set_motion_v1(app, radio_group, 1);
+}
+```
+
+The first frame after enabling snaps to the selected value. Repeated enable
+calls preserve active motion. Passing `0` snaps the next frame to the current
+value and frees the node's motion state. Removing the node also frees that
+state. The bridge allocates a slot index on first use and one bounded state per
+enabled node. In an application that calls `cui_bridge_step` directly, keep
+passing elapsed time on successive frames. A dynamically loaded provider must
+export this optional symbol for the setting. Native hosts can pass `0` when
+their own preference handling calls for reduced motion.
 
 ### Configure a retained pager from C
 

@@ -126,8 +126,8 @@ bool changed = cui_radio_present(ui, cui_id_from(ui, "priority"), theme,
 ```
 
 Schedule `priority_motion.next_wake_seconds` as you would for the group. The
-context reduced-motion setting applies to both. The retained bridge and language
-builders continue to use immediate marks.
+context reduced-motion setting applies to both. A retained C app can opt in
+with `cui_bridge_radio_set_motion_v1`. See [the bridge guide](BRIDGE_COMPONENTS.md#animate-retained-radio-selection-from-c).
 
 The headless test asserts same-frame selection paint, semantic set relationships,
 callback rejection/acceptance, selected no-op, keyboard wrap/disabled skipping,

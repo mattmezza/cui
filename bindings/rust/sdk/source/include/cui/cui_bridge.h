@@ -955,6 +955,12 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_br
  * Setting a range clamps the current value into it atomically. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_checked(cui_bridge_app *, cui_bridge_node,
                                                         uint32_t checked);
+/* Optional Radio or RadioGroup mark and fill animation. Use 0 for immediate
+ * presentation (default) or 1 to retain motion per node. Enabling twice keeps an
+ * active transition. Disabling or removal releases its state. Selection and
+ * queued notifications keep their existing timing. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_set_motion_v1(cui_bridge_app *, cui_bridge_node,
+                                                                uint32_t enabled);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *, cui_bridge_node,
                                                          uint32_t disabled);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_value(cui_bridge_app *, cui_bridge_node,

@@ -172,6 +172,138 @@ static void pagination_modes(void) {
     assert(!sized_page_frame(&f, options).control && f.value == 8 && f.calls == 3);
     cui_destroy(f.ui);
 }
+static const cui_semantic *pagination_node(const fixture *f, cui_role role, const char *name) {
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(f->ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (nodes[i].role == role && nodes[i].name.length == strlen(name) &&
+            !memcmp(nodes[i].name.data, name, nodes[i].name.length))
+            return &nodes[i];
+    return NULL;
+}
+static void pagination_key(fixture *f, cui_key code) {
+    assert(cui_queue_event(f->ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = code}));
+}
+static void pagination_action(fixture *f, cui_id target) {
+    assert(cui_queue_event(f->ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
+                                              .accessibility_target = target,
+                                              .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
+}
+static cui_numeric_selection_event_result
+ellipsis_frame(fixture *f, size_t total, cui_pagination_options options, bool passive, bool omit) {
+    assert(cui_begin_frame(f->ui, 400, 420, .016f));
+    cui_theme theme = cui_theme_light();
+    cui_numeric_selection_event_result result = {0};
+    if (!omit) {
+        cui_begin_box(f->ui, 911, (cui_box){.inert = passive});
+        result = cui_pagination_events_ex(f->ui, 2, &theme, &f->value, total, options,
+                                          (cui_pagination_event_handler){page_changed, f});
+        cui_end_box(f->ui);
+    }
+    f->draw = cui_end_frame(f->ui);
+    assert(cui_last_error(f->ui) == CUI_OK);
+    return result;
+}
+static void pagination_ellipsis_menu(void) {
+    fixture f = make();
+    f.value = 205;
+    cui_pagination_options options = {.design_size = CUI_DESIGN_BASE,
+                                      .available_width = 352,
+                                      .visible_pages = 5,
+                                      .ellipsis_viewport = {0, 0, 400, 420}};
+    assert(!ellipsis_frame(&f, 400, options, false, false).control);
+    const cui_semantic *gap = pagination_node(&f, CUI_ROLE_BUTTON, "Later pages");
+    assert(gap && !gap->details.expanded && gap->details.controls);
+    cui_id later = gap->id;
+    key(&f, later, CUI_KEY_DOWN);
+    assert(!ellipsis_frame(&f, 400, options, false, false).control && !f.calls);
+    const cui_semantic *panel = pagination_node(&f, CUI_ROLE_MENU, "Later pages");
+    assert(panel && panel->details.scrollable && panel->details.labelled_by == later);
+    cui_rect panel_bounds = cui_bounds(f.ui, panel->id);
+    assert(panel_bounds.w > 0 && panel_bounds.h > 0 && panel_bounds.h <= 240);
+    const cui_semantic *row = pagination_node(&f, CUI_ROLE_MENUITEM, "207");
+    assert(row && cui_focused(f.ui) == row->id);
+    assert(pagination_node(&f, CUI_ROLE_BUTTON, "Later pages")->details.expanded);
+
+    cui_id popup_id = panel->id;
+    cui_rect initial_trigger = cui_bounds(f.ui, later);
+    options.available_width = 164;
+    assert(!ellipsis_frame(&f, 400, options, false, false).control);
+    cui_rect moved_trigger = cui_bounds(f.ui, later);
+    assert(initial_trigger.x != moved_trigger.x || initial_trigger.y != moved_trigger.y);
+    assert(cui_needs_redraw(f.ui));
+    assert(!ellipsis_frame(&f, 400, options, false, false).control);
+    cui_rect moved_popup = cui_bounds(f.ui, popup_id);
+    assert(panel_bounds.x != moved_popup.x || panel_bounds.y != moved_popup.y);
+
+    pagination_key(&f, CUI_KEY_END);
+    assert(!ellipsis_frame(&f, 400, options, false, false).control && !f.calls);
+    row = pagination_node(&f, CUI_ROLE_MENUITEM, "306");
+    assert(row && cui_focused(f.ui) == row->id);
+    assert(!pagination_node(&f, CUI_ROLE_MENUITEM, "307"));
+    pagination_key(&f, CUI_KEY_ENTER);
+    cui_numeric_selection_event_result result = ellipsis_frame(&f, 400, options, false, false);
+    assert(result.control && result.change_count == 1 && f.value == 306 && f.calls == 1);
+    assert(f.page_event.before == 205 && f.page_event.after == 306);
+    assert(!pagination_node(&f, CUI_ROLE_MENU, "Later pages") && cui_focused(f.ui) == later);
+
+    cui_id earlier = pagination_node(&f, CUI_ROLE_BUTTON, "Earlier pages")->id;
+    pagination_action(&f, earlier);
+    assert(!ellipsis_frame(&f, 400, options, false, false).control);
+    row = pagination_node(&f, CUI_ROLE_MENUITEM, "205");
+    assert(row); /* The earlier gap exposes the 100 pages nearest the window. */
+    pagination_action(&f, row->id);
+    f.value = 305; /* External owner replacement retires previously offered rows. */
+    assert(!ellipsis_frame(&f, 400, options, false, false).control && f.value == 305 &&
+           f.calls == 1 && !pagination_node(&f, CUI_ROLE_MENU, "Earlier pages"));
+
+    pagination_action(&f, earlier);
+    assert(!ellipsis_frame(&f, 400, options, false, false).control);
+    assert(pagination_node(&f, CUI_ROLE_MENU, "Earlier pages"));
+    pagination_key(&f, CUI_KEY_ESCAPE);
+    assert(!ellipsis_frame(&f, 400, options, false, false).control);
+    assert(!pagination_node(&f, CUI_ROLE_MENU, "Earlier pages") && cui_focused(f.ui) == earlier);
+
+    pagination_action(&f, earlier);
+    assert(!ellipsis_frame(&f, 400, options, false, false).control);
+    row = pagination_node(&f, CUI_ROLE_MENUITEM, "204");
+    assert(row);
+    pagination_action(&f, row->id);
+    options.disabled = true;
+    assert(!ellipsis_frame(&f, 400, options, false, false).control);
+    assert(f.value == 305 && f.calls == 1 && !pagination_node(&f, CUI_ROLE_MENU, "Earlier pages"));
+    assert(pagination_node(&f, CUI_ROLE_BUTTON, "Earlier pages")->disabled);
+    options.disabled = false;
+    ellipsis_frame(&f, 400, options, false, false);
+    pagination_action(&f, earlier);
+    ellipsis_frame(&f, 400, options, false, false);
+    assert(pagination_node(&f, CUI_ROLE_MENU, "Earlier pages"));
+    ellipsis_frame(&f, 400, options, false, true);
+    ellipsis_frame(&f, 400, options, false, false);
+    assert(!pagination_node(&f, CUI_ROLE_MENU, "Earlier pages"));
+    pagination_action(&f, earlier);
+    ellipsis_frame(&f, 400, options, false, false);
+    row = pagination_node(&f, CUI_ROLE_MENUITEM, "204");
+    assert(row);
+    pagination_action(&f, row->id);
+    assert(!ellipsis_frame(&f, 400, options, true, false).control && f.value == 305 &&
+           f.calls == 1);
+    ellipsis_frame(&f, 400, options, false, false);
+    assert(!pagination_node(&f, CUI_ROLE_MENU, "Earlier pages"));
+
+    f.value = 6;
+    ellipsis_frame(&f, 20, options, false, false);
+    pagination_action(&f, earlier);
+    ellipsis_frame(&f, 20, options, false, false);
+    row = pagination_node(&f, CUI_ROLE_MENUITEM, "2");
+    assert(row);
+    pagination_action(&f, row->id);
+    result = ellipsis_frame(&f, 20, options, false, false);
+    assert(result.control && result.change_count == 1 && f.value == 2 && f.calls == 2);
+    assert(!pagination_node(&f, CUI_ROLE_BUTTON, "Earlier pages"));
+    assert(cui_focused(f.ui) == cui_numeric_part_id(2, 2));
+    cui_destroy(f.ui);
+}
 static void compare(fixture *a, fixture *b) {
     assert(a->value == b->value && cui_focused(a->ui) == cui_focused(b->ui));
     cui_rect x = cui_bounds(a->ui, 2), y = cui_bounds(b->ui, 2);
@@ -533,6 +665,7 @@ static void paired_input(bool styled) {
 int main(void) {
     sized_pagination();
     pagination_modes();
+    pagination_ellipsis_menu();
     for (unsigned styled = 0; styled < 2; ++styled) {
         pagination(styled != 0);
         stepper(styled != 0);

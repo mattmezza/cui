@@ -42,7 +42,26 @@ bool draw_results_pages(cui_context *ui, cui_id id, const cui_theme *theme,
 }
 ```
 
-Use `cui_pagination_events_ex` for the synchronous aggregate change observer and `cui_base_pagination_ex` for the matching Base behavior in custom layouts. Numbered actions use the window computed from the normalized entry page and the options supplied in that submission. The retained binding builders provide the numbered single-row presentation. Configurable labels, interactive ellipsis menus and foreign exposure of the C layout options remain open.
+Use `cui_pagination_events_ex` for the synchronous aggregate change observer and `cui_base_pagination_ex` for the Base behavior in custom layouts. Numbered actions use the window computed from the normalized entry page and the options supplied in that submission.
+
+### Jump to an omitted page
+
+In Styled numbered mode, pass the current overlay viewport in absolute logical pixels through `.ellipsis_viewport`. The visible ellipses become **Earlier pages** and **Later pages** buttons. Each opens a scrolling menu of up to 100 omitted pages nearest the visible window. The pager keeps one menu open at a time and allocates its bounded state on the first open through the context's existing resource budget. The state is collected after omission. Base-only layouts and zero-sized viewports leave ellipses passive.
+
+```c
+#include <cui/cui_numeric.h>
+
+bool draw_numbered_results(cui_context *ui, cui_id id, const cui_theme *theme,
+                            size_t *page, size_t total, float content_width,
+                            cui_rect viewport) {
+    return cui_pagination_ex(ui, id, theme, page, total,
+        (cui_pagination_options){.visible_pages = 5, .design_size = CUI_DESIGN_BASE,
+                                 .available_width = content_width,
+                                 .ellipsis_viewport = viewport});
+}
+```
+
+Opening, scrolling and dismissing the menu leave the page unchanged. Select a row by pointer, touch, keyboard or accessibility activation to commit in that frame. Escape or a pointer press outside dismisses the menu. Focus returns to the ellipsis when it is still present, or to the corresponding Previous or Next control after a jump removes it. Use a stable pager ID across frames. Changing the owner page, total or budget closes the existing menu and rejects its queued row actions. The retained binding builders provide the numbered single-row presentation. Configurable labels and foreign exposure of the C layout options remain open.
 
 ## Rating
 

@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_numeric.h"
+#include "../base/cui_pagination_internal.h"
+#include "cui/cui_choice.h"
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
 #include "cui/cui_number_events.h"
-#include "cui/cui_numeric_selection_events.h"
 #include <math.h>
 #include <stdio.h>
 static void cui_numeric_paint_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str text,
@@ -177,10 +178,20 @@ cui_number_event_result cui_number_input_events(cui_context *ui, cui_id id, cons
                                              &result.change_count);
     return result;
 }
+static bool cui_pagination_follow_anchor(const cui_prepaint_info *info, const void *payload,
+                                         cui_prepaint_writer *writer) {
+    const cui_rect *before = payload;
+    cui_rect after = info->bounds;
+    if (before->x != after.x || before->y != after.y || before->w != after.w ||
+        before->h != after.h)
+        cui_prepaint_request_frame(writer);
+    return true;
+}
 typedef struct {
     const cui_theme *theme;
     const cui_design_metrics *metrics;
     float available_width, occupied;
+    cui_id popup_trigger;
     bool row_open;
 } cui_pagination_layout;
 static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *layout, cui_id id,
@@ -227,6 +238,13 @@ static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *la
                                 .background = disabled ? t->surface : t->primary,
                                 .border = cui_focused(ui) == id ? t->focus : t->border,
                                 .border_width = 1});
+    if (id && id == layout->popup_trigger) {
+        cui_rect anchor = cui_bounds(ui, id);
+        cui_set_prepaint(ui, (cui_prepaint_options){.callback = cui_pagination_follow_anchor,
+                                                    .payload = &anchor,
+                                                    .payload_bytes = sizeof(anchor),
+                                                    .command_budget = 1});
+    }
     if (icon)
         cui_icon_named(
             ui, cui_numeric_part_id(id, 0), t, label,
@@ -239,6 +257,156 @@ static void cui_pagination_paint_item(cui_context *ui, cui_pagination_layout *la
         cui_text_line(ui, label, m->font_size, text, 0, (cui_text_style){0});
     if (id)
         cui_end_box(ui);
+}
+enum { CUI_PAGINATION_MENU_MAX = 100 };
+#define CUI_PAGINATION_MENU_RESOURCE UINT64_C(0xf570525ef9572f4f)
+typedef struct {
+    size_t first, last;
+} cui_pagination_gap;
+typedef struct {
+    cui_menu_tree_state menu;
+    cui_pagination_gap gap;
+    size_t total, count, owner_page;
+    unsigned side, budget;
+    cui_menu_entry entries[CUI_PAGINATION_MENU_MAX];
+    char labels[CUI_PAGINATION_MENU_MAX][32];
+} cui_pagination_menu;
+
+static void cui_pagination_gaps(size_t page, size_t total, unsigned budget,
+                                cui_pagination_gap out[2]) {
+    out[0] = out[1] = (cui_pagination_gap){0};
+    cui_page_item items[CUI_PAGINATION_MAX_ITEMS];
+    size_t count = cui_pagination_visible_items(page, total, budget, items);
+    for (size_t i = 1; i + 1 < count; ++i) {
+        if (!items[i].ellipsis)
+            continue;
+        size_t first = items[i - 1].page + 1, last = items[i + 1].page - 1;
+        unsigned side = last < page ? 0 : 1;
+        out[side] = (cui_pagination_gap){first, last};
+    }
+}
+static cui_id cui_pagination_gap_id(cui_id id, unsigned side) {
+    return cui_numeric_part_id(id, 5 + side);
+}
+static cui_id cui_pagination_popup_id(cui_id id, unsigned side) {
+    return cui_numeric_part_id(id, 7 + side);
+}
+static cui_str cui_pagination_gap_name(unsigned side) {
+    return cui_string(side ? "Later pages" : "Earlier pages");
+}
+static void cui_pagination_open_menu(cui_context *ui, cui_pagination_menu *state, cui_id id,
+                                     unsigned side, cui_pagination_gap gap, cui_rect anchor) {
+    cui_menu_tree_init(&state->menu, cui_pagination_popup_id(id, side));
+    state->side = side;
+    state->gap = gap;
+    size_t first = gap.first, last = gap.last;
+    if (last - first >= CUI_PAGINATION_MENU_MAX) {
+        if (side)
+            last = first + CUI_PAGINATION_MENU_MAX - 1;
+        else
+            first = last - CUI_PAGINATION_MENU_MAX + 1;
+    }
+    state->count = last - first + 1;
+    for (size_t i = 0; i < state->count; ++i) {
+        snprintf(state->labels[i], sizeof(state->labels[i]), "%zu", first + i);
+        state->entries[i] =
+            (cui_menu_entry){.id = cui_numeric_part_id(state->menu.overlay.id, 100 + (unsigned)i),
+                             .label = cui_string(state->labels[i]),
+                             .kind = CUI_MENU_ACTION};
+    }
+    state->menu.drag_scroll = true;
+    cui_context_menu_open(ui, &state->menu, cui_pagination_gap_id(id, side), anchor);
+}
+static void cui_pagination_menu_activated(void *user, const cui_menu_command *event) {
+    *(cui_menu_command *)user = *event;
+}
+static cui_pagination_menu *cui_pagination_reduce_menu(cui_context *ui, cui_id id, size_t page,
+                                                       size_t total, cui_pagination_options options,
+                                                       cui_pagination_jump *jump) {
+    if (!id || !cui_frame_sequence(ui))
+        return NULL;
+    size_t current = !total ? 0 : page > total ? total : page < 1 ? 1 : page;
+    cui_pagination_gap gaps[2];
+    cui_pagination_gaps(current, total, options.visible_pages, gaps);
+    cui_pagination_menu *state = cui_resource_find(ui, id, CUI_PAGINATION_MENU_RESOURCE);
+    bool interactive = !options.disabled && cui_frame_input_snapshot_ready(ui);
+    if (state && state->menu.overlay.open &&
+        (!interactive || page != state->owner_page || total != state->total ||
+         options.visible_pages != state->budget))
+        cui_overlay_close(ui, &state->menu.overlay);
+    if (!interactive || (!gaps[0].first && !gaps[1].first))
+        return state;
+
+    size_t n;
+    const cui_event *events = cui_frame_events(ui, &n);
+    for (size_t e = 0; e < n; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
+        bool arrow = events[e].type == CUI_EVENT_KEY_DOWN &&
+                     (events[e].key == CUI_KEY_DOWN || events[e].key == CUI_KEY_UP);
+        cui_id activation = arrow ? cui_event_target(ui, e) : cui_event_activation(ui, e);
+        unsigned side = activation == cui_pagination_gap_id(id, 1);
+        if (!gaps[side].first || activation != cui_pagination_gap_id(id, side))
+            continue;
+        if (state && state->menu.overlay.open) {
+            if (!arrow && side == state->side) {
+                cui_overlay_close(ui, &state->menu.overlay);
+                cui_consume_event(ui, e);
+            }
+            continue;
+        }
+        cui_rect anchor = cui_bounds(ui, activation);
+        if (anchor.w <= 0 || anchor.h <= 0)
+            continue;
+        if (!state)
+            state =
+                cui_resource_get(ui, id, CUI_PAGINATION_MENU_RESOURCE, sizeof(*state), NULL, NULL);
+        if (!state)
+            return NULL;
+        cui_pagination_open_menu(ui, state, id, side, gaps[side], anchor);
+        state->owner_page = page;
+        state->total = total;
+        state->budget = options.visible_pages;
+        cui_consume_event(ui, e);
+        /* The Menu detects Up from the trigger and focuses the last row. */
+        break;
+    }
+    if (state && state->menu.overlay.open) {
+        cui_id action = 0;
+        cui_menu_command command = {0};
+        cui_base_menu_tree_events(
+            ui, cui_pagination_gap_id(id, state->side), cui_pagination_gap_name(state->side),
+            state->entries, state->count, &action, &state->menu, false, cui_frame_delta(ui), false,
+            (cui_menu_command_handler){cui_pagination_menu_activated, &command});
+        if (action && command.command == action &&
+            (command.event.flags & CUI_COMPONENT_EVENT_HAS_INDEX)) {
+            size_t first = state->side ? state->gap.first : state->gap.last - (state->count - 1);
+            for (size_t i = 0; i < state->count; ++i)
+                if (state->entries[i].id == action)
+                    *jump = (cui_pagination_jump){first + i, command.event.event_index};
+        }
+    }
+    return state;
+}
+static void cui_pagination_paint_menu(cui_context *ui, cui_id id, const cui_theme *theme,
+                                      cui_pagination_menu *state, cui_rect viewport) {
+    if (!state || !state->menu.overlay.open)
+        return;
+    cui_id trigger = cui_pagination_gap_id(id, state->side);
+    cui_rect anchor = cui_bounds(ui, trigger);
+    float density = theme->font_size / 16;
+    cui_menu_metrics metrics = cui_menu_size_metrics(CUI_MENU_SMALL, density, theme->radius);
+    cui_size label =
+        cui_measure_text(ui, state->entries[state->count - 1].label, metrics.font_size);
+    cui_menu_popup_paint(
+        ui, theme, cui_pagination_gap_name(state->side), state->entries, state->count, &state->menu,
+        anchor,
+        (cui_menu_tree_options){.popup = {.viewport = viewport,
+                                          .side = CUI_POPUP_BELOW,
+                                          .width = fmaxf(88, label.width + 2 * metrics.padding_x +
+                                                                 2 * metrics.padding + 12)},
+                                .size = CUI_MENU_SMALL,
+                                .max_height = 240});
 }
 static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t, size_t *page,
                                   size_t total, cui_pagination_options options, bool legacy,
@@ -255,18 +423,38 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
         !cui_design_measure(options.design_size, t->font_size / 16, &metrics))
         return false;
     bool icon = options.icon_only, disabled = options.disabled;
+    cui_rect viewport = options.ellipsis_viewport;
+    bool menus = !icon && !options.compact && (viewport.w != 0 || viewport.h != 0);
+    if (menus && (!isfinite(viewport.x) || !isfinite(viewport.y) || !isfinite(viewport.w) ||
+                  !isfinite(viewport.h) || viewport.w <= 0 || viewport.h <= 8))
+        return false;
+    cui_pagination_jump jump = {0};
+    cui_pagination_menu *menu =
+        menus ? cui_pagination_reduce_menu(ui, id, *page, total, options, &jump) : NULL;
     bool changed;
     if (handler) {
         cui_numeric_selection_event_result result =
-            cui_base_pagination_events_ex(ui, id, page, total, options, *handler);
+            cui_base_pagination_observe_internal(ui, id, page, total, options, jump, *handler);
         changed = result.control;
         *change_count = result.change_count;
     } else
-        changed = cui_base_pagination_ex(ui, id, page, total, options);
+        changed = cui_base_pagination_reduce_internal(ui, id, page, total, options, jump);
+    cui_pagination_gap gaps[2] = {0};
+    if (menus)
+        cui_pagination_gaps(*page, total, options.visible_pages, gaps);
+    if (menu) {
+        if (*page != menu->owner_page && menu->menu.overlay.open)
+            cui_overlay_close(ui, &menu->menu.overlay);
+        if (!gaps[menu->side].first && cui_focused(ui) == cui_pagination_gap_id(id, menu->side))
+            cui_focus_restore(ui, cui_numeric_part_id(id, menu->side ? 3 : 2));
+    }
     bool wrap = options.available_width > 0;
     cui_pagination_layout layout = {.theme = t,
                                     .metrics = legacy ? NULL : &metrics,
-                                    .available_width = options.available_width};
+                                    .available_width = options.available_width,
+                                    .popup_trigger = menu && menu->menu.overlay.open
+                                                         ? cui_pagination_gap_id(id, menu->side)
+                                                         : 0};
     cui_begin_box(ui, id, (cui_box){.row = !wrap, .gap = metrics.gap, .align_y = CUI_ALIGN_CENTER});
     if (!icon)
         cui_pagination_paint_item(ui, &layout, cui_numeric_part_id(id, 1), cui_string("First"),
@@ -282,7 +470,21 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
         cui_page_item items[CUI_PAGINATION_MAX_ITEMS];
         size_t n = cui_pagination_visible_items(*page, total, options.visible_pages, items);
         for (size_t i = 0; i < n; ++i) {
-            if (items[i].ellipsis)
+            if (items[i].ellipsis && menus) {
+                unsigned side = items[i + 1].page > *page;
+                cui_id trigger = cui_pagination_gap_id(id, side);
+                bool open = menu && menu->side == side && menu->menu.overlay.open;
+                cui_interact(ui, trigger, CUI_ROLE_BUTTON, cui_pagination_gap_name(side), disabled,
+                             open, 0);
+                cui_set_semantic_details(
+                    ui, trigger,
+                    (cui_semantic_details){.parent = id,
+                                           .expanded = open,
+                                           .controls = cui_pagination_popup_id(id, side),
+                                           .cursor = CUI_CURSOR_POINTER});
+                cui_pagination_paint_item(ui, &layout, trigger, cui_string("ellipsis"), disabled,
+                                          true);
+            } else if (items[i].ellipsis)
                 cui_pagination_paint_item(ui, &layout, 0, cui_string("..."), true, false);
             else {
                 char label[32];
@@ -302,6 +504,7 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
     if (layout.row_open)
         cui_end_box(ui);
     cui_end_box(ui);
+    cui_pagination_paint_menu(ui, id, t, menu, viewport);
     return changed;
 }
 bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page, size_t total,

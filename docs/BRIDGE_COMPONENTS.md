@@ -46,7 +46,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Shimmer | `cui_shimmer_text` | copied text, retained state | Single line |
 | List | `cui_list` | selected Item, change, disabled | Up to 64 Items |
 | Menu | `cui_menu` | menu Item action, change, disabled | Up to 64 leaf actions |
-| Pagination | `cui_pagination` | current page, total, change, disabled | One-based page, total <= 1,000,000. Shared sizes, responsive rows, configurable page budgets, icon-only navigation and typed C aggregate callbacks are available in the [frame API](NUMERIC.md#pagination). |
+| Pagination | `cui_pagination` | current page, total, change, disabled | One-based page, total <= 1,000,000. Shared sizes, responsive rows, configurable page budgets, ellipsis menus, icon-only navigation and typed C aggregate callbacks are available in the [frame API](NUMERIC.md#pagination). |
 | Rating | `cui_rating` | value, maximum, change, disabled | Maximum <= 10 |
 | Stepper | `cui_stepper` / opt-in `cui_stepper_visual_navigation` | selected Item, status, aggregate change, disabled; opt-in density/orientation/shared size and copied RGBA Item icons | Up to 64 Items; visual selection paints on next submission; no foreign controlled REQUEST handlers |
 | DescriptionList | `cui_description_list` | Item label/value pairs | Up to 64 Items, default columns |

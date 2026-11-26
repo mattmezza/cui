@@ -39,7 +39,13 @@ The `cui_pagination_events_ex` and `cui_base_pagination_events_ex` entrypoints
 also accept the bounded numbered window and icon-only navigation options. They
 observe changes with the same synchronous timing and aggregation. Numbered
 destinations use the configured entry window, and omitted First and Last
-controls cannot activate in icon-only mode. See the [layout guide](NUMERIC.md#pagination).
+controls cannot activate in icon-only mode. The Styled ellipsis-menu opt-in
+submits the chosen destination at the Menu activation's actual input index
+in the existing reduce loop. Opening, scrolling and dismissing the Menu
+produce zero Pagination changes. A selected page uses the same aggregate
+result and one synchronous typed notification, after the page semantics and
+before Styled paint. The aggregate metadata stays independent of the Menu
+command metadata. See the [layout guide](NUMERIC.md#jump-to-an-omitted-page).
 
 Stepper adds the same Base/Styled `_events` pattern with a distinct
 `cui_stepper_change_event`: exact `size_t before`, `after`, `count`. Indices are

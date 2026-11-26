@@ -6749,7 +6749,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                    .design_size = design_size,
                                                    .available_width = fmaxf(1, width - 48),
                                                    .visible_pages = pagination_visible_pages,
-                                                   .icon_only = pagination_mode == 2});
+                                                   .icon_only = pagination_mode == 2,
+                                                   .ellipsis_viewport = {0, 0, width, height}});
         char text[64];
         snprintf(text, sizeof(text), "Page %zu of 20", page_number);
         cui_label(ui, &t, cui_string(text));

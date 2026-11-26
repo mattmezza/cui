@@ -411,6 +411,28 @@ def run_cases(a):
         assert a.target('Pagination', 9)['f'][8] == 7
         a.configure('disabled', False)
     a.case('Pagination', 'visible-page budgets and icon-only controls support touch', pagination_modes)
+    def pagination_ellipsis():
+        a.configure('design-size', 3)
+        a.configure('pagination-mode', 0)
+        a.tap(a.target('First', 1))
+        a.configure('pagination-mode', 1)
+        a.configure('pagination-visible-pages', 5)
+        a.tap(a.target('Later pages', 1))
+        assert a.target('Later pages', 1)['f'][10] == 1
+        popup = a.target('Later pages', 15)
+        assert popup['f'][17] and popup['f'][4] <= 240
+        assert a.target('5', 16)['f'][7] == 1
+        a.drag(popup, 0, -92)
+        assert a.target('Later pages', 15)['f'][19] > 0
+        assert a.target('Pagination', 9)['f'][8] == 1, 'Pan must not select a page'
+        visible = a.target(role=16, predicate=lambda s: int(s['name']) > 5 and
+                           s['f'][2] + s['f'][4] <= popup['f'][2] + popup['f'][4] - 4)
+        a.tap(visible)
+        assert a.target('Pagination', 9)['f'][8] == int(visible['name'])
+        assert all(s['f'][0] != 15 for s in a.snapshot())
+        assert '.ellipsis_viewport = viewport' in a.page.locator('#snippet').text_content()
+    a.case('Pagination', 'touch opens and scrolls an ellipsis menu before jumping to a page',
+           pagination_ellipsis)
     def calendar():
         day = a.target(role=1, predicate=lambda s: s['name'].endswith('-25'))
         a.tap(day)

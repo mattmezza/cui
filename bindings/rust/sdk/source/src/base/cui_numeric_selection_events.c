@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_numeric_selection_events.h"
+#include "cui_pagination_internal.h"
 #include <math.h>
 cui_numeric_selection_event_result
 cui_base_pagination_events(cui_context *ui, cui_id id, size_t *page, size_t total, bool compact,
@@ -12,11 +12,18 @@ cui_numeric_selection_event_result
 cui_base_pagination_events_ex(cui_context *ui, cui_id id, size_t *page, size_t total,
                               cui_pagination_options options,
                               cui_pagination_event_handler handler) {
+    return cui_base_pagination_observe_internal(ui, id, page, total, options,
+                                                (cui_pagination_jump){0}, handler);
+}
+cui_numeric_selection_event_result
+cui_base_pagination_observe_internal(cui_context *ui, cui_id id, size_t *page, size_t total,
+                                     cui_pagination_options options, cui_pagination_jump jump,
+                                     cui_pagination_event_handler handler) {
     uint64_t frame = cui_frame_sequence(ui);
     bool observe = handler.change && frame && id && page && !options.disabled;
     size_t before = observe ? *page : 0;
     cui_numeric_selection_event_result result = {0};
-    result.control = cui_base_pagination_ex(ui, id, page, total, options);
+    result.control = cui_base_pagination_reduce_internal(ui, id, page, total, options, jump);
     if (observe && cui_frame_sequence(ui) == frame && before != *page) {
         cui_pagination_change_event event = {0};
         (void)cui_component_event_init(&event.event, CUI_COMPONENT_EVENT_CHANGE, id,

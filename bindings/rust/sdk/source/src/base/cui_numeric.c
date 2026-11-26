@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_numeric.h"
+#include "cui_pagination_internal.h"
 #include <errno.h>
 #include <float.h>
 #include <locale.h>
@@ -508,6 +509,11 @@ bool cui_base_pagination(cui_context *ui, cui_id id, size_t *page, size_t total,
 }
 bool cui_base_pagination_ex(cui_context *ui, cui_id id, size_t *page, size_t total,
                             cui_pagination_options options) {
+    return cui_base_pagination_reduce_internal(ui, id, page, total, options,
+                                               (cui_pagination_jump){0});
+}
+bool cui_base_pagination_reduce_internal(cui_context *ui, cui_id id, size_t *page, size_t total,
+                                         cui_pagination_options options, cui_pagination_jump jump) {
     if (!ui || !page)
         return false;
     size_t original = *page;
@@ -525,6 +531,10 @@ bool cui_base_pagination_ex(cui_context *ui, cui_id id, size_t *page, size_t tot
     size_t n;
     cui_frame_events(ui, &n);
     for (size_t e = 0; e < n && !disabled; ++e) {
+        if (jump.page && jump.page <= total && e == jump.input_index) {
+            *page = jump.page;
+            continue;
+        }
         cui_id activation = cui_event_activation(ui, e);
         if (!activation)
             continue;

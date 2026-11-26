@@ -6,12 +6,12 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
 
 export function paginationUsage(size, disabled = false, mode = 0, visiblePages = 5) {
  const layout = mode === 2 ? '.icon_only = true' :
-                mode === 1 ? `.visible_pages = ${visiblePages}` : '.compact = true';
+                mode === 1 ? `.visible_pages = ${visiblePages}, .ellipsis_viewport = viewport` : '.compact = true';
  return `#include <cui/cui_numeric.h>
 
 /* The application retains page and supplies the layout's current content width. */
 bool draw_results_pages(cui_context *ui, cui_id id, const cui_theme *theme,
-                        size_t *page, size_t total_pages, float content_width) {
+                        size_t *page, size_t total_pages, float content_width${mode === 1 ? ', cui_rect viewport' : ''}) {
     return cui_pagination_ex(ui, id, theme, page, total_pages,
         (cui_pagination_options){${layout}, .disabled = ${disabled},
                                  .design_size = ${sizes[size] || 'CUI_DESIGN_BASE'},

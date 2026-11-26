@@ -85,6 +85,9 @@ typedef struct {
     float available_width;
     unsigned visible_pages; /* Numbered mode only. Zero uses the legacy window. */
     bool icon_only;         /* Submit only Previous and Next. Overrides compact. */
+    /* Styled numbered mode only. Set an absolute logical viewport to enable
+     * ellipsis menus. Zero dimensions keep passive ellipses. */
+    cui_rect ellipsis_viewport;
 } cui_pagination_options;
 /* Same owner and result as cui_base_pagination. Ignores presentation metrics. */
 bool cui_base_pagination_ex(cui_context *, cui_id, size_t *, size_t total, cui_pagination_options);

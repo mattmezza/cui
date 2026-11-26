@@ -52,7 +52,7 @@ features, evidence, and full limitations. Regenerate with `--write-summary`.
 | Input Group | tested | [cui_form.h](../include/cui/cui_form.h) |
 | NumberInput | tested | [cui_numeric.h](../include/cui/cui_numeric.h) |
 | OtpInput | tested | [cui_otp.h](../include/cui/cui_otp.h) |
-| Questionnaire | implemented | [cui_questionnaire.h](../include/cui/cui_questionnaire.h) |
+| Questionnaire | tested | [cui_questionnaire.h](../include/cui/cui_questionnaire.h) |
 | Select | tested | [cui_choice.h](../include/cui/cui_choice.h) |
 | Slider | tested | [cui_components.h](../include/cui/cui_components.h) |
 | Speech | tested | [cui_speech.h](../include/cui/cui_speech.h) |

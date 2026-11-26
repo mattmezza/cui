@@ -13,8 +13,12 @@ class SDLV1SourceTests(unittest.TestCase):
         current = (ROOT / 'backends/sdl3/cui_sdl3.c').read_text()
         def fields(source):
             return source.split('struct cui_sdl3 {', 1)[1].split('};', 1)[0].split()
+        # Ordered IME uses one existing padding byte to remember which input
+        # session owns the composition. The original members stay in order.
+        expected = original.replace('    cui_id ime_focus;\n',
+                                    '    bool ime_uses_input_state;\n    cui_id ime_focus;\n', 1)
         extension_fields = 'bool v2_busy, v2_faulted; bool wheel_shift;'
-        self.assertEqual(fields(current), fields(original) + extension_fields.split())
+        self.assertEqual(fields(current), fields(expected) + extension_fields.split())
         self.assertEqual(current.count('cui_sdl3 *s = calloc(1, sizeof(*s));'), 1)
         self.assertEqual((ROOT / 'backends/sdl3/cui_sdl3_mesh.h').read_bytes(),
                          (FIXTURE / 'cui_sdl3_mesh.h').read_bytes())

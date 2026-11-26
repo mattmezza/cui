@@ -1,5 +1,7 @@
 """Real bridge component state, input and copied-event regression tests."""
+import os
 import unittest
+from unittest.mock import patch
 from cui_bridge import dropdown_button, select, combobox, collapsible, alert, radio_group, tabs, accordion, item, label, App, column, checkbox, radio, switch, toggle, slider, progress, badge, input, textarea, number_input
 
 class Components(unittest.TestCase):
@@ -20,6 +22,58 @@ class Components(unittest.TestCase):
                 self.assertTrue(first.is_checked());self.assertTrue(events[0].checked)
                 self.press(app,second);self.assertEqual(app.dispatch(),0)
                 self.assertFalse(second.is_checked())
+
+    def test_radio_motion_preserves_callbacks(self):
+        with self.assertRaises(ValueError):
+            checkbox('check').animate_selection()
+        with self.assertRaises(TypeError):
+            radio('radio').animate_selection(1)
+        with App() as app:
+            self.assertTrue(app.supports_radio_motion())
+            first, second = item('a', 'Standard'), item('b', 'Priority')
+            changes = []
+            group = radio_group('delivery').children(first, second).select(first)
+            group.animate_selection().on_change(changes.append)
+            single = radio('alternate', 'Use alternate pickup').on_change(changes.append)
+            app.mount(column().children(group, single))
+            app.step()
+            self.press(app, second)
+            self.assertIs(group.selected(), second)
+            self.assertEqual(app.dispatch(), 1)
+            self.assertEqual(changes[0].selected_handle,
+                             (second._handle.slot, second._handle.generation))
+            single.animate_selection()
+            app.step()
+            self.press(app, single)
+            self.assertTrue(single.is_checked())
+            self.assertEqual(app.dispatch(), 1)
+            self.assertTrue(changes[1].checked)
+            single.animate_selection(False)
+            group.animate_selection(False)
+            app.step()
+            self.assertEqual(app.dispatch(), 0)
+
+    def check_radio_provider_without_motion(self, app):
+        self.assertFalse(app.supports_radio_motion())
+        choice = radio('choice', 'Choice').animate_selection()
+        root = column().children(choice)
+        with self.assertRaisesRegex(RuntimeError, 'cui_bridge_radio_set_motion_v1'):
+            app.mount(root)
+        self.assertIsNone(root._handle)
+        choice.animate_selection(False)
+        app.mount(root).step()
+        self.press(app, choice)
+        self.assertTrue(choice.is_checked())
+        with self.assertRaisesRegex(RuntimeError, 'cui_bridge_radio_set_motion_v1'):
+            choice.animate_selection()
+
+    def test_older_provider_keeps_immediate_radio(self):
+        with App() as app, patch.object(app._api, 'radio_set_motion', None):
+            self.check_radio_provider_without_motion(app)
+        legacy = os.environ.get('CUI_RADIO_LEGACY_LIBRARY')
+        if legacy:
+            with App(library=legacy) as app:
+                self.check_radio_provider_without_motion(app)
 
     def test_numeric_ranges_and_static(self):
         with App(width=800,height=800) as app:

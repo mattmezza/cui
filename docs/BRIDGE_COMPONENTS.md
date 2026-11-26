@@ -141,6 +141,18 @@ passing elapsed time on successive frames. A dynamically loaded provider must
 export this optional symbol for the setting. Native hosts can pass `0` when
 their own preference handling calls for reduced motion.
 
+In Python, call `.animate_selection()` on `radio()` or `radio_group()` before or
+after mounting. Query `app.supports_radio_motion()` before opting in if the app
+supports older library releases. The [delivery example](../bindings/python/examples/radio_delivery.py)
+changes the arrival estimate in its existing `on_change` callback. From an installed
+Python environment with a matching bridge, run it without arguments to verify the
+callback headlessly, or pass a font path to open the native checkout window.
+
+```sh
+python bindings/python/examples/radio_delivery.py
+python bindings/python/examples/radio_delivery.py --font third_party/inter/Inter-Regular.otf
+```
+
 ### Configure a retained pager from C
 
 The bridge keeps the page on a `CUI_BRIDGE_PAGINATION` node. Set its total and initial value through `cui_bridge_set_total` and `cui_bridge_set_value`. Use the shared design-size setter for XS through 9XL and the V1 configuration for navigation and labels. For a dynamically loaded provider, probe the optional Pagination V1 symbols and check the version bit and exact layout size before using the extended options. A configured pager or one with an explicit design size or custom height uses the extended theme paint, including the current-page outline and pointer feedback. The default retained pager keeps the original paint.

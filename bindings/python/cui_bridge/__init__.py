@@ -147,6 +147,10 @@ class _API:
         bind_skeleton_api(self, bind)
         from .pagination_options import bind_api as bind_pagination_api
         bind_pagination_api(self, bind)
+        self.radio_set_motion = None
+        if hasattr(lib, "cui_bridge_radio_set_motion_v1"):
+            self.radio_set_motion = bind("radio_set_motion_v1", C.c_int, C.c_void_p,
+                                         _Handle, C.c_uint32)
         self.clipboard_set = bind("clipboard_set",C.c_int,C.c_void_p,C.c_char_p)
         self.clipboard_get = bind("clipboard_get",C.c_int,C.c_void_p,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
         self.theme_count = bind("theme_preset_count", C.c_uint32)
@@ -457,6 +461,7 @@ class Widget:
         self._radius = 0.0
         self._disabled = False
         self._checked = False
+        self._radio_motion = False
         self._detail = ""
         self._open = False
         self._open_set = False
@@ -672,6 +677,22 @@ class Widget:
         self._change("set_checked", int(value))
         self._checked = value
         self._checked_set = True
+        return self
+
+    def animate_selection(self, enabled: bool = True) -> "Widget":
+        """Use the theme spring for Radio or RadioGroup selection marks."""
+        if self.kind not in {"radio", "radio_group"}:
+            raise ValueError("animate_selection requires Radio or RadioGroup")
+        if type(enabled) is not bool:
+            raise TypeError("enabled must be a bool")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is not None:
+            if enabled:
+                self._app._require_radio_motion()
+            if self._app.supports_radio_motion():
+                self._change("radio_set_motion", int(enabled))
+        self._radio_motion = enabled
         return self
 
     def is_checked(self) -> bool:
@@ -1628,6 +1649,15 @@ class App:
         self._ensure_open()
         return self._api.set_matrix_keyed is not None
 
+    def supports_radio_motion(self) -> bool:
+        """Report whether the loaded bridge can animate Radio and RadioGroup."""
+        self._ensure_open()
+        return self._api.radio_set_motion is not None
+
+    def _require_radio_motion(self) -> None:
+        if not self.supports_radio_motion():
+            raise RuntimeError("Radio motion requires cui_bridge_radio_set_motion_v1")
+
     def data_table_max_row_capacity(self) -> int | None:
         """Return the opt-in row limit usable by Python, or None on older providers."""
         self._ensure_open()
@@ -1690,6 +1720,8 @@ class App:
                     raise ValueError("controlled Slider requires Row/Column ancestry")
             if isinstance(node, Pagination):
                 node._preflight_pagination(self)
+            if node._radio_motion:
+                self._require_radio_motion()
             if isinstance(node, ConfiguredIcon):
                 node._preflight_icon(self)
             if node.kind == "configured_badge":
@@ -1746,6 +1778,8 @@ class App:
                     node._change("set_gap", node._gap)
                 if node.kind in _BOOLEAN or (node.kind == "item" and node._checked_set):
                     node._change("set_checked", int(node._checked))
+                if node._radio_motion:
+                    node._change("radio_set_motion", 1)
                 if node.kind in {"slider", "number_input"}:
                     node._change("set_range", *node._range)
                 if node.kind in {"pagination", "rating"}:

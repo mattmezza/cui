@@ -2697,14 +2697,16 @@
           ]
         },
         {
-          "name": "retained C Radio and RadioGroup motion",
+          "name": "retained Radio and RadioGroup motion in C and Python",
           "status": "tested",
           "evidence": [
             "tests/unit/test_bridge_radio_motion.c",
+            "bindings/python/test_components.py",
+            "bindings/python/examples/radio_delivery.py",
             "docs/BRIDGE_COMPONENTS.md"
           ],
           "limitations": [
-            "Optional C bridge configuration. Existing standalone CHANGE and group selected Item payloads retain their timing. Language builder authoring and OS preference observation remain open."
+            "Optional C bridge configuration and Python builder setting. Existing standalone CHANGE and group selected Item payloads retain their timing. JavaScript, TypeScript, Go and Rust authoring and OS preference observation remain open."
           ]
         }
       ],

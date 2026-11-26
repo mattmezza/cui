@@ -11,11 +11,11 @@ use the checklists below to track acceptance and delivery.
 
 | Track | Current status |
 | --- | --- |
-| Public release | **v0.1.0-alpha.11**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.11) |
+| Public release | **v0.1.0-alpha.12**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.12) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
-| Public website | Interactive WASM gallery and docs at alpha.11. The Pages deployment from `85df489c` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45888310574) |
-| Latest integrated work | Retained Carousel supports both orientations, optional edge wrapping, custom arrow and marker content, and independent control sizes in C, Python, JavaScript, TypeScript, Go and Rust. Content-sized slides work on both axes in C, the gallery, and all five language builders. Retained apps can place custom navigation buttons anywhere. Queued in the alpha.12 candidate. |
-| Packages | Alpha.11 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
+| Public website | Interactive WASM gallery and docs at alpha.12. The Pages deployment from `b36abbd8` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45905182265) |
+| Latest integrated work | Alpha.12 ships retained Carousel on both axes with wrapping, content sizing, custom controls and shared navigation events. |
+| Packages | Alpha.12 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
 feature test does not establish complete component parity.
@@ -28,6 +28,12 @@ feature test does not establish complete component parity.
 - **Released / deployed:** verified published artifacts, tracked separately from source.
 
 ## Release wrap-up
+
+Alpha.12 ships content-sized Carousel slides on both axes, retained arrows
+and markers, looping and application-owned navigation. Installed
+bindings exercise navigation events. The release and gallery serve
+the same native starter.
+[Release evidence](docs/validation/alpha12-release.json)
 
 Alpha.11 ships Accordion and Collapsible title states, retained Attachment
 actions and slots, and viewport-relative Carousel slides. Installed examples
@@ -218,7 +224,7 @@ Historical source evidence and remaining acceptance:
 | Dialog composition | `ef893a34` idle fix; focused native checks and full browser gate on artifact `f728908e` pass | Broader lifecycle. Alpha.5 deploys the focused behavior and nested-touch checks pass. |
 | Localized TimeField | Integrated `49267cc4`; native/source/ABI checks and keyboard gallery gates pass. Working source covers ordered IME and formatted semantic values. Chromium AX and Linux AT-SPI verify the current time, discrete values and segment focus. Released language artifacts pass headless examples. | Physical IME, assistive-technology editing and screen-reader qualification, and interactive native binding acceptance. |
 
-Receipts travel with their source changes. Use the alpha.11 receipt above for
+Receipts travel with their source changes. Use the alpha.12 receipt above for
 exact-source acceptance and delivery.
 
 Detailed validation receipts live in [docs/validation](docs/validation).

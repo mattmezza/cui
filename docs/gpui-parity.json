@@ -2615,6 +2615,7 @@
         "tests/unit/test_radio_group.c",
         "tests/unit/test_radio_group_base.c",
         "tests/unit/test_radio_events.c",
+        "tests/unit/test_bridge_radio_motion.c",
         "tests/web/test_radio_group.py"
       ],
       "status": "tested",
@@ -2624,7 +2625,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. RadioGroup supports descriptions and decorative callbacks in immediate C. The retained C bridge, Python, JavaScript, TypeScript, Go and Rust support Item descriptions and opt-in passive children. Optional tooltips are available for standalone and grouped options in immediate C, the retained C bridge, Python, JavaScript, TypeScript, Go and Rust. Immediate C, retained C, Python, JavaScript, TypeScript, Go and Rust support signed tab ordering. Immediate C offers group, option, indicator and typography refinements. Immediate C and the gallery support controlled standalone select-only requests. Retained paint callbacks, synchronous requests in the bindings and native accessibility acceptance remain open."
+        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. RadioGroup supports descriptions and decorative callbacks in immediate C. The retained C bridge, Python, JavaScript, TypeScript, Go and Rust support Item descriptions and opt-in passive children. Optional tooltips are available for standalone and grouped options in immediate C, the retained C bridge, Python, JavaScript, TypeScript, Go and Rust. Immediate C, retained C, Python, JavaScript, TypeScript, Go and Rust support signed tab ordering. Immediate C offers group, option, indicator and typography refinements. Immediate C and the gallery support controlled standalone select-only requests. The retained C bridge supports copied state paint layers for the group and its options. Language builder paint layers and synchronous requests remain open. Native accessibility acceptance remains open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2811,6 +2812,17 @@
           ],
           "limitations": [
             "The immediate Base and Styled C facades deliver typed requests synchronously while keeping the entry boolean for semantics and paint. Retained bindings preserve their queued events."
+          ]
+        },
+        {
+          "name": "retained Radio and RadioGroup state paint layers",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_radio_motion.c:test_paint",
+            "docs/BRIDGE_COMPONENTS.md#style-retained-radio-states-from-c"
+          ],
+          "limitations": [
+            "Retained C copies style values between steps. Geometry is configured in the base layer, groups expose their frame, and Item overrides apply to each option. No foreign builder support is claimed."
           ]
         }
       ],

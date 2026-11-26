@@ -34,6 +34,7 @@ typedef struct bridge_chart_owned bridge_chart_owned;
 typedef struct bridge_speech_owned bridge_speech_owned;
 typedef struct bridge_questionnaire_owned bridge_questionnaire_owned;
 typedef struct bridge_part_shadows bridge_part_shadows;
+typedef struct bridge_radio_paints bridge_radio_paints;
 typedef struct bridge_dock_owned bridge_dock_owned;
 typedef struct bridge_settings_owned bridge_settings_owned;
 typedef struct bridge_data_table_owned bridge_data_table_owned;
@@ -57,6 +58,7 @@ typedef struct {
     cui_color hover;
     cui_bridge_box_shadows_v1 shadows;
     bridge_part_shadows *part_shadows;
+    bridge_radio_paints *radio_paints;
     cui_button_state button_state;
     cui_checkbox_state checkbox_state;
     cui_switch_state switch_state;

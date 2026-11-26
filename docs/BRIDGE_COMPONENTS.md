@@ -368,6 +368,81 @@ reaches Reset. [Python](../bindings/python/examples/radio_delivery.py) ·
 [Go](GO_BUILDERS.md#set-radio-tab-order-from-go) ·
 [Rust](RUST_BUILDERS.md#set-radio-tab-order-from-rust)
 
+### Style retained Radio states from C
+
+Use `cui_bridge_radio_set_paint_v1` on a Radio, a RadioGroup, or one of the
+group's direct Items. The bridge copies the supplied record. A dynamically
+loaded provider must export this optional symbol. The API is available to
+retained C callers. Python, JavaScript, TypeScript, Go and Rust builders do
+not yet wrap it.
+
+This delivery form gives the group an inset frame and highlights the selected
+Priority option. Pass the RadioGroup handle as `group` and its Priority Item
+handle as `priority` after creating both with `cui_bridge_node_create`.
+
+```c
+#include <cui/cui_bridge.h>
+
+cui_bridge_status style_delivery(cui_bridge_app *app, cui_bridge_node group,
+                                 cui_bridge_node priority) {
+    cui_bridge_radio_paint_v1 frame = {
+        .struct_size = sizeof frame,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_RADIO_ROOT_BG | CUI_BRIDGE_RADIO_ROOT_RADIUS |
+                  CUI_BRIDGE_RADIO_ROOT_PADDING | CUI_BRIDGE_RADIO_ROOT_GAP,
+        .root_background_rgba = 0x1a2330ff,
+        .root_radius = 10,
+        .root_padding = 12,
+        .root_gap = 8,
+    };
+    cui_bridge_status status = cui_bridge_radio_set_paint_v1(
+        app, group, CUI_BRIDGE_RADIO_PAINT_BASE, &frame);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    cui_bridge_radio_paint_v1 base = {
+        .struct_size = sizeof base,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_RADIO_ROOT_RADIUS | CUI_BRIDGE_RADIO_ROOT_PADDING,
+        .root_radius = 6,
+        .root_padding = 8,
+    };
+    status = cui_bridge_radio_set_paint_v1(app, priority, CUI_BRIDGE_RADIO_PAINT_BASE, &base);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    cui_bridge_radio_paint_v1 checked = {
+        .struct_size = sizeof checked,
+        .schema_version = 1,
+        .fields = CUI_BRIDGE_RADIO_ROOT_BG | CUI_BRIDGE_RADIO_LABEL_COLOR,
+        .root_background_rgba = 0x284664ff,
+        .label_rgba = 0xedf6ffff,
+    };
+    return cui_bridge_radio_set_paint_v1(
+        app, priority, CUI_BRIDGE_RADIO_PAINT_CHECKED, &checked);
+}
+```
+
+Each call replaces one layer and leaves the other layers in place. Fields
+selected by the mask override the resolved theme, and all others inherit the
+previous layer. Color values use numeric `0xRRGGBBAA`, so zero explicitly clears
+a color. Pass NULL or a valid record with no fields to remove a layer.
+
+Enabled options apply base, checked, hovered, pressed and focused in that
+order. Disabled options apply base, checked and disabled. A RadioGroup applies
+base and disabled to its frame. Set individual option layers on its direct
+Items. The base layer owns sizing, padding, radii, text size and weight. Layers
+for changing states can edit colors and border widths. Root and indicator
+border widths range from 0–64. Radii, padding and gaps range from 0–256.
+Indicator extent ranges from 4–128 and text size from 1–128, in logical
+pixels. Item descriptions keep their existing accessible text.
+
+Motion still controls mark opacity. An explicit indicator fill overrides the
+theme's fill interpolation for that layer. Shared part shadows, option
+tooltips, keyboard order and queued selection notifications continue to work.
+Update styles between steps on the owner thread. Invalid records and
+allocation failure preserve the previous settings. Each styled node uses
+528 bytes of paint storage, freed when its final layer is cleared or the
+node is removed.
+
 ### Configure a retained pager from C
 
 The bridge keeps the page on a `CUI_BRIDGE_PAGINATION` node. Set its total and initial value through `cui_bridge_set_total` and `cui_bridge_set_value`. Use the shared design-size setter for XS through 9XL and the V1 configuration for navigation and labels. For a dynamically loaded provider, probe the optional Pagination V1 symbols and check the version bit and exact layout size before using the extended options. A configured pager or one with an explicit design size or custom height uses the extended theme paint, including the current-page outline and pointer feedback. The default retained pager keeps the original paint.

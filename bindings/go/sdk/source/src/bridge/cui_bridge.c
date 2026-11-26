@@ -466,6 +466,187 @@ cui_bridge_status cui_bridge_radio_set_tab_index_v1(cui_bridge_app *app, cui_bri
     }
     return CUI_BRIDGE_OK;
 }
+enum {
+    BRIDGE_RADIO_LAYER_COUNT = CUI_BRIDGE_RADIO_PAINT_DISABLED + 1,
+    BRIDGE_RADIO_ROOT_FIELDS = (CUI_BRIDGE_RADIO_ROOT_GAP << 1) - 1,
+    BRIDGE_RADIO_ALL_FIELDS = (CUI_BRIDGE_RADIO_DESCRIPTION_WEIGHT << 1) - 1,
+    BRIDGE_RADIO_DESCRIPTION_FIELDS = CUI_BRIDGE_RADIO_DESCRIPTION_COLOR |
+        CUI_BRIDGE_RADIO_DESCRIPTION_SIZE | CUI_BRIDGE_RADIO_DESCRIPTION_WEIGHT,
+    BRIDGE_RADIO_BASE_FIELDS = CUI_BRIDGE_RADIO_ROOT_RADIUS | CUI_BRIDGE_RADIO_ROOT_PADDING |
+        CUI_BRIDGE_RADIO_ROOT_GAP | CUI_BRIDGE_RADIO_INDICATOR_RADIUS |
+        CUI_BRIDGE_RADIO_INDICATOR_EXTENT | CUI_BRIDGE_RADIO_LABEL_SIZE |
+        CUI_BRIDGE_RADIO_DESCRIPTION_SIZE | CUI_BRIDGE_RADIO_LABEL_WEIGHT |
+        CUI_BRIDGE_RADIO_DESCRIPTION_WEIGHT
+};
+struct bridge_radio_paints {
+    cui_bridge_radio_paint_v1 layers[BRIDGE_RADIO_LAYER_COUNT];
+};
+_Static_assert(sizeof(cui_bridge_radio_paint_v1) == 88 &&
+                   offsetof(cui_bridge_radio_paint_v1, root_border_width) == 44 &&
+                   offsetof(cui_bridge_radio_paint_v1, label_weight) == 80,
+               "retained Radio paint V1 ABI");
+static bool bridge_radio_paint_range(uint32_t fields, uint32_t bit, float value, float minimum,
+                                     float maximum) {
+    return !(fields & bit) || (isfinite(value) && value >= minimum && value <= maximum);
+}
+static bool bridge_radio_paint_valid(const cui_bridge_radio_paint_v1 *paint, uint32_t layer,
+                                     cui_bridge_kind kind) {
+    uint32_t fields = paint->fields;
+    return paint->struct_size == sizeof(*paint) && paint->schema_version == 1 && !paint->reserved &&
+           !(fields & ~BRIDGE_RADIO_ALL_FIELDS) &&
+           (layer == CUI_BRIDGE_RADIO_PAINT_BASE || !(fields & BRIDGE_RADIO_BASE_FIELDS)) &&
+           (kind != CUI_BRIDGE_RADIO_GROUP || !(fields & ~BRIDGE_RADIO_ROOT_FIELDS)) &&
+           (kind == CUI_BRIDGE_ITEM || !(fields & BRIDGE_RADIO_DESCRIPTION_FIELDS)) &&
+           bridge_radio_paint_range(fields, CUI_BRIDGE_RADIO_ROOT_BORDER_WIDTH,
+                                    paint->root_border_width, 0, 64) &&
+           bridge_radio_paint_range(fields, CUI_BRIDGE_RADIO_ROOT_RADIUS, paint->root_radius, 0,
+                                    256) &&
+           bridge_radio_paint_range(fields, CUI_BRIDGE_RADIO_ROOT_PADDING, paint->root_padding, 0,
+                                    256) &&
+           bridge_radio_paint_range(fields, CUI_BRIDGE_RADIO_ROOT_GAP, paint->root_gap, 0, 256) &&
+           bridge_radio_paint_range(fields, CUI_BRIDGE_RADIO_INDICATOR_BORDER_WIDTH,
+                                    paint->indicator_border_width, 0, 64) &&
+           bridge_radio_paint_range(fields, CUI_BRIDGE_RADIO_INDICATOR_RADIUS,
+                                    paint->indicator_radius, 0, 256) &&
+           bridge_radio_paint_range(fields, CUI_BRIDGE_RADIO_INDICATOR_EXTENT,
+                                    paint->indicator_extent, 4, 128) &&
+           bridge_radio_paint_range(fields, CUI_BRIDGE_RADIO_LABEL_SIZE, paint->label_size, 1,
+                                    128) &&
+           bridge_radio_paint_range(fields, CUI_BRIDGE_RADIO_DESCRIPTION_SIZE,
+                                    paint->description_size, 1, 128) &&
+           (!(fields & CUI_BRIDGE_RADIO_LABEL_WEIGHT) ||
+            paint->label_weight <= CUI_TEXT_WEIGHT_BOLD) &&
+           (!(fields & CUI_BRIDGE_RADIO_DESCRIPTION_WEIGHT) ||
+            paint->description_weight <= CUI_TEXT_WEIGHT_BOLD);
+}
+cui_bridge_status cui_bridge_radio_set_paint_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                uint32_t layer,
+                                                const cui_bridge_radio_paint_v1 *paint) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_RADIO && node->kind != CUI_BRIDGE_RADIO_GROUP &&
+        !(node->kind == CUI_BRIDGE_ITEM && node->parent &&
+          app->nodes[node->parent].kind == CUI_BRIDGE_RADIO_GROUP))
+        return CUI_BRIDGE_INVALID_STATE;
+    if (layer >= BRIDGE_RADIO_LAYER_COUNT ||
+        (node->kind == CUI_BRIDGE_RADIO_GROUP && layer != CUI_BRIDGE_RADIO_PAINT_BASE &&
+         layer != CUI_BRIDGE_RADIO_PAINT_DISABLED) ||
+        (paint && !bridge_radio_paint_valid(paint, layer, node->kind)))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (paint && paint->fields) {
+        if (!node->radio_paints) {
+            node->radio_paints = calloc(1, sizeof *node->radio_paints);
+            if (!node->radio_paints)
+                return CUI_BRIDGE_OUT_OF_MEMORY;
+        }
+        node->radio_paints->layers[layer] = *paint;
+    } else {
+        if (!node->radio_paints || !node->radio_paints->layers[layer].fields)
+            return CUI_BRIDGE_OK;
+        node->radio_paints->layers[layer] = (cui_bridge_radio_paint_v1){0};
+        bool remaining = false;
+        for (size_t i = 0; i < BRIDGE_RADIO_LAYER_COUNT; ++i)
+            remaining |= node->radio_paints->layers[i].fields != 0;
+        if (!remaining) {
+            free(node->radio_paints);
+            node->radio_paints = NULL;
+        }
+    }
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+static cui_color bridge_radio_color(uint32_t rgba) {
+    return (cui_color){rgba >> 24, rgba >> 16, rgba >> 8, rgba};
+}
+static void bridge_radio_apply_root(cui_box *box, const cui_bridge_radio_paint_v1 *layer) {
+    uint32_t fields = layer->fields;
+    if (fields & CUI_BRIDGE_RADIO_ROOT_BG)
+        box->background = bridge_radio_color(layer->root_background_rgba);
+    if (fields & CUI_BRIDGE_RADIO_ROOT_BORDER)
+        box->border = bridge_radio_color(layer->root_border_rgba);
+    if (fields & CUI_BRIDGE_RADIO_ROOT_BORDER_WIDTH)
+        box->border_width = layer->root_border_width;
+    if (fields & CUI_BRIDGE_RADIO_ROOT_RADIUS)
+        box->radius = layer->root_radius;
+    if (fields & CUI_BRIDGE_RADIO_ROOT_PADDING)
+        box->padding = layer->root_padding;
+    if (fields & CUI_BRIDGE_RADIO_ROOT_GAP)
+        box->gap = layer->root_gap;
+}
+static void bridge_radio_apply_option(cui_radio_paint *paint,
+                                      const cui_bridge_radio_paint_v1 *layer) {
+    bridge_radio_apply_root(&paint->root, layer);
+    uint32_t fields = layer->fields;
+    if (fields & CUI_BRIDGE_RADIO_INDICATOR_BG)
+        paint->indicator.background = bridge_radio_color(layer->indicator_background_rgba);
+    if (fields & CUI_BRIDGE_RADIO_INDICATOR_BORDER)
+        paint->indicator.border = bridge_radio_color(layer->indicator_border_rgba);
+    if (fields & CUI_BRIDGE_RADIO_INDICATOR_BORDER_WIDTH)
+        paint->indicator.border_width = layer->indicator_border_width;
+    if (fields & CUI_BRIDGE_RADIO_INDICATOR_RADIUS)
+        paint->indicator.radius = layer->indicator_radius;
+    if (fields & CUI_BRIDGE_RADIO_INDICATOR_EXTENT)
+        paint->indicator.width = paint->indicator.height = layer->indicator_extent;
+    if (fields & CUI_BRIDGE_RADIO_MARK_COLOR)
+        paint->mark = bridge_radio_color(layer->mark_rgba);
+    if (fields & CUI_BRIDGE_RADIO_LABEL_COLOR)
+        paint->label.color = bridge_radio_color(layer->label_rgba);
+    if (fields & CUI_BRIDGE_RADIO_DESCRIPTION_COLOR)
+        paint->description.color = bridge_radio_color(layer->description_rgba);
+    if (fields & CUI_BRIDGE_RADIO_LABEL_SIZE)
+        paint->label.font_size = layer->label_size;
+    if (fields & CUI_BRIDGE_RADIO_DESCRIPTION_SIZE)
+        paint->description.font_size = layer->description_size;
+    if (fields & CUI_BRIDGE_RADIO_LABEL_WEIGHT)
+        paint->label.style.weight = (cui_text_weight)layer->label_weight;
+    if (fields & CUI_BRIDGE_RADIO_DESCRIPTION_WEIGHT)
+        paint->description.style.weight = (cui_text_weight)layer->description_weight;
+}
+static void bridge_radio_option_paint(cui_context *ui, void *user, cui_id id, bool checked,
+                                      bool disabled, cui_radio_paint *paint) {
+    const cui_bridge_node_record *node = user;
+    const bridge_radio_paints *style = node->radio_paints;
+    if (!style)
+        return;
+    bridge_radio_apply_option(paint, &style->layers[CUI_BRIDGE_RADIO_PAINT_BASE]);
+    if (checked)
+        bridge_radio_apply_option(paint, &style->layers[CUI_BRIDGE_RADIO_PAINT_CHECKED]);
+    if (disabled) {
+        bridge_radio_apply_option(paint, &style->layers[CUI_BRIDGE_RADIO_PAINT_DISABLED]);
+        return;
+    }
+    if (style->layers[CUI_BRIDGE_RADIO_PAINT_HOVERED].fields && cui_hovered(ui, id))
+        bridge_radio_apply_option(paint, &style->layers[CUI_BRIDGE_RADIO_PAINT_HOVERED]);
+    if (style->layers[CUI_BRIDGE_RADIO_PAINT_PRESSED].fields && cui_pressed(ui, id))
+        bridge_radio_apply_option(paint, &style->layers[CUI_BRIDGE_RADIO_PAINT_PRESSED]);
+    if (cui_focused(ui) == id)
+        bridge_radio_apply_option(paint, &style->layers[CUI_BRIDGE_RADIO_PAINT_FOCUSED]);
+}
+static void bridge_radio_group_paint(cui_context *ui, void *user, cui_id id, cui_box *box) {
+    (void)ui;
+    (void)id;
+    const cui_bridge_node_record *group = user;
+    bridge_radio_apply_root(box, &group->radio_paints->layers[CUI_BRIDGE_RADIO_PAINT_BASE]);
+    if (group->disabled)
+        bridge_radio_apply_root(box, &group->radio_paints->layers[CUI_BRIDGE_RADIO_PAINT_DISABLED]);
+}
+typedef struct {
+    cui_bridge_app *app;
+    uint32_t next_slot;
+} bridge_radio_item_paints;
+static void bridge_radio_item_paint(cui_context *ui, void *user, cui_id id, bool checked,
+                                    bool disabled, cui_radio_paint *paint) {
+    bridge_radio_item_paints *scan = user;
+    if (!scan->next_slot)
+        return;
+    cui_bridge_node_record *node = &scan->app->nodes[scan->next_slot];
+    if (node->id != id)
+        return;
+    scan->next_slot = node->next_sibling;
+    bridge_radio_option_paint(ui, node, id, checked, disabled, paint);
+}
 static bool bridge_radio_content_kind(cui_bridge_kind kind) {
     switch (kind) {
     case CUI_BRIDGE_ROW:
@@ -1046,6 +1227,8 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
         node->owner->radio_motions[node->own_slot] = NULL;
     }
     bridge_radio_tooltip_remove(node->owner, node->own_slot);
+    free(node->radio_paints);
+    node->radio_paints = NULL;
     free(node->part_shadows);
     free(node->key);
     free(node->text);
@@ -4018,12 +4201,13 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
         cui_selection_indicator_parts parts[64];
         cui_radio_group_content content[CUI_RADIO_GROUP_MAX] = {0};
         bool has_content = false, named = false, authored = node->shadows.schema_version != 0;
-        bool has_tooltip = false;
+        bool has_tooltip = false, item_paint = false;
         for (size_t i = 0; i < count; ++i) {
             cui_bridge_node_record *item = &app->nodes[scratch->binding.slots[i]];
             content[i].description = cui_string(item->detail);
             content[i].tooltip = bridge_radio_tooltip(app, item->own_slot);
             has_tooltip |= content[i].tooltip != NULL;
+            item_paint |= item->radio_paints != NULL;
             if (item->radio_item_content && item->first_child) {
                 content[i].content = bridge_item_content;
                 content[i].content_user = item;
@@ -4041,13 +4225,20 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                                                      .custom_tab_index =
                                                          node->radio_custom_tab_index,
                                                      .tab_index = node->radio_tab_index};
+        bridge_radio_item_paints item_styles = {app, node->first_child};
+        cui_radio_group_styles styles = {
+            .group = node->radio_paints ? bridge_radio_group_paint : NULL,
+            .group_user = node,
+            .items = {.instance = item_paint ? bridge_radio_item_paint : NULL,
+                      .user = &item_styles}};
         cui_radio_group_result result =
-            cui_radio_group_present_with_content(
+            cui_radio_group_present_styled(
                 app->ui, node->id, &app->theme, scratch->radios, count, &selected,
                 &node->radio_group_state, options, presentation, has_content ? content : NULL,
-                has_content ? count : 0, (cui_selection_handler){0})
+                has_content ? count : 0, styles, (cui_selection_handler){0})
                 .legacy;
-        if (!result.valid && (named || authored || has_tooltip) &&
+        if (!result.valid &&
+            (named || authored || has_tooltip || item_paint || node->radio_paints) &&
             app->frame_error == CUI_BRIDGE_OK)
             app->frame_error = CUI_BRIDGE_CORE_ERROR;
         if (result.valid) {
@@ -5544,9 +5735,11 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
                                                .tab_index = node->radio_tab_index};
         if (bridge_target_style(node, CUI_BRIDGE_SHADOW_INDICATOR))
             presentation.parts.indicator = bridge_indicator_id(node);
-        bool changed =
-            cui_radio_present(app->ui, node->id, &app->theme, cui_string(node->text), &value, 1,
-                              (cui_radio_options){.disabled = node->disabled}, presentation);
+        cui_radio_styles styles = {
+            .instance = node->radio_paints ? bridge_radio_option_paint : NULL, .user = node};
+        bool changed = cui_radio_present_styled(
+            app->ui, node->id, &app->theme, cui_string(node->text), &value, 1,
+            (cui_radio_options){.disabled = node->disabled}, presentation, styles);
         if (changed) {
             node->checked = value == 1;
             bridge_change(app, slot);

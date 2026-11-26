@@ -992,6 +992,56 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_item_set_content_v1(cui_bridge
 CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_set_tooltip_v1(cui_bridge_app *, cui_bridge_node,
                                                                  const char *text_utf8,
                                                                  uint32_t open_delay_ms);
+/* Optional retained Radio paint, applied in the listed order. Hover, pressed
+ * and focused layers require an enabled option. Disabled applies last. */
+enum {
+    CUI_BRIDGE_RADIO_PAINT_BASE = 0,
+    CUI_BRIDGE_RADIO_PAINT_CHECKED,
+    CUI_BRIDGE_RADIO_PAINT_HOVERED,
+    CUI_BRIDGE_RADIO_PAINT_PRESSED,
+    CUI_BRIDGE_RADIO_PAINT_FOCUSED,
+    CUI_BRIDGE_RADIO_PAINT_DISABLED
+};
+enum {
+    CUI_BRIDGE_RADIO_ROOT_BG = 1u << 0,
+    CUI_BRIDGE_RADIO_ROOT_BORDER = 1u << 1,
+    CUI_BRIDGE_RADIO_ROOT_BORDER_WIDTH = 1u << 2,
+    CUI_BRIDGE_RADIO_ROOT_RADIUS = 1u << 3,
+    CUI_BRIDGE_RADIO_ROOT_PADDING = 1u << 4,
+    CUI_BRIDGE_RADIO_ROOT_GAP = 1u << 5,
+    CUI_BRIDGE_RADIO_INDICATOR_BG = 1u << 6,
+    CUI_BRIDGE_RADIO_INDICATOR_BORDER = 1u << 7,
+    CUI_BRIDGE_RADIO_INDICATOR_BORDER_WIDTH = 1u << 8,
+    CUI_BRIDGE_RADIO_INDICATOR_RADIUS = 1u << 9,
+    CUI_BRIDGE_RADIO_INDICATOR_EXTENT = 1u << 10,
+    CUI_BRIDGE_RADIO_MARK_COLOR = 1u << 11,
+    CUI_BRIDGE_RADIO_LABEL_COLOR = 1u << 12,
+    CUI_BRIDGE_RADIO_DESCRIPTION_COLOR = 1u << 13,
+    CUI_BRIDGE_RADIO_LABEL_SIZE = 1u << 14,
+    CUI_BRIDGE_RADIO_DESCRIPTION_SIZE = 1u << 15,
+    CUI_BRIDGE_RADIO_LABEL_WEIGHT = 1u << 16,
+    CUI_BRIDGE_RADIO_DESCRIPTION_WEIGHT = 1u << 17
+};
+typedef struct {
+    uint32_t struct_size, schema_version, fields, reserved;
+    uint32_t root_background_rgba, root_border_rgba, indicator_background_rgba,
+        indicator_border_rgba, mark_rgba, label_rgba, description_rgba;
+    float root_border_width, root_radius, root_padding, root_gap;
+    float indicator_border_width, indicator_radius, indicator_extent;
+    float label_size, description_size;
+    uint32_t label_weight, description_weight;
+} cui_bridge_radio_paint_v1;
+/* Copy one layer on Radio, RadioGroup or a direct RadioGroup Item. NULL clears
+ * that layer. Exact size, schema 1, reserved 0. fields selects present values,
+ * including numeric RGBA 0xRRGGBBAA. Inactive fields are ignored. A zero mask is
+ * equivalent to clear. Dimensions use logical pixels. Only BASE may set radius,
+ * padding, gap, extent, text size or weight. Groups accept ROOT fields on BASE
+ * and DISABLED only. Description fields apply to direct Items only. Weights
+ * are normal=0, medium=1, semibold=2, bold=3. Errors preserve prior layers.
+ * Set between steps on the owner thread. Paint never emits a notification. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_radio_set_paint_v1(cui_bridge_app *, cui_bridge_node,
+                                                               uint32_t layer,
+                                                               const cui_bridge_radio_paint_v1 *);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *, cui_bridge_node,
                                                          uint32_t disabled);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_value(cui_bridge_app *, cui_bridge_node,

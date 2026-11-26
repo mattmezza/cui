@@ -793,7 +793,8 @@
         "cui_radio_group_present_with_content",
         "cui_radio_group_present_styled",
         "cui_bridge_radio_set_tooltip_v1",
-        "cui_bridge_radio_set_tab_index_v1"
+        "cui_bridge_radio_set_tab_index_v1",
+        "cui_bridge_radio_set_paint_v1"
       ],
       "additional_public_headers": ["include/cui/cui_boolean_events.h", "include/cui/cui_bridge.h"],
       "state_types": [
@@ -807,7 +808,7 @@
       ],
       "state_ownership": "Keep one selected ID and cui_radio_group_state per group. A controlled standalone radio takes an owner-held bool. The legacy standalone API uses a shared integer. For animated marks, keep zero-initialized cui_radio_group_motion per group or cui_radio_motion per standalone option. For a tooltip, keep one zero-initialized cui_radio_tooltip_state per option in immediate C. The retained C bridge owns its option tooltip state and copies the hint.",
       "interaction": "cui_radio_group resolves controlled callback requests before painting and provides arrow/Home/End navigation with one Tab stop. cui_radio_events sends select-only boolean requests for unchecked options. Legacy standalone functions return true when selection changes. Optional signed tab ordering in immediate C and the retained C bridge keeps the group as one stop.",
-      "usage": "Submit stable unique item IDs. With cui_radio_events, update the bool in the handler and request a frame to show the change. Use cui_radio_group_present or cui_radio_present with motion storage, and schedule its next frame on the host clock. Use cui_radio_group_present_with_content to add descriptions and decorative label content to grouped options. Attach optional tooltips to the standalone presentation or the group item content descriptor. In retained C, use cui_bridge_radio_set_tooltip_v1 with a Radio or direct RadioGroup Item. Use cui_bridge_radio_set_tab_index_v1 on a retained Radio or RadioGroup.",
+      "usage": "Submit stable unique item IDs. With cui_radio_events, update the bool in the handler and request a frame to show the change. Use cui_radio_group_present or cui_radio_present with motion storage, and schedule its next frame on the host clock. Use cui_radio_group_present_with_content to add descriptions and decorative label content to grouped options. Attach optional tooltips to the standalone presentation or the group item content descriptor. In retained C, use cui_bridge_radio_set_tooltip_v1 with a Radio or direct RadioGroup Item. Use cui_bridge_radio_set_tab_index_v1 on a retained Radio or RadioGroup. Use cui_bridge_radio_set_paint_v1 to set copied layers on a retained Radio, RadioGroup or direct Item.",
       "docs": [
         "docs/RADIO_GROUP.md",
         "docs/BOOLEAN_EVENTS.md",

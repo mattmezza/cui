@@ -310,6 +310,208 @@ static void test_tab_order(void) {
     cui_bridge_destroy(app);
 }
 
+static const cui_draw_command *painted_color(cui_draw_type type, uint32_t rgba) {
+    for (size_t i = 0; i < painted.count; ++i) {
+        const cui_draw_command *command = &painted.commands[i];
+        cui_color color = type == CUI_DRAW_IMAGE ? command->bitmap.tint : command->color;
+        if (command->type == type && bridge_pack_color(color) == rgba)
+            return command;
+    }
+    return NULL;
+}
+
+static cui_bridge_radio_paint_v1 radio_bg(uint32_t rgba) {
+    return (cui_bridge_radio_paint_v1){.struct_size = sizeof(cui_bridge_radio_paint_v1),
+                                       .schema_version = 1,
+                                       .fields = CUI_BRIDGE_RADIO_ROOT_BG,
+                                       .root_background_rgba = rgba};
+}
+
+static void test_paint(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_SDL,
+                                  .width = 360,
+                                  .height = 380,
+                                  .max_nodes = 12};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = node(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root");
+    cui_bridge_node radio = node(app, root, CUI_BRIDGE_RADIO, "radio");
+    cui_bridge_node group = node(app, root, CUI_BRIDGE_RADIO_GROUP, "group");
+    cui_bridge_node first = node(app, group, CUI_BRIDGE_ITEM, "first");
+    cui_bridge_node second = node(app, group, CUI_BRIDGE_ITEM, "second");
+    cui_bridge_node unrelated = node(app, root, CUI_BRIDGE_TABS, "tabs");
+    cui_bridge_node tab = node(app, unrelated, CUI_BRIDGE_ITEM, "tab");
+    assert(cui_bridge_set_text(app, radio, "Save a copy") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, first, "Standard") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, second, "Priority") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_detail_text(app, second, "Tracked delivery") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_selected(app, group, first) == CUI_BRIDGE_OK);
+    step(app);
+    float default_height = bounds(app, radio).height;
+
+    const uint32_t row_base = 0x112244ff, row_checked = 0x3344ddff, row_hover = 0x5577aaff,
+                   row_pressed = 0xba7df8ff, row_disabled = 0x232323ff, focus_border = 0x85cc55ff,
+                   group_base = 0x2c2933ff, group_disabled = 0x29262aff, indicator = 0xdd8723ff,
+                   label = 0x328871ff, detail = 0xdde7acff, mark_color = 0x118833ff;
+
+    cui_bridge_radio_paint_v1 base = radio_bg(row_base);
+    base.fields |= CUI_BRIDGE_RADIO_ROOT_PADDING | CUI_BRIDGE_RADIO_ROOT_RADIUS |
+                   CUI_BRIDGE_RADIO_INDICATOR_BG | CUI_BRIDGE_RADIO_INDICATOR_EXTENT |
+                   CUI_BRIDGE_RADIO_LABEL_COLOR | CUI_BRIDGE_RADIO_LABEL_SIZE |
+                   CUI_BRIDGE_RADIO_LABEL_WEIGHT;
+    base.root_padding = 7;
+    base.root_radius = 4;
+    base.indicator_background_rgba = indicator;
+    base.indicator_extent = 22;
+    base.label_rgba = label;
+    base.label_size = 20;
+    base.label_weight = CUI_TEXT_WEIGHT_SEMIBOLD;
+    assert(cui_bridge_radio_set_paint_v1(app, tab, CUI_BRIDGE_RADIO_PAINT_BASE, &base) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_radio_set_paint_v1(app, group, CUI_BRIDGE_RADIO_PAINT_BASE, &base) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_HOVERED, &base) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_radio_set_paint_v1(app, radio, UINT32_MAX, &base) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    allocations_until_failure = 1;
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_BASE, &base) ==
+           CUI_BRIDGE_OUT_OF_MEMORY);
+    assert(!app->nodes[radio.slot].radio_paints);
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_BASE, &base) ==
+           CUI_BRIDGE_OK);
+    cui_bridge_radio_paint_v1 invalid = radio_bg(0x119999ff);
+    invalid.schema_version = 2;
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_BASE, &invalid) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    invalid.schema_version = 1;
+    --invalid.struct_size;
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_BASE, &invalid) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    invalid.struct_size = sizeof invalid;
+    invalid.fields |= 1u << 31;
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_BASE, &invalid) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    base.root_background_rgba = 0;
+    base.indicator_extent = NAN;
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_BASE, &base) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+
+    cui_bridge_radio_paint_v1 checked = radio_bg(row_checked);
+    checked.fields |= CUI_BRIDGE_RADIO_MARK_COLOR;
+    checked.mark_rgba = mark_color;
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_CHECKED, &checked) ==
+           CUI_BRIDGE_OK);
+    cui_bridge_radio_paint_v1 hover = radio_bg(row_hover), pressed = radio_bg(row_pressed),
+                              disabled = radio_bg(row_disabled), focus = radio_bg(0);
+    focus.fields = CUI_BRIDGE_RADIO_ROOT_BORDER | CUI_BRIDGE_RADIO_ROOT_BORDER_WIDTH;
+    focus.root_border_rgba = focus_border;
+    focus.root_border_width = 3;
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_HOVERED, &hover) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_PRESSED, &pressed) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_FOCUSED, &focus) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_DISABLED, &disabled) ==
+           CUI_BRIDGE_OK);
+
+    cui_bridge_radio_paint_v1 outer = radio_bg(group_base), muted = radio_bg(group_disabled);
+    outer.fields |= CUI_BRIDGE_RADIO_ROOT_PADDING;
+    outer.root_padding = 6;
+    assert(cui_bridge_radio_set_paint_v1(app, group, CUI_BRIDGE_RADIO_PAINT_BASE, &outer) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_paint_v1(app, group, CUI_BRIDGE_RADIO_PAINT_DISABLED, &muted) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_paint_v1(app, group, CUI_BRIDGE_RADIO_PAINT_HOVERED, &muted) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    cui_bridge_radio_paint_v1 item = radio_bg(0);
+    item.fields = CUI_BRIDGE_RADIO_DESCRIPTION_COLOR | CUI_BRIDGE_RADIO_DESCRIPTION_WEIGHT;
+    item.description_rgba = detail;
+    item.description_weight = CUI_TEXT_WEIGHT_BOLD;
+    assert(cui_bridge_radio_set_paint_v1(app, second, CUI_BRIDGE_RADIO_PAINT_BASE, &item) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_BASE, &item) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+
+    step(app);
+    const cui_draw_command *cmd = painted_color(CUI_DRAW_RECT, indicator);
+    assert(cmd && cmd->bounds.w == 22 && cmd->bounds.h == 22);
+    cmd = painted_color(CUI_DRAW_TEXT, label);
+    assert(cmd && cmd->font_size == 20 && cmd->text_style.weight == CUI_TEXT_WEIGHT_SEMIBOLD);
+    cmd = painted_color(CUI_DRAW_TEXT, detail);
+    assert(cmd && cmd->text_style.weight == CUI_TEXT_WEIGHT_BOLD &&
+           describes(app, second, "Tracked delivery"));
+    assert(painted_color(CUI_DRAW_RECT, row_base) && painted_color(CUI_DRAW_RECT, group_base));
+    cui_bridge_rect box = bounds(app, radio);
+    assert(box.height > default_height);
+    float x = box.x + box.width / 2, y = box.y + box.height / 2;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_MOVE, x, y) == CUI_BRIDGE_OK);
+    step(app);
+    assert(painted_color(CUI_DRAW_RECT, row_hover));
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    step(app);
+    assert(painted_color(CUI_DRAW_RECT, row_pressed) && bounds(app, radio).height == box.height);
+    cmd = painted_color(CUI_DRAW_BORDER, focus_border);
+    assert(cmd && cmd->stroke == 3);
+    cui_bridge_notification_v1 event;
+    assert(poll(app, &event) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
+    step(app);
+    assert(painted_color(CUI_DRAW_RECT, row_hover) && painted_color(CUI_DRAW_IMAGE, mark_color));
+    assert(poll(app, &event) == CUI_BRIDGE_OK && event.node.slot == radio.slot &&
+           event.payload_kind == CUI_BRIDGE_PAYLOAD_LEGACY && event.legacy.checked == 1);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_MOVE, 359, 379) == CUI_BRIDGE_OK);
+    step(app);
+    assert(painted_color(CUI_DRAW_RECT, row_checked));
+    assert(cui_bridge_radio_set_paint_v1(app, second, CUI_BRIDGE_RADIO_PAINT_CHECKED, &checked) ==
+           CUI_BRIDGE_OK);
+    click(app, second);
+    cui_bridge_rect second_box = bounds(app, second);
+    bool checked_item = false;
+    for (size_t i = 0; i < painted.count; ++i) {
+        const cui_draw_command *draw = &painted.commands[i];
+        checked_item |= draw->type == CUI_DRAW_RECT && draw->bounds.y == second_box.y &&
+                        bridge_pack_color(draw->color) == row_checked;
+    }
+    assert(checked_item);
+    assert(poll(app, &event) == CUI_BRIDGE_OK && event.node.slot == group.slot &&
+           event.payload_kind == CUI_BRIDGE_PAYLOAD_SELECTION &&
+           event.payload.selected.slot == second.slot);
+
+    assert(cui_bridge_set_disabled(app, radio, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_disabled(app, group, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_MOVE, x, y) == CUI_BRIDGE_OK);
+    step(app);
+    assert(painted_color(CUI_DRAW_RECT, row_disabled) &&
+           painted_color(CUI_DRAW_RECT, group_disabled));
+    assert(!painted_color(CUI_DRAW_RECT, row_hover) &&
+           !painted_color(CUI_DRAW_BORDER, focus_border));
+    assert(poll(app, &event) == CUI_BRIDGE_EMPTY);
+
+    cui_bridge_radio_paint_v1 clear = radio_bg(0);
+    clear.fields = 0;
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_DISABLED, NULL) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_paint_v1(app, group, CUI_BRIDGE_RADIO_PAINT_DISABLED, &clear) ==
+           CUI_BRIDGE_OK);
+    step(app);
+    assert(!painted_color(CUI_DRAW_RECT, row_disabled) && painted_color(CUI_DRAW_RECT, group_base));
+    assert(cui_bridge_radio_set_paint_v1(app, group, CUI_BRIDGE_RADIO_PAINT_BASE, NULL) ==
+           CUI_BRIDGE_OK);
+    assert(!app->nodes[group.slot].radio_paints);
+    assert(cui_bridge_node_remove(app, radio) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_remove(app, second) == CUI_BRIDGE_OK);
+    assert(cui_bridge_radio_set_paint_v1(app, radio, CUI_BRIDGE_RADIO_PAINT_BASE, &clear) ==
+           CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_node replacement = node(app, group, CUI_BRIDGE_ITEM, "reused");
+    assert(!app->nodes[replacement.slot].radio_paints);
+    cui_bridge_destroy(app);
+}
+
 int main(void) {
     cui_bridge_options options = {.struct_size = sizeof options,
                                   .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -449,4 +651,5 @@ int main(void) {
     cui_bridge_destroy(app);
     test_tooltips();
     test_tab_order();
+    test_paint();
 }

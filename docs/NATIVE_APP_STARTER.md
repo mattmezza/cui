@@ -1,6 +1,6 @@
 # Build your first native CUI app
 
-The versioned alpha.6 starter includes the minimal app, fonts and CUI sources. [GitHub release archive](https://github.com/mattmezza/cui/releases/download/v0.1.0-alpha.6/cui-0.1.0-alpha.6-native-starter.tar.gz)
+The versioned alpha.7 starter includes the minimal app, fonts and CUI sources. [GitHub release archive](https://github.com/mattmezza/cui/releases/download/v0.1.0-alpha.7/cui-0.1.0-alpha.7-native-starter.tar.gz)
 
 For the smallest standalone build, use the **native source bundle**.
 [Download the archive](https://matteo.merola.co/cui/downloads/cui-native.tar.gz)
@@ -19,8 +19,10 @@ This path includes CUI's portable sources, native SDL3 adapter, text/bidi
 implementation, generated assets, and Inter 4.1 Regular/Bold fonts with licenses.
 It requires no installed CUI package or repository checkout. The default renderer
 is SDL3's `SDL_Renderer`; Sokol and SDL_GPU are separate optional integrations.
-Linux X11 is the validated native target; Windows, macOS and Wayland native
-runtime support remains unverified. External system libraries remain prerequisites. See [macOS native builds and bundles](MACOS.md) and [Linux-to-macOS cross compilation](MACOS_CROSS.md) for the new workflows and their validation limits.
+Linux X11 has native window evidence. Hosted macOS covers dummy/software execution
+and development bundle installation. Interactive macOS, Windows and Wayland
+acceptance remains open. External system libraries remain prerequisites. See
+[macOS builds and bundles](MACOS.md) and [Linux-to-macOS cross compilation](MACOS_CROSS.md).
 
 Before building, check their visibility:
 

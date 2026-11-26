@@ -1,9 +1,10 @@
 # Native macOS applications
 
-CUI's portable library has macOS CI evidence. The native workflow below adds the
-SDL3/text adapters and a `.app` starter. A configured CI job or a successful Linux
-build is not evidence that the app runs correctly on macOS. Record the revision,
-Mac architecture, macOS version, dependency receipt and results when validating.
+Alpha.7 passed hosted Apple Silicon checks for the SDL3/text adapters in
+dummy/software mode, with declared skips. The same job installed the starter
+app bundle and verified its ad-hoc signature. The interactive acceptance steps
+below cover Cocoa windows, Retina, OS input and accessibility. Record the source
+revision, Mac architecture, OS version, dependency receipt and results. [Hosted native job](https://github.com/mattmezza/cui/actions/runs/45760644484/job/139709548646)
 
 ## Build on your Apple Silicon Mac
 

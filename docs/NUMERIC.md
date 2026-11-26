@@ -22,7 +22,23 @@ Remaining GPUI options include thousands-separator masks, custom pattern validat
 
 Pages are one-based, with zero representing an empty result. Current page clamps to `[1,total]` or zero when no pages exist. Buttons support First, Previous, Next and Last, and visible numbered pages. A compact mode shows the current/total count. Boundaries and the current page disable redundant activation.
 
-The allocation-free item model emits endpoints and a radius-bounded neighborhood, fills single omitted pages, and inserts ellipses for larger gaps. Radius is capped at three, with at most eleven items. Arithmetic remains bounded for `SIZE_MAX` totals. The styled control uses radius two. All page buttons use the ordinary pointer/keyboard button routing; selected semantic details reflect the controlled page. Layout wrapping, configurable label slots, exact GPUI compact typography and arbitrary visible-page budgets remain pending.
+The allocation-free item model emits endpoints and a radius-bounded neighborhood, fills single omitted pages, and inserts ellipses for larger gaps. Radius is capped at three, with at most eleven items. Arithmetic remains bounded for `SIZE_MAX` totals. The styled control uses radius two. All page buttons use the ordinary pointer/keyboard button routing; selected semantic details reflect the controlled page. The original `cui_pagination` uses the theme's control sizing in a single row.
+
+Use `cui_pagination_ex` with `cui_pagination_options` for the shared XS through 9XL sizing and single-line labels. BASE and MD are equivalent. INHERIT uses theme metrics. A positive `available_width` wraps between whole items in navigation order. Supply the current container's inner width in logical pixels each frame. Zero keeps one row. An item wider than the available width keeps its natural width, so provide a sufficiently wide or horizontally scrollable parent for extreme sizes and long page counts. The counter aligns with the controls in its row.
+
+```c
+#include <cui/cui_numeric.h>
+
+/* Call in a frame. The application retains page and loads data on a true result. */
+bool draw_results_pages(cui_context *ui, cui_id id, const cui_theme *theme,
+                        size_t *page, size_t total, float content_width) {
+    return cui_pagination_ex(ui, id, theme, page, total,
+        (cui_pagination_options){.compact = true, .design_size = CUI_DESIGN_BASE,
+                                 .available_width = content_width});
+}
+```
+
+Use `cui_pagination_events_ex` for the same layout with the synchronous aggregate change observer. The C options leave the existing retained binding builders on their numbered single-row presentation. Configurable label slots, an icon-only compact presentation and arbitrary visible-page budgets remain open.
 
 ## Rating
 

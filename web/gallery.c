@@ -6742,7 +6742,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 34: {
-        cui_pagination(ui, cui_id_from(ui, "pagination"), &t, &page_number, 20, true, disabled);
+        cui_pagination_ex(ui, cui_id_from(ui, "pagination"), &t, &page_number, 20,
+                          (cui_pagination_options){.compact = true,
+                                                   .disabled = disabled,
+                                                   .design_size = design_size,
+                                                   .available_width = fmaxf(1, width - 48)});
         char text[64];
         snprintf(text, sizeof(text), "Page %zu of 20", page_number);
         cui_label(ui, &t, cui_string(text));

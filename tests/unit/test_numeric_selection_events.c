@@ -87,6 +87,41 @@ static cui_numeric_selection_event_result page_frame(fixture *f, bool styled, bo
     assert(cui_last_error(f->ui) == CUI_OK);
     return r;
 }
+static cui_numeric_selection_event_result sized_page_frame(fixture *f,
+                                                           cui_pagination_options options) {
+    assert(cui_begin_frame(f->ui, 220, 800, .016f));
+    cui_theme theme = cui_theme_light();
+    cui_numeric_selection_event_result r = cui_pagination_events_ex(
+        f->ui, 2, &theme, &f->value, 20, options, (cui_pagination_event_handler){page_changed, f});
+    f->draw = cui_end_frame(f->ui);
+    assert(cui_last_error(f->ui) == CUI_OK);
+    return r;
+}
+static void sized_pagination(void) {
+    fixture f = make();
+    f.value = 3;
+    cui_pagination_options options = {
+        .compact = true, .design_size = CUI_DESIGN_LG, .available_width = 180};
+    assert(!sized_page_frame(&f, options).control);
+    click(&f, 3, .5f);
+    cui_numeric_selection_event_result r = sized_page_frame(&f, options);
+    assert(r.control && r.change_count == 1 && f.calls == 1 && f.value == 4);
+    activate(&f, 4);
+    activate(&f, 2);
+    r = sized_page_frame(&f, options);
+    assert(r.control && r.change_count == 1 && f.calls == 2 && f.value == 19);
+    options.disabled = true;
+    activate(&f, 4);
+    r = sized_page_frame(&f, options);
+    assert(!r.control && !r.change_count && f.calls == 2 && f.value == 19);
+    options.disabled = false;
+    options.available_width = NAN;
+    f.value = 22;
+    r = sized_page_frame(&f, options);
+    assert(!r.control && !r.change_count && f.calls == 2 && f.value == 22);
+    assert(cui_bounds(f.ui, cui_numeric_part_id(2, 4)).h == 0);
+    cui_destroy(f.ui);
+}
 static void compare(fixture *a, fixture *b) {
     assert(a->value == b->value && cui_focused(a->ui) == cui_focused(b->ui));
     cui_rect x = cui_bounds(a->ui, 2), y = cui_bounds(b->ui, 2);
@@ -446,6 +481,7 @@ static void paired_input(bool styled) {
     cui_destroy(b.ui);
 }
 int main(void) {
+    sized_pagination();
     for (unsigned styled = 0; styled < 2; ++styled) {
         pagination(styled != 0);
         stepper(styled != 0);

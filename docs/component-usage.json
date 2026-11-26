@@ -715,12 +715,14 @@
     {
       "api_symbols": [
         "cui_pagination",
-        "cui_pagination_events"
+        "cui_pagination_ex",
+        "cui_pagination_events",
+        "cui_pagination_events_ex"
       ],
       "state_types": [],
       "state_ownership": "Caller retains size_t page.",
-      "interaction": "Returns true when page changes.",
-      "usage": "On a page change, load or select application data for the new page.",
+      "interaction": "Returns the page-change result and optionally notifies a synchronous aggregate observer.",
+      "usage": "Use cui_pagination_ex with cui_pagination_options for shared size presets, one-line labels and whole-item wrapping at the available content width.",
       "docs": [
         "docs/NUMERIC.md",
         "docs/NUMERIC_SELECTION_EVENTS.md"

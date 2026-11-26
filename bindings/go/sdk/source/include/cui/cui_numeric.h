@@ -72,6 +72,16 @@ bool cui_base_pagination(cui_context *, cui_id, size_t *, size_t total, bool com
 bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page, size_t total,
                     bool compact, bool disabled);
 typedef struct {
+    bool compact, disabled;
+    cui_design_size design_size; /* INHERIT uses theme metrics. */
+    /* Positive content width in logical pixels wraps whole items onto new rows.
+     * Zero uses one row. An individual item keeps its natural width. */
+    float available_width;
+} cui_pagination_options;
+/* Same owner and result as cui_pagination. Invalid size or width does not submit. */
+bool cui_pagination_ex(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page,
+                       size_t total, cui_pagination_options);
+typedef struct {
     unsigned maximum;
     bool half_steps, clearable, disabled, readonly;
     float width;

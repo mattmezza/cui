@@ -15,13 +15,13 @@ import {runInNewContext} from 'node:vm';
 const source=readFileSync(process.argv[1],'utf8');
 const load = name => import('data:text/javascript;base64,' +
     readFileSync(join(process.argv[2], name)).toString('base64'));
-const {timeFieldUsage, virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage} =
+const {paginationUsage, timeFieldUsage, virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage} =
     await load('cui_usage.js');
 const {hoverCardUsage} = await load('cui_hover_card_usage.js');
 const pick=(name)=>{const start=source.indexOf('const '+name+' = {');
  if(start<0)throw Error(name+' missing');
  return source.slice(start,name==='stories'?source.indexOf('};',start)+2:source.indexOf('\n};\nlet wasm',start)+3);};
-const context={timeFieldUsage};
+const context={paginationUsage,timeFieldUsage};
 runInNewContext(pick('stories')+'\n'+pick('snippets')+'\nglobalThis.data={stories,snippets};',context);
 const {stories, snippets} = context.data;
 const standalone = {
@@ -29,8 +29,10 @@ const standalone = {
     DataTable: [liveDataTableUsage, pagedDataTableUsage],
     HoverCard: [0, 1, 2].flatMap(mode => [0, 1, 2].map(preview => hoverCardUsage(mode, preview))),
     TimeField: [snippets.TimeField, timeFieldUsage(3, true)],
+    Pagination: [snippets.Pagination, paginationUsage(14, true)],
 };
-delete snippets.TimeField; // Compile its complete source as separate translation units.
+delete snippets.TimeField; // Compile complete sources as separate translation units.
+delete snippets.Pagination;
 process.stdout.write(JSON.stringify({stories, snippets, standalone}));
 '''
 
@@ -126,7 +128,6 @@ def main():
         'DatePicker': 'cui_str label = {0}; cui_date_picker_state state = {0}; cui_date_selection selection = {0}; cui_date_picker_options options = {0};',
         'ColorPicker': 'cui_color_state state = {0}; cui_color color = {0}; cui_color_picker_options options = {0};',
         'Combobox': 'cui_str label = {0}; cui_edit *query = 0; cui_choice_item items[4] = {0}, scratch[4] = {0}; cui_id selection = 0; cui_choice_popup popup = {0}; cui_choice_popup_options options = {0};',
-        'Pagination': 'size_t page = 1, total_pages = 10;',
         'Rating': 'cui_str label = {0}; float rating = 0; cui_rating_options options = {0};',
         'Stepper': 'cui_step steps[3] = {0}; size_t current_step = 0;',
         'List': 'cui_choice_item items[3] = {0}; cui_id selection = 0; cui_list_state state = {0}; cui_list_options options = {0};',

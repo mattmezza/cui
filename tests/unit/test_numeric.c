@@ -736,11 +736,63 @@ static void pagination_counter_center(void) {
         }
     }
 }
+static void pagination_sizes_and_wrap(void) {
+    cui_context *ui = cui_create((cui_config){.width = 2800, .height = 1000});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    size_t page = 3;
+    for (int size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; ++size) {
+        cui_design_metrics metrics;
+        assert(cui_design_measure((cui_design_size)size, theme.font_size / 16, &metrics));
+        assert(cui_begin_frame(ui, 2800, 1000, .016f));
+        assert(!cui_pagination_ex(ui, 71, &theme, &page, 20,
+                                  (cui_pagination_options){.compact = true, .design_size = size}));
+        cui_draw_list draw = cui_end_frame(ui);
+        cui_rect first = cui_bounds(ui, cui_numeric_part_id(71, 1));
+        cui_rect last = cui_bounds(ui, cui_numeric_part_id(71, 4));
+        assert(fabsf(first.h - metrics.control_height) < .01f && first.y == last.y);
+        bool found = false;
+        for (size_t i = 0; i < draw.count; ++i) {
+            cui_draw_command c = draw.commands[i];
+            if (c.type == CUI_DRAW_TEXT && c.text.length == 6 &&
+                !memcmp(c.text.data, "3 / 20", 6)) {
+                assert(c.font_size == metrics.font_size);
+                assert(fabsf(c.bounds.y + c.bounds.h / 2 - first.y - first.h / 2) < .01f);
+                found = true;
+            }
+        }
+        assert(found);
+    }
+    for (unsigned compact = 0; compact < 2; ++compact) {
+        assert(cui_begin_frame(ui, 164, 500, .016f));
+        assert(!cui_pagination_ex(ui, 71, &theme, &page, 20,
+                                  (cui_pagination_options){.compact = compact != 0,
+                                                           .design_size = CUI_DESIGN_BASE,
+                                                           .available_width = 164}));
+        cui_draw_list draw = cui_end_frame(ui);
+        cui_rect first = cui_bounds(ui, cui_numeric_part_id(71, 1));
+        cui_rect last = cui_bounds(ui, cui_numeric_part_id(71, 4));
+        assert(first.y < last.y && cui_bounds(ui, 71).w <= 164);
+        const char *label = compact ? "3 / 20" : "...";
+        size_t found = 0;
+        for (size_t i = 0; i < draw.count; ++i) {
+            cui_draw_command c = draw.commands[i];
+            if (c.type != CUI_DRAW_TEXT)
+                continue;
+            assert(c.bounds.x + c.bounds.w <= 164);
+            if (c.text.length == strlen(label) && !memcmp(c.text.data, label, c.text.length))
+                ++found;
+        }
+        assert(found == 1 && cui_last_error(ui) == CUI_OK);
+    }
+    cui_destroy(ui);
+}
 #endif
 int main(void) {
     number_composition();
 #ifndef CUI_NUMERIC_BASE_ONLY
     pagination_counter_center();
+    pagination_sizes_and_wrap();
     design_number_sizes();
     number_sizes_and_icons();
     rating_star_graphics();

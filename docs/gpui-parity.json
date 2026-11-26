@@ -2323,7 +2323,9 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_numeric.c",
-        "tests/web/test_browser.py"
+        "tests/unit/test_numeric_selection_events.c",
+        "tests/web/test_browser.py",
+        "tests/web/test_touch_components.py"
       ],
       "status": "tested",
       "platforms": {
@@ -2331,7 +2333,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. Responsive wrapping, configurable label slots and arbitrary page budgets pending."
+        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. C frame options add shared sizing and responsive whole-item rows. Configurable label slots, icon-only compact presentation and arbitrary page budgets remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2355,6 +2357,21 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_numeric.c"
+          ]
+        },
+        {
+          "name": "shared sizes and whole-item wrapping",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c",
+            "tests/web/test_touch_components.py"
+          ]
+        },
+        {
+          "name": "typed aggregate observation across layout modes",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric_selection_events.c"
           ]
         }
       ],

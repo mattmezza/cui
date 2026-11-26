@@ -355,6 +355,33 @@ def run_cases(a):
         a.tap(a.target('Next', 1))
         assert a.target('Pagination', 9)['f'][8] == before+1, 'Touch did not advance page'
     a.case('Pagination', 'touch advances current page', pagination)
+    def narrow_pagination():
+        viewport = a.page.viewport_size
+        try:
+            a.page.set_viewport_size({'width': 390, 'height': viewport['height']})
+            a.configure('design-size', 7)  # 2xl
+            assert a.page.locator('#design-size').is_visible()
+            first, last = a.target('First', 1), a.target('Last', 1)
+            assert first['f'][4] == 56 and first['f'][2] < last['f'][2]
+            assert 'CUI_DESIGN_2XL' in a.page.locator('#snippet').text_content()
+            before = int(a.target('Pagination', 9)['f'][8])
+            assert a.texts().count(f'{before} / 20') == 1, 'Compact counter split across lines'
+            a.tap(a.target('Next', 1))
+            assert a.target('Pagination', 9)['f'][8] == before + 1
+            assert a.texts().count(f'{before + 1} / 20') == 1
+
+            a.configure('design-size', 14)  # 9xl keeps natural item widths.
+            assert a.target('Previous', 1)['f'][4] == 264
+            canvas_width = a.page.locator('canvas').evaluate('e => e.clientWidth')
+            assert a.page.locator('canvas').evaluate('e => e.parentElement.clientWidth') < canvas_width
+            for label in ('First', 'Previous', 'Next', 'Last'):
+                button = a.target(label, 1)['f']
+                assert button[1] + button[3] <= canvas_width - 24, label
+            assert a.texts().count(f'{before + 1} / 20') == 1
+        finally:
+            a.page.set_viewport_size(viewport)
+    a.case('Pagination', '2xl controls wrap at 390px and keep an actionable, single-line counter',
+           narrow_pagination)
     def calendar():
         day = a.target(role=1, predicate=lambda s: s['name'].endswith('-25'))
         a.tap(day)

@@ -35,6 +35,10 @@ the callback. Request teardown or owner updates in separate application state
 and perform them after the outer call returns. Styled paint rereads the owner;
 owner mutation during observation has no supported rendering contract.
 
+Use `cui_pagination_events_ex` with `cui_pagination_options` to add the shared
+size scale and whole-item wrapping. It observes changes with the same synchronous
+timing and aggregation as `cui_pagination_events`. See the [layout guide](NUMERIC.md#pagination).
+
 Stepper adds the same Base/Styled `_events` pattern with a distinct
 `cui_stepper_change_event`: exact `size_t before`, `after`, `count`. Indices are
 zero-based; an empty list normalizes to zero. Descriptors, titles and descriptions

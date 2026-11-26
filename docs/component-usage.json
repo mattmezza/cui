@@ -121,7 +121,9 @@
         "cui_attachment_with_metadata",
         "cui_attachment_events_with_metadata",
         "cui_attachment_part_id",
-        "cui_attachment_child_part_id"
+        "cui_attachment_child_part_id",
+        "cui_bridge_attachment_configure_v1",
+        "cui_bridge_attachment_set_preview_rgba_v1"
       ],
       "state_types": [
         "cui_attachment_model",
@@ -129,11 +131,12 @@
       ],
       "state_ownership": "Caller retains cui_attachment_state and owns attachment model, metadata and resource lifetime.",
       "interaction": "cui_attachment_result reports actions; cui_attachment_action_fn receives remove/retry activation.",
-      "usage": "Submit transfer status and progress; perform removal/retry in action callbacks, not render callbacks. Use cui_attachment_with_metadata for one-line grapheme ellipsis, full semantic labels, and optional typography in immediate C.",
+      "usage": "Submit transfer status and progress. Handle removal and retry in action callbacks. Use cui_attachment_with_metadata for one-line grapheme ellipsis, full labels and typography in immediate C. Retained C can copy layout and text options and a decoded RGBA8 preview through separate bridge capabilities. Retained progress is a fraction in [0,1].",
       "docs": [
         "docs/MEDIA.md",
         "docs/ATTACHMENT_EVENTS.md",
-        "docs/COMPOUND_SHADOW_PARTS.md"
+        "docs/COMPOUND_SHADOW_PARTS.md",
+        "docs/BRIDGE_COMPONENTS.md"
       ],
       "callback_symbols": [
         "cui_attachment_action_fn",
@@ -144,7 +147,8 @@
       "public_header": "include/cui/cui_media.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_media_events.h"
+        "include/cui/cui_media_events.h",
+        "include/cui/cui_bridge.h"
       ]
     },
     {

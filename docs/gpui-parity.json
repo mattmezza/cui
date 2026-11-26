@@ -366,6 +366,7 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_media.c",
+        "tests/unit/test_bridge_attachment.c",
         "tests/web/test_browser.py",
         "tests/unit/test_compound_shadow_parts.c",
         "tests/unit/test_compound_shadow_legacy.c"
@@ -376,7 +377,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Opt-in C metadata has styled end ellipsis. Built-in encoded file/network decoding, shared resource cache, fully inherited text styling, retained metadata authoring and platform accessibility remain open."
+        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions have headless and Chromium coverage. Immediate and retained C have opt-in styled end ellipsis. Retained C supports named sizes, axis, media aspect, child status overrides and copied RGBA previews. Language facades for these options, retained actions, encoded file/network decoding, shared resource cache, fully inherited styling and platform accessibility remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -399,6 +400,16 @@
             "docs/MEDIA.md"
           ],
           "scope": "Immediate C and WASM examples. Full label semantics, grapheme boundaries, title weight, progress and retry keep separate roles. Platform accessibility and foreign metadata authoring are open."
+        },
+        {
+          "name": "retained C fitted labels, axis and decoded cover preview",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_attachment.c",
+            "tests/unit/test_media.c",
+            "docs/BRIDGE_COMPONENTS.md"
+          ],
+          "scope": "Headless draw geometry, copy and replacement, media aspect, status overrides, normalized progress and accessible full labels. Language facades and composed actions are pending."
         },
         {
           "name": "preview/remove actions",

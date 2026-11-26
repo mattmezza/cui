@@ -566,7 +566,10 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
         cui_end_box(ui);
     }
     cui_id media_id = cui_media_id(id, 3);
-    if (o.model.media) {
+    bool has_media = p.media_width > 0 && p.media_height > 0;
+    if (!has_media)
+        state->media = (cui_rect){0};
+    if (has_media) {
         float media_radius = p.flush ? fmaxf(0, radius - 1) : t->radius;
         cui_color background =
             o.model.status == CUI_ATTACHMENT_FAILED && !o.model.image ? t->danger : t->surface;
@@ -629,7 +632,7 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
             cui_end_box(ui);
         }
     }
-    if (!o.model.vertical && o.model.media && (o.model.content || o.actions)) {
+    if (!o.model.vertical && has_media && (o.model.content || o.actions)) {
         cui_begin_box(ui, cui_media_id(id, 13),
                       (cui_box){.width = p.metrics.gap, .fixed_width = true});
         cui_end_box(ui);
@@ -637,7 +640,7 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
     float content_width = o.model.vertical
                               ? p.width - 2 * p.metrics.card_padding
                               : fmaxf(0, p.width - p.metrics.padding_start - p.metrics.padding_end -
-                                             (o.model.media ? p.metrics.media + p.metrics.gap : 0) -
+                                             (has_media ? p.media_width + p.metrics.gap : 0) -
                                              (o.actions ? o.actions_width + p.metrics.gap : 0));
     if (o.model.content)
         cui_media_metadata(ui, cui_media_id(id, 4), t, state, o, p,

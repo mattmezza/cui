@@ -240,14 +240,20 @@ bool cui_base_attachment(cui_attachment_model m, cui_attachment_plan *out) {
                                        : p.metrics.padding_end) +
                                   p.metrics.padding_end;
         p.media_width = p.media_height = m.media ? p.metrics.media : 0;
+        if (m.media && m.width) {
+            float spacing = p.metrics.padding_start + p.metrics.padding_end +
+                            ((m.content || m.actions) ? p.metrics.gap : 0);
+            p.media_width = p.media_height = fminf(p.media_width, fmaxf(0, m.width - spacing));
+        }
     } else {
         p.width =
             p.flush ? p.metrics.height : 7.5f * (m.design_size ? p.metrics.text : m.root_font_size);
         if (m.width)
             p.width = m.width;
-        p.media_width = m.media ? p.width - (p.flush ? 2 : 2 * p.metrics.card_padding) : 0;
+        float padding = p.flush ? 2 : 2 * p.metrics.card_padding;
+        p.media_width = m.media ? fmaxf(0, p.width - padding) : 0;
         p.media_height = p.media_width / m.media_aspect;
-        p.height = p.flush ? p.metrics.height : p.media_height + 2 * p.metrics.card_padding;
+        p.height = p.flush && !m.media ? p.metrics.height : p.media_height + padding;
     }
     if (m.width)
         p.width = m.width;

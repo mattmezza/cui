@@ -535,8 +535,12 @@ indices. Language-builder MAIN/ROOT/subpart targets remain pending.
 For grapheme-safe one-line Attachment labels, use `cui_attachment_with_metadata`
 or `cui_attachment_events_with_metadata` in immediate C. Zero typography options
 give medium titles and regular descriptions. The semantic tree keeps the full
-labels. See `docs/MEDIA.md#fit-file-names-and-descriptions`. Retained builders
-currently expose the earlier presentation.
+labels. Retained C can use `cui_bridge_attachment_configure_v1` and
+`cui_bridge_attachment_set_preview_rgba_v1` for fitted labels, axis, status
+refinements and copied decoded pixels. Probe the capabilities separately.
+Language builders expose the earlier presentation. Retained progress uses
+a fraction. See `docs/MEDIA.md#fit-file-names-and-descriptions` and
+`docs/BRIDGE_COMPONENTS.md#configure-a-retained-attachment-from-c`.
 
 For a pinned navigation header/footer with body-only scrolling, use
 `cui_sidebar` with a persistent measurement cache. Tab and accessibility focus

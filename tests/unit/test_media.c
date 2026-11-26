@@ -144,9 +144,19 @@ static void attachments(void) {
     m.content = false;
     assert(cui_base_attachment(m, &p) && p.flush && p.width == 56 && p.height == 56 &&
            p.media_width == 54 && !p.progress_bar);
-    m.content = true;
+    m.width = 162;
     m.media_aspect = 2;
+    assert(cui_base_attachment(m, &p) && p.flush && p.width == 162 && p.height == 82 &&
+           p.media_width == 160 && p.media_height == 80);
+    m.width = 0;
+    m.content = true;
     assert(cui_base_attachment(m, &p) && !p.flush && p.width == 120 && p.media_height == 52);
+    m.width = 8;
+    assert(cui_base_attachment(m, &p) && p.media_width == 0 && p.width == 8);
+    m.vertical = false;
+    m.width = 50;
+    assert(cui_base_attachment(m, &p) && p.media_width == 20 && p.media_height == 20);
+    m.width = 0;
     m.progress = NAN;
     assert(!cui_base_attachment(m, &p));
     assert(!cui_attachment_metrics_resolve(CUI_MEDIA_CUSTOM, 16, NAN, &p.metrics));

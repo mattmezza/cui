@@ -56,7 +56,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | TitleBar | `cui_title_bar` | Item text labels, retained title state | No native window host controls |
 | Icon | `cui_icon_named`, optional `cui_icon` | Legacy catalog name and dimensions, or a shared owned resource and full copied Icon options | An unknown legacy name fails the frame. A configured Icon reports its own artwork error separately. [C presentation guide](BRIDGE_ICON_PRESENTATION.md). |
 | Message | `cui_message` | Copied body/header, width | Incoming filled bubble, one body |
-| Attachment | `cui_attachment` | Copied title/description, status, progress, width | Metadata chip; no host file or remove/retry actions |
+| Attachment | `cui_attachment` | Copied title/description, status, progress, width. Optional retained C sizing, typography, lifecycle refinements and decoded previews | File transport and action controls remain application-owned. Language builders expose the original metadata chip. |
 | Image | `cui_image` | Owned RGBA8 pixels, revision, description, size | At most 16 MiB; no path, URI, animated loader |
 | Tree | `cui_tree` | 64 flat Item records with preorder depth, expansion and selected Item events | Item step status is depth 0..63; no custom row content |
 | TimeField | `cui_time_field` | HH:MM:SS state, keyboard change, copied event text, disabled | 24-hour fixed format |
@@ -523,6 +523,60 @@ Run each example from the repository root. Use the setup commands under
 [Animate retained Radio selection from C](#animate-retained-radio-selection-from-c)
 to build the matching provider. Omit the font argument to run headlessly.
 The TypeScript example uses Node's TypeScript execution support.
+
+### Configure a retained Attachment from C
+
+Set the filename, detail, width, transfer status and fractional progress with
+the ordinary bridge setters. Call `cui_bridge_attachment_configure_v1` to opt
+into one-line metadata with ellipsis and full semantic labels. An empty title
+or detail is omitted. All nonempty labels must be single lines while the
+presentation is configured. Use `cui_bridge_set_design_size` with the shared
+`XS` through `9XL` scale or `INHERIT` for the original density. Width set
+through `cui_bridge_set_visual_size` overrides the default width.
+
+```c
+cui_bridge_status configure_preview(cui_bridge_app *app, cui_bridge_node file,
+                                    const uint8_t *rgba, uint32_t width, uint32_t height,
+                                    uint32_t stride, uint32_t bytes) {
+    const cui_bridge_attachment_config_v1 presentation = {
+        .struct_size = sizeof presentation,
+        .schema_version = 1,
+        .flags = CUI_BRIDGE_ATTACHMENT_VERTICAL_V1 | CUI_BRIDGE_ATTACHMENT_MEDIA_V1,
+        .media_aspect = 16.0f / 9.0f,
+        .title = {
+            .flags = CUI_BRIDGE_ATTACHMENT_TEXT_STYLE_V1,
+            .weight = 2, /* Semibold. */
+        },
+    };
+    cui_bridge_status status = cui_bridge_attachment_configure_v1(app, file, &presentation);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    return cui_bridge_attachment_set_preview_rgba_v1(
+        app, file, rgba, width, height, stride, bytes);
+}
+```
+
+The host provides the decoded RGBA8 rows. The bridge copies at most 16 MiB
+per preview. Replacing or clearing it releases the old copy. Pass `NULL` and
+four zero sizes to clear the pixels. With `MEDIA` set, the slot stays visible
+for lifecycle feedback before pixels arrive. Vertical media uses the supplied
+aspect or defaults to square. At very narrow widths the preview may collapse
+while metadata labels remain available to assistive technology.
+
+A value of `0.4` represents 40% during Uploading. Set `INDETERMINATE` to omit
+the percentage and show an indeterminate media indicator. Use the child status
+flags to let the title or description reflect a different stage from the card.
+A text record can specify a size or color independently of its font style.
+Color includes explicit transparency. Nonzero letter spacing needs a capable
+text host. A NULL configuration restores the earlier metadata renderer and
+orientation. Preview ownership and named size are independent.
+
+Probe `cui_bridge_attachment_configure_v1` and
+`cui_bridge_attachment_set_preview_rgba_v1` separately when loading a bridge
+dynamically. Call the setters between steps on the owner thread. The
+application owns file selection, decoding, transfer state and retry. Language
+builders currently offer copied labels, status, progress and width.
+[Immediate C Attachment](MEDIA.md#fit-file-names-and-descriptions)
 
 ### Style retained Accordion and Collapsible from C
 

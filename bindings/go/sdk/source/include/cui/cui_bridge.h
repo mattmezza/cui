@@ -1231,8 +1231,56 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_total(cui_bridge_app *, cui_brid
                                                       uint32_t total);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_step_status(cui_bridge_app *, cui_bridge_node item,
                                                             uint32_t status);
+/* Attachment progress passed via set_value is a fraction in [0,1]. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_attachment_status(
     cui_bridge_app *, cui_bridge_node attachment, cui_bridge_attachment_status status);
+enum {
+    CUI_BRIDGE_ATTACHMENT_VERTICAL_V1 = 1u << 0,
+    CUI_BRIDGE_ATTACHMENT_MEDIA_V1 = 1u << 1,
+    CUI_BRIDGE_ATTACHMENT_INDETERMINATE_V1 = 1u << 2,
+    CUI_BRIDGE_ATTACHMENT_TITLE_STATUS_V1 = 1u << 3,
+    CUI_BRIDGE_ATTACHMENT_DESCRIPTION_STATUS_V1 = 1u << 4
+};
+enum {
+    CUI_BRIDGE_ATTACHMENT_TEXT_STYLE_V1 = 1u << 0,
+    CUI_BRIDGE_ATTACHMENT_TEXT_COLOR_V1 = 1u << 1,
+    CUI_BRIDGE_ATTACHMENT_TEXT_ITALIC_V1 = 1u << 2,
+    CUI_BRIDGE_ATTACHMENT_TEXT_MONOSPACE_V1 = 1u << 3
+};
+typedef struct {
+    uint32_t flags, weight;
+    float font_size, letter_spacing;
+    uint32_t color_rgba, reserved;
+} cui_bridge_attachment_text_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, flags, reserved;
+    float media_aspect;
+    uint32_t title_status, description_status, reserved2;
+    cui_bridge_attachment_text_v1 title, description;
+} cui_bridge_attachment_config_v1;
+/* Copy the Attachment presentation. Exact struct_size, schema 1, reserved zero.
+ * A non-NULL record opts into one-line ellipsis with full semantic labels. It
+ * requires CR/LF-free title and detail, including subsequent text updates.
+ * Empty labels are omitted. Width comes from the existing visual-size setter
+ * and named sizes from the design-size setter. MEDIA keeps a preview slot even
+ * when no pixels are installed. Vertical media aspect 0 is square; nonzero
+ * is width/height (1/16 through 16). Indeterminate applies during Uploading.
+ * Child statuses inherit unless their flags are set. Title/detail font size 0
+ * inherits, otherwise set logical pixels up to 4096. STYLE enables weight 0–3,
+ * optional italic/monospace and tracking -4096–4096 (nonzero needs host support).
+ * COLOR sets 0xRRGGBBAA, including transparent. Inactive fields are ignored.
+ * NULL restores legacy metadata/layout while preview pixels and design size
+ * remain independently configurable. Call between steps on the owner thread.
+ * Errors preserve prior settings. No events are enqueued by these setters. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_attachment_configure_v1(
+    cui_bridge_app *, cui_bridge_node, const cui_bridge_attachment_config_v1 *);
+/* Copy decoded straight RGBA8 for Attachment's cover-fitted preview. Same
+ * dimensions/stride/16 MiB bound as set_image_rgba. NULL with four zero sizes
+ * clears it. The bridge owns pixels through replacement, clear or removal.
+ * No I/O, decoding or lifecycle changes occur. Errors preserve the preview. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_attachment_set_preview_rgba_v1(
+    cui_bridge_app *, cui_bridge_node, const uint8_t *pixels, uint32_t width, uint32_t height,
+    uint32_t stride, uint32_t byte_count);
 /* Opt-in Stepper visual composition. Density: 0 MD, 1 XS, 2 SM, 3 LG.
  * Legacy is default; bridge remains selection-owned with aggregate CHANGE.
  * Visual paint snapshots selection until the next frame. Group cap remains 64. */

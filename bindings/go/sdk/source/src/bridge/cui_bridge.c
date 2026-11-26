@@ -1094,6 +1094,7 @@ static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *no
 #include "cui_bridge_skeleton_internal.h"
 #include "cui_bridge_pagination_internal.h"
 #include "cui_bridge_disclosure_internal.h"
+#include "cui_bridge_attachment_internal.h"
 // clang-format on
 
 uint32_t cui_bridge_abi_version(void) {
@@ -1237,6 +1238,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     free(node->disclosure_headings);
     free(node->disclosure_titles);
     free(node->disclosure_divider);
+    free(node->attachment_config);
     free(node->part_shadows);
     free(node->key);
     free(node->text);
@@ -2254,6 +2256,8 @@ cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_bridge_node handl
         return CUI_BRIDGE_INVALID_STATE;
     if (node->kind == CUI_BRIDGE_NOTIFICATION && bridge_notification_entry(app, node->id))
         return CUI_BRIDGE_INVALID_STATE;
+    if (node->attachment_config && !bridge_attachment_single_line(text_utf8))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
     if (node->kind == CUI_BRIDGE_TEXT_VIEW) {
         char *copy = NULL;
         status = bridge_copy(text_utf8, &copy);
@@ -2926,6 +2930,8 @@ cui_bridge_status cui_bridge_set_detail_text(cui_bridge_app *app, cui_bridge_nod
         return CUI_BRIDGE_INVALID_STATE;
     if (node->kind == CUI_BRIDGE_NOTIFICATION && bridge_notification_entry(app, node->id))
         return CUI_BRIDGE_INVALID_STATE;
+    if (node->attachment_config && !bridge_attachment_single_line(text_utf8))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
     char *copy = NULL;
     status = bridge_copy(text_utf8, &copy);
     if (status != CUI_BRIDGE_OK)
@@ -3346,16 +3352,9 @@ cui_bridge_status cui_bridge_set_stepper_fill(cui_bridge_app *app, cui_bridge_no
     cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
-cui_bridge_status cui_bridge_set_image_rgba(cui_bridge_app *app, cui_bridge_node handle,
-                                            const uint8_t *pixels, uint32_t width, uint32_t height,
-                                            uint32_t stride, uint32_t byte_count) {
-    cui_bridge_node_record *node;
-    cui_bridge_status status = bridge_valid_node(app, handle, &node);
-    if (status != CUI_BRIDGE_OK)
-        return status;
-    if (node->kind != CUI_BRIDGE_IMAGE && !(node->kind == CUI_BRIDGE_ITEM && node->parent &&
-                                            app->nodes[node->parent].kind == CUI_BRIDGE_STEPPER))
-        return CUI_BRIDGE_INVALID_STATE;
+static cui_bridge_status bridge_copy_image_rgba(cui_bridge_node_record *node, const uint8_t *pixels,
+                                                uint32_t width, uint32_t height, uint32_t stride,
+                                                uint32_t byte_count) {
     if (!pixels || !width || !height || width > 2048 || height > 2048 || stride < width * 4u ||
         (uint64_t)stride * height > UINT32_C(16777216) || byte_count != (uint64_t)stride * height)
         return CUI_BRIDGE_INVALID_ARGUMENT;
@@ -3371,6 +3370,45 @@ cui_bridge_status cui_bridge_set_image_rgba(cui_bridge_app *app, cui_bridge_node
                                           .stride = stride,
                                           .revision = node->image_frame.revision + 1};
     cui_image_state_reset(&node->image_state);
+    return CUI_BRIDGE_OK;
+}
+cui_bridge_status cui_bridge_set_image_rgba(cui_bridge_app *app, cui_bridge_node handle,
+                                            const uint8_t *pixels, uint32_t width, uint32_t height,
+                                            uint32_t stride, uint32_t byte_count) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_IMAGE && !(node->kind == CUI_BRIDGE_ITEM && node->parent &&
+                                            app->nodes[node->parent].kind == CUI_BRIDGE_STEPPER))
+        return CUI_BRIDGE_INVALID_STATE;
+    return bridge_copy_image_rgba(node, pixels, width, height, stride, byte_count);
+}
+
+cui_bridge_status cui_bridge_attachment_set_preview_rgba_v1(cui_bridge_app *app,
+                                                            cui_bridge_node handle,
+                                                            const uint8_t *pixels, uint32_t width,
+                                                            uint32_t height, uint32_t stride,
+                                                            uint32_t byte_count) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_ATTACHMENT)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (!pixels) {
+        if (width || height || stride || byte_count)
+            return CUI_BRIDGE_INVALID_ARGUMENT;
+        free(node->image_pixels);
+        node->image_pixels = NULL;
+        node->image_frame = (cui_image_frame){.revision = node->image_frame.revision + 1};
+        cui_image_state_reset(&node->image_state);
+    } else {
+        status = bridge_copy_image_rgba(node, pixels, width, height, stride, byte_count);
+        if (status != CUI_BRIDGE_OK)
+            return status;
+    }
+    cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
 cui_bridge_status cui_bridge_set_time(cui_bridge_app *app, cui_bridge_node handle,
@@ -3703,11 +3741,14 @@ cui_bridge_status cui_bridge_set_design_size(cui_bridge_app *app, cui_bridge_nod
     if (status != CUI_BRIDGE_OK)
         return status;
     if (node->kind != CUI_BRIDGE_BUTTON && node->kind != CUI_BRIDGE_AVATAR &&
-        node->kind != CUI_BRIDGE_STEPPER && node->kind != CUI_BRIDGE_PAGINATION)
+        node->kind != CUI_BRIDGE_STEPPER && node->kind != CUI_BRIDGE_PAGINATION &&
+        node->kind != CUI_BRIDGE_ATTACHMENT)
         return CUI_BRIDGE_INVALID_STATE;
     if (size < CUI_BRIDGE_SIZE_INHERIT || size > CUI_BRIDGE_SIZE_9XL)
         return CUI_BRIDGE_INVALID_ARGUMENT;
     node->size = size;
+    if (node->kind == CUI_BRIDGE_ATTACHMENT)
+        cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
 cui_bridge_status cui_bridge_set_avatar_identity(cui_bridge_app *app, cui_bridge_node handle,
@@ -4627,6 +4668,66 @@ static cui_image_load bridge_image_loader(void *user, cui_image_source source) {
     if (!node->image_pixels)
         return (cui_image_load){.status = CUI_IMAGE_PENDING};
     return (cui_image_load){.status = CUI_IMAGE_READY, .frames = &node->image_frame, .count = 1};
+}
+static void bridge_render_attachment(cui_bridge_app *app, cui_bridge_node_record *node) {
+    const cui_bridge_attachment_config_v1 *config = node->attachment_config;
+    uint32_t flags = config ? config->flags : 0;
+    cui_attachment_child children[2];
+    size_t count = 0;
+    if (!config || node->text[0]) {
+        children[count] =
+            (cui_attachment_child){.kind = CUI_ATTACHMENT_TITLE, .text = cui_string(node->text)};
+        if (config)
+            bridge_attachment_apply_text(&children[count], config->title,
+                                         (flags & CUI_BRIDGE_ATTACHMENT_TITLE_STATUS_V1) != 0,
+                                         config->title_status);
+        count++;
+    }
+    if (node->detail[0]) {
+        children[count] = (cui_attachment_child){.kind = CUI_ATTACHMENT_DESCRIPTION,
+                                                 .text = cui_string(node->detail)};
+        if (config)
+            bridge_attachment_apply_text(&children[count], config->description,
+                                         (flags & CUI_BRIDGE_ATTACHMENT_DESCRIPTION_STATUS_V1) != 0,
+                                         config->description_status);
+        count++;
+    }
+    cui_attachment_options options = cui_attachment_options_default();
+    options.model.status = (cui_attachment_status)node->attachment_status;
+    options.model.progress_known = !(flags & CUI_BRIDGE_ATTACHMENT_INDETERMINATE_V1);
+    options.model.progress = (float)(node->value * 100.0);
+    options.model.width = node->visual_width;
+    options.model.design_size = (cui_design_size)node->size;
+    options.model.vertical = (flags & CUI_BRIDGE_ATTACHMENT_VERTICAL_V1) != 0;
+    options.model.media = (flags & CUI_BRIDGE_ATTACHMENT_MEDIA_V1) != 0;
+    if (config && config->media_aspect)
+        options.model.media_aspect = config->media_aspect;
+    options.children = children;
+    options.child_count = count;
+    options.name = cui_string(node->text);
+    options.now_seconds = cui_frame_time(app->ui);
+    if (node->image_pixels) {
+        options.image_state = &node->image_state;
+        options.image_source = (cui_image_source){.kind = CUI_IMAGE_CUSTOM, .identity = node->id};
+        options.image_loader = bridge_image_loader;
+        options.image_user = node;
+    }
+    cui_attachment_result result;
+    if (config) {
+        cui_attachment_metadata_style metadata = {
+            .title = bridge_attachment_text_style(config->title),
+            .description = bridge_attachment_text_style(config->description),
+            .custom_title = (config->title.flags & CUI_BRIDGE_ATTACHMENT_TEXT_STYLE_V1) != 0,
+            .custom_description =
+                (config->description.flags & CUI_BRIDGE_ATTACHMENT_TEXT_STYLE_V1) != 0,
+        };
+        result = cui_attachment_with_metadata(app->ui, node->id, &app->theme,
+                                              &node->attachment_state, options, metadata);
+    } else {
+        result = cui_attachment(app->ui, node->id, &app->theme, &node->attachment_state, options);
+    }
+    if (!result.valid)
+        app->frame_error = CUI_BRIDGE_CORE_ERROR;
 }
 static void bridge_render_tree(cui_bridge_app *app, uint32_t slot, cui_bridge_node_record *node) {
     if (!node->tree_model) {
@@ -5865,23 +5966,7 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         if (!cui_message(app->ui, node->id, &app->theme, options))
             app->frame_error = CUI_BRIDGE_CORE_ERROR;
     } else if (node->kind == CUI_BRIDGE_ATTACHMENT) {
-        cui_attachment_child children[2] = {
-            {.kind = CUI_ATTACHMENT_TITLE, .text = cui_string(node->text)},
-            {.kind = CUI_ATTACHMENT_DESCRIPTION, .text = cui_string(node->detail)}};
-        cui_attachment_options options = cui_attachment_options_default();
-        options.model = cui_attachment_model_default();
-        options.model.status = (cui_attachment_status)node->attachment_status;
-        options.model.progress_known = true;
-        options.model.progress = (float)node->value;
-        options.model.width = node->visual_width;
-        options.children = children;
-        options.child_count = node->detail[0] ? 2 : 1;
-        options.name = cui_string(node->text);
-        options.now_seconds = cui_frame_time(app->ui);
-        cui_attachment_result result =
-            cui_attachment(app->ui, node->id, &app->theme, &node->attachment_state, options);
-        if (!result.valid)
-            app->frame_error = CUI_BRIDGE_CORE_ERROR;
+        bridge_render_attachment(app, node);
     } else if (node->kind == CUI_BRIDGE_IMAGE) {
         cui_image_options options = cui_image_options_default();
         options.geometry.width = node->visual_width > 0    ? node->visual_width

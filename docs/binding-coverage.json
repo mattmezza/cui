@@ -62,7 +62,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Opt-in metadata ellipsis, full child labels, independent typography and the typed observer are immediate C APIs. Retained builders retain their existing Attachment presentation and events."
+        "Retained C supports configurable layout, preview pixels and fitted metadata through separately probed symbols. Python, JS/TS, Go and Rust currently expose the original copied title/description, status, progress and width. Composed slots and typed remove/retry observers remain immediate C APIs."
       ]
     },
     {

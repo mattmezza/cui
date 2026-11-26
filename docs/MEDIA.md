@@ -95,7 +95,10 @@ the same typography options and a trailing `cui_attachment_handler`.
 The application still owns transfer state. Custom children keep their rendering
 callbacks. Typed title and description inputs must be single lines. On extremely
 narrow cards the row can retain the full semantic label when even the ellipsis
-does not fit. Retained language builders currently expose the older presentation.
+does not fit. The same narrow-width handling applies when the preview
+must shrink to fit. A vertical media-only card follows its explicit aspect
+ratio. Retained C can opt into fitted labels and supply a decoded preview
+through the bridge. [Retained Attachment](BRIDGE_COMPONENTS.md#configure-a-retained-attachment-from-c)
 
 AttachmentGroup retains a horizontal scroll offset, or uses an explicit external
 scroll state. Its default gap is 12 and vertical padding is 4. Dominant horizontal

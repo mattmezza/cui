@@ -5,21 +5,23 @@
     {
       "api_symbols": [
         "cui_accordion",
-        "cui_accordion_events"
+        "cui_accordion_events",
+        "cui_accordion_present"
       ],
       "state_types": [
         "cui_disclosure_motion"
       ],
       "state_ownership": "Caller retains bool expansion values and optional per-panel cui_disclosure_motion arrays.",
       "interaction": "Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.",
-      "usage": "Submit stable item IDs and current expansion each frame; keep motion and style arrays alive through end_frame.",
+      "usage": "Submit stable item IDs and current expansion each frame; keep motion and style arrays alive through end_frame. Use the styled presenter for shared size tokens, responsive width and decorative SVG indicators.",
       "docs": [
         "docs/DISCLOSURE.md",
         "docs/DISCLOSURE_EVENTS.md"
       ],
       "callback_symbols": [
         "cui_disclosure_panel_fn",
-        "cui_disclosure_header_fn"
+        "cui_disclosure_header_fn",
+        "cui_disclosure_change_fn"
       ],
       "scope": "styled frame component",
       "name": "Accordion",
@@ -334,21 +336,23 @@
       "api_symbols": [
         "cui_collapsible",
         "cui_collapsible_ex",
-        "cui_collapsible_events"
+        "cui_collapsible_events",
+        "cui_collapsible_present"
       ],
       "state_types": [
         "cui_disclosure_motion"
       ],
       "state_ownership": "Caller retains bool expansion values and optional per-panel cui_disclosure_motion arrays.",
       "interaction": "Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.",
-      "usage": "Submit stable item IDs and current expansion each frame; keep motion and style arrays alive through end_frame.",
+      "usage": "Submit stable item IDs and current expansion each frame; keep motion and style arrays alive through end_frame. Use the styled presenter for shared size tokens, responsive width and decorative SVG indicators.",
       "docs": [
         "docs/DISCLOSURE.md",
         "docs/DISCLOSURE_EVENTS.md"
       ],
       "callback_symbols": [
         "cui_disclosure_panel_fn",
-        "cui_disclosure_header_fn"
+        "cui_disclosure_header_fn",
+        "cui_disclosure_change_fn"
       ],
       "scope": "styled frame component",
       "name": "Collapsible",

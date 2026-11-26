@@ -2,20 +2,90 @@
 #include "cui/cui_disclosure_events.h"
 #include "cui/cui_icon.h"
 #include <math.h>
+
+typedef struct {
+    cui_disclosure_presentation options;
+    cui_design_metrics metrics;
+} cui_disclosure_paint;
+
+static bool cui_disclosure_resolve(const cui_theme *theme, cui_disclosure_presentation p,
+                                   cui_disclosure_paint *paint) {
+    if (!theme || !isfinite(p.width) || (p.width < 0 && p.width != -1))
+        return false;
+    cui_design_metrics m = {.font_size = theme->font_size,
+                            .control_height = theme->control_height,
+                            .gap = theme->gap,
+                            .padding_x = theme->padding,
+                            .padding_y = theme->padding};
+    if (p.design_size && !cui_design_measure(p.design_size, theme->font_size / 16, &m))
+        return false;
+    *paint = (cui_disclosure_paint){.options = p, .metrics = m};
+    return true;
+}
+
+static cui_box cui_disclosure_layout(const cui_theme *theme, const cui_disclosure_paint *paint) {
+    if (!paint)
+        return (cui_box){.padding = theme->padding, .gap = theme->gap};
+    return (cui_box){.width = paint->options.width != 0 ? 1 : 0,
+                     .width_percent = paint->options.width != 0,
+                     .gap = paint->metrics.gap,
+                     .custom_padding = true,
+                     .padding_edges = {paint->metrics.padding_x, paint->metrics.padding_x,
+                                       paint->metrics.padding_y, paint->metrics.padding_y}};
+}
+
+static void cui_disclosure_title(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
+                                 bool open, bool disabled, bool bounded,
+                                 const cui_disclosure_paint *paint) {
+    cui_color color = disabled ? theme->muted : theme->text;
+    cui_id indicator = id ^ UINT64_C(0x52fc0dc74f3d9a22);
+    if (paint) {
+        if (bounded)
+            cui_begin_box(ui, 0, (cui_box){.width = -1, .clip = true});
+        cui_text_line(ui, label, paint->metrics.font_size, color, paint->metrics.line_height,
+                      (cui_text_style){0});
+        if (bounded)
+            cui_end_box(ui);
+        cui_str name = open ? paint->options.expanded_icon : paint->options.collapsed_icon;
+        if (!name.length)
+            name = cui_string(open ? "chevron-up" : "chevron-down");
+        (void)cui_icon_named(ui, indicator, theme, name,
+                             (cui_icon_options){.size = paint->metrics.indicator_size
+                                                            ? CUI_ICON_CUSTOM
+                                                            : CUI_ICON_XSMALL,
+                                                .custom_size = paint->metrics.indicator_size,
+                                                .custom_color = true,
+                                                .color = theme->muted});
+        return;
+    }
+    cui_text(ui, label, theme->font_size, color);
+    if (!disabled) {
+        cui_begin_box(ui, id ^ UINT64_C(0x52fc0dc74f3d9a21), (cui_box){.width = -1});
+        cui_end_box(ui);
+        (void)cui_icon_named(
+            ui, indicator, theme, cui_string("chevron-down"),
+            (cui_icon_options){.size = CUI_ICON_XSMALL,
+                               .custom_color = true,
+                               .color = theme->muted,
+                               .custom_transform = true,
+                               .transform = open ? (cui_icon_transform){-1, 0, 0, -1, 0, 0}
+                                                 : cui_icon_identity()});
+    }
+}
+
 static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *theme,
                                    cui_str label, bool open, bool disabled, bool bordered,
                                    const cui_disclosure_item *item, size_t index,
                                    cui_disclosure_header_fn render, void *user,
-                                   const cui_box *style) {
-    cui_box box = {.height = theme->control_height,
-                   .padding = theme->padding,
-                   .gap = theme->gap,
-                   .row = true,
-                   .align_y = CUI_ALIGN_CENTER,
-                   .radius = theme->radius,
-                   .background = theme->surface,
-                   .border = theme->border,
-                   .border_width = bordered ? 1 : 0};
+                                   const cui_box *style, const cui_disclosure_paint *paint) {
+    cui_box box = cui_disclosure_layout(theme, paint);
+    box.height = paint ? paint->metrics.control_height : theme->control_height;
+    box.row = true;
+    box.align_y = CUI_ALIGN_CENTER;
+    box.radius = theme->radius;
+    box.background = theme->surface;
+    box.border = theme->border;
+    box.border_width = bordered ? 1 : 0;
     if (style)
         box = *style;
     if (cui_focused(ui) == id) {
@@ -28,26 +98,15 @@ static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *
         effective.disabled = disabled;
         render(ui, &effective, index, open, user);
     } else {
-        cui_text(ui, label, theme->font_size, disabled ? theme->muted : theme->text);
-        if (!disabled) {
-            cui_begin_box(ui, id ^ UINT64_C(0x52fc0dc74f3d9a21), (cui_box){.width = -1});
-            cui_end_box(ui);
-            (void)cui_icon_named(
-                ui, id ^ UINT64_C(0x52fc0dc74f3d9a22), theme, cui_string("chevron-down"),
-                (cui_icon_options){.size = CUI_ICON_XSMALL,
-                                   .custom_color = true,
-                                   .color = theme->muted,
-                                   .custom_transform = true,
-                                   .transform = open ? (cui_icon_transform){-1, 0, 0, -1, 0, 0}
-                                                     : cui_icon_identity()});
-        }
+        cui_disclosure_title(ui, id, theme, label, open, disabled, box.width != 0, paint);
     }
     cui_end_box(ui);
 }
 static void cui_disclosure_panel(cui_context *ui, cui_id trigger, cui_id parent, cui_str label,
                                  bool open, cui_box box, cui_disclosure_motion *motion, float dt,
                                  float response, cui_spring_settings settings, bool reduced_motion,
-                                 size_t index, cui_disclosure_panel_fn panel, void *user) {
+                                 size_t index, cui_disclosure_panel_fn panel, void *user,
+                                 bool fill_width) {
     if (!panel || (!open && !motion))
         return;
     cui_id panel_id = trigger ^ UINT64_C(0x1d8f322539deca61);
@@ -60,7 +119,8 @@ static void cui_disclosure_panel(cui_context *ui, cui_id trigger, cui_id parent,
         cui_disclosure_motion_step_ex(motion, open, dt, settings, reduced_motion);
         float height = isfinite(motion->measured.h) ? fmaxf(0, motion->measured.h) : 0;
         cui_begin_box(ui, trigger ^ UINT64_C(0x48aaf2a21d3ed09f),
-                      (cui_box){.height = height * fminf(1, fmaxf(0, motion->progress)),
+                      (cui_box){.width = fill_width ? -1 : 0,
+                                .height = height * fminf(1, fmaxf(0, motion->progress)),
                                 .fixed_height = true,
                                 .clip = true,
                                 .layout_only = motion->progress == 0,
@@ -83,7 +143,7 @@ static cui_disclosure_event_result
 cui_collapsible_styled_common(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
                               bool *open, cui_collapsible_options options,
                               cui_disclosure_panel_fn panel, void *user,
-                              cui_disclosure_handler handler) {
+                              cui_disclosure_handler handler, const cui_disclosure_paint *paint) {
     if (!theme || !open)
         return (cui_disclosure_event_result){0};
     cui_disclosure_event_result result = {0};
@@ -91,16 +151,18 @@ cui_collapsible_styled_common(cui_context *ui, cui_id id, const cui_theme *theme
         result = cui_base_collapsible_events(ui, id, label, open, options.disabled, handler);
     else
         result.changed = cui_base_collapsible(ui, id, label, open, options.disabled);
-    cui_begin_box(ui, id ^ UINT64_C(0xb7c1c9d453922783), (cui_box){.gap = theme->gap});
+    cui_begin_box(ui, id ^ UINT64_C(0xb7c1c9d453922783),
+                  (cui_box){.width = paint ? paint->options.width : 0,
+                            .gap = paint ? paint->metrics.gap : theme->gap});
     cui_disclosure_item item = {.id = id, .label = label, .disabled = options.disabled};
     cui_disclosure_trigger(ui, id, theme, label, *open, options.disabled, !options.borderless,
                            &item, 0, options.render_header, options.header_user,
-                           options.trigger_box);
-    cui_box panel_box = options.panel_box ? *options.panel_box
-                                          : (cui_box){.padding = theme->padding, .gap = theme->gap};
+                           options.trigger_box, paint);
+    cui_box panel_box =
+        options.panel_box ? *options.panel_box : cui_disclosure_layout(theme, paint);
     cui_disclosure_panel(ui, id, 0, label, *open, panel_box, options.motion, options.dt,
                          options.response, theme->spring_control, options.reduced_motion, 0, panel,
-                         user);
+                         user, paint && paint->options.width != 0);
     cui_end_box(ui);
     return result;
 }
@@ -108,7 +170,7 @@ bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_
                         bool *open, cui_collapsible_options options, cui_disclosure_panel_fn panel,
                         void *user) {
     return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user,
-                                         (cui_disclosure_handler){0})
+                                         (cui_disclosure_handler){0}, NULL)
         .changed;
 }
 cui_disclosure_event_result cui_collapsible_events(cui_context *ui, cui_id id,
@@ -118,18 +180,30 @@ cui_disclosure_event_result cui_collapsible_events(cui_context *ui, cui_id id,
                                                    cui_disclosure_handler handler) {
     if (!ui || !id || !theme || !open)
         return (cui_disclosure_event_result){0};
-    return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user, handler);
+    return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user, handler,
+                                         NULL);
+}
+cui_disclosure_event_result cui_collapsible_present(cui_context *ui, cui_id id,
+                                                    const cui_theme *theme, cui_str label,
+                                                    bool *open, cui_collapsible_options options,
+                                                    cui_disclosure_presentation presentation,
+                                                    cui_disclosure_panel_fn panel, void *user,
+                                                    cui_disclosure_handler handler) {
+    cui_disclosure_paint paint;
+    if (!ui || !id || !open || !cui_disclosure_resolve(theme, presentation, &paint))
+        return (cui_disclosure_event_result){0};
+    return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user, handler,
+                                         &paint);
 }
 bool cui_collapsible(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label, bool *open,
                      bool disabled, cui_disclosure_panel_fn panel, void *user) {
     return cui_collapsible_ex(ui, id, theme, label, open,
                               (cui_collapsible_options){.disabled = disabled}, panel, user);
 }
-static cui_disclosure_event_result
-cui_accordion_styled_common(cui_context *ui, cui_id container, const cui_theme *theme,
-                            const cui_disclosure_item *items, size_t count, bool *open,
-                            cui_accordion_options options, cui_disclosure_panel_fn panel,
-                            void *user, cui_disclosure_handler handler) {
+static cui_disclosure_event_result cui_accordion_styled_common(
+    cui_context *ui, cui_id container, const cui_theme *theme, const cui_disclosure_item *items,
+    size_t count, bool *open, cui_accordion_options options, cui_disclosure_panel_fn panel,
+    void *user, cui_disclosure_handler handler, const cui_disclosure_paint *paint) {
     if (!theme || !items || !open)
         return (cui_disclosure_event_result){0};
     cui_disclosure_event_result result = {0};
@@ -140,12 +214,15 @@ cui_accordion_styled_common(cui_context *ui, cui_id container, const cui_theme *
     cui_interact(ui, container, CUI_ROLE_GROUP, cui_string(""), options.disabled, false, 0);
     cui_set_semantic_details(ui, container,
                              (cui_semantic_details){.orientation = CUI_ORIENTATION_VERTICAL});
-    cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
+    cui_begin_box(ui, container,
+                  (cui_box){.width = paint ? paint->options.width : 0,
+                            .gap = paint ? paint->metrics.gap : theme->gap});
     for (size_t i = 0; i < count; ++i) {
         cui_disclosure_trigger(
             ui, items[i].id, theme, items[i].label, open[i], options.disabled || items[i].disabled,
             options.bordered, &items[i], i, options.render_header, options.header_user,
-            options.trigger_boxes && i < options.style_count ? &options.trigger_boxes[i] : NULL);
+            options.trigger_boxes && i < options.style_count ? &options.trigger_boxes[i] : NULL,
+            paint);
         cui_set_semantic_details(
             ui, items[i].id,
             (cui_semantic_details){.expanded = open[i],
@@ -153,12 +230,13 @@ cui_accordion_styled_common(cui_context *ui, cui_id container, const cui_theme *
                                    .parent = container});
         cui_box panel_box = options.panel_boxes && i < options.style_count
                                 ? options.panel_boxes[i]
-                                : (cui_box){.padding = theme->padding, .gap = theme->gap};
+                                : cui_disclosure_layout(theme, paint);
         cui_disclosure_motion *motion =
             options.motion && i < options.motion_count ? &options.motion[i] : NULL;
         cui_disclosure_panel(ui, items[i].id, container, items[i].label, open[i], panel_box, motion,
                              options.dt, options.response, theme->spring_control,
-                             options.reduced_motion, i, panel, user);
+                             options.reduced_motion, i, panel, user,
+                             paint && paint->options.width != 0);
     }
     cui_end_box(ui);
     return result;
@@ -168,7 +246,7 @@ bool cui_accordion(cui_context *ui, cui_id container, const cui_theme *theme,
                    const cui_disclosure_item *items, size_t count, bool *open,
                    cui_accordion_options options, cui_disclosure_panel_fn panel, void *user) {
     return cui_accordion_styled_common(ui, container, theme, items, count, open, options, panel,
-                                       user, (cui_disclosure_handler){0})
+                                       user, (cui_disclosure_handler){0}, NULL)
         .changed;
 }
 cui_disclosure_event_result cui_accordion_events(cui_context *ui, cui_id container,
@@ -183,5 +261,21 @@ cui_disclosure_event_result cui_accordion_events(cui_context *ui, cui_id contain
         if (!items[i].id)
             return (cui_disclosure_event_result){0};
     return cui_accordion_styled_common(ui, container, theme, items, count, open, options, panel,
-                                       user, handler);
+                                       user, handler, NULL);
+}
+
+cui_disclosure_event_result
+cui_accordion_present(cui_context *ui, cui_id container, const cui_theme *theme,
+                      const cui_disclosure_item *items, size_t count, bool *open,
+                      cui_accordion_options options, cui_disclosure_presentation presentation,
+                      cui_disclosure_panel_fn panel, void *user, cui_disclosure_handler handler) {
+    cui_disclosure_paint paint;
+    if (!ui || !container || !items || !count || !open ||
+        !cui_disclosure_resolve(theme, presentation, &paint))
+        return (cui_disclosure_event_result){0};
+    for (size_t i = 0; i < count; ++i)
+        if (!items[i].id)
+            return (cui_disclosure_event_result){0};
+    return cui_accordion_styled_common(ui, container, theme, items, count, open, options, panel,
+                                       user, handler, &paint);
 }

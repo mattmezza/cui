@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
-#include "cui/cui_disclosure.h"
+#include "cui/cui_disclosure_events.h"
 #include <assert.h>
 #include <math.h>
 #include <string.h>
@@ -342,8 +342,113 @@ static void test_disclosure_chevron(void) {
     }
     cui_destroy(ui);
 }
+
+typedef struct {
+    bool nested_open;
+    size_t changes;
+    cui_disclosure_change last;
+} disclosure_presentation_state;
+
+static void record_presentation_change(void *user, const cui_disclosure_change *change) {
+    disclosure_presentation_state *state = user;
+    state->last = *change;
+    ++state->changes;
+}
+
+static void present_nested(cui_context *ui, size_t index, void *user) {
+    if (index != 0)
+        return;
+    disclosure_presentation_state *state = user;
+    const cui_theme theme = cui_theme_light();
+    cui_collapsible_present(
+        ui, 2002, &theme, cui_string("Nested details"), &state->nested_open,
+        (cui_collapsible_options){0},
+        (cui_disclosure_presentation){.width = -1, .design_size = CUI_DESIGN_XS}, panel, NULL,
+        (cui_disclosure_handler){record_presentation_change, state});
+}
+
+static void test_disclosure_presentation(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 700});
+    const cui_theme theme = cui_theme_light();
+    const cui_disclosure_item section = {
+        2001, cui_string("A long heading keeps its accessible name at narrow widths"), false};
+    bool open = false;
+    disclosure_presentation_state state = {0};
+    assert(ui);
+    for (int size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; ++size) {
+        assert(cui_begin_frame(ui, 400, 700, .016f));
+        const float width = size == CUI_DESIGN_9XL ? 360 : 280;
+        cui_begin_box(ui, 2000, (cui_box){.width = width});
+        assert(
+            !cui_accordion_present(
+                 ui, 2003, &theme, &section, 1, &open, (cui_accordion_options){.bordered = true},
+                 (cui_disclosure_presentation){.width = -1, .design_size = (cui_design_size)size},
+                 NULL, NULL, (cui_disclosure_handler){0})
+                 .changed);
+        cui_end_box(ui);
+        cui_draw_list draw = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        cui_design_metrics metrics;
+        assert(cui_design_measure((cui_design_size)size, theme.font_size / 16, &metrics));
+        cui_rect row = cui_bounds(ui, section.id);
+        assert(row.w == width && row.h == metrics.control_height);
+        size_t images = 0, titles = 0, title_clips = 0, semantic_count;
+        const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+        assert(semantic_count == 2 && semantics[0].id == section.id &&
+               semantics[0].name.length == section.label.length);
+        for (size_t i = 0; i < draw.count; ++i) {
+            const cui_draw_command *cmd = &draw.commands[i];
+            if (cmd->type == CUI_DRAW_IMAGE) {
+                ++images;
+                assert(fabsf(cmd->bounds.y + cmd->bounds.h / 2 - row.y - row.h / 2) < .6f);
+                assert(fabsf(cmd->bounds.x + cmd->bounds.w - row.x - row.w + metrics.padding_x) <
+                       .6f);
+            } else if (cmd->type == CUI_DRAW_TEXT) {
+                ++titles;
+                assert(cmd->font_size == metrics.font_size);
+            } else if (cmd->type == CUI_DRAW_CLIP_PUSH) {
+                ++title_clips;
+                assert(cmd->bounds.h == metrics.line_height);
+                assert(fabsf(cmd->bounds.y + cmd->bounds.h / 2 - row.y - row.h / 2) < .6f);
+            }
+        }
+        assert(images == 1 && titles == 1 && title_clips == 1);
+    }
+
+    cui_disclosure_presentation p = {.width = 280,
+                                     .design_size = CUI_DESIGN_BASE,
+                                     .collapsed_icon = {"plus", 4},
+                                     .expanded_icon = {"minus", 5}};
+    for (int phase = 0; phase < 4; ++phase) {
+        if (phase > 0)
+            click(ui, phase == 2 ? 2002 : section.id);
+        assert(cui_begin_frame(ui, 400, 700, .016f));
+        cui_disclosure_event_result result = cui_accordion_present(
+            ui, 2003, &theme, &section, 1, &open, (cui_accordion_options){.collapsible = true}, p,
+            present_nested, &state, (cui_disclosure_handler){record_presentation_change, &state});
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        assert(result.changed == (phase == 1 || phase == 3));
+        assert(open == (phase == 1 || phase == 2));
+        assert(has_semantic(ui, 2002) == open);
+        assert(state.changes == (size_t)phase);
+        if (phase == 2)
+            assert(state.nested_open && state.last.item == 2002 && state.last.expanded);
+    }
+    assert(cui_begin_frame(ui, 400, 700, .016f));
+    p.width = NAN;
+    assert(!cui_accordion_present(ui, 2003, &theme, &section, 1, &open, (cui_accordion_options){0},
+                                  p, present_nested, &state,
+                                  (cui_disclosure_handler){record_presentation_change, &state})
+                .changed);
+    assert(cui_end_frame(ui).count == 0 && !open && state.changes == 3);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_disclosure_chevron();
+    test_disclosure_presentation();
     test_measured_reveal();
     test_configured_disclosure_springs();
     test_accordion_reveal_storage();

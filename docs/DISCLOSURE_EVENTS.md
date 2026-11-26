@@ -4,7 +4,9 @@ Include `cui/cui_disclosure_events.h`. `cui_base_collapsible_events` and
 `cui_collapsible_events` add a synchronous observer to the existing owned bool.
 They preserve the old return in `result.changed`; `change_count` counts actual
 observer calls and saturates at SIZE_MAX with `count_overflow`. A missing observer
-still permits editing and ignores its user pointer.
+still permits editing and ignores its user pointer. `cui_accordion_present` and
+`cui_collapsible_present` accept this same handler when using
+[design sizes and SVG indicators](DISCLOSURE.md#size-and-indicators).
 
 ```c
 static void expanded(void *user, const cui_disclosure_change *change) {

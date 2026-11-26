@@ -109,7 +109,7 @@ The checkbox updates the application's bool. Controlled Switch/Toggle `on_change
 
 **Interaction:** Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.
 
-**Usage:** Submit stable item IDs and current expansion each frame; keep motion and style arrays alive through end_frame.
+**Usage:** Submit stable item IDs and current expansion each frame; keep motion and style arrays alive through end_frame. Use the styled presenter for shared size tokens, responsive width and decorative SVG indicators.
 
 API: `cui_accordion`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md).
 
@@ -250,7 +250,7 @@ API: `cui_sdl3_clipboard_interface`. [Public header](../include/cui/cui_sdl3.h);
 
 **Interaction:** Returns whether expansion changed; cui_disclosure_panel_fn composes panel children and cui_disclosure_header_fn custom headers.
 
-**Usage:** Submit stable item IDs and current expansion each frame; keep motion and style arrays alive through end_frame.
+**Usage:** Submit stable item IDs and current expansion each frame; keep motion and style arrays alive through end_frame. Use the styled presenter for shared size tokens, responsive width and decorative SVG indicators.
 
 API: `cui_collapsible`, `cui_collapsible_ex`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md).
 

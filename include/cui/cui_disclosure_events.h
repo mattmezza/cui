@@ -46,6 +46,19 @@ cui_disclosure_event_result cui_accordion_events(cui_context *, cui_id container
                                                  bool *open, cui_accordion_options,
                                                  cui_disclosure_panel_fn, void *panel_user,
                                                  cui_disclosure_handler);
+/* Same controlled state, timing and results as the Styled event functions.
+ * Invalid width or design metrics leave the frame and state unchanged. */
+cui_disclosure_event_result cui_collapsible_present(cui_context *, cui_id, const cui_theme *,
+                                                    cui_str, bool *open, cui_collapsible_options,
+                                                    cui_disclosure_presentation,
+                                                    cui_disclosure_panel_fn, void *panel_user,
+                                                    cui_disclosure_handler);
+cui_disclosure_event_result cui_accordion_present(cui_context *, cui_id container,
+                                                  const cui_theme *, const cui_disclosure_item *,
+                                                  size_t count, bool *open, cui_accordion_options,
+                                                  cui_disclosure_presentation,
+                                                  cui_disclosure_panel_fn, void *panel_user,
+                                                  cui_disclosure_handler);
 #ifdef __cplusplus
 }
 #endif

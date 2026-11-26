@@ -10,7 +10,9 @@
       "public_header": "include/cui/cui_disclosure.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_disclosure.c"
+        "tests/unit/test_disclosure.c",
+        "tests/unit/test_disclosure_events.c",
+        "tests/web/test_touch_components.py"
       ],
       "status": "tested",
       "platforms": {
@@ -18,7 +20,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending."
+        "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending.",
+        "The frozen styled source has a bordered outer card with separators and per-item hover/style refinement. CUI provides independent framed headers and per-item trigger/panel box overrides plus header composition. A group-root and per-state refinement audit, retained presentation and physical accessibility remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -50,6 +53,22 @@
           "evidence": [
             "tests/unit/test_disclosure.c",
             "docs/validation/gcc-56.txt"
+          ]
+        },
+        {
+          "name": "shared design sizes and centered, configurable SVG indicators",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c",
+            "tests/web/test_touch_components.py"
+          ]
+        },
+        {
+          "name": "nested groups with independently owned expansion and routed activation",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c",
+            "tests/web/test_touch_components.py"
           ]
         }
       ],
@@ -1074,7 +1093,9 @@
       "public_header": "include/cui/cui_disclosure.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_disclosure.c"
+        "tests/unit/test_disclosure.c",
+        "tests/unit/test_disclosure_events.c",
+        "tests/web/test_touch_components.py"
       ],
       "status": "tested",
       "platforms": {
@@ -1082,7 +1103,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending."
+        "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending.",
+        "The sized, named SVG presentation and typed observer are immediate C APIs. Physical native accessibility and retained presentation remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1114,6 +1136,14 @@
           "evidence": [
             "tests/unit/test_disclosure.c",
             "docs/validation/gcc-56.txt"
+          ]
+        },
+        {
+          "name": "shared design sizes and centered, configurable SVG indicators",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c",
+            "tests/web/test_touch_components.py"
           ]
         }
       ],

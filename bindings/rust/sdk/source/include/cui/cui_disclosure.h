@@ -51,6 +51,18 @@ typedef struct {
     float dt, response;
     bool reduced_motion;
 } cui_collapsible_options;
+/* Optional presentation for the styled _present entry points. Width zero fits
+ * content, -1 fills the parent, and a positive width uses logical pixels.
+ * Per-trigger/panel box overrides and render_header still take precedence.
+ * The default trigger keeps the full accessible label and clips long visible
+ * titles at bounded widths. Icons are decorative catalog names (or paths),
+ * borrowed during submission and resolved using the theme's SVG loader.
+ * Empty icon names use the built-in chevrons for their respective states. */
+typedef struct {
+    cui_design_size design_size;
+    float width;
+    cui_str collapsed_icon, expanded_icon;
+} cui_disclosure_presentation;
 typedef void (*cui_disclosure_panel_fn)(cui_context *, size_t index, void *user);
 /* Applied transition observers: see cui_disclosure_events.h. */
 /* Base submits semantic triggers without layout or painting. */

@@ -647,8 +647,8 @@ cui_plot_viewport_bind(ui, id, &viewport, navigation);`,
  Menu:'cui_menu_tree(ui, id, &theme, label, entries,\n    count, &action, &state, options);',
  DropdownButton:'cui_dropdown_button_result result = cui_dropdown_button(\n    ui, container, action_id, menu_id, &theme,\n    label, menu_name, entries, count, &menu_action,\n    &menu_state, options);',
  ContextMenu:'/* Call after painting the receiving area. */\ncui_context_menu(ui, target, &theme, label,\n    entries, count, &action, &state, options);',
- Accordion:'cui_accordion(ui, id, &theme, items, 3,\n    expanded, options, draw_panel, user);',
- Collapsible:'cui_collapsible(ui, id, &theme, label,\n    &open, false, draw_panel, user);',
+ Accordion:'/* Keep expanded flags in your application state. */\ncui_accordion_present(ui, id, &theme, items, 3, expanded, options,\n    (cui_disclosure_presentation){.width = -1, .design_size = CUI_DESIGN_BASE,\n        .collapsed_icon = cui_string("plus"), .expanded_icon = cui_string("minus")},\n    draw_panel, user, (cui_disclosure_handler){0});',
+ Collapsible:'cui_collapsible_present(ui, id, &theme, label, &open,\n    (cui_collapsible_options){0},\n    (cui_disclosure_presentation){.width = -1, .design_size = CUI_DESIGN_BASE},\n    draw_panel, user, (cui_disclosure_handler){0});',
  Tabs:'cui_tabs(ui, id, &theme, items, 3,\n    &selection, options, draw_panel, user);',
  Avatar:"/* Existing photo storage/cache remains live through rendering. */\nstatic unsigned char pixels[96 * 96 * 4];\nstatic cui_avatar_image circle;\nif (!circle.storage)\n    cui_avatar_image_init(&circle, pixels, sizeof pixels, 96);\ncui_avatar_ex(ui, id, &theme, cui_string(\"Taylor Reed\"),\n    (cui_avatar_options){.design_size = CUI_DESIGN_MD,\n        .identity_colors = true, .custom_identity_hue = true, .identity_hue = 2,\n        .image = photo, .image_state = &circle});\n/* A valid photo wins; missing pixels show named initials with the palette. */\ncui_avatar_ex(ui, cui_id_from(ui, \"anonymous\"), &theme, cui_string(\"\"),\n    (cui_avatar_options){.design_size = CUI_DESIGN_SM,\n        .anonymous_icon = true, .placeholder_name = cui_string(\"circle-check\")});\n/* For custom SVG pass .placeholder = &retained_icon_state.\n * Keep that state/mask versions alive through rendering; icons are decorative.\n * INHERIT keeps .size behavior; explicit variants and rem scale together,\n * preserving the text/diameter ratio when diameter reaches the 512px bound. */",
  Kbd:'cui_kbd_ex(ui, id, &theme,\n    (cui_kbd_stroke){.modifiers = CUI_MOD_CTRL | CUI_MOD_SHIFT,\n                     .key = CUI_STR("k")},\n    (cui_kbd_options){.outline = true});',
@@ -1030,6 +1030,8 @@ function render(){
  if(!selected || (!selected.example && !(selected.name in stories)))return;
  const designScale=($('design-size').hidden?0:Number($('design-size').value)),designHeights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
  const gaps=[0,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
+ const accordion=selected.name==='Accordion',disclosure=accordion||selected.name==='Collapsible';
+ const disclosureMode=Number($('disclosure-mode').value);
  const timeField=selected.name==='TimeField';
  const orderedTime=orderedTimeField();
  const timeFieldHeight=designHeights[designScale]*($('density').value==='1'?.875:1);
@@ -1054,6 +1056,11 @@ function render(){
  const widePagination=pagination&&canvasWrap.scrollWidth>canvasWrap.clientWidth;
  canvas.style.touchAction=wideTimeField||widePagination?'pan-x':'none';
  const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):timeField?Math.max(width<420?560:360,timeFieldHeight+240):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'?($('popover-mode').value==='1'?520:320):selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<268?240:width-48<488?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?($('virtual-axis').value==='2'?390:360):selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value!=='0'?10*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ if(disclosure){
+  const rows=accordion?(disclosureMode===3?5:3):1;
+  const panelRoom=(disclosureMode===1||disclosureMode===2)&&$('disclosure-multiple').checked?440:210;
+  height=Math.max(height,rows*(designHeights[designScale]+gaps[designScale])+panelRoom);
+ }
  if(orderedTime)height=Math.max(360,2*timeFieldHeight+224);
  if(pagination){
   const controlHeight=paginationHeight,gap=paginationCustom?6*paginationCustom/32:gaps[designScale];
@@ -1082,7 +1089,7 @@ function render(){
   if(!['popover-mode','popover-trigger'].includes(input.id))input.disabled=$('popover-mode').value==='0';
  wasm.gallery_button_collection(Number($('button-collection').value));
  wasm.gallery_input_mode(Number($('input-mode').value));
- wasm.gallery_disclosure_options(Number($('disclosure-mode').value),Number($('disclosure-multiple').checked));
+ wasm.gallery_disclosure_options(disclosureMode,Number($('disclosure-multiple').checked));
  wasm.gallery_image_options(Number($('image-state').value),Number($('image-fit').value),Number($('image-grayscale').checked),Number($('image-opacity').checked));
  wasm.gallery_attachment_options(Number($('attachment-status').value),Number($('attachment-vertical').checked));
  wasm.gallery_description_options(Number($('description-columns').value),Number($('description-vertical').checked),Number($('description-plain').checked),Number($('description-size').value));
@@ -1534,6 +1541,7 @@ function selectComponent(){
  for(const id of ['custom-offset','edge','inert','modal'])$('popover-'+id).checked=false;
  $('popover-arrow').checked=true;
  $('disclosure-mode').hidden=!['Accordion','Collapsible'].includes(selected.name);$('disclosure-mode').value='0';
+ $('disclosure-nested').hidden=selected.name!=='Accordion';
  $('disclosure-multiple-control').hidden=selected.name!=='Accordion';$('disclosure-multiple').checked=false;
  for(const id of ['avatar-source','avatar-palette-control','avatar-hue','avatar-placeholder','avatar-rem'])$(id).hidden=selected.name!=='Avatar';
  $('avatar-source').value='1';$('avatar-palette').checked=true;$('avatar-hue').value='-1';$('avatar-placeholder').value='0';$('avatar-rem').value='16';
@@ -1565,7 +1573,7 @@ function selectComponent(){
  $('pagination-language').hidden=selected.name!=='Pagination';$('pagination-language').value='en';
  $('time-field-tab-mode').hidden=selected.name!=='TimeField';$('time-field-tab-mode').value='segments';
  for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control','text-paint'])$(id).hidden=selected.name!=='Theme';textPaintControl.value='0';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
- $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Pagination','Rating','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar','TimeField'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
+ $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Pagination','Rating','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar','TimeField','Accordion','Collapsible'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
  $('design-radius').value='-1';$('design-spacing').value='-1';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);

@@ -15,8 +15,9 @@ cui_accordion(ui, 10, &theme, sections, 2, open,
     draw_section, application);
 ```
 
-`draw_section(cui_context *, size_t index, void *)` runs synchronously only for
-expanded panels. It can submit any CUI children, including nested accordions.
+Without motion, `draw_section(cui_context *, size_t index, void *)` runs
+synchronously for expanded panels. It can submit nested accordions or other CUI
+children.
 Children of collapsed panels are omitted from rendering and focus order.
 Collapsible uses the same callback shape with index zero.
 
@@ -32,21 +33,64 @@ call them and then submit boxes with matching trigger IDs. The styled functions
 use theme colors, padding, gap, radius and control height; themes provide density
 and high contrast without duplicating behavior. Trigger semantics expose
 expanded state and the controlled panel ID. Mounted panels expose their trigger
-relationship; an Accordion group supplies a semantic parent. Native accessibility bridges are separate
-unfinished infrastructure.
+relationship. An Accordion group supplies a semantic parent. The WASM gallery
+projects these relationships to browser accessibility nodes.
 
 The implementation derives panel IDs by XORing the trigger ID with
 `0x1d8f322539deca61`; Collapsible derives its outer container using
 `0xb7c1c9d453922783`. Reserve those IDs when composing children. Duplicate IDs
 are diagnosed by the core rather than silently reused.
 
-`tests/unit/test_disclosure.c` exercises all four supplied themes, actual pointer
+`tests/unit/test_disclosure.c` exercises four supplied themes, actual pointer
 clicks, Enter and Space, disabled triggers, single/multiple expansion, required
 expansion, keyboard traversal, and removal of focused hidden content. Portable
-C11 and renderer-independent draw lists are supported; OS accessibility is not
-claimed. Compared with GPUI Kit 0.7.1, a demonstrated native/browser gallery remain unfinished.
-Immediate mount/unmount behavior is implemented. Full family parity is not yet
-verified.
+C11 and renderer-independent draw lists are supported. Physical native
+assistive-technology behavior still requires verification.
+
+## Size and indicators
+
+Use `cui_accordion_present` or `cui_collapsible_present` from
+`cui_disclosure_events.h` to size the default header and choose an SVG indicator.
+Keep expansion state in your application and call the presenter each frame.
+
+```c
+#include <cui/cui_disclosure_events.h>
+
+static void draw_section(cui_context *ui, size_t index, void *user) {
+    const cui_theme *theme = user;
+    cui_text(ui, cui_string(index ? "Manage access." : "Update your details."),
+             theme->font_size, theme->text);
+}
+
+void draw_preferences(cui_context *ui, cui_theme *theme, bool open[2]) {
+    const cui_disclosure_item items[] = {
+        {cui_id_from(ui, "profile"), cui_string("Profile"), false},
+        {cui_id_from(ui, "permissions"), cui_string("Permissions"), false},
+    };
+    cui_accordion_present(ui, cui_id_from(ui, "preferences"), theme, items, 2, open,
+        (cui_accordion_options){.collapsible = true, .bordered = true},
+        (cui_disclosure_presentation){.width = -1, .design_size = CUI_DESIGN_LG,
+            .collapsed_icon = cui_string("plus"), .expanded_icon = cui_string("minus")},
+        draw_section, theme, (cui_disclosure_handler){0});
+}
+```
+
+The shared `xs`–`9xl` tokens set the default title font, line and trigger height,
+indicator size, padding and gap. `CUI_DESIGN_INHERIT` takes its metrics from the
+theme. Width `-1` fills the parent, a positive width sets a fixed outer extent,
+and zero fits the content. At a bounded width, a single-line title clips within
+the available lane while its accessible name retains the entire label. Panel
+children choose their own typography. Try **Custom icons and panels** and
+**Nested panels** in the gallery to see alternate indicators and separate,
+caller-owned expansion arrays. **Borderless** removes the default outlines.
+
+Each icon name resolves through the same catalog and theme SVG loader as
+`cui_icon_named`. An empty name uses the default chevron for that state. Icons
+are decorative, so the trigger remains a single focus and activation target.
+Use a custom header callback to compose leading artwork, a badge, or an icon
+from a caller-owned SVG state. An optional `cui_disclosure_handler` observes the
+same [applied transitions](DISCLOSURE_EVENTS.md) as the older event entry points.
+Retained language builders currently expose their existing disclosure controls.
 
 Set Accordion `render_header` and `header_user` to compose a custom title, icon,
 badge or other header body. `cui_collapsible_ex` exposes the same callback and
@@ -99,4 +143,4 @@ with invalid response/damping/epsilon use safe defaults. Tests compare different
 configured response/damping, preserve underdamped overshoot, and verify theme
 travel/zero-response snap through actual trigger clicks. The public `_step_ex`
 accepts the same portable policy; the original `_step` keeps critical damping and
-its legacy .2-second default response. A demonstrated gallery remains unfinished.
+its legacy .2-second default response.

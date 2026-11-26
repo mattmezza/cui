@@ -190,6 +190,55 @@ def run_cases(a):
     a.case('Radio', 'tap selects Priority', lambda: a.selected('Priority', 4, 6))
     a.case('Tabs', 'tap selects Activity', lambda: a.selected('Activity', 8))
     a.case('Accordion', 'tap expands Configuration', lambda: a.selected('Configuration', 1, 10))
+    def accordion_presentation():
+        def indicator(trigger):
+            icons = a.page.evaluate('''([x,y,w,h])=>{
+                const e=cuiGallery.exports;
+                const icons=[];
+                for(let i=0;i<e.gallery_count();i++){
+                    const [ix,iy,iw,ih]=[1,2,3,4].map(k=>e.gallery_command(i,k));
+                    if(e.gallery_command(i,0)!==5||iy<y||iy+ih>y+h||ix<x||ix+iw>x+w)continue;
+                    const pixels=e.gallery_bitmap_pixels(i);
+                    const length=e.gallery_bitmap(i,1)*e.gallery_bitmap(i,2);
+                    icons.push([ix,iy,iw,ih,Array.from(new Uint8Array(e.memory.buffer,pixels,length)).join()]);
+                }
+                return icons;
+            }''', trigger['f'][1:5])
+            assert len(icons) == 1
+            _, y, _, h, mask = icons[0]
+            assert abs(y + h/2 - trigger['f'][2] - trigger['f'][4]/2) < 1
+            return mask
+
+        try:
+            a.page.set_viewport_size({'width': 390, 'height': 844})
+            for size in (1, 5):
+                a.configure('design-size', size)
+                rows = [a.target(label, 1) for label in ('Getting started', 'Configuration', 'More details')]
+                assert rows[0]['f'][3] == rows[1]['f'][3] == rows[2]['f'][3]
+                assert rows[0]['f'][4] == (20 if size == 1 else 40)
+                for row in rows:
+                    indicator(row)
+            a.configure('disclosure-mode', 2)
+            config = a.target('Configuration', 1)
+            before = indicator(config)
+            a.tap(config)
+            config = a.target('Configuration', 1)
+            assert indicator(config) != before
+
+            a.configure('disclosure-mode', 3)
+            started = a.target('Getting started', 1)
+            if not started['f'][10]:
+                a.tap(started)
+            child = a.target('Install CUI', 1)
+            a.tap(child)
+            assert a.value(child, 10) == 1 and a.value(started, 10) == 1
+            a.tap(started)
+            assert not any(node['name'] == 'Install CUI' for node in a.snapshot())
+        finally:
+            a.page.set_viewport_size({'width': 1280, 'height': 900})
+            a.configure('disclosure-mode', 0)
+            a.configure('design-size', 3)
+    a.case('Accordion', 'centered sized SVG indicators and nested touch activation', accordion_presentation)
     a.case('Collapsible', 'tap expands Show details', lambda: a.selected('Show details', 1, 10))
     for family, opener, slot, closer in [('Dialog', 'Edit preferences', 0, 'Save changes'),
                                         ('AlertDialog', 'Delete workspace', 1, 'Keep workspace'),

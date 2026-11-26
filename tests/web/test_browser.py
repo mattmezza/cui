@@ -2158,8 +2158,14 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===0')
             assert page.locator('#accessible button[aria-label="Apply panel"]').count() == 0
             page.emulate_media(reduced_motion='no-preference')
+            closed_icon = '''()=>{const e=cuiGallery.exports;
+                const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===5);
+                return i===undefined?null:Array.from(new Uint8Array(e.memory.buffer,
+                    e.gallery_bitmap_pixels(i),e.gallery_bitmap(i,1)*e.gallery_bitmap(i,2))).join();}'''
+            chevron = page.evaluate(closed_icon)
+            assert chevron
             control_change('disclosure-mode', '2')
-            page.wait_for_function(texts+'.includes(" (custom)")')
+            page.wait_for_function(f'(before)=>({closed_icon})()!==null&&({closed_icon})()!==before', arg=chevron)
             click_semantic('Show details', 1)
             page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===1')
             page.evaluate('location.hash="Accordion"')

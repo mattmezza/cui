@@ -25,7 +25,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_date_time_picker.h"
 #include "cui/cui_description.h"
 #include "cui/cui_dialog_composition_styled.h"
-#include "cui/cui_disclosure.h"
+#include "cui/cui_disclosure_events.h"
 #include "cui/cui_dock.h"
 #include "cui/cui_effects.h"
 #include "cui/cui_form.h"
@@ -1615,16 +1615,15 @@ static cui_tab_overflow tabs_overflow;
 static cui_menu_entry tabs_entries[12];
 static int disclosure_mode, disclosure_actions;
 static bool disclosure_multiple, disclosure_checked;
+static bool accordion_nested_open[2];
 static cui_disclosure_motion accordion_motion[3], collapsible_motion;
-static void disclosure_header(cui_context *context, const cui_disclosure_item *item, size_t index,
-                              bool expanded, void *user) {
-    (void)index;
-    (void)user;
-    cui_text(context, cui_string(expanded ? "-" : "+"), current_theme.font_size,
-             current_theme.primary);
-    cui_text(context, item->label, current_theme.font_size,
-             item->disabled ? current_theme.muted : current_theme.text);
-    cui_text(context, cui_string(" (custom)"), current_theme.font_size, current_theme.muted);
+static cui_disclosure_presentation disclosure_presentation(void) {
+    cui_disclosure_presentation result = {.width = -1, .design_size = design_size};
+    if (disclosure_mode == 2) {
+        result.collapsed_icon = cui_string("plus");
+        result.expanded_icon = cui_string("minus");
+    }
+    return result;
 }
 
 static unsigned char avatar_mask_pixels[3][96 * 96 * 4];
@@ -2243,6 +2242,19 @@ static void disclosure_panel(cui_context *context, size_t index, void *user) {
                    cui_string("Apply panel"), false))
         disclosure_actions++;
     cui_label(context, &current_theme, cui_string("Application-owned interactive content."));
+}
+static void disclosure_nested_panel(cui_context *context, size_t index, void *user) {
+    if (index != 0) {
+        panel(context, index, user);
+        return;
+    }
+    const cui_theme *theme = user;
+    cui_disclosure_item items[] = {
+        {cui_id_from(context, "disclosure-install"), cui_string("Install CUI"), false},
+        {cui_id_from(context, "disclosure-create"), cui_string("Create a window"), false}};
+    cui_accordion_present(context, cui_id_from(context, "disclosure-nested"), theme, items, 2,
+                          accordion_nested_open, (cui_accordion_options){.collapsible = true},
+                          disclosure_presentation(), panel, NULL, (cui_disclosure_handler){0});
 }
 static float slider = 40; /* Legacy Progress and compatibility fixture only. */
 static struct {
@@ -5862,70 +5874,53 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             {cui_id_from(ui, "a1"), cui_string("Getting started"), false},
             {cui_id_from(ui, "a2"), cui_string("Configuration"), false},
             {cui_id_from(ui, "a3"), cui_string("More details"), false}};
-        cui_box triggers[3], panels[3];
+        cui_box panels[3];
         for (size_t i = 0; i < 3; i++) {
-            triggers[i] = (cui_box){.width = width - 48,
-                                    .height = t.control_height,
-                                    .padding = t.padding,
-                                    .row = true,
-                                    .gap = t.gap,
-                                    .radius = t.radius,
-                                    .background = t.background,
-                                    .border = t.success,
-                                    .border_width = 1};
-            panels[i] = (cui_box){.width = width - 48,
+            panels[i] = (cui_box){.width = -1,
                                   .padding = t.padding,
                                   .gap = t.gap,
                                   .background = t.surface,
                                   .border = t.border,
                                   .border_width = 1};
         }
-        cui_accordion(ui, cui_id_from(ui, "accordion"), &t, items, 3, open,
-                      (cui_accordion_options){
-                          .collapsible = true,
-                          .disabled = disabled,
-                          .bordered = true,
-                          .multiple = disclosure_multiple,
-                          .render_header = disclosure_mode == 2 ? disclosure_header : NULL,
-                          .trigger_boxes = disclosure_mode == 2 ? triggers : NULL,
-                          .panel_boxes = disclosure_mode == 2 ? panels : NULL,
-                          .style_count = 3,
-                          .motion = disclosure_mode ? accordion_motion : NULL,
-                          .motion_count = 3,
-                          .dt = host_dt,
-                          .response = .45f,
-                          .reduced_motion = reduced_motion},
-                      disclosure_mode ? disclosure_panel : panel, NULL);
+        bool animated = disclosure_mode == 1 || disclosure_mode == 2;
+        cui_accordion_present(
+            ui, cui_id_from(ui, "accordion"), &t, items, 3, open,
+            (cui_accordion_options){.collapsible = true,
+                                    .disabled = disabled,
+                                    .bordered = disclosure_mode != 4,
+                                    .multiple = disclosure_multiple,
+                                    .panel_boxes = disclosure_mode == 2 ? panels : NULL,
+                                    .style_count = 3,
+                                    .motion = animated ? accordion_motion : NULL,
+                                    .motion_count = 3,
+                                    .dt = host_dt,
+                                    .response = .45f,
+                                    .reduced_motion = reduced_motion},
+            disclosure_presentation(),
+            disclosure_mode == 3 ? disclosure_nested_panel : animated ? disclosure_panel : panel,
+            &t, (cui_disclosure_handler){0});
         break;
     }
     case 21: {
-        cui_box trigger_box = {.width = width - 48,
-                               .height = t.control_height,
-                               .padding = t.padding,
-                               .row = true,
-                               .gap = t.gap,
-                               .radius = t.radius,
-                               .background = t.background,
-                               .border = t.success,
-                               .border_width = 1};
-        cui_box panel_box = {.width = width - 48,
+        cui_box panel_box = {.width = -1,
                              .padding = t.padding,
                              .gap = t.gap,
                              .background = t.surface,
                              .border = t.border,
                              .border_width = 1};
-        cui_collapsible_ex(ui, cui_id_from(ui, "collapsible"), &t, cui_string("Show details"),
-                           &collapsed,
-                           (cui_collapsible_options){
-                               .disabled = disabled,
-                               .render_header = disclosure_mode == 2 ? disclosure_header : NULL,
-                               .trigger_box = disclosure_mode == 2 ? &trigger_box : NULL,
-                               .panel_box = disclosure_mode == 2 ? &panel_box : NULL,
-                               .motion = disclosure_mode ? &collapsible_motion : NULL,
-                               .dt = host_dt,
-                               .response = .45f,
-                               .reduced_motion = reduced_motion},
-                           disclosure_mode ? disclosure_panel : panel, NULL);
+        bool animated = disclosure_mode == 1 || disclosure_mode == 2;
+        cui_collapsible_present(
+            ui, cui_id_from(ui, "collapsible"), &t, cui_string("Show details"), &collapsed,
+            (cui_collapsible_options){.disabled = disabled,
+                                      .borderless = disclosure_mode == 4,
+                                      .panel_box = disclosure_mode == 2 ? &panel_box : NULL,
+                                      .motion = animated ? &collapsible_motion : NULL,
+                                      .dt = host_dt,
+                                      .response = .45f,
+                                      .reduced_motion = reduced_motion},
+            disclosure_presentation(), animated ? disclosure_panel : panel, NULL,
+            (cui_disclosure_handler){0});
         break;
     }
     case 22: {
@@ -7916,9 +7911,10 @@ void gallery_table_appearance(int custom_header, int striped) {
     table_striped = striped != 0;
 }
 void gallery_disclosure_options(int mode, int multiple) {
-    if (mode >= 0 && mode <= 2 && mode != disclosure_mode) {
+    if (mode >= 0 && mode <= 4 && mode != disclosure_mode) {
         disclosure_mode = mode;
         memset(accordion_motion, 0, sizeof(accordion_motion));
+        memset(accordion_nested_open, 0, sizeof(accordion_nested_open));
         memset(&collapsible_motion, 0, sizeof(collapsible_motion));
     }
     if (disclosure_multiple && !multiple) {

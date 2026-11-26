@@ -3814,15 +3814,14 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                                 .fixed_height = true});
     cui_begin_box(ui, 0, (cui_box){.width = inset});
     cui_end_box(ui);
-    cui_begin_box(
-        ui, viewport_id,
-        (cui_box){.width = width > 0 ? viewport_width : -1,
-                  .fixed_width = width > 0,
-                  .height = metrics.line_height,
-                  .fixed_height = true,
-                  .clip = true,
-                  .align_x = options.text_align,
-                  .offset_x = -state->scroll_x});
+    cui_begin_box(ui, viewport_id,
+                  (cui_box){.width = width > 0 ? viewport_width : -1,
+                            .fixed_width = width > 0,
+                            .height = metrics.line_height,
+                            .fixed_height = true,
+                            .clip = true,
+                            .align_x = options.text_align,
+                            .offset_x = -state->scroll_x});
     /* Paint-only text wrapper: neighboring owner IDs must not alias another
      * field's tracked viewport. No routing or geometry refers to this box. */
     cui_begin_box(ui, 0,

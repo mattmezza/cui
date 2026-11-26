@@ -966,8 +966,8 @@ static void cui_tfw_frame_compose(cui_tfw_frame_field *field, const cui_event *e
         }
         p->segment = 0;
         if (event->type == CUI_EVENT_COMPOSITION_COMMIT && text.length)
-            field->rejected += !cui_tfw_compose_value(&field->state, &field->value,
-                                                     field->entry.options, text);
+            field->rejected +=
+                !cui_tfw_compose_value(&field->state, &field->value, field->entry.options, text);
     }
 }
 
@@ -1048,10 +1048,10 @@ cui_time_text_status_v1 cui_begin_time_field_frame_v1(cui_context *ui, float w, 
             .entry = entry, .state = *entry.state, .value = *entry.value, .before = *entry.value};
         cui_time_field_state_v1 *state = &field->state;
         bool reset = disabled || !previous || state->last_frame_sequence != previous ||
-            !cui_time_field_v1_equal(state->last_value, field->value) ||
-            state->edit_generation != options->edit_generation ||
-            state->last_cycle != options->text.cycle ||
-            state->last_precision != options->text.precision;
+                     !cui_time_field_v1_equal(state->last_value, field->value) ||
+                     state->edit_generation != options->edit_generation ||
+                     state->last_cycle != options->text.cycle ||
+                     state->last_precision != options->text.precision;
         if (reset) {
             cui_tfw_reset(state);
             state->validation = status;
@@ -1105,8 +1105,8 @@ cui_tfw_frame_field *cui_tfw_frame_start(cui_context *ui, cui_id id, cui_str nam
             f->submitted = true;
             cui_tfw_submit(ui, id, name, &f->state, &f->value, f->entry.options, true);
             if (f->preedit.segment && cui_focused(ui) == id) {
-                cui_tfw_preedit *paint = cui_resource_get(ui, id, cui_tfw_preedit_resource,
-                                                          sizeof(*paint), NULL, NULL);
+                cui_tfw_preedit *paint =
+                    cui_resource_get(ui, id, cui_tfw_preedit_resource, sizeof(*paint), NULL, NULL);
                 if (!paint)
                     return NULL;
                 f->preedit.frame = cui_frame_sequence(ui);

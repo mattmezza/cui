@@ -311,8 +311,8 @@ static void time_field_frame(cui_context *ui, time_field_test *field, const char
         assert(cui_focused(ui) == 20 || !cui_focused(ui));
     } else {
         assert(cui_begin_frame(ui, 320, 160, .016f));
-        result = cui_time_field_v1(ui, 20, &theme, cui_string("Time"), &field->state,
-                                   &field->value, &field->options, handler);
+        result = cui_time_field_v1(ui, 20, &theme, cui_string("Time"), &field->state, &field->value,
+                                   &field->options, handler);
     }
     assert(result.status == CUI_TIME_TEXT_OK && result.validation == CUI_TIME_TEXT_OK);
     cui_id segment = 0;

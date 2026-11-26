@@ -1015,7 +1015,7 @@ static void ordered_pointer_and_discard(void) {
 }
 
 static cui_time_field_result_v1 ordered_ime_frame(fixture *f, ordered_observer *observer,
-                                                   const char *expected) {
+                                                  const char *expected) {
     cui_time_field_frame_entry_v1 entry = {20, &f->state, &f->time, &f->options};
     assert(cui_begin_time_field_frame_v1(f->ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
     cui_time_field_result_v1 result = ordered_story(f, 20, observer);
@@ -1024,7 +1024,8 @@ static cui_time_field_result_v1 ordered_ime_frame(fixture *f, ordered_observer *
     cui_str preedit = cui_time_field_preedit_v1(f->ui, 20, &composing);
     if (expected) {
         assert(composing == cui_time_segment_id(20, f->state.segment));
-        assert(preedit.length == strlen(expected) && !memcmp(preedit.data, expected, preedit.length));
+        assert(preedit.length == strlen(expected) &&
+               !memcmp(preedit.data, expected, preedit.length));
     } else
         assert(!composing && !preedit.length);
     f->draw = cui_end_frame(f->ui);
@@ -1094,10 +1095,12 @@ static void ordered_localized_semantics(bool styled) {
 
 static bool offer(fixture *f, cui_text_input_state input, cui_event_type type, cui_str text,
                   bool empty_clear) {
-    return cui_queue_text_input_event_v1(
-        f->ui, input.generation,
-        (cui_event){.type = type, .composition_target = input.owner, .text_data = text.data,
-                    .text_length = text.length, .ime_composing = empty_clear});
+    return cui_queue_text_input_event_v1(f->ui, input.generation,
+                                         (cui_event){.type = type,
+                                                     .composition_target = input.owner,
+                                                     .text_data = text.data,
+                                                     .text_length = text.length,
+                                                     .ime_composing = empty_clear});
 }
 
 static void ordered_accessibility_focus(void) {

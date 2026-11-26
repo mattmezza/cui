@@ -1881,7 +1881,7 @@ static bool gallery_begin_ordered_time(float width, float height, bool disabled)
             return false;
         for (unsigned i = 0; i < 2; i++)
             if (cui_time_field_state_init_v1(&ordered_time_state[i], ordered_times[i],
-                                            &ordered_time_options) != CUI_TIME_TEXT_OK)
+                                             &ordered_time_options) != CUI_TIME_TEXT_OK)
                 return false;
         ordered_time_ready = true;
     }
@@ -1890,8 +1890,8 @@ static bool gallery_begin_ordered_time(float width, float height, bool disabled)
     cui_time_field_frame_entry_v1 fields[2];
     for (unsigned i = 0; i < 2; i++)
         fields[i] = (cui_time_field_frame_entry_v1){cui_id_from(ui, ordered_time_keys[i]),
-                                                   &ordered_time_state[i], &ordered_times[i],
-                                                   &ordered_time_options};
+                                                    &ordered_time_state[i], &ordered_times[i],
+                                                    &ordered_time_options};
     return cui_begin_time_field_frame_v1(ui, width, height, host_dt, fields, 2) == CUI_TIME_TEXT_OK;
 }
 
@@ -7013,15 +7013,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case GALLERY_ORDERED_TIME:
         for (unsigned i = 0; i < 2; i++) {
             cui_label(ui, &t, cui_string(ordered_time_labels[i]));
-            cui_time_field_result_v1 time =
-                cui_time_field_from_frame_v1(ui, cui_id_from(ui, ordered_time_keys[i]), &t,
-                                             cui_string(ordered_time_labels[i]), design_size,
-                                             (cui_time_handler){0});
+            cui_time_field_result_v1 time = cui_time_field_from_frame_v1(
+                ui, cui_id_from(ui, ordered_time_keys[i]), &t, cui_string(ordered_time_labels[i]),
+                design_size, (cui_time_handler){0});
             if (time.changed)
                 ordered_time_saved = false;
         }
-        if (cui_button(ui, cui_id_from(ui, "ordered-time-save"), &t,
-                       cui_string("Save schedule"), disabled))
+        if (cui_button(ui, cui_id_from(ui, "ordered-time-save"), &t, cui_string("Save schedule"),
+                       disabled))
             ordered_time_saved = true;
         if (ordered_time_saved) {
             cui_str status = cui_string("Schedule saved.");

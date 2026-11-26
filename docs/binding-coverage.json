@@ -478,7 +478,7 @@
           "symbols": [
             "cui_stepper_present"
           ],
-          "note": "The immediate C and WASM presenter adds fill and indicator feedback. Foreign builders and the retained bridge expose fixed connectors and keep their existing queued change events."
+          "note": "The retained bridge and all five language builders expose opt-in fill, explicit orientation, logical extents and theme indicator feedback. The immediate C custom palette and synchronous controlled request handler remain outside the builders. Retained selection keeps queued change events."
         }
       ]
     },

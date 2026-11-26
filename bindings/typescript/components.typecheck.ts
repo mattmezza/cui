@@ -125,3 +125,10 @@ if (app.supports_radio_paint()) radio.radio_paint(c.RadioPaintLayer.BASE, radioP
 radio.radio_paint(6, {});
 // @ts-expect-error invalid weight
 radio.radio_paint(c.RadioPaintLayer.BASE, {labelWeight: 4});
+
+visualStepper().stepper_fill().stepper_fill(true, 'xs', 300, 120).stepper_visual();
+const stepperFillSupported: boolean = app.supports_stepper_fill();
+// @ts-expect-error unsupported density
+visualStepper().stepper_fill(false, 'huge');
+// @ts-expect-error width must be numeric
+visualStepper().stepper_fill(false, 'md', '300');

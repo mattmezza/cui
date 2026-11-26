@@ -12,7 +12,7 @@ static cui_bridge_node create(cui_bridge_app *a, cui_bridge_node p, cui_bridge_k
 }
 static cui_draw_list paint(cui_bridge_app *a) {
     assert(cui_bridge_step(a, .016f) == CUI_BRIDGE_OK);
-    assert(cui_begin_frame(a->ui, 800, 800, .016f));
+    assert(cui_begin_frame(a->ui, a->width, a->height, .016f));
     cui_begin_box(a->ui, 1, (cui_box){.width = -1, .height = -1});
     bridge_render_node(a, a->root);
     cui_end_box(a->ui);
@@ -31,7 +31,7 @@ static unsigned drain(cui_bridge_app *a) {
     }
     return count;
 }
-static void click(cui_bridge_app *a, cui_bridge_node n, unsigned part) {
+static void queue_click(cui_bridge_app *a, cui_bridge_node n, unsigned part) {
     cui_bridge_rect r;
     assert(cui_bridge_numeric_part_bounds(a, n, part, &r) == CUI_BRIDGE_OK);
     assert(r.width > 0 && r.height > 0);
@@ -39,7 +39,93 @@ static void click(cui_bridge_app *a, cui_bridge_node n, unsigned part) {
                                     r.y + r.height / 2) == CUI_BRIDGE_OK);
     assert(cui_bridge_queue_pointer(a, CUI_BRIDGE_POINTER_UP, r.x + r.width / 2,
                                     r.y + r.height / 2) == CUI_BRIDGE_OK);
+}
+static void click(cui_bridge_app *a, cui_bridge_node n, unsigned part) {
+    queue_click(a, n, part);
     assert(cui_bridge_step(a, .016f) == CUI_BRIDGE_OK);
+}
+static cui_color indicator_color(cui_draw_list list, cui_rect bounds) {
+    for (size_t i = 0; i < list.count; i++) {
+        const cui_draw_command *c = &list.commands[i];
+        if (c->type == CUI_DRAW_RECT && c->bounds.x == bounds.x && c->bounds.y == bounds.y &&
+            c->bounds.w == bounds.w && c->bounds.h == bounds.h && c->radius == bounds.w / 2)
+            return c->color;
+    }
+    assert(false);
+    return (cui_color){0};
+}
+static bool same_color(cui_color a, cui_color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+static void check_fill(cui_bridge_app *a, cui_bridge_node root, cui_bridge_node steps,
+                       cui_bridge_node first, cui_bridge_node second) {
+    cui_bridge_rect r, one, two;
+    assert(cui_bridge_set_selected(a, steps, first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_stepper_fill(a, root, 0, 0, 0, 0) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_stepper_fill(a, steps, 0, 0, 0, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_stepper_fill(a, steps, 2, 0, 240, 200) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_stepper_fill(a, steps, 1, 4, 240, 200) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_stepper_fill(a, steps, 1, 0, NAN, 200) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_stepper_fill(a, steps, 1, 0, 240, INFINITY) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_stepper_fill(a, steps, 1, 0, -1, 200) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_stepper_fill(a, steps, 1, 0, 4097, 200) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_stepper_fill(a, steps, 1, 0, 240, 4097) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_step(a, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_bounds(a, steps, &r) == CUI_BRIDGE_OK && r.width == 768);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 1, &one) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 2, &two) == CUI_BRIDGE_OK);
+    assert(two.x > one.x + 600 && two.y == one.y);
+    a->width = 560;
+    assert(cui_bridge_step(a, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_bounds(a, steps, &r) == CUI_BRIDGE_OK && r.width == 528);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 2, &r) == CUI_BRIDGE_OK);
+    assert(fabsf(r.x - two.x + 240) < .01f);
+    assert(drain(a) == 0);
+
+    assert(cui_bridge_set_stepper_fill(a, steps, 1, 0, 250.5f, 284) == CUI_BRIDGE_OK);
+    cui_draw_list list = paint(a);
+    assert(cui_bridge_node_bounds(a, steps, &r) == CUI_BRIDGE_OK);
+    assert(r.width == 250.5f && r.height == 284);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 1, &one) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 2, &two) == CUI_BRIDGE_OK);
+    assert(two.y > one.y + 200 && two.x == one.x);
+    cui_rect pending = cui_bounds(a->ui, cui_numeric_part_id(a->nodes[steps.slot].id, 1001));
+    assert(pending.w == 27 && pending.h == 27);
+    assert(same_color(indicator_color(list, pending), a->theme.secondary));
+    float x = pending.x + pending.w / 2, y = pending.y + pending.h / 2;
+    assert(cui_bridge_queue_pointer(a, CUI_BRIDGE_POINTER_MOVE, x, y) == CUI_BRIDGE_OK);
+    assert(same_color(indicator_color(paint(a), pending), a->theme.secondary_hover));
+    assert(cui_bridge_queue_pointer(a, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(same_color(indicator_color(paint(a), pending),
+                      a->theme.buttons[CUI_THEME_BUTTON_SECONDARY].active));
+    assert(cui_bridge_queue_pointer(a, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(a, .016f) == CUI_BRIDGE_OK);
+    assert(drain(a) == 1);
+    cui_bridge_node selected;
+    assert(cui_bridge_get_selected(a, steps, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == second.slot);
+    queue_click(a, steps, 1);
+    queue_click(a, steps, 2);
+    assert(cui_bridge_step(a, .016f) == CUI_BRIDGE_OK);
+    assert(drain(a) == 0);
+    click(a, steps, 1);
+    assert(drain(a) == 1);
+    assert(cui_bridge_set_disabled(a, second, 1) == CUI_BRIDGE_OK);
+    (void)paint(a);
+    assert(cui_bridge_queue_pointer(a, CUI_BRIDGE_POINTER_MOVE, x, y) == CUI_BRIDGE_OK);
+    assert(same_color(indicator_color(paint(a), pending), a->theme.secondary));
+    click(a, steps, 2);
+    assert(drain(a) == 0);
+    assert(cui_bridge_set_disabled(a, second, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_selected(a, steps, second) == CUI_BRIDGE_OK);
+
+    assert(cui_bridge_set_stepper_visual(a, steps, 1, 0, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(a, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 2, &r) == CUI_BRIDGE_OK);
+    assert(r.x > one.x && r.x < two.x + 200 && r.y == one.y);
+    assert(drain(a) == 0);
+    a->width = 800;
 }
 int main(void) {
     cui_bridge_options o = {.struct_size = sizeof o,
@@ -163,6 +249,7 @@ int main(void) {
            selected.slot == second.slot);
     assert(cui_bridge_set_image_rgba(a, first, pixels, 2, 2, 8, 16) == CUI_BRIDGE_OK);
     assert(a->nodes[first.slot].image_frame.revision == 2);
+    check_fill(a, root, steps, first, second);
     assert(cui_bridge_set_stepper_visual(a, steps, 0, 1, 3) == CUI_BRIDGE_OK);
     cui_draw_list legacy = paint(a);
     for (size_t i = 0; i < legacy.count; i++)
@@ -175,6 +262,8 @@ int main(void) {
     cui_bridge_node menu = create(a, root, CUI_BRIDGE_MENU, "menu");
     cui_bridge_node wrong = create(a, menu, CUI_BRIDGE_ITEM, "wrong");
     assert(cui_bridge_set_image_rgba(a, wrong, pixels, 2, 2, 8, 16) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_node_remove(a, steps) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_stepper_fill(a, steps, 1, 0, 200, 200) == CUI_BRIDGE_STALE_HANDLE);
     cui_bridge_destroy(a);
     return 0;
 }

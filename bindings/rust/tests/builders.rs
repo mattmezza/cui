@@ -1829,3 +1829,68 @@ fn stepper_visual_authoring() {
  app.stepper_visual(steps,false,false,StepperDensity::Md).unwrap();app.step(0.016).unwrap();
  assert!(app.stepper_visual(first,true,false,StepperDensity::Md).is_err());
 }
+
+#[test]
+fn stepper_fill_authoring() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(800., 400.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let steps = app.child(root, Kind::Stepper, "steps").unwrap();
+    let first = app.child(steps, Kind::Item, "first").unwrap();
+    let second = app.child(steps, Kind::Item, "second").unwrap();
+    app.text(first, "First")
+        .unwrap()
+        .text(second, "Second")
+        .unwrap();
+    for invalid in [-1., 4097., f32::NAN, f32::INFINITY] {
+        assert_eq!(
+            app.stepper_fill(steps, false, StepperDensity::Md, invalid, 0.).err(),
+            Some(Error(3))
+        );
+        assert_eq!(
+            app.stepper_fill(steps, false, StepperDensity::Md, 0., invalid).err(),
+            Some(Error(3))
+        );
+    }
+    let supported = app.supports_stepper_fill();
+    assert_eq!(
+        supported,
+        std::env::var("CUI_TEST_OLD_STEPPER_BRIDGE").as_deref() != Ok("1")
+    );
+    if supported {
+        app.stepper_fill(steps, false, StepperDensity::Sm, 0., 0.)
+            .unwrap()
+            .design_size(steps, DesignSize::Lg)
+            .unwrap();
+        app.step(0.016).unwrap();
+        assert_eq!(app.bounds(steps).unwrap().width, 768.);
+        app.stepper_visual(steps, true, false, StepperDensity::Md).unwrap();
+        app.step(0.016).unwrap();
+        assert!(app.bounds(steps).unwrap().width < 768.);
+        app.stepper_fill(steps, true, StepperDensity::Lg, 320., 240.).unwrap();
+        let changes = Rc::new(Cell::new(0));
+        let changed = changes.clone();
+        app.on_change(steps, move || changed.set(changed.get() + 1)).unwrap();
+        app.step(0.016).unwrap();
+        let bounds = app.bounds(steps).unwrap();
+        assert_eq!((bounds.width, bounds.height), (320., 240.));
+        let one = app.numeric_part_bounds(steps, 1).unwrap();
+        let two = app.numeric_part_bounds(steps, 2).unwrap();
+        assert!(two.y > one.y + 150.);
+        let (x, y) = (two.x + two.width / 2., two.y + two.height / 2.);
+        app.pointer(Phase::Down, x, y).unwrap();
+        app.pointer(Phase::Up, x, y).unwrap();
+        app.step(0.016).unwrap();
+        assert_eq!(changes.get(), 0);
+        app.dispatch().unwrap();
+        assert_eq!(app.selected(steps).unwrap(), Some(second));
+        assert_eq!(changes.get(), 1);
+    } else {
+        assert_eq!(
+            app.stepper_fill(steps, false, StepperDensity::Md, 0., 0.).err(),
+            Some(Error::STEPPER_FILL_UNAVAILABLE)
+        );
+        app.stepper_visual(steps, true, false, StepperDensity::Md).unwrap();
+    }
+    app.step(0.016).unwrap();
+}

@@ -378,6 +378,26 @@ static void go_load_optional_symbol(void *destination, size_t size, const char *
 
 #include "pagination_ffi.h"
 
+// Optional symbol: admission of older providers remains unchanged.
+#if defined(CUI_GO_STATIC)
+extern cui_bridge_status cui_bridge_set_stepper_fill(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t, float, float);
+#pragma weak cui_bridge_set_stepper_fill
+#endif
+static cui_bridge_status (*stepper_fill_set)(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t, float, float);
+static void go_stepper_fill_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&stepper_fill_set, sizeof stepper_fill_set, "cui_bridge_set_stepper_fill");
+ }
+#if defined(CUI_GO_STATIC)
+ else { stepper_fill_set = cui_bridge_set_stepper_fill; }
+#endif
+}
+static int go_stepper_fill_supported(void) { return stepper_fill_set != NULL; }
+static cui_bridge_status go_stepper_fill(cui_bridge_app *a, cui_bridge_node n, uint32_t vertical, uint32_t density, float width, float height) {
+ return stepper_fill_set ? stepper_fill_set(a,n,vertical,density,width,height) : CUI_BRIDGE_INVALID_ARGUMENT;
+}
+
+
 static cui_bridge_status (*radio_tooltip_set)(cui_bridge_app *, cui_bridge_node, const char *, uint32_t);
 static void go_radio_tooltip_initialize(void) {
  if (bridge_lib) {
@@ -549,6 +569,7 @@ static int bridge_open(const char *path) {
  go_radio_tab_index_initialize();
  go_radio_content_initialize();
  go_radio_tooltip_initialize();
+ go_stepper_fill_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -583,6 +604,7 @@ static int bridge_open(const char *path) {
  go_radio_tab_index_initialize();
  go_radio_content_initialize();
  go_radio_tooltip_initialize();
+ go_stepper_fill_initialize();
  cui_go_icon_resources_init(bridge_lib);
  cui_go_icon_badge_init(bridge_lib);
  bridge_initialized = 1;
@@ -730,6 +752,8 @@ type Node struct {
 	removed                              bool
 
 	stepperVisual, stepperVertical, hasStepperVisual   bool
+	stepperFill                                        bool
+	stepperFillWidth, stepperFillHeight                float32
 	stepperDensity                                     StepperDensity
 	designSize                                         int
 	hasDesignSize                                      bool
@@ -1564,6 +1588,53 @@ func (n *Node) StepperVisual(enabled, vertical bool, density StepperDensity) *No
 		}
 	}
 	n.stepperVisual, n.stepperVertical, n.stepperDensity, n.hasStepperVisual = enabled, vertical, density, true
+	n.stepperFill = false
+	return n
+}
+
+// ErrStepperFillUnavailable indicates that the selected provider lacks filled steppers.
+var ErrStepperFillUnavailable = errors.New("Stepper fill unavailable from bridge provider")
+
+// SupportsStepperFill reports whether the loaded provider offers filled Stepper presentation.
+func (a *App) SupportsStepperFill() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_stepper_fill_supported() != 0, nil
+}
+
+// StepperFill fills the available width when width is zero; zero height is intrinsic.
+// A subsequent StepperVisual call restores ordinary presentation.
+func (n *Node) StepperFill(vertical bool, density StepperDensity, width, height float32) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 44 || density > StepperLG || !(0 <= width && width <= 4096 && 0 <= height && height <= 4096) {
+		n.err = errors.New("invalid Stepper fill options")
+		return n
+	}
+	if n.app != nil {
+		supported, err := n.app.SupportsStepperFill()
+		if err != nil {
+			n.err = err
+			return n
+		}
+		if !supported {
+			n.err = ErrStepperFillUnavailable
+			return n
+		}
+		var axis C.uint32_t
+		if vertical {
+			axis = 1
+		}
+		if err := result(C.go_stepper_fill(n.app.ptr, n.handle, axis, C.uint32_t(density), C.float(width), C.float(height))); err != nil {
+			n.err = err
+			return n
+		}
+	}
+	n.stepperFill, n.hasStepperVisual = true, false
+	n.stepperVertical, n.stepperDensity = vertical, density
+	n.stepperFillWidth, n.stepperFillHeight = width, height
 	return n
 }
 
@@ -1881,6 +1952,9 @@ func (a *App) Mount(root *Node) error {
 		if n.radioMotion && C.go_radio_motion_supported() == 0 {
 			return ErrRadioMotionUnavailable
 		}
+		if n.stepperFill && C.go_stepper_fill_supported() == 0 {
+			return ErrStepperFillUnavailable
+		}
 		usesResponsiveSkeleton = usesResponsiveSkeleton || n.skeletonConfig != nil
 		if n.paginationCustomSize != 0 && C.go_pagination_custom_supported() == 0 {
 			return ErrPaginationCustomSizeUnavailable
@@ -2104,6 +2178,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.hasStepStatus {
 			if e := result(C.go_set_step_status(a.ptr, h, C.uint32_t(n.stepStatus))); e != nil {
+				return e
+			}
+		}
+		if n.stepperFill {
+			if e := n.StepperFill(n.stepperVertical, n.stepperDensity, n.stepperFillWidth, n.stepperFillHeight).err; e != nil {
 				return e
 			}
 		}

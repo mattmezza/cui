@@ -10,6 +10,11 @@ func main() {
 	defer a.Close()
 	first := cui.Item("first", "First").RGBA([]byte{255, 255, 255, 255}, 1, 1, 4)
 	steps := cui.Stepper("steps").StepperVisual(true, false, cui.StepperSM).DesignSize(cui.LG).Children(first, cui.Item("second", "Second"))
+	if supported, err := a.SupportsStepperFill(); err != nil {
+		panic(err)
+	} else if supported {
+		steps.StepperFill(false, cui.StepperSM, 0, 0)
+	}
 	if e = a.Mount(cui.Column("root").Children(steps)); e != nil {
 		panic(e)
 	}

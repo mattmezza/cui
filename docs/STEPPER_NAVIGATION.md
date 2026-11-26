@@ -113,13 +113,12 @@ icons/count/density fail before semantic registration or callbacks. `valid` is
 argument preflight, not completed layout/resource-capacity or visibility proof.
 The returned request count and callback restrictions match the existing API.
 
-In this original visual entry, centered text/separators, responsive flex growth, arbitrary child content/style,
-exact source density and language builders remain unfinished. Follow-up slices
-should add independently tested centered geometry and then further theme/style
-controls without changing the request reducer. Native software tests cover this
-bounded composition and actual pointer/touch/keyboard requests. The WASM gallery
-fixture additionally covers desktop DPR1/2 and touch390 DPR2 for the bounded
-visual facade. Live assistive-technology acceptance remains untested.
+This entry uses fixed spacers. The Fill presenter and its retained bindings are
+described below. Centered separators, arbitrary child content and exact source
+density remain open. Native software checks cover the fixed layout and actual
+pointer, touch and keyboard requests. The WASM gallery tests also cover desktop
+at DPR 1 and 2 and a touch viewport at 390 px and DPR 2. Physical
+assistive-technology acceptance remains open.
 
 `options.design_size` accepts the existing shared XS/SM/BASE/MD/LG/XL/2XL..9XL
 scale. INHERIT (zero) leaves the source-density dimensions above unchanged.
@@ -161,11 +160,15 @@ assistive-technology acceptance remain open.
 
 ## Foreign builder visual authoring
 
-Python/JS/TS, Go and Rust now expose the existing non-centered visual composition
-through an opt-in builder method; see [binding builders](BINDING_BUILDERS.md).
-They keep the legacy bridge selected Item and aggregate CHANGE model rather than
-exporting controlled C REQUEST callbacks. Icons are copied from owned RGBA bytes;
-bridge groups remain bounded at 64 Items. Examples are
+Python, JavaScript, TypeScript, Go and Rust offer fixed connectors and Fill.
+Retained C apps use `cui_bridge_set_stepper_fill` to choose a direction and
+optional extents. In a builder, first check `supports_stepper_fill`
+(`SupportsStepperFill` in Go) when deploying to earlier providers. See
+[binding builders](BINDING_BUILDERS.md#stepper-layouts).
+
+These settings keep the bridge's selected Item and aggregate CHANGE semantics.
+Icons are copied from owned RGBA bytes, and groups allow up to 64 Items.
+Examples are
 [`stepper_visual.py`](../bindings/python/examples/stepper_visual.py),
 [`stepper_visual.cjs`](../bindings/node/examples/stepper_visual.cjs),
 [`stepper_visual.ts`](../bindings/typescript/examples/stepper_visual.ts),
@@ -215,5 +218,6 @@ Existing request ordering and owner-validation rules still apply, exactly once.
 Callback owner updates affect the next submission; selection/configuration used
 for painting are captured by value. Do not mutate borrowed steps/theme/icon arrays
 inside callbacks. Arrays are borrowed through return, bitmap bytes through renderer
-completion. No new retained application state is required. Language builders do
-not expose this typed presentation API; use a C-authored UI for these options.
+completion. The retained Fill setters reuse the same layout and theme feedback.
+The immediate C presenter also accepts the typed custom palette and controlled
+request handler.

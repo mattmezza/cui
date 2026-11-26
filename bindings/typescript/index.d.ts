@@ -35,6 +35,8 @@ export class App {
   set_window_visible(visible: boolean): this;
   window_visible(): boolean;
   mount(root: Row | Column | RootView): this;
+  /** Whether this app's native bridge offers retained Stepper Fill. */
+  supports_stepper_fill(): boolean;
   /** Whether this app's native bridge can animate retained Radio selection. */
   supports_radio_motion(): boolean;
   supports_radio_paint(): boolean;
@@ -175,7 +177,11 @@ export interface Pagination extends PagedNumericControl, DesignSized {
 export interface Rating extends PagedNumericControl {}
 export function list_view(key?: string, text?: string): Group;
 export function menu(key?: string, text?: string): Group;
-export interface Stepper extends Group, DesignSized {stepper_visual(enabled?: boolean, vertical?: boolean, density?: "md" | "xs" | "sm" | "lg"): this; numeric_part_bounds(part: number): Bounds}
+export interface Stepper extends Group, DesignSized {
+  stepper_fill(vertical?: boolean, density?: "md" | "xs" | "sm" | "lg", width?: number, height?: number): this;
+  stepper_visual(enabled?: boolean, vertical?: boolean, density?: "md" | "xs" | "sm" | "lg"): this;
+  numeric_part_bounds(part: number): Bounds;
+}
 export function stepper(key?: string, text?: string): Stepper;
 export function pagination(key?: string, text?: string): Pagination;
 export function rating(key?: string, text?: string): Rating;

@@ -48,7 +48,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Menu | `cui_menu` | menu Item action, change, disabled | Up to 64 leaf actions |
 | Pagination | `cui_pagination` | current page, total, change, disabled | One-based page, total <= 1,000,000. The retained bridge and language bindings add sizing, wrapping, page budgets, jump menus and localized navigation. [C](#configure-a-retained-pager-from-c) · [Python](BINDING_BUILDERS.md#configure-pagination-from-python) · [JS/TS](BINDING_BUILDERS.md#configure-pagination-from-javascript-and-typescript) · [Go](GO_BUILDERS.md#configure-pagination-from-go) · [Rust](RUST_BUILDERS.md#configure-pagination-from-rust). |
 | Rating | `cui_rating` | value, maximum, change, disabled | Maximum <= 10 |
-| Stepper | `cui_stepper` / opt-in `cui_stepper_visual_navigation` | selected Item, status, aggregate change, disabled; opt-in density/orientation/shared size and copied RGBA Item icons | Up to 64 Items; visual selection paints on next submission; no foreign controlled REQUEST handlers |
+| Stepper | `cui_stepper`, `cui_stepper_visual_navigation`, `cui_stepper_present` | Selected Item, status, aggregate change, disabled, shared size and copied RGBA Item icons. Choose fixed connectors or fill with an explicit axis. | Up to 64 Items. Visual selection paints on the next submission. Synchronous controlled requests and custom indicator palettes use the immediate C API. |
 | DescriptionList | `cui_description_list` | Item label/value pairs | Up to 64 Items, default columns |
 | Scrollable | `cui_scrollable_begin/end_ex` | child tree, viewport/extents, wheel change | Vertical viewport |
 | StatusBar | `cui_status_bar` | Item labels in left/center/right regions | Set Item step status to 0/1/2 for region |

@@ -759,12 +759,35 @@ manual-loop compatibility contract, see [binding native runners](BINDING_NATIVE_
 
 The optional `cui_date_time_picker.h` single civil date/time API is C-only in this revision. Generated source SDKs carry its header/implementation, but Python/JavaScript/TypeScript/Go/Rust builders and bridge records do not expose its typed value/state, assignment, options, helpers or result. Do not pass legacy date-only builder storage to it. See `docs/DATE_TIME_PICKER.md`.
 
-Stepper builders opt into non-centered connectors and per-Item RGBA icons with
+### Stepper layouts
+
+Stepper builders opt into fixed connectors and per-Item RGBA icons with
 `stepper_visual(true, false, "md")` (Python uses `True`/`False`; Go uses
 `StepperVisual(true, false, cui.StepperMD)`; Rust uses
 `stepper_visual(node, true, false, StepperDensity::Md)`). The default remains
 legacy rendering. Density is `md/xs/sm/lg`; shared `design_size` also accepts
-Stepper. Connectors have no independent toggle in the current C visual API.
+Stepper.
+
+Use `stepper_fill(vertical, density, width, height)` for growing connectors and
+indicator hover and press feedback. Width 0 grows with the containing box.
+Height 0 sizes to the steps. Positive dimensions within 4096 logical pixels
+set the allocated extent. To distribute a vertical Stepper over a region, pass
+that region's height. Set the axis again when your layout calls for a change.
+
+| Language | Capability probe | Apply fill |
+| --- | --- | --- |
+| Python, JavaScript, TypeScript | `app.supports_stepper_fill()` | `steps.stepper_fill()` for horizontal fill, or pass the four options |
+| Go | `app.SupportsStepperFill()` returns `(bool, error)` | `steps.StepperFill(false, cui.StepperMD, 0, 0)` |
+| Rust | `app.supports_stepper_fill()` | `app.stepper_fill(steps, false, StepperDensity::Md, 0., 0.)?` or the fluent builder method |
+
+The probe checks the optional `cui_bridge_set_stepper_fill` symbol. Use
+`stepper_visual` for fixed connectors on an earlier provider. Calling either
+setter replaces the previous layout choice. An explicit Fill request requires
+the new provider. Python, JavaScript, TypeScript and Go reject unsupported
+settings before mounting the tree. Rust reports the error at the setter on the
+already-created node. A failed update preserves the C bridge configuration.
+
+The complete headless examples run with either layout. [Python](../bindings/python/examples/stepper_visual.py) · [JavaScript](../bindings/node/examples/stepper_visual.cjs) · [TypeScript](../bindings/typescript/examples/stepper_visual.ts) · [Go](../bindings/go/examples/stepper_visual/main.go) · [Rust](../bindings/rust/examples/stepper_visual.rs)
 
 Use the existing Item `image_rgba` method (Go `RGBA`, Rust `image_rgba`) to supply
 straight-alpha RGBA icons. Builders and bridge copy bytes; use white RGB for
@@ -783,10 +806,9 @@ Use matching bridge/addon/SDK revisions for the additive methods. See
 [Stepper navigation](STEPPER_NAVIGATION.md) and the
 [binding design contract](STEPPER_BINDING_VISUAL_DESIGN.md).
 
-The C-only `cui_stepper_presentation.h` facade adds non-centered fill, indicator
-interaction and a typed custom palette. Its layout/palette/options types and
-`cui_stepper_present` entry are omitted from every language builder/bridge; source
-SDK inclusion does not imply authoring support.
+The retained Fill layout uses the theme's indicator colors. Use
+`cui_stepper_present` directly from C for custom palettes or synchronous
+application-controlled requests.
 
 ## Native window visibility
 

@@ -74,7 +74,10 @@ No output is clipped or filtered by safety keywords.
 Use `cui_stepper_present` for fill connectors. Choose direction from the
 container width with `cui_responsive_query`. The request callback validates
 the next selection. Keep it in owner state and resubmit on the next frame.
-Foreign builders provide fixed connectors and queued changes.
+Retained builders provide fixed connectors and queued changes. Probe
+`supports_stepper_fill` (`SupportsStepperFill` in Go) before using Fill on an
+earlier bridge. Pass an explicit axis, width 0 to grow, and height 0 for
+intrinsic height. See the Stepper layouts in `docs/BINDING_BUILDERS.md`.
 See `docs/STEPPER_NAVIGATION.md`.
 
 Use `cui_rating_present` for shared Rating sizes, custom SVG masks, colors and

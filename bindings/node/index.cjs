@@ -95,7 +95,9 @@ const radioContentKinds = new Set([1, 2, 3, 11, 30, 34, 37, 50, 53]);
 function requestsRadioMotion(node) {
   return node.radioMotionValue || node.childrenValue.some(requestsRadioMotion);
 }
-function preflightRadioOptions(app, node, insideDecoration = false) {
+const stepperFillUnavailable = 'Stepper Fill requires cui_bridge_set_stepper_fill';
+function preflightNodeOptions(app, node, insideDecoration = false) {
+  if (node.stepperFillValue && !app.supports_stepper_fill()) throw new Error(stepperFillUnavailable);
   if (insideDecoration && !radioContentKinds.has(node.kind))
     throw new TypeError('RadioGroup Item decoration requires passive children');
   if (node.radioPaintValues?.size) {
@@ -114,7 +116,7 @@ function preflightRadioOptions(app, node, insideDecoration = false) {
   if (node.radioTabIndexValue !== null && !app.supports_radio_tab_index())
     throw new Error(radioTabIndexUnavailable);
   for (const child of node.childrenValue)
-    preflightRadioOptions(app, child, insideDecoration || node.radioContentValue);
+    preflightNodeOptions(app, child, insideDecoration || node.radioContentValue);
 }
 function keyFor(node) { return `${node.slot}:${node.generation}`; }
 function positive(value, name) {
@@ -385,7 +387,19 @@ class Node {
     if(this.kind!==44 || typeof enabled!=='boolean' || typeof vertical!=='boolean' || !Object.hasOwn(densities,density))throw new TypeError('stepper_visual requires Stepper, bools and md/xs/sm/lg density');
     const value=[+enabled,+vertical,densities[density]];
     if(this.owner)native.setStepperVisual(this.owner.handle,this[NODE],...value);
-    this.stepperVisualValue=value;return this;
+    this.stepperVisualValue=value;this.stepperFillValue=null;return this;
+  }
+  stepper_fill(vertical=false,density='md',width=0,height=0) {
+    const densities={md:0,xs:1,sm:2,lg:3};
+    if(this.kind!==44 || typeof vertical!=='boolean' || typeof density!=='string' || !Object.hasOwn(densities,density) ||
+       ![width,height].every(x=>Number.isFinite(x)&&x>=0&&x<=4096))
+      throw new TypeError('stepper_fill requires Stepper, bool, md/xs/sm/lg and finite dimensions in [0,4096]');
+    const value=[+vertical,densities[density],width,height];
+    if(this.owner){
+      if(!this.owner.supports_stepper_fill())throw new Error(stepperFillUnavailable);
+      native.setStepperFill(this.owner.handle,this[NODE],...value);
+    }
+    this.stepperFillValue=value;this.stepperVisualValue=null;return this;
   }
   image_rgba(pixels,width,height,stride=width*4) {
     if(![53,20].includes(this.kind) || !(pixels instanceof Uint8Array) || ![width,height].every(x=>Number.isInteger(x)&&x>0&&x<=2048) ||
@@ -653,7 +667,7 @@ class App {
     if (this.root) throw new Error('app already has a root');
     if (!(root instanceof Node) || root.parent || root.owner || ![1,2,76].includes(root.kind)) throw new TypeError('root must be an unattached row, column or root_view');
     if (!this.supports_radio_motion() && requestsRadioMotion(root)) throw new Error(radioMotionUnavailable);
-    preflightRadioOptions(this, root);
+    preflightNodeOptions(this, root);
     preflightDataTables(this, root);
     skeletons.preflight(this, root);
     paginationOptions.preflight(this, root);
@@ -709,6 +723,7 @@ class App {
       if(node.extentValue)native.setScrollExtent(this.handle,node[NODE],...node.extentValue);
       if(node.visualValue)native.setVisualSize(this.handle,node[NODE],...node.visualValue);
       if(node.statusValue!==null)native.setStepStatus(this.handle,node[NODE],node.statusValue);
+      if(node.stepperFillValue)native.setStepperFill(this.handle,node[NODE],...node.stepperFillValue);
       if(node.stepperVisualValue)native.setStepperVisual(this.handle,node[NODE],...node.stepperVisualValue);
       if(node.designSizeValue!==undefined)native.setDesignSize(this.handle,node[NODE],node.designSizeValue);
       if(node.shadowStyleValue)native.setShadows(this.handle,node[NODE],node.shadowStyleValue.wire());
@@ -859,6 +874,10 @@ class App {
   supports_radio_paint() {
     this._alive();
     return typeof native.supportsRadioPaint === 'function' && typeof native.setRadioPaint === 'function' && native.supportsRadioPaint();
+  }
+  supports_stepper_fill() {
+    this._alive();
+    return typeof native.supportsStepperFill==='function' && typeof native.setStepperFill==='function' && native.supportsStepperFill();
   }
   supports_radio_motion() {
     this._alive();

@@ -2,7 +2,7 @@
 #include "../base/cui_table_internal.h"
 #include "cui/cui_media.h"
 #include "cui/cui_message.h"
-#include "cui/cui_stepper_visual.h"
+#include "cui/cui_stepper_presentation.h"
 #include "cui_bridge_internal.h"
 #include <limits.h>
 #include <math.h>
@@ -3243,9 +3243,31 @@ cui_bridge_status cui_bridge_set_stepper_visual(cui_bridge_app *app, cui_bridge_
         return CUI_BRIDGE_INVALID_STATE;
     if (enabled > 1 || vertical > 1 || density > CUI_STEPPER_DENSITY_LG)
         return CUI_BRIDGE_INVALID_ARGUMENT;
-    node->stepper_visual = enabled != 0;
+    if (node->stepper_layout == BRIDGE_STEPPER_FILL)
+        cui_invalidate(app->ui);
+    node->stepper_layout = enabled ? BRIDGE_STEPPER_FIXED : BRIDGE_STEPPER_BUTTONS;
     node->stepper_vertical = vertical != 0;
     node->stepper_density = density;
+    return CUI_BRIDGE_OK;
+}
+cui_bridge_status cui_bridge_set_stepper_fill(cui_bridge_app *app, cui_bridge_node handle,
+                                              uint32_t vertical, uint32_t density, float width,
+                                              float height) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_STEPPER)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (vertical > 1 || density > CUI_STEPPER_DENSITY_LG || !isfinite(width) || !isfinite(height) ||
+        width < 0 || height < 0 || width > 4096 || height > 4096)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->stepper_layout = BRIDGE_STEPPER_FILL;
+    node->stepper_vertical = vertical != 0;
+    node->stepper_density = density;
+    node->visual_width = width;
+    node->visual_height = height;
+    cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
 cui_bridge_status cui_bridge_set_image_rgba(cui_bridge_app *app, cui_bridge_node handle,
@@ -4298,18 +4320,30 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                 if (scratch->binding.slots[i] == (uint32_t)node->value)
                     current = i;
             bool changed;
-            if (node->stepper_visual) {
+            if (node->stepper_layout != BRIDGE_STEPPER_BUTTONS) {
                 bridge_stepper_request request = {current};
-                cui_stepper_navigation_result result = cui_stepper_visual_navigation(
-                    app->ui, node->id, &app->theme, scratch->steps, count, current,
-                    (cui_stepper_visual_options){.vertical = node->stepper_vertical,
-                                                 .disabled = node->disabled,
-                                                 .density =
-                                                     (cui_stepper_density)node->stepper_density,
-                                                 .design_size = (cui_design_size)node->size,
-                                                 .icons = scratch->step_icons,
-                                                 .icon_count = count},
-                    (cui_stepper_navigation_handler){bridge_stepper_requested, &request});
+                cui_stepper_visual_options options = {
+                    .vertical = node->stepper_vertical,
+                    .disabled = node->disabled,
+                    .density = (cui_stepper_density)node->stepper_density,
+                    .design_size = (cui_design_size)node->size,
+                    .icons = scratch->step_icons,
+                    .icon_count = count};
+                cui_stepper_navigation_handler handler = {bridge_stepper_requested, &request};
+                cui_stepper_navigation_result result;
+                if (node->stepper_layout == BRIDGE_STEPPER_FILL) {
+                    cui_stepper_presentation_options presentation = {.layout =
+                                                                         CUI_STEPPER_LAYOUT_FILL,
+                                                                     .width = node->visual_width,
+                                                                     .height = node->visual_height};
+                    result = cui_stepper_present(app->ui, node->id, &app->theme, scratch->steps,
+                                                 count, current, options, presentation, handler);
+                    if (result.valid && request.requested != current)
+                        cui_invalidate(app->ui);
+                } else
+                    result = cui_stepper_visual_navigation(app->ui, node->id, &app->theme,
+                                                           scratch->steps, count, current, options,
+                                                           handler);
                 changed = result.valid && request.requested != current;
                 if (changed)
                     current = request.requested;

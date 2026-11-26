@@ -38,6 +38,11 @@ typedef struct bridge_radio_paints bridge_radio_paints;
 typedef struct bridge_dock_owned bridge_dock_owned;
 typedef struct bridge_settings_owned bridge_settings_owned;
 typedef struct bridge_data_table_owned bridge_data_table_owned;
+typedef enum {
+    BRIDGE_STEPPER_BUTTONS,
+    BRIDGE_STEPPER_FIXED,
+    BRIDGE_STEPPER_FILL
+} bridge_stepper_layout;
 typedef struct {
     uint32_t generation;
     bool live;
@@ -51,8 +56,9 @@ typedef struct {
     char *avatar_placeholder;
     bool avatar_identity, avatar_custom_hue, avatar_anonymous;
     unsigned avatar_hue;
-    bool stepper_visual, stepper_vertical;
+    bridge_stepper_layout stepper_layout;
     unsigned stepper_density;
+    bool stepper_vertical;
     cui_bridge_button_rounding rounding;
     bool disabled, custom_hover, radio_item_content, radio_custom_tab_index;
     cui_color hover;

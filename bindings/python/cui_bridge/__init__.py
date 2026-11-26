@@ -247,6 +247,10 @@ class _API:
         self.set_text = bind("set_text", C.c_int, C.c_void_p, _Handle, C.c_char_p)
         self.set_gap = bind("set_gap", C.c_int, C.c_void_p, _Handle, C.c_float)
         self.set_variant = bind("set_button_variant", C.c_int, C.c_void_p, _Handle, C.c_int)
+        self.set_stepper_fill = None
+        if hasattr(lib, "cui_bridge_set_stepper_fill"):
+            self.set_stepper_fill = bind("set_stepper_fill", C.c_int, C.c_void_p, _Handle,
+                                         C.c_uint32, C.c_uint32, C.c_float, C.c_float)
         self.set_stepper_visual = bind("set_stepper_visual", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.c_uint32)
         self.set_design_size = bind("set_design_size", C.c_int, C.c_void_p, _Handle, C.c_int)
         self.set_avatar_identity = bind("set_avatar_identity", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.c_uint32)
@@ -470,6 +474,7 @@ class Widget:
         self._size = "base"
         self._design_size = None
         self._stepper_visual = None
+        self._stepper_fill = None
         self._avatar_identity = None
         self._avatar_placeholder = None
         self._part_shadow_styles = {}
@@ -971,6 +976,24 @@ class Widget:
         value = (int(enabled), int(vertical), densities[density])
         self._change("set_stepper_visual", *value)
         self._stepper_visual = value
+        self._stepper_fill = None
+        return self
+
+    def stepper_fill(self, vertical: bool = False, density: str = "md",
+                     width: float = 0, height: float = 0) -> "Widget":
+        """Use Fill steps; zero width grows and zero height uses intrinsic height."""
+        densities = {"md": 0, "xs": 1, "sm": 2, "lg": 3}
+        if (self.kind != "stepper" or type(vertical) is not bool or
+                not isinstance(density, str) or density not in densities or
+                any(type(x) not in (int, float) or not 0 <= x <= 4096
+                    for x in (width, height))):
+            raise ValueError("stepper_fill requires Stepper, bool, md/xs/sm/lg and finite dimensions in [0,4096]")
+        if self._app is not None:
+            self._app._require_stepper_fill()
+        value = (int(vertical), densities[density], width, height)
+        self._change("set_stepper_fill", *value)
+        self._stepper_fill = value
+        self._stepper_visual = None
         return self
 
     def image_rgba(self, pixels: bytes | bytearray | memoryview, width: int,
@@ -1755,6 +1778,15 @@ class App:
         if not self.supports_radio_motion():
             raise RuntimeError("Radio motion requires cui_bridge_radio_set_motion_v1")
 
+    def supports_stepper_fill(self) -> bool:
+        """Report whether the provider offers retained Stepper Fill."""
+        self._ensure_open()
+        return self._api.set_stepper_fill is not None
+
+    def _require_stepper_fill(self) -> None:
+        if not self.supports_stepper_fill():
+            raise RuntimeError("Stepper Fill requires cui_bridge_set_stepper_fill")
+
     def supports_radio_tab_index(self) -> bool:
         """Report whether the loaded bridge offers signed Radio and RadioGroup Tab order."""
         self._ensure_open()
@@ -1854,6 +1886,8 @@ class App:
                     raise ValueError("controlled Slider requires Row/Column ancestry")
             if isinstance(node, Pagination):
                 node._preflight_pagination(self)
+            if node._stepper_fill is not None:
+                self._require_stepper_fill()
             if node._radio_motion:
                 self._require_radio_motion()
             if node._radio_tab_index is not None:
@@ -1985,6 +2019,8 @@ class App:
                     node._change("set_open", int(node._open))
                 if node.kind in _DETAIL:
                     node._change("set_detail", _utf8(node._detail))
+                if node._stepper_fill is not None:
+                    node._change("set_stepper_fill", *node._stepper_fill)
                 if node._stepper_visual is not None:
                     node._change("set_stepper_visual", *node._stepper_visual)
                 if node._design_size is not None:

@@ -68,6 +68,40 @@ class Extended(unittest.TestCase):
             bad=c.item('bad','Bad').image_rgba(bytes(4),1,1)
             with self.assertRaises(c.BridgeError):app.mount(c.column().children(c.menu('menu').children(bad)))
 
+    def test_stepper_fill(self):
+        from unittest.mock import patch
+        with c.App(width=800,height=800) as app:
+            self.assertTrue(app.supports_stepper_fill())
+            a,b=c.item('a','First'),c.item('b','Second')
+            node=c.stepper('fill').stepper_visual().stepper_fill(width=360,height=64).children(a,b)
+            events=[];node.on_change(events.append)
+            app.mount(c.column().children(node));app.step()
+            self.assertAlmostEqual(app.bounds(node)[2],360,delta=1)
+            self.press_rect(app,app.numeric_part_bounds(node,2));app.dispatch()
+            self.assertIs(node.selected(),b);self.assertEqual(len(events),1)
+            self.press_rect(app,app.numeric_part_bounds(node,2));app.dispatch()
+            self.assertEqual(len(events),1)
+            for density in ('md','xs','sm','lg'):
+                node.stepper_fill(True,density,240,240);app.step()
+                self.assertGreater(app.numeric_part_bounds(node,2)[1],app.numeric_part_bounds(node,1)[1])
+            node.stepper_visual(True,False);app.step()
+            self.assertIsNone(node._stepper_fill)
+            with patch.object(app._api,'set_stepper_fill',None):
+                with self.assertRaisesRegex(RuntimeError,'cui_bridge_set_stepper_fill'):
+                    node.stepper_fill()
+            self.assertIsNone(node._stepper_fill)
+        for value in (-1,4097,float('nan'),float('inf'),True,'1'):
+            with self.assertRaises(ValueError):c.stepper("validation").stepper_fill(width=value)
+        with c.App() as app:
+            node=c.stepper('missing').stepper_fill().children(c.item('a','A'))
+            with patch.object(app._api,'set_stepper_fill',None):
+                self.assertFalse(app.supports_stepper_fill())
+                with self.assertRaisesRegex(RuntimeError,'cui_bridge_set_stepper_fill'):
+                    app.mount(c.column().children(node))
+                self.assertIsNone(node._app)
+                node.stepper_visual()
+                app.mount(c.column().children(c.stepper("validation").stepper_fill().stepper_visual()))
+
     def test_navigation(self):
         for name in ('list_view','menu','stepper'):
             with self.subTest(name=name),c.App(width=800,height=800) as app:

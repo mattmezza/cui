@@ -1080,6 +1080,16 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_attachment_status(
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_stepper_visual(cui_bridge_app *, cui_bridge_node,
                                                                uint32_t enabled, uint32_t vertical,
                                                                uint32_t density);
+/* Opt in to non-centered fill connectors and indicator hover/press feedback.
+ * vertical is 0/1 and density uses the visual setter's values. Logical extents
+ * must be finite and within [0,4096]. Width 0 grows to available parent space;
+ * height 0 is intrinsic. This call copies settings without emitting events.
+ * The visual setter replaces Fill with fixed connectors or legacy buttons.
+ * Selection, copied Item icons, and aggregate CHANGE follow the visual mode.
+ * Call between steps on the owner thread. Errors preserve the prior settings. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_stepper_fill(cui_bridge_app *, cui_bridge_node,
+                                                             uint32_t vertical, uint32_t density,
+                                                             float width, float height);
 /* Copies a tightly packed or padded RGBA8 image (at most 16 MiB).
  * Also accepts Item children of Stepper as optional tinted visual icons.
  * Item icon bytes remain owned through replacement/removal; other parents reject. */

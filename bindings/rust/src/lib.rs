@@ -7,6 +7,7 @@ pub use radio_paint::{RadioPaint, RadioPaintLayer};
 mod shadows;
 mod skeleton_presentation;
 mod slider_model;
+mod stepper_fill;
 mod time_localized;
 pub use icon_resources::{
     BadgeConfig, BadgeResult, BadgeSize, BadgeVariant, IconAlign, IconAvailability, IconBitmap,

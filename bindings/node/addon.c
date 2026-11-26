@@ -1347,6 +1347,40 @@ static napi_value get_plot(napi_env env, napi_callback_info info) {
     return result;
 }
 static int optional_bridge_symbol(void *target, size_t size, const char *name);
+typedef cui_bridge_status (*stepper_fill_fn)(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t,
+                                             float, float);
+static stepper_fill_fn stepper_fill_symbol(void) {
+    stepper_fill_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_set_stepper_fill");
+    return set;
+}
+static napi_value supports_stepper_fill(napi_env env, napi_callback_info info) {
+    (void)info;
+    napi_value result;
+    if (napi_get_boolean(env, stepper_fill_symbol() != NULL, &result) != napi_ok)
+        return NULL;
+    return result;
+}
+static napi_value set_stepper_fill(napi_env env, napi_callback_info info) {
+    napi_value v[6];
+    js_app *app;
+    js_node *node;
+    uint32_t vertical, density;
+    double width, height;
+    if (!args(env, info, 6, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &vertical) || !uint_arg(env, v[3], &density) ||
+        !number_arg(env, v[4], &width) || !number_arg(env, v[5], &height))
+        return NULL;
+    if (vertical > 1 || density > 3 || width < 0 || width > 4096 || height < 0 || height > 4096)
+        return fail(env, "invalid Stepper Fill configuration");
+    stepper_fill_fn set = stepper_fill_symbol();
+    if (!set)
+        return fail(env, "Stepper Fill requires cui_bridge_set_stepper_fill");
+    cui_bridge_status code =
+        set(app->bridge, node->node, vertical, density, (float)width, (float)height);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 typedef cui_bridge_status (*radio_flag_fn)(cui_bridge_app *, cui_bridge_node, uint32_t);
 
 static radio_flag_fn radio_flag_symbol(const char *name) {
@@ -2467,6 +2501,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setVariant", set_num, 2);
     EXPORT("setSize", set_num, 3);
     EXPORT("setDesignSize", set_num, 14);
+    EXPORT("setStepperFill", set_stepper_fill, 0);
+    EXPORT("supportsStepperFill", supports_stepper_fill, 0);
     EXPORT("setStepperVisual", set_stepper_visual, 0);
     EXPORT("setAvatarIdentity", set_avatar_identity, 0);
     EXPORT("setAvatarPlaceholder", set_avatar_placeholder, 0);

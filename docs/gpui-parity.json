@@ -2623,7 +2623,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. Richer child composition, integrated tooltips, full styling and OS accessibility acceptance remain open."
+        "Controlled RadioGroup with same-frame checked state, roving focus, removal cleanup, named indicators and opt-in spring marks. Standalone and retained Radio motion are opt-in. RadioGroup supports descriptions and decorative content in immediate C and Item descriptions through the retained API. Integrated tooltips, full styling and OS accessibility acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2694,6 +2694,19 @@
           ],
           "limitations": [
             "The immediate C presenter takes optional per-option motion and keeps the shared-integer activation contract. Use RadioGroup for atomic sibling paint and roving focus. The C bridge provides optional retained motion."
+          ]
+        },
+        {
+          "name": "grouped option descriptions and decorative composition",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_radio_group.c:test_rich_content",
+            "tests/unit/test_bridge_radio_motion.c",
+            "tests/web/test_radio_group.py",
+            "docs/RADIO_GROUP.md"
+          ],
+          "limitations": [
+            "Immediate C supports per-option decorative callbacks inside the option target. Retained authoring supports copied Item descriptions. Native accessibility adapter acceptance remains open."
           ]
         },
         {

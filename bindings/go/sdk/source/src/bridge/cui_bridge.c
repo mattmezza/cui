@@ -3861,9 +3861,12 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                 selected = app->nodes[index].id;
         }
         cui_selection_indicator_parts parts[64];
-        bool named = false, authored = node->shadows.schema_version != 0;
+        cui_radio_group_content content[CUI_RADIO_GROUP_MAX] = {0};
+        bool described = false, named = false, authored = node->shadows.schema_version != 0;
         for (size_t i = 0; i < count; ++i) {
             cui_bridge_node_record *item = &app->nodes[scratch->binding.slots[i]];
+            content[i].description = cui_string(item->detail);
+            described |= content[i].description.length != 0;
             parts[i].indicator = bridge_indicator_id(item);
             named |= bridge_target_style(item, CUI_BRIDGE_SHADOW_INDICATOR) != NULL;
             authored |= item->shadows.schema_version != 0;
@@ -3873,9 +3876,10 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                                                      .parts = named ? parts : NULL,
                                                      .part_count = named ? count : 0};
         cui_radio_group_result result =
-            cui_radio_group_present(app->ui, node->id, &app->theme, scratch->radios, count,
-                                    &selected, &node->radio_group_state, options, presentation,
-                                    (cui_selection_handler){0})
+            cui_radio_group_present_with_content(app->ui, node->id, &app->theme, scratch->radios,
+                                                 count, &selected, &node->radio_group_state,
+                                                 options, presentation, described ? content : NULL,
+                                                 described ? count : 0, (cui_selection_handler){0})
                 .legacy;
         if (!result.valid && (named || authored) && app->frame_error == CUI_BRIDGE_OK)
             app->frame_error = CUI_BRIDGE_CORE_ERROR;

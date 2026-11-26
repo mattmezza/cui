@@ -4861,9 +4861,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                      .parts =
                                                          control_surface_shadows ? parts : NULL,
                                                      .part_count = control_surface_shadows ? 3 : 0};
-        cui_radio_group_present(ui, cui_id_from(ui, "radio-group"), &t, items, 3, &radio_selected,
-                                &radio_group_state, radio_options, presentation,
-                                (cui_selection_handler){0});
+        const cui_radio_group_content content[] = {
+            {.description = cui_string("Arrives in four business days"), .max_width = 205},
+            {.description = cui_string("Arrives Wednesday with tracked delivery"),
+             .max_width = 205},
+            {.description = cui_string("Unavailable for this address"), .max_width = 205}};
+        cui_radio_group_present_with_content(ui, cui_id_from(ui, "radio-group"), &t, items, 3,
+                                             &radio_selected, &radio_group_state, radio_options,
+                                             presentation, content, 3, (cui_selection_handler){0});
         if (control_surface_shadows)
             for (size_t i = 0; i < 3; i++)
                 gallery_control_shadow(ui, parts[i].indicator,

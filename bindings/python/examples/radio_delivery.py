@@ -12,7 +12,7 @@ def main():
     arrival = "Friday"
     summary = label(f"Estimated arrival: {arrival}")
     standard = item("standard", "Standard")
-    priority = item("priority", "Priority")
+    priority = item("priority", "Priority").detail("Tracked delivery")
     group = radio_group("delivery").children(standard, priority).select(standard)
 
     def update_estimate(_event):

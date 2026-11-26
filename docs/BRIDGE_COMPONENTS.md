@@ -21,7 +21,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | NumberInput | `cui_number_input` | per-node numeric editor, value, range, step, change, disabled | Finite values; 127-byte draft |
 | Collapsible | `cui_collapsible` | open state, change, disabled | Child subtree is panel |
 | Alert | `cui_alert` | copied title/message | Static informational alert |
-| RadioGroup | `cui_radio_group_present` | selected Item, change, disabled, optional animated selection | Up to 64 Items |
+| RadioGroup | `cui_radio_group_present_with_content` | selected Item, description, change, disabled, optional animated selection | Up to 64 Items |
 | Tabs | `cui_tabs` | selected Item, change, disabled | Up to 64 Items; Item subtree is panel |
 | Accordion | `cui_accordion` | per-Item open state, change, disabled | Up to 64 Items; multiple expansion |
 | Item | Composite descriptor | label, disabled, optional panel children | Must belong to group |
@@ -181,6 +181,21 @@ Rust uses `app.supports_radio_motion()` and `Builder::animate_selection(enabled)
 Use `app.animate_selection(node, enabled)` to update a mounted control. Its
 delivery form also supports headless and native execution.
 [Rust guide and runnable form](RUST_BUILDERS.md#animate-radio-selection-from-rust)
+
+### Describe retained Radio options
+
+Set copied supporting text on a RadioGroup's direct Item with
+`cui_bridge_set_detail_text(app, item, text)`. It appears under the label and
+is published as the option's semantic description. Pass an empty string to
+remove it. The whole row remains one radio target and selection produces the
+same queued change event.
+
+Use `item.detail(text)` in Python, JavaScript or TypeScript, `item.Detail(text)`
+in Go, and `app.detail_text(item, text)` or `Builder::detail_text(text)` in
+Rust. The delivery form examples above include a described option. Earlier
+bridge releases accept the same Item detail setter and keep ordinary
+RadioGroup labels. Arbitrary decorative children are available through the
+[immediate C presenter](RADIO_GROUP.md#add-descriptions-and-custom-content).
 
 ### Configure a retained pager from C
 

@@ -148,6 +148,78 @@ static void test_motion(void) {
     motion_frame(&motion, items, 0, options, NULL);
     assert(motion.items[0].id == 0 && motion.next_wake_seconds == 0);
 }
+static cui_radio_group_content rich_content[3];
+static unsigned content_calls;
+static void decoration(cui_context *ctx, void *user) {
+    assert(ctx == ui && user == &content_calls);
+    content_calls++;
+    assert(!cui_button(ctx, 301, &theme, cui_string("Tracked"), false));
+}
+static void change_and_replace_content(void *user, cui_id id) {
+    change(user, id);
+    rich_content[1] = (cui_radio_group_content){0};
+}
+static cui_radio_group_result rich_frame(cui_radio_group_options options, size_t content_count) {
+    assert(cui_begin_frame(ui, 450, 280, .016f));
+    cui_radio_group_result result =
+        cui_radio_group_present_with_content(ui, 10, &theme, items, 3, &selected, &state, options,
+                                             (cui_radio_group_presentation){0}, rich_content,
+                                             content_count, (cui_selection_handler){0})
+            .legacy;
+    drawing = cui_end_frame(ui);
+    return result;
+}
+static void check_description(cui_str expected) {
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    assert(count == 4 && sem[2].id == 12 && sem[2].role == CUI_ROLE_RADIO &&
+           sem[2].name.length == 8 && !memcmp(sem[2].name.data, "Priority", 8));
+    assert(sem[2].details.parent == 10 && sem[2].details.pos_in_set == 2 &&
+           sem[2].details.set_size == 3 && sem[2].details.required &&
+           sem[2].checked == (selected == 12));
+    assert(sem[2].details.description.length == expected.length);
+    if (expected.length)
+        assert(!memcmp(sem[2].details.description.data, expected.data, expected.length));
+}
+static void test_rich_content(void) {
+    char description[] = "One business day";
+    rich_content[1] = (cui_radio_group_content){.description = cui_string(description),
+                                                .content = decoration,
+                                                .content_user = &content_calls,
+                                                .max_width = 135};
+    selected = 11;
+    cui_radio_group_options options = {.vertical = true, .required = true};
+    assert(rich_frame(options, 3).valid && cui_last_error(ui) == CUI_OK);
+    description[0] = 'X';
+    check_description(cui_string("One business day"));
+    description[0] = 'O';
+    cui_rect row = cui_bounds(ui, 12), child = cui_bounds(ui, 301);
+    assert(row.w <= 16 + 8 + 135 && row.h > cui_bounds(ui, 11).h);
+    assert(child.w > 0 && child.h > 0 && child.y > row.y && child.y + child.h <= row.y + row.h);
+    assert(content_calls == 1);
+
+    calls = 0;
+    accept = true;
+    options.on_change = change_and_replace_content;
+    options.change_user = &selected;
+    float x = child.x + child.w / 2, y = child.y + child.h / 2;
+    touch(CUI_EVENT_POINTER_DOWN, x, y);
+    touch(CUI_EVENT_POINTER_UP, x, y);
+    cui_radio_group_result result = rich_frame(options, 3);
+    assert(cui_last_error(ui) == CUI_OK && result.valid && result.changed && selected == 12 &&
+           calls == 1 && content_calls == 2);
+    check_description(cui_string("One business day"));
+    assert(rich_frame(options, 3).valid && content_calls == 2);
+    check_description((cui_str){0});
+    assert(cui_bounds(ui, 12).h < row.h);
+
+    rich_content[1].max_width = NAN;
+    assert(!rich_frame(options, 3).valid && calls == 1 && content_calls == 2);
+    rich_content[1].max_width = 0;
+    assert(!rich_frame(options, 2).valid && cui_last_error(ui) == CUI_ERROR_INVALID_ACTION);
+    cui_clear_error(ui);
+    assert(rich_frame(options, 3).valid && cui_last_error(ui) == CUI_OK);
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 2000, .height = 1000});
     assert(ui);
@@ -285,6 +357,7 @@ int main(void) {
     items[1].id = saved;
     theme = cui_theme_light();
     test_motion();
+    test_rich_content();
     cui_destroy(ui);
     return 0;
 }

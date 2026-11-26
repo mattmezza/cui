@@ -71,6 +71,9 @@ function declarations produce matching paths only. `api SYMBOL --full` restores
 complete matching headers. `--declaration` explicitly selects the concise API view.
 No output is clipped or filtered by safety keywords.
 
+For RadioGroup descriptions and decorative content, read
+`docs/RADIO_GROUP.md`. Retained applications can use the Item detail setter
+in `docs/BRIDGE_COMPONENTS.md` for copied accessible descriptions.
 For retained Radio selection animation, read the Radio section of
 `docs/BRIDGE_COMPONENTS.md`. Python, JS/TS and Rust use
 `app.supports_radio_motion()`. Go uses `app.SupportsRadioMotion()`.

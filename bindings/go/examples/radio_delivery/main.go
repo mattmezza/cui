@@ -25,7 +25,7 @@ func main() {
 	motion, err := app.SupportsRadioMotion()
 	must(err)
 	standard := cui.Item("standard", "Standard")
-	priority := cui.Item("priority", "Priority")
+	priority := cui.Item("priority", "Priority").Detail("Tracked delivery")
 	summary := cui.Label("Estimated arrival: Friday")
 	delivery := cui.RadioGroup("delivery").Children(standard, priority).Selected(standard).
 		AnimateSelection(motion).OnChange(func(event cui.Event) {

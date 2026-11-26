@@ -44,6 +44,7 @@ fn main() -> Result<()> {
     let priority = app
         .build_child(group, Kind::Item, "priority")?
         .text("Priority")?
+        .detail_text("Tracked delivery")?
         .finish();
     app.select(group, standard)?;
     let summary = app

@@ -12,7 +12,7 @@ try {
   let arrival = 'Friday';
   const summary = label(`Estimated arrival: ${arrival}`);
   const standard = item('standard', 'Standard');
-  const priority = item('priority', 'Priority');
+  const priority = item('priority', 'Priority').detail('Tracked delivery');
   const delivery = radio_group('delivery').children(standard, priority).select(standard)
     .animate_selection(app.supports_radio_motion())
     .on_change(() => {

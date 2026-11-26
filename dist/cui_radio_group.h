@@ -95,6 +95,24 @@ cui_radio_group_event_result
 cui_radio_group_present(cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *,
                         size_t, cui_id *, cui_radio_group_state *, cui_radio_group_options,
                         cui_radio_group_presentation, cui_selection_handler);
+/* Optional content below an item's ordinary label. A positive max_width caps
+ * the label column in logical pixels; zero fits the available layout. */
+typedef struct {
+    cui_str description;
+    cui_button_content_fn content;
+    void *content_user;
+    float max_width;
+} cui_radio_group_content;
+/* Supply one descriptor per item in the same order, or NULL/zero. Descriptors
+ * are copied before selection callbacks. Strings and userdata follow ordinary
+ * frame lifetimes. A nonempty description is also the radio's semantic
+ * description. The optional content callback runs once per composed row after
+ * selection is resolved, in an inert subtree. Submit decorative content only.
+ * Keep the item label as the accessible name. No added focus or input target. */
+cui_radio_group_event_result cui_radio_group_present_with_content(
+    cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *, size_t, cui_id *,
+    cui_radio_group_state *, cui_radio_group_options, cui_radio_group_presentation,
+    const cui_radio_group_content *, size_t content_count, cui_selection_handler);
 #ifdef __cplusplus
 }
 #endif
@@ -311,7 +329,8 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
                        const cui_radio_group_item *items, size_t count, cui_id *selected,
                        cui_radio_group_state *state, cui_radio_group_options o,
                        cui_selection_handler handler, cui_selection_event_result *observed,
-                       const cui_selection_indicator_parts *parts, cui_radio_group_motion *motion) {
+                       const cui_selection_indicator_parts *parts, cui_radio_group_motion *motion,
+                       const cui_radio_group_content *content) {
     cui_radio_group_result r = {0};
     if (!t)
         return r;
@@ -332,6 +351,9 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
         size = design.indicator_size;
         font = design.font_size;
     }
+    size_t first_semantic = 0;
+    if (content)
+        cui_semantics(ui, &first_semantic);
     if (observed) {
         cui_radio_group_event_result result =
             cui_base_radio_group_events(ui, id, items, count, selected, state, o, handler);
@@ -341,6 +363,21 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
         r = cui_base_radio_group(ui, id, items, count, selected, state, o);
     if (!r.valid)
         return r;
+    if (content) {
+        size_t semantic_count;
+        const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+        for (size_t i = 0; i < count; i++) {
+            if (!content[i].description.length)
+                continue;
+            for (size_t j = first_semantic; j < semantic_count; j++)
+                if (semantics[j].id == items[i].id) {
+                    cui_semantic_details details = semantics[j].details;
+                    details.description = content[i].description;
+                    cui_set_semantic_details(ui, items[i].id, details);
+                    break;
+                }
+        }
+    }
     if (motion) {
         cui_disclosure_motion samples[CUI_RADIO_GROUP_MAX] = {0};
         if (motion->id == id)
@@ -392,7 +429,9 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
         }
         cui_begin_box(ui, items[i].id, row);
         cui_begin_box(ui, 0, (cui_box){.width = size});
-        if (items[i].label.length) {
+        const cui_radio_group_content *extra = content ? &content[i] : NULL;
+        bool rich = extra && (extra->description.length || extra->content || extra->max_width > 0);
+        if (items[i].label.length || rich) {
             cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
             cui_end_box(ui);
         }
@@ -410,7 +449,19 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
             cui_checkmark(ui, size - 4 * density, dot);
         cui_end_box(ui);
         cui_end_box(ui);
-        if (items[i].label.length)
+        if (rich) {
+            cui_begin_box(ui, 0, (cui_box){.gap = 3 * density, .max_width = extra->max_width});
+            if (items[i].label.length)
+                cui_text(ui, items[i].label, font, disabled ? t->muted : t->text);
+            if (extra->description.length)
+                cui_text(ui, extra->description, font * .875f, t->muted);
+            if (extra->content) {
+                cui_begin_box(ui, 0, (cui_box){.inert = true});
+                extra->content(ui, extra->content_user);
+                cui_end_box(ui);
+            }
+            cui_end_box(ui);
+        } else if (items[i].label.length)
             cui_text(ui, items[i].label, font, disabled ? t->muted : t->text);
         cui_end_box(ui);
     }
@@ -423,7 +474,7 @@ cui_radio_group_result cui_radio_group(cui_context *ui, cui_id id, const cui_the
                                        cui_id *selected, cui_radio_group_state *state,
                                        cui_radio_group_options options) {
     return cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                  (cui_selection_handler){0}, NULL, NULL, NULL);
+                                  (cui_selection_handler){0}, NULL, NULL, NULL, NULL);
 }
 cui_radio_group_event_result cui_radio_group_events(cui_context *ui, cui_id id,
                                                     const cui_theme *theme,
@@ -434,7 +485,7 @@ cui_radio_group_event_result cui_radio_group_events(cui_context *ui, cui_id id,
     cui_radio_group_event_result result;
     memset(&result, 0, sizeof(result));
     result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                           handler, &result.events, NULL, NULL);
+                                           handler, &result.events, NULL, NULL, NULL);
     return result;
 }
 
@@ -472,7 +523,7 @@ cui_radio_group_with_parts(cui_context *ui, cui_id id, const cui_theme *theme,
     if (!cui_radio_group_parts_copy(ui, id, items, count, parts, part_count, copied))
         return (cui_radio_group_result){0};
     return cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                  (cui_selection_handler){0}, NULL, copied, NULL);
+                                  (cui_selection_handler){0}, NULL, copied, NULL, NULL);
 }
 cui_radio_group_event_result cui_radio_group_events_with_parts(
     cui_context *ui, cui_id id, const cui_theme *theme, const cui_radio_group_item *items,
@@ -483,7 +534,7 @@ cui_radio_group_event_result cui_radio_group_events_with_parts(
     if (!cui_radio_group_parts_copy(ui, id, items, count, parts, part_count, copied))
         return result;
     result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                           handler, &result.events, copied, NULL);
+                                           handler, &result.events, copied, NULL, NULL);
     return result;
 }
 
@@ -492,16 +543,42 @@ cui_radio_group_present(cui_context *ui, cui_id id, const cui_theme *theme,
                         const cui_radio_group_item *items, size_t count, cui_id *selected,
                         cui_radio_group_state *state, cui_radio_group_options options,
                         cui_radio_group_presentation presentation, cui_selection_handler handler) {
+    return cui_radio_group_present_with_content(ui, id, theme, items, count, selected, state,
+                                                options, presentation, NULL, 0, handler);
+}
+
+cui_radio_group_event_result cui_radio_group_present_with_content(
+    cui_context *ui, cui_id id, const cui_theme *theme, const cui_radio_group_item *items,
+    size_t count, cui_id *selected, cui_radio_group_state *state, cui_radio_group_options options,
+    cui_radio_group_presentation presentation, const cui_radio_group_content *content,
+    size_t content_count, cui_selection_handler handler) {
     cui_radio_group_event_result result = {0};
+    cui_radio_group_content copied_content[CUI_RADIO_GROUP_MAX];
+    if (content || content_count) {
+        bool valid = content && content_count == count && count <= CUI_RADIO_GROUP_MAX;
+        for (size_t i = 0; valid && i < count; i++) {
+            valid = (!content[i].description.length || content[i].description.data) &&
+                    isfinite(content[i].max_width) && content[i].max_width >= 0;
+        }
+        if (!valid) {
+            if (ui)
+                cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_INVALID_ACTION,
+                                                            .operation = "radio_group_content",
+                                                            .id = id});
+            return result;
+        }
+        if (count)
+            memcpy(copied_content, content, count * sizeof(*content));
+    }
     cui_selection_indicator_parts copied[CUI_RADIO_GROUP_MAX];
     if (presentation.parts || presentation.part_count) {
         if (!cui_radio_group_parts_copy(ui, id, items, count, presentation.parts,
                                         presentation.part_count, copied))
             return result;
     }
-    result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                           handler, &result.events,
-                                           presentation.parts ? copied : NULL, presentation.motion);
+    result.legacy = cui_radio_group_render(
+        ui, id, theme, items, count, selected, state, options, handler, &result.events,
+        presentation.parts ? copied : NULL, presentation.motion, content ? copied_content : NULL);
     return result;
 }
 

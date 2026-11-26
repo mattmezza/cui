@@ -13,6 +13,9 @@
   animation. Their delivery forms update an arrival estimate in the existing
   selection callback.
 
+- RadioGroup options can show accessible descriptions and decorative content.
+  Retained builders use the existing Item detail setter for descriptions.
+
 ## 0.1.0-alpha.7
 
 - Pagination wraps its controls at the available width and keeps the page

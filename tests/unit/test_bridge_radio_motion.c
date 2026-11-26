@@ -105,6 +105,24 @@ int main(void) {
     assert(cui_bridge_radio_set_motion_v1(app, group, 1) == CUI_BRIDGE_OK);
     assert(cui_bridge_radio_set_motion_v1(app, radio, 1) == CUI_BRIDGE_OK);
     step(app);
+    assert(cui_bridge_set_text(app, second, "Priority") == CUI_BRIDGE_OK);
+    step(app);
+    float ordinary_height = bounds(app, second).height;
+    assert(cui_bridge_set_detail_text(app, second, "Tracked delivery") == CUI_BRIDGE_OK);
+    step(app);
+    assert(bounds(app, second).height > ordinary_height);
+    size_t semantic_count;
+    const cui_semantic *sem = cui_semantics(app->ui, &semantic_count);
+    bool described = false;
+    for (size_t i = 0; i < semantic_count; i++) {
+        if (sem[i].id != app->nodes[second.slot].id)
+            continue;
+        assert(sem[i].role == CUI_ROLE_RADIO && sem[i].name.length == 8 &&
+               sem[i].details.description.length == 16 &&
+               !memcmp(sem[i].details.description.data, "Tracked delivery", 16));
+        described = true;
+    }
+    assert(described);
     unsigned full = app->theme.on_primary.a;
     assert(mark(app, radio) == 0 && mark(app, first) == full && mark(app, second) == 0);
 

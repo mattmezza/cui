@@ -162,6 +162,51 @@ def main():
                 assert all(s['f'][5]for s in a.snapshot()if s['f'][0]==4)
                 a.configure('disabled',False)
             a.case('Radio','disabled group rejects touch and keyboard changes',disabled)
+            def rich_content():
+                standard = a.target('Standard', 4)
+                priority = a.target('Priority', 4)
+                group = a.page.locator('#accessible')
+                assert group.get_by_role('radio', name='Priority', exact=True).get_attribute(
+                    'aria-description') == 'Arrives Wednesday with tracked delivery'
+                assert group.get_by_role('radio', name='Standard', exact=True).get_attribute(
+                    'aria-description') == 'Arrives in four business days'
+                # The description may wrap. Click the center of its first painted line.
+                def description_point(target, *, wraps=False):
+                    layout = a.page.evaluate("""({row, title}) => {
+                        const e = cuiGallery.exports, decoder = new TextDecoder();
+                        const lines = [];
+                        for (let i = 0; i < e.gallery_count(); ++i) {
+                            if (e.gallery_command(i, 0) !== 2) continue;
+                            const text = decoder.decode(new Uint8Array(e.memory.buffer,
+                                e.gallery_command_text(i), e.gallery_command_length(i)));
+                            const [x,y,w,h] = [1,2,3,4].map(f => e.gallery_command(i, f));
+                            if (y >= row[1] && y + h <= row[1] + row[3] &&
+                                text !== title)
+                                lines.push({text, x, y, w, h});
+                        }
+                        return lines;
+                    }""", {'row': target['f'][1:5], 'title': target['name']})
+                    assert layout and layout[0]['text'].startswith('Arrives '), layout
+                    if wraps:
+                        assert len({line['y'] for line in layout}) > 1, layout
+                    x, y, w, h = target['f'][1:5]
+                    line = layout[0]
+                    rx = (line['x'] + line['w']/2 - x) / w
+                    ry = (line['y'] + line['h']/2 - y) / h
+                    assert 0 < rx < 1 and 0 < ry < 1
+                    return a.point(target, rx, ry)
+
+                count = a.page.evaluate('cuiGallery.exports.gallery_radio_stat(0)')
+                mouse = description_point(standard)
+                a.page.mouse.click(mouse['x'], mouse['y'])
+                a.page.wait_for_timeout(60)
+                selected('Standard')
+                a.dispatch('touchStart', [description_point(priority, wraps=True)])
+                a.dispatch('touchEnd', [])
+                selected('Priority')
+                assert a.page.evaluate('cuiGallery.exports.gallery_radio_stat(0)') == count + 2
+            a.case('Radio', 'rich labels paint and expose descriptions inside one option target',
+                   rich_content)
             assert not a.errors,a.errors
             a.case('Radio', 'marks crossfade and reverse, settle without frames, and respect reduced motion',
                    lambda: check_animated_marks(browser, f'http://127.0.0.1:{server.server_port}'))

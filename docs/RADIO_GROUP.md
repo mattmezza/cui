@@ -67,7 +67,44 @@ including theme density. It uses the existing selection mark renderer and the
 same indicator/font/theme colors as the standalone radio. The separate base API
 registers/reduces behavior without styled layout; a custom renderer must submit
 boxes with the same IDs. Do not register another interactive radio with the same
-ID after calling the base API. Rich child composition, integrated tooltips and full styling remain open.
+ID after calling the base API. Standalone Radio accepts decorative composition
+through `cui_radio_options.content`. Integrated tooltips and the full styling
+audit remain open.
+
+## Add descriptions and custom content
+
+`cui_radio_group_present_with_content` accepts one optional descriptor per
+option. Use `description` for supporting text. The item label remains the
+accessible name, and the supporting text is also the semantic description.
+Use `max_width` to cap the option's text column in logical pixels. Leaving it
+zero lets the parent layout determine the available space.
+
+```c
+const cui_radio_group_content content[] = {
+    {.description = cui_string("Arrives in four business days"), .max_width = 205},
+    {.description = cui_string("Arrives Wednesday with tracked delivery"), .max_width = 205}
+};
+
+cui_radio_group_present_with_content(
+    ui, group_id, theme, items, 2, &selection, &navigation,
+    (cui_radio_group_options){.vertical = true, .name = cui_string("Delivery options")},
+    (cui_radio_group_presentation){.motion = &motion}, content, 2,
+    (cui_selection_handler){0});
+```
+
+Supply `content` and exactly one descriptor per item, or pass `NULL, 0`. A
+zeroed descriptor preserves ordinary label layout for that option. The
+presenter copies the small descriptor array before synchronous selection
+requests. Description bytes and callback userdata still follow ordinary
+frame lifetimes. An optional `content` callback runs once per submitted row
+after the selection request and observer have completed. Its subtree paints
+and participates in layout while the row remains the only focus and
+activation target. Submit decorative content such as styled labels or art
+and put selection instructions in the accessible name or description.
+
+Retained applications can attach copied description text to each direct
+RadioGroup Item with the existing detail setter. The runnable delivery forms
+use that path. [Retained descriptions](BRIDGE_COMPONENTS.md#describe-retained-radio-options)
 
 ## Animate the marks
 

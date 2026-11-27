@@ -26,10 +26,12 @@ fn main() -> Result<()> {
     assert!(app.supports_kbd_stroke(), "installed bridge lacks typed Kbd");
     assert!(app.supports_spinner_presentation(), "installed bridge lacks rotating Spinner");
     assert!(app.supports_spinner_icon_resources(), "installed bridge lacks shared Spinner artwork");
+    assert!(app.supports_button_focus(), "installed bridge lacks Button focus treatments");
     let root = app.build_root(Kind::Column,"root")?.finish();
     let clicked = Rc::new(Cell::new(0));
     let callback = clicked.clone();
     let button = app.build_child(root,Kind::Button,"save")?.text("Save ✓")?
+        .button_focus(ButtonFocusMode::OuterRing)?
         .on_click(move || callback.set(callback.get()+1))?.finish();
     let slides = app.build_child(root, Kind::Carousel, "slides")?.visual_size(240., 100.)?.finish();
     let overview = app.build_child(slides, Kind::Item, "overview")?.text("Overview")?

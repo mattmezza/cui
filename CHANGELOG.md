@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-alpha.17
 
 - Box-scoped text defaults set a fallback size and solid color for Labels
   and Icons and a fallback color for Spinners. Use them from immediate C or

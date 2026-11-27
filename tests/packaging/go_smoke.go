@@ -80,10 +80,13 @@ func main() {
 	if supported, err := app.SupportsSpinnerIconResources(); err != nil || !supported {
 		panic(fmt.Sprintf("installed bridge lacks shared Spinner artwork: %v", err))
 	}
+	if supported, err := app.SupportsButtonFocus(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Button focus treatments: %v", err))
+	}
 	spinner := cui.RotatingSpinner("spinner", cui.DefaultSpinnerConfig())
 	sharedSpinner := cui.RotatingSpinner("shared-spinner", cui.DefaultSpinnerConfig())
 	clicks := 0
-	button := cui.Button("save").Text("Save ✓").OnClick(func(cui.Event) { clicks++ })
+	button := cui.Button("save").Text("Save ✓").ButtonFocus(cui.ButtonFocusOuterRing).OnClick(func(cui.Event) { clicks++ })
 	overview := cui.Item("overview", "Overview").CarouselBasis(0.5)
 	activity := cui.Item("activity", "Activity").CarouselBasis(0.5)
 	settings := cui.Item("settings", "Settings").CarouselBasis(0.5)

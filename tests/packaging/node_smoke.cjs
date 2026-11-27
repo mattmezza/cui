@@ -11,6 +11,8 @@ const widget = cui.button('save').label('Save changes').on_click(() => ++clicks)
 const options = process.env.CUI_PACKAGE_SMOKE_BACKEND === 'sdl'
   ? {backend:'sdl', fontPath:process.env.CUI_PACKAGE_SMOKE_FONT} : {};
 const app = new cui.App(options);
+assert(app.supports_button_focus(), 'installed bridge lacks Button focus treatments');
+widget.focus_treatment('outer-ring');
 assert.equal(app.supports_radio_tab_index(), true, 'installed bridge lacks Radio ordering');
 assert.equal(app.supports_radio_paint(), true, 'installed bridge lacks Radio paint');
 assert.equal(app.supports_rating_options(), true, 'installed bridge lacks Rating options');

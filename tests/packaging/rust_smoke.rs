@@ -8,6 +8,11 @@ fn main() -> Result<()> {
     assert!(app.supports_radio_paint(), "installed bridge lacks Radio paint");
     assert!(app.supports_rating_options(), "installed bridge lacks Rating options");
     assert!(app.supports_stepper_fill(), "installed bridge lacks Stepper Fill");
+    assert!(app.supports_notification_action(), "installed bridge lacks Notification actions");
+    assert!(app.supports_notification_auto_hide(), "installed bridge lacks Notification auto-hide");
+    assert!(app.supports_stepper_centered_fill(), "installed bridge lacks Stepper Centered Fill");
+    assert!(app.supports_dialog_composition(), "installed bridge lacks Dialog composition");
+    assert!(app.supports_popover_secondary_trigger(), "installed bridge lacks Popover right-click");
     assert!(app.supports_stepper_wrapped_fill(), "installed bridge lacks Stepper Wrapped Fill");
     assert!(app.supports_virtual_list_axis(), "installed bridge lacks horizontal VirtualList");
     assert!(app.supports_kbd_style(), "installed bridge lacks Kbd styling");

@@ -26,6 +26,21 @@ func main() {
 	if supported, err := app.SupportsStepperFill(); err != nil || !supported {
 		panic(fmt.Sprintf("installed bridge lacks Stepper Fill: %v", err))
 	}
+	if supported, err := app.SupportsNotificationAction(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Notification actions: %v", err))
+	}
+	if supported, err := app.SupportsNotificationAutoHide(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Notification auto-hide: %v", err))
+	}
+	if supported, err := app.SupportsStepperCenteredFill(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Stepper Centered Fill: %v", err))
+	}
+	if supported, err := app.SupportsDialogComposition(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Dialog composition: %v", err))
+	}
+	if supported, err := app.SupportsPopoverSecondaryTrigger(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Popover right-click: %v", err))
+	}
 	if supported, err := app.SupportsStepperWrappedFill(); err != nil || !supported {
 		panic(fmt.Sprintf("installed bridge lacks Stepper Wrapped Fill: %v", err))
 	}

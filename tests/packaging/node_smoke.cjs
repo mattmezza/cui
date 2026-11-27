@@ -15,6 +15,11 @@ assert.equal(app.supports_radio_tab_index(), true, 'installed bridge lacks Radio
 assert.equal(app.supports_radio_paint(), true, 'installed bridge lacks Radio paint');
 assert.equal(app.supports_rating_options(), true, 'installed bridge lacks Rating options');
 assert.equal(app.supports_stepper_fill(), true, 'installed bridge lacks Stepper Fill');
+assert(app.supports_notification_action(), 'installed bridge lacks Notification actions');
+assert(app.supports_notification_auto_hide(), 'installed bridge lacks Notification auto-hide');
+assert(app.supports_stepper_centered_fill(), 'installed bridge lacks Stepper Centered Fill');
+assert(app.supports_dialog_composition(), 'installed bridge lacks Dialog composition');
+assert(app.supports_popover_secondary_trigger(), 'installed bridge lacks Popover right-click');
 assert(app.supports_stepper_wrapped_fill(), 'installed bridge lacks Stepper Wrapped Fill');
 assert(app.supportsVirtualListAxis(), 'installed bridge lacks horizontal VirtualList');
 assert(app.supportsKbdStyle(), 'installed bridge lacks Kbd styling');

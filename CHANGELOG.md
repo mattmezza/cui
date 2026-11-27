@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.0-alpha.16
+
+- Styled C Root can mount composed Dialog and AlertDialog owners. Retained C,
+  Python, JavaScript, TypeScript, Go and Rust can use six named slots, a
+  scrollable Body and a fixed Footer. Typed Footer actions queue the ordinary
+  Button click followed by one accepted, cancelled or closed result.
+- Retained Popover supports anchored placement, arrows, focus entry and return,
+  and an opt-in right-click trigger. Normal primary, keyboard and touch
+  activation remain available to application callbacks.
+- Retained Notifications support one action Button per card and optional
+  auto-hide. Hover or focus pauses the five-second timer.
+- Stepper's optional Centered Fill layout aligns labels around each marker
+  and draws connectors through the marker row. The gallery previews the layout.
+- Removing configured Attachment and disclosure nodes safely releases their
+  owned options.
+
 ## 0.1.0-alpha.15
 
 - Immediate C Root and retained C can opt into responsive notification cards.

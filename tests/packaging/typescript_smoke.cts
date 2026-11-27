@@ -5,6 +5,13 @@ if (!app.supports_stepper_wrapped_fill() || !app.supportsVirtualListAxis() ||
     !app.supportsKbdStyle() || !app.supports_responsive_notifications()) {
   throw new Error('installed provider lacks an alpha.15 layout capability');
 }
+if (!app.supports_notification_action() ||
+    !app.supports_notification_auto_hide() ||
+    !app.supports_stepper_centered_fill() ||
+    !app.supports_dialog_composition() ||
+    !app.supports_popover_secondary_trigger()) {
+  throw new Error('installed provider lacks an alpha.16 overlay or Stepper capability');
+}
 const save = button('save').label('Save').on_click(event => event.node.label('Saved'));
 const overview = item('overview', 'Overview').carousel_basis(0.5);
 const activity = item('activity', 'Activity').carousel_basis(0.5);

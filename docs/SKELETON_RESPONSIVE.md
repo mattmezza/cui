@@ -23,8 +23,9 @@ The **Theme** appearance reads the active preset's owned Skeleton palette.
 **Secondary** halves its alpha. **Accent** uses the theme's primary color as an
 explicit override. For a custom theme, `cui_skeleton_palette_from_theme` copies
 `theme.secondary`. An independently authored Skeleton color can be passed in
-the owned palette. The strict legacy ThemeSet importer currently rejects
-`skeleton.background`; partial imports skip it and report an unsupported field.
+the owned palette. Use [ThemeSet registry v2](THEME_REGISTRY_GUIDE.md#import-a-dedicated-skeleton-color)
+to import a dedicated solid `skeleton.background` and resolve it alongside the
+active theme. Pass `&host.skeleton` to the presenter.
 
 Choose **Loaded** to replace the shapes with a profile, article titles or file
 names and statuses. Each recipe keeps its surrounding region and announces the

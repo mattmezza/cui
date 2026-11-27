@@ -2,6 +2,7 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_THEME_REGISTRY_H
 #define CUI_THEME_REGISTRY_H
+#include "cui_skeleton_palette.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
@@ -112,6 +113,44 @@ cui_theme_registry_error cui_theme_registry_import(cui_theme_registry *, cui_str
                                                    cui_theme_registry_entry *scratch,
                                                    size_t scratch_capacity,
                                                    cui_theme_import_result *);
+/* Opt-in registry with owned resolved Skeleton paint. The original registry
+ * and theme structs keep their layouts and import policy. A v2 record's base
+ * member is a single v1 entry, not a view of a contiguous v1 array. */
+typedef struct {
+    cui_theme_registry_entry base;
+    cui_skeleton_palette skeleton;
+    bool has_skeleton_override;
+} cui_theme_registry_entry_v2;
+typedef struct {
+    cui_theme_registry_entry_v2 *entries;
+    size_t count, capacity;
+    uint64_t revision;
+    bool seed_presets;
+} cui_theme_registry_v2;
+/* Same ownership, capacity, name matching and ordering as v1. Seeded entries
+ * carry the frozen preset palettes as overrides. Query pointers are borrowed
+ * until the next mutation. Pass only complete v2 arrays as storage. */
+bool cui_theme_registry_init_v2(cui_theme_registry_v2 *, cui_theme_registry_entry_v2 *,
+                                size_t capacity, bool seed_presets);
+bool cui_theme_registry_reset_v2(cui_theme_registry_v2 *);
+const cui_theme_registry_entry_v2 *cui_theme_registry_find_v2(const cui_theme_registry_v2 *,
+                                                              cui_str name);
+const cui_theme_registry_entry_v2 *cui_theme_registry_sorted_v2(const cui_theme_registry_v2 *,
+                                                                size_t index);
+/* With has_skeleton_override=false, put resolves skeleton from base.theme.secondary.
+ * With it true, all authored bytes are kept, including RGB with alpha zero. */
+cui_theme_registry_error cui_theme_registry_put_v2(cui_theme_registry_v2 *,
+                                                   const cui_theme_registry_entry_v2 *,
+                                                   bool replace_existing);
+/* Same transactional rules as v1, with complete v2 scratch records. Supports
+ * solid colors at colors["skeleton.background"]. Omitted/null uses the entry's
+ * resulting secondary color. Replacing an entry replaces its override as well.
+ * Unsupported colors/fields follow the common import policy. */
+cui_theme_registry_error cui_theme_registry_import_v2(cui_theme_registry_v2 *, cui_str,
+                                                      cui_theme_import_options,
+                                                      cui_theme_registry_entry_v2 *scratch,
+                                                      size_t scratch_capacity,
+                                                      cui_theme_import_result *);
 typedef enum {
     CUI_THEME_FOLLOW_SYSTEM,
     CUI_THEME_FORCE_LIGHT,
@@ -140,6 +179,17 @@ typedef struct {
 cui_theme_registry_error cui_theme_host_update(cui_theme_host_state *, const cui_theme_registry *,
                                                cui_theme_selection, cui_theme_host_preferences,
                                                float rem_pixels);
+typedef struct {
+    cui_theme_host_state base;
+    cui_skeleton_palette skeleton;
+} cui_theme_host_state_v2;
+/* Resolve both values for the selected entry. High contrast uses its own
+ * secondary fallback. base.changed includes a Skeleton palette change.
+ * On failure the entire output stays unchanged, as with the v1 resolver. */
+cui_theme_registry_error cui_theme_host_update_v2(cui_theme_host_state_v2 *,
+                                                  const cui_theme_registry_v2 *,
+                                                  cui_theme_selection, cui_theme_host_preferences,
+                                                  float rem_pixels);
 #ifdef __cplusplus
 }
 #endif
@@ -152,6 +202,10 @@ cui_theme_registry_error cui_theme_host_update(cui_theme_host_state *, const cui
 #define CUI_THEME_IMPLEMENTATION
 #endif
 #include "cui_theme.h"
+#ifndef CUI_SKELETON_PALETTE_IMPLEMENTATION
+#define CUI_SKELETON_PALETTE_IMPLEMENTATION
+#endif
+#include "cui_skeleton_palette.h"
 /* src/theme/cui_theme_registry.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -1615,9 +1669,42 @@ static bool cui_theme_private_motion_equal(const cui_theme_motion_tokens *a,
            a->distance_short == b->distance_short && a->distance_medium == b->distance_medium;
 }
 
-static bool cui_theme_private_registry_valid(const cui_theme_registry *r) {
-    return r && r->entries && r->capacity && r->capacity <= CUI_THEME_REGISTRY_CAPACITY &&
+/* Common registry logic accesses each array through its own complete record type. */
+typedef struct {
+    void *entries;
+    size_t count, capacity;
+    uint64_t revision;
+    bool seed_presets, extended;
+} cui_theme_registry_view;
+
+static cui_theme_registry_view cui_theme_private_registry_view(const cui_theme_registry *r) {
+    return r ? (cui_theme_registry_view){r->entries,  r->count,        r->capacity,
+                                         r->revision, r->seed_presets, false}
+             : (cui_theme_registry_view){0};
+}
+static cui_theme_registry_view cui_theme_private_registry_view_v2(const cui_theme_registry_v2 *r) {
+    return r ? (cui_theme_registry_view){r->entries,  r->count,        r->capacity,
+                                         r->revision, r->seed_presets, true}
+             : (cui_theme_registry_view){0};
+}
+static bool cui_theme_private_registry_valid(const cui_theme_registry_view *r) {
+    return r->entries && r->capacity && r->capacity <= CUI_THEME_REGISTRY_CAPACITY &&
            r->count <= r->capacity;
+}
+static size_t cui_theme_private_entry_size(const cui_theme_registry_view *r) {
+    return r->extended ? sizeof(cui_theme_registry_entry_v2) : sizeof(cui_theme_registry_entry);
+}
+static const cui_theme_registry_entry *cui_theme_private_entry_at(const cui_theme_registry_view *r,
+                                                                  size_t index) {
+    return r->extended ? &((const cui_theme_registry_entry_v2 *)r->entries)[index].base
+                       : &((const cui_theme_registry_entry *)r->entries)[index];
+}
+static void cui_theme_private_entry_write(const cui_theme_registry_view *r, size_t index,
+                                          const cui_theme_registry_entry_v2 *entry) {
+    if (r->extended)
+        ((cui_theme_registry_entry_v2 *)r->entries)[index] = *entry;
+    else
+        ((cui_theme_registry_entry *)r->entries)[index] = entry->base;
 }
 static bool cui_theme_private_entry_valid(const cui_theme_registry_entry *e) {
     return e && cui_theme_private_fixed_string(e->name, sizeof e->name, false) &&
@@ -1629,15 +1716,26 @@ static bool cui_theme_private_entry_valid(const cui_theme_registry_entry *e) {
 static bool cui_theme_private_name_equal(cui_str name, const char *fixed) {
     return name.data && name.length == strlen(fixed) && !memcmp(name.data, fixed, name.length);
 }
-const cui_theme_registry_entry *cui_theme_registry_find(const cui_theme_registry *r, cui_str name) {
+static size_t cui_theme_private_find_index(const cui_theme_registry_view *r, cui_str name) {
     if (!cui_theme_private_registry_valid(r) || !name.data || !name.length ||
         name.length >= CUI_THEME_NAME_CAPACITY ||
         !cui_theme_private_theme_utf8(name.data, name.length))
-        return NULL;
+        return SIZE_MAX;
     for (size_t i = 0; i < r->count; i++)
-        if (cui_theme_private_name_equal(name, r->entries[i].name))
-            return &r->entries[i];
-    return NULL;
+        if (cui_theme_private_name_equal(name, cui_theme_private_entry_at(r, i)->name))
+            return i;
+    return SIZE_MAX;
+}
+const cui_theme_registry_entry *cui_theme_registry_find(const cui_theme_registry *r, cui_str name) {
+    cui_theme_registry_view view = cui_theme_private_registry_view(r);
+    size_t index = cui_theme_private_find_index(&view, name);
+    return index != SIZE_MAX ? &r->entries[index] : NULL;
+}
+const cui_theme_registry_entry_v2 *cui_theme_registry_find_v2(const cui_theme_registry_v2 *r,
+                                                              cui_str name) {
+    cui_theme_registry_view view = cui_theme_private_registry_view_v2(r);
+    size_t index = cui_theme_private_find_index(&view, name);
+    return index != SIZE_MAX ? &r->entries[index] : NULL;
 }
 static unsigned cui_theme_private_ascii_fold(unsigned c) {
     return c >= 'A' && c <= 'Z' ? c + 'a' - 'A' : c;
@@ -1658,77 +1756,150 @@ static int cui_theme_private_entry_order(const cui_theme_registry_entry *a,
         return *x ? 1 : -1;
     return strcmp(a->name, b->name);
 }
-const cui_theme_registry_entry *cui_theme_registry_sorted(const cui_theme_registry *r,
-                                                          size_t index) {
+static size_t cui_theme_private_sorted_index(const cui_theme_registry_view *r, size_t index) {
     if (!cui_theme_private_registry_valid(r) || index >= r->count)
-        return NULL;
+        return SIZE_MAX;
     for (size_t i = 0; i < r->count; i++) {
+        const cui_theme_registry_entry *entry = cui_theme_private_entry_at(r, i);
         size_t rank = 0;
         for (size_t k = 0; k < r->count; k++)
-            if (cui_theme_private_entry_order(&r->entries[k], &r->entries[i]) < 0)
+            if (cui_theme_private_entry_order(cui_theme_private_entry_at(r, k), entry) < 0)
                 rank++;
         if (rank == index)
-            return &r->entries[i];
+            return i;
     }
-    return NULL;
+    return SIZE_MAX;
 }
-bool cui_theme_registry_reset(cui_theme_registry *r) {
-    if (!cui_theme_private_registry_valid(r) || r->revision == UINT64_MAX ||
-        (r->seed_presets && r->capacity < cui_theme_preset_count()))
+const cui_theme_registry_entry *cui_theme_registry_sorted(const cui_theme_registry *r,
+                                                          size_t index) {
+    cui_theme_registry_view view = cui_theme_private_registry_view(r);
+    size_t slot = cui_theme_private_sorted_index(&view, index);
+    return slot != SIZE_MAX ? &r->entries[slot] : NULL;
+}
+const cui_theme_registry_entry_v2 *cui_theme_registry_sorted_v2(const cui_theme_registry_v2 *r,
+                                                                size_t index) {
+    cui_theme_registry_view view = cui_theme_private_registry_view_v2(r);
+    size_t slot = cui_theme_private_sorted_index(&view, index);
+    return slot != SIZE_MAX ? &r->entries[slot] : NULL;
+}
+static bool cui_theme_private_registry_reset(cui_theme_registry_view *r) {
+    size_t count = r->seed_presets ? cui_theme_preset_count() : 0;
+    if (!cui_theme_private_registry_valid(r) || r->revision == UINT64_MAX || r->capacity < count)
         return false;
-    size_t count = 0;
-    if (r->seed_presets)
-        for (size_t i = 0; i < cui_theme_preset_count(); i++) {
-            cui_theme_registry_entry entry = {0};
-            cui_str name = cui_theme_preset_name(i);
-            if (name.length >= sizeof entry.name)
-                return false;
-            memcpy(entry.name, name.data, name.length);
-            entry.name[name.length] = 0;
-            cui_theme_preset_get(i, &entry.theme);
-            cui_theme_semantic_snapshot(&entry.theme, &entry.semantic);
-            entry.motion = cui_theme_motion_default();
-            entry.is_default =
-                !strcmp(entry.name, "Default Light") || !strcmp(entry.name, "Default Dark");
-            r->entries[count++] = entry;
+    for (size_t i = 0; i < count; i++) {
+        cui_theme_registry_entry_v2 entry = {0};
+        cui_theme_registry_entry *base = &entry.base;
+        cui_str name = cui_theme_preset_name(i);
+        if (name.length >= sizeof base->name)
+            return false;
+        memcpy(base->name, name.data, name.length);
+        cui_theme_preset_get(i, &base->theme);
+        cui_theme_semantic_snapshot(&base->theme, &base->semantic);
+        base->motion = cui_theme_motion_default();
+        base->is_default =
+            !strcmp(base->name, "Default Light") || !strcmp(base->name, "Default Dark");
+        if (r->extended) {
+            entry.skeleton.background = base->theme.secondary;
+            entry.has_skeleton_override = cui_skeleton_palette_preset_get(i, &entry.skeleton);
         }
+        cui_theme_private_entry_write(r, i, &entry);
+    }
     r->count = count;
     r->revision++;
     return true;
 }
+bool cui_theme_registry_reset(cui_theme_registry *r) {
+    cui_theme_registry_view view = cui_theme_private_registry_view(r);
+    if (!cui_theme_private_registry_reset(&view))
+        return false;
+    r->count = view.count;
+    r->revision = view.revision;
+    return true;
+}
+bool cui_theme_registry_reset_v2(cui_theme_registry_v2 *r) {
+    cui_theme_registry_view view = cui_theme_private_registry_view_v2(r);
+    if (!cui_theme_private_registry_reset(&view))
+        return false;
+    r->count = view.count;
+    r->revision = view.revision;
+    return true;
+}
+static bool cui_theme_private_init_valid(const cui_theme_registry_view *r, const void *out,
+                                         size_t out_size) {
+    return out && cui_theme_private_registry_valid(r) &&
+           !cui_theme_private_memory_overlap(out, out_size, r->entries,
+                                             r->capacity * cui_theme_private_entry_size(r));
+}
 bool cui_theme_registry_init(cui_theme_registry *out, cui_theme_registry_entry *entries,
                              size_t capacity, bool seed) {
-    if (!out || !entries || !capacity || capacity > CUI_THEME_REGISTRY_CAPACITY ||
-        cui_theme_private_memory_overlap(out, sizeof *out, entries, capacity * sizeof *entries) ||
-        (seed && capacity < cui_theme_preset_count()))
-        return false;
     cui_theme_registry r = {.entries = entries, .capacity = capacity, .seed_presets = seed};
-    if (!cui_theme_registry_reset(&r))
+    cui_theme_registry_view view = cui_theme_private_registry_view(&r);
+    if (!cui_theme_private_init_valid(&view, out, sizeof *out) || !cui_theme_registry_reset(&r))
         return false;
     *out = r;
     return true;
 }
-cui_theme_registry_error cui_theme_registry_put(cui_theme_registry *r,
-                                                const cui_theme_registry_entry *e, bool replace) {
+bool cui_theme_registry_init_v2(cui_theme_registry_v2 *out, cui_theme_registry_entry_v2 *entries,
+                                size_t capacity, bool seed) {
+    cui_theme_registry_v2 r = {.entries = entries, .capacity = capacity, .seed_presets = seed};
+    cui_theme_registry_view view = cui_theme_private_registry_view_v2(&r);
+    if (!cui_theme_private_init_valid(&view, out, sizeof *out) || !cui_theme_registry_reset_v2(&r))
+        return false;
+    *out = r;
+    return true;
+}
+static cui_theme_registry_error cui_theme_private_registry_put(cui_theme_registry_view *r,
+                                                               cui_theme_registry_entry_v2 entry,
+                                                               bool replace) {
+    cui_theme_registry_entry *e = &entry.base;
     if (!cui_theme_private_registry_valid(r) || !cui_theme_private_entry_valid(e) ||
         r->revision == UINT64_MAX)
         return CUI_THEME_REGISTRY_INVALID;
-    const cui_theme_registry_entry *old =
-        cui_theme_registry_find(r, (cui_str){e->name, strlen(e->name)});
-    if (old && !replace)
+    size_t index = cui_theme_private_find_index(r, (cui_str){e->name, strlen(e->name)});
+    if (index != SIZE_MAX && !replace)
         return CUI_THEME_REGISTRY_OK;
-    if (!old && r->count == r->capacity)
-        return CUI_THEME_REGISTRY_CAPACITY_ERROR;
-    size_t index = old ? (size_t)(old - r->entries) : r->count++;
-    cui_theme_registry_entry coherent = *e;
-    coherent.semantic.colors = cui_theme_private_colors_of(&e->theme);
-    coherent.semantic.colors.selection = e->semantic.colors.selection;
-    coherent.semantic.radius.md = e->theme.radius;
-    coherent.semantic.radius.lg = e->theme.radius_lg;
-    coherent.semantic.typography.md.size = e->theme.font_size;
-    r->entries[index] = coherent;
+    if (index == SIZE_MAX) {
+        if (r->count == r->capacity)
+            return CUI_THEME_REGISTRY_CAPACITY_ERROR;
+        index = r->count++;
+    }
+    cui_color selection = e->semantic.colors.selection;
+    e->semantic.colors = cui_theme_private_colors_of(&e->theme);
+    e->semantic.colors.selection = selection;
+    e->semantic.radius.md = e->theme.radius;
+    e->semantic.radius.lg = e->theme.radius_lg;
+    e->semantic.typography.md.size = e->theme.font_size;
+    if (!entry.has_skeleton_override)
+        entry.skeleton.background = e->theme.secondary;
+    cui_theme_private_entry_write(r, index, &entry);
     r->revision++;
     return CUI_THEME_REGISTRY_OK;
+}
+cui_theme_registry_error cui_theme_registry_put(cui_theme_registry *r,
+                                                const cui_theme_registry_entry *e, bool replace) {
+    if (!r || !e)
+        return CUI_THEME_REGISTRY_INVALID;
+    cui_theme_registry_view view = cui_theme_private_registry_view(r);
+    cui_theme_registry_error error =
+        cui_theme_private_registry_put(&view, (cui_theme_registry_entry_v2){.base = *e}, replace);
+    if (!error && view.revision != r->revision) {
+        r->count = view.count;
+        r->revision = view.revision;
+    }
+    return error;
+}
+cui_theme_registry_error cui_theme_registry_put_v2(cui_theme_registry_v2 *r,
+                                                   const cui_theme_registry_entry_v2 *e,
+                                                   bool replace) {
+    if (!r || !e)
+        return CUI_THEME_REGISTRY_INVALID;
+    cui_theme_registry_view view = cui_theme_private_registry_view_v2(r);
+    cui_theme_registry_error error = cui_theme_private_registry_put(&view, *e, replace);
+    if (!error && view.revision != r->revision) {
+        r->count = view.count;
+        r->revision = view.revision;
+    }
+    return error;
 }
 /* SPDX-License-Identifier: MIT */
 /* Explicit projection of pinned legacy ThemeConfigColors onto existing CUI fields.
@@ -1830,10 +2001,12 @@ static cui_theme_registry_error cui_theme_private_unsupported(cui_theme_import_o
 static cui_theme_registry_error
 cui_theme_private_legacy_entry(const cui_theme_private_theme_json *j, size_t object,
                                cui_theme_import_options options, cui_theme_import_result *report,
-                               cui_theme_registry_entry *out) {
+                               bool extended, cui_theme_registry_entry_v2 *out) {
     if (j->nodes[object].type != CUI_THEME_PRIVATE_J_OBJECT)
         return CUI_THEME_REGISTRY_INVALID;
     cui_theme_registry_entry e = {.motion = cui_theme_motion_default()};
+    bool has_skeleton = false;
+    cui_color skeleton = {0};
     size_t mode = cui_theme_private_json_member(j, object, "mode");
     char value[128];
     bool dark = false;
@@ -1883,7 +2056,8 @@ cui_theme_private_legacy_entry(const cui_theme_private_theme_json *j, size_t obj
                                                  sizeof cui_theme_private_legacy_colors /
                                                      sizeof *cui_theme_private_legacy_colors,
                                                  token);
-                if (!f)
+                bool skeleton_color = extended && !strcmp(token, "skeleton.background");
+                if (!f && !skeleton_color)
                     error = cui_theme_private_unsupported(options, report);
                 else if (j->nodes[color].type != CUI_THEME_PRIVATE_J_NULL) {
                     cui_color c;
@@ -1894,6 +2068,9 @@ cui_theme_private_legacy_entry(const cui_theme_private_theme_json *j, size_t obj
                             error = cui_theme_private_unsupported(options, report);
                         else
                             return CUI_THEME_REGISTRY_INVALID;
+                    } else if (skeleton_color) {
+                        has_skeleton = true;
+                        skeleton = c;
                     } else
                         memcpy((char *)&e.theme + f->offset, &c, sizeof c);
                 }
@@ -1957,35 +2134,36 @@ cui_theme_private_legacy_entry(const cui_theme_private_theme_json *j, size_t obj
     e.semantic = refreshed;
     if (!cui_theme_private_entry_valid(&e))
         return CUI_THEME_REGISTRY_INVALID;
-    *out = e;
+    *out = (cui_theme_registry_entry_v2){.base = e,
+                                         .skeleton = {has_skeleton ? skeleton : e.theme.secondary},
+                                         .has_skeleton_override = has_skeleton};
     return CUI_THEME_REGISTRY_OK;
 }
-cui_theme_registry_error cui_theme_registry_import(cui_theme_registry *r, cui_str source,
-                                                   cui_theme_import_options options,
-                                                   cui_theme_registry_entry *scratch,
-                                                   size_t capacity,
-                                                   cui_theme_import_result *report) {
+static cui_theme_registry_error
+cui_theme_private_registry_import(cui_theme_registry_view *r, const void *owner, size_t owner_size,
+                                  cui_str source, cui_theme_import_options options, void *scratch,
+                                  size_t capacity, cui_theme_import_result *report) {
     cui_theme_import_result result = {.error = CUI_THEME_REGISTRY_INVALID};
     cui_theme_private_theme_json j;
-    if (report && cui_theme_private_registry_valid(r) &&
-        (cui_theme_private_memory_overlap(report, sizeof *report, r, sizeof *r) ||
-         cui_theme_private_memory_overlap(report, sizeof *report, r->entries,
-                                          r->capacity * sizeof *r->entries) ||
-         (scratch && capacity <= CUI_THEME_REGISTRY_CAPACITY &&
-          cui_theme_private_memory_overlap(report, sizeof *report, scratch,
-                                           capacity * sizeof *scratch)) ||
+    size_t entry_size = cui_theme_private_entry_size(r);
+    bool valid = cui_theme_private_registry_valid(r);
+    size_t live_bytes = valid ? r->capacity * entry_size : 0;
+    bool scratch_valid = scratch && capacity && capacity <= CUI_THEME_REGISTRY_CAPACITY;
+    size_t scratch_bytes = scratch_valid ? capacity * entry_size : 0;
+    if (report && valid &&
+        (cui_theme_private_memory_overlap(report, sizeof *report, owner, owner_size) ||
+         cui_theme_private_memory_overlap(report, sizeof *report, r->entries, live_bytes) ||
+         (scratch_valid &&
+          cui_theme_private_memory_overlap(report, sizeof *report, scratch, scratch_bytes)) ||
          (source.data &&
           cui_theme_private_memory_overlap(report, sizeof *report, source.data, source.length))))
         return CUI_THEME_REGISTRY_INVALID;
-    if (!cui_theme_private_registry_valid(r) || !scratch || !capacity ||
-        capacity > CUI_THEME_REGISTRY_CAPACITY || r->revision == UINT64_MAX ||
-        cui_theme_private_memory_overlap(r, sizeof *r, scratch, capacity * sizeof *scratch) ||
-        cui_theme_private_memory_overlap(r->entries, r->capacity * sizeof *r->entries, scratch,
-                                         capacity * sizeof *scratch) ||
-        (source.data && (cui_theme_private_memory_overlap(source.data, source.length, scratch,
-                                                          capacity * sizeof *scratch) ||
-                         cui_theme_private_memory_overlap(source.data, source.length, r->entries,
-                                                          r->capacity * sizeof *r->entries))))
+    if (!valid || !scratch_valid || r->revision == UINT64_MAX ||
+        cui_theme_private_memory_overlap(owner, owner_size, scratch, scratch_bytes) ||
+        cui_theme_private_memory_overlap(r->entries, live_bytes, scratch, scratch_bytes) ||
+        (source.data &&
+         (cui_theme_private_memory_overlap(source.data, source.length, scratch, scratch_bytes) ||
+          cui_theme_private_memory_overlap(source.data, source.length, r->entries, live_bytes))))
         goto done;
     if (!cui_theme_private_json_parse(&j, source)) {
         result.error = j.error;
@@ -2017,39 +2195,42 @@ cui_theme_registry_error cui_theme_registry_import(cui_theme_registry *r, cui_st
         result.error = CUI_THEME_REGISTRY_CAPACITY_ERROR;
         goto done;
     }
-    memcpy(scratch, r->entries, r->count * sizeof *scratch);
-    cui_theme_registry temporary = *r;
+    memcpy(scratch, r->entries, r->count * entry_size);
+    cui_theme_registry_view temporary = *r;
     temporary.entries = scratch;
     temporary.capacity = capacity;
     size_t theme_start = themes == SIZE_MAX ? j.nodes[0].next : themes + 1,
            theme_end = themes == SIZE_MAX ? j.nodes[0].next : j.nodes[themes].next;
     for (size_t i = theme_start; i < theme_end; i = j.nodes[i].next) {
-        cui_theme_registry_entry entry;
-        result.error = cui_theme_private_legacy_entry(&j, i, options, &result, &entry);
+        cui_theme_registry_entry_v2 entry;
+        result.error = cui_theme_private_legacy_entry(&j, i, options, &result, r->extended, &entry);
         if (result.error) {
             result.byte_offset = j.nodes[i].start;
             goto done;
         }
-        const cui_theme_registry_entry *old =
-            cui_theme_registry_find(&temporary, (cui_str){entry.name, strlen(entry.name)});
-        if (old && !options.replace_existing) {
+        cui_str name = {entry.base.name, strlen(entry.base.name)};
+        size_t index = cui_theme_private_find_index(&temporary, name);
+        bool replacing = index != SIZE_MAX;
+        if (replacing && !options.replace_existing) {
             result.skipped++;
             continue;
         }
-        if (!old && (temporary.count == r->capacity || temporary.count == capacity)) {
-            result.error = CUI_THEME_REGISTRY_CAPACITY_ERROR;
-            goto done;
+        if (!replacing) {
+            if (temporary.count == r->capacity || temporary.count == capacity) {
+                result.error = CUI_THEME_REGISTRY_CAPACITY_ERROR;
+                goto done;
+            }
+            index = temporary.count++;
         }
-        /* Revision changes once for a complete batch; never wrap mid-parse. */
-        size_t index = old ? (size_t)(old - temporary.entries) : temporary.count++;
-        temporary.entries[index] = entry;
-        if (old)
+        cui_theme_private_entry_write(&temporary, index, &entry);
+        if (replacing)
             result.replaced++;
         else
             result.added++;
     }
     if (result.added || result.replaced) {
-        memcpy(r->entries, scratch, temporary.count * sizeof *scratch);
+        /* Revision changes once for a complete batch; never wrap mid-parse. */
+        memcpy(r->entries, scratch, temporary.count * entry_size);
         r->count = temporary.count;
         r->revision++;
     }
@@ -2063,22 +2244,56 @@ done:
         *report = result;
     return result.error;
 }
-cui_theme_registry_error cui_theme_host_update(cui_theme_host_state *state,
-                                               const cui_theme_registry *r,
-                                               cui_theme_selection selection,
-                                               cui_theme_host_preferences preferences, float rem) {
+cui_theme_registry_error cui_theme_registry_import(cui_theme_registry *r, cui_str source,
+                                                   cui_theme_import_options options,
+                                                   cui_theme_registry_entry *scratch,
+                                                   size_t capacity,
+                                                   cui_theme_import_result *report) {
+    cui_theme_registry_view view = cui_theme_private_registry_view(r);
+    cui_theme_registry_error error = cui_theme_private_registry_import(
+        &view, r, sizeof *r, source, options, scratch, capacity, report);
+    if (!error && view.revision != r->revision) {
+        r->count = view.count;
+        r->revision = view.revision;
+    }
+    return error;
+}
+cui_theme_registry_error cui_theme_registry_import_v2(cui_theme_registry_v2 *r, cui_str source,
+                                                      cui_theme_import_options options,
+                                                      cui_theme_registry_entry_v2 *scratch,
+                                                      size_t capacity,
+                                                      cui_theme_import_result *report) {
+    cui_theme_registry_view view = cui_theme_private_registry_view_v2(r);
+    cui_theme_registry_error error = cui_theme_private_registry_import(
+        &view, r, sizeof *r, source, options, scratch, capacity, report);
+    if (!error && view.revision != r->revision) {
+        r->count = view.count;
+        r->revision = view.revision;
+    }
+    return error;
+}
+
+static cui_theme_registry_error cui_theme_private_host_entry(const cui_theme_host_state *state,
+                                                             const cui_theme_registry_view *r,
+                                                             cui_theme_selection selection,
+                                                             cui_theme_host_preferences preferences,
+                                                             size_t *index) {
     if (!state || !cui_theme_private_registry_valid(r) ||
         selection.mode < CUI_THEME_FOLLOW_SYSTEM || selection.mode > CUI_THEME_FORCE_DARK ||
         (state->ready && preferences.revision < state->preferences.revision))
         return CUI_THEME_REGISTRY_INVALID;
     bool dark = selection.mode == CUI_THEME_FORCE_DARK ||
                 (selection.mode == CUI_THEME_FOLLOW_SYSTEM && preferences.dark);
-    const cui_theme_registry_entry *entry =
-        cui_theme_registry_find(r, dark ? selection.dark_name : selection.light_name);
-    if (!entry)
-        return CUI_THEME_REGISTRY_MISSING;
+    *index = cui_theme_private_find_index(r, dark ? selection.dark_name : selection.light_name);
+    return *index == SIZE_MAX ? CUI_THEME_REGISTRY_MISSING : CUI_THEME_REGISTRY_OK;
+}
+
+static cui_theme_registry_error
+cui_theme_private_host_update(cui_theme_host_state *state, const cui_theme_registry_entry *entry,
+                              uint64_t revision, cui_theme_host_preferences preferences,
+                              float rem) {
     cui_theme_host_state next = {.ready = true,
-                                 .registry_revision = r->revision,
+                                 .registry_revision = revision,
                                  .preferences = preferences,
                                  .theme = entry->theme,
                                  .semantic = entry->semantic};
@@ -2098,6 +2313,42 @@ cui_theme_registry_error cui_theme_host_update(cui_theme_host_state *state,
         !cui_theme_private_typography_equal(&state->semantic.typography, &next.semantic.typography);
     next.motion_changed =
         !state->ready || !cui_theme_private_motion_equal(&state->motion, &next.motion);
+    *state = next;
+    return CUI_THEME_REGISTRY_OK;
+}
+cui_theme_registry_error cui_theme_host_update(cui_theme_host_state *state,
+                                               const cui_theme_registry *r,
+                                               cui_theme_selection selection,
+                                               cui_theme_host_preferences preferences, float rem) {
+    cui_theme_registry_view view = cui_theme_private_registry_view(r);
+    size_t index;
+    cui_theme_registry_error error =
+        cui_theme_private_host_entry(state, &view, selection, preferences, &index);
+    return error ? error
+                 : cui_theme_private_host_update(state, &r->entries[index], r->revision,
+                                                 preferences, rem);
+}
+cui_theme_registry_error cui_theme_host_update_v2(cui_theme_host_state_v2 *state,
+                                                  const cui_theme_registry_v2 *r,
+                                                  cui_theme_selection selection,
+                                                  cui_theme_host_preferences preferences,
+                                                  float rem) {
+    cui_theme_registry_view view = cui_theme_private_registry_view_v2(r);
+    size_t index;
+    cui_theme_registry_error error = cui_theme_private_host_entry(
+        state ? &state->base : NULL, &view, selection, preferences, &index);
+    if (error)
+        return error;
+    const cui_theme_registry_entry_v2 *entry = &r->entries[index];
+    cui_theme_host_state_v2 next = {.base = state->base, .skeleton = entry->skeleton};
+    error = cui_theme_private_host_update(&next.base, &entry->base, r->revision, preferences, rem);
+    if (error)
+        return error;
+    if (preferences.high_contrast)
+        next.skeleton.background = next.base.theme.secondary;
+    next.base.changed =
+        next.base.changed ||
+        !cui_theme_private_color_equal(state->skeleton.background, next.skeleton.background);
     *state = next;
     return CUI_THEME_REGISTRY_OK;
 }

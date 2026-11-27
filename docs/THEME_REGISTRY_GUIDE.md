@@ -111,6 +111,55 @@ values are bounded to 1e6, text size/line height to 4096 and weight to 1..1000.
 These stricter CUI bounds reject atomically instead of truncating. The new module
 has no destruction function because its registry/snapshots own no allocations.
 
+## Import a dedicated Skeleton color
+
+Use `cui_theme_registry_v2` and arrays of `cui_theme_registry_entry_v2` to keep
+the solid `skeleton.background` token in a legacy ThemeSet. The imported
+`skeleton` palette owns the color, including the RGB bytes of a fully transparent
+paint. Omitted or null uses the entry's resulting `secondary.background`.
+Seeded entries use their exact built-in Skeleton palette. The v1 records and
+strict import semantics remain available for existing consumers.
+
+```c
+#include "cui/cui_theme_registry.h"
+
+/* Set up once. A real application can load and release the JSON itself. */
+static cui_theme_registry_entry_v2 entries[2], scratch[2];
+static const char json[] =
+    "{\"themes\":[{\"name\":\"Brand\",\"colors\":{"
+    "\"skeleton.background\":\"#33669980\",\"secondary.background\":\"#dbeafe\"}}]}";
+
+bool load_brand(cui_theme_registry_v2 *registry, cui_theme_host_state_v2 *host) {
+    const cui_theme_selection selection = {
+        .mode = CUI_THEME_FORCE_LIGHT, .light_name = {"Brand", 5}};
+    if (!cui_theme_registry_init_v2(registry, entries, 2, false))
+        return false;
+    if (cui_theme_registry_import_v2(registry, (cui_str){json, sizeof json - 1},
+                                     (cui_theme_import_options){0}, scratch, 2, NULL))
+        return false;
+    return cui_theme_host_update_v2(host, registry, selection,
+                                    (cui_theme_host_preferences){0}, 16)
+        == CUI_THEME_REGISTRY_OK;
+}
+```
+
+Initialize the host snapshot to zero before the first update. In your CUI frame,
+pass `&host.skeleton` to `cui_skeleton_present` and `&host.base.theme` to other
+styled controls. The [Skeleton guide](SKELETON_RESPONSIVE.md) shows motion and
+layout. Copy a palette returned by `cui_theme_registry_find_v2` when you do not
+need host selection. The copied value remains valid after registry mutation.
+
+To author a programmatic override, set `entry.skeleton` and
+`entry.has_skeleton_override = true` before `cui_theme_registry_put_v2`.
+With the flag clear, put resolves a new palette from the supplied secondary.
+A replacement import resolves both values from the replacement entry.
+Hosts can invalidate on `host.base.changed`, which includes Skeleton-only
+paint changes. High contrast uses its own secondary fallback. The v2
+transaction has the same limits, disjoint scratch requirement and failure
+behavior as the v1 transaction. ThemeSet gradients remain unsupported.
+Retained language builders can use explicit colors. They have no ThemeSet v2
+loading API.
+
 ## Motion and appearance
 
 `cui_theme_motion_default` represents every pinned MotionTokens field: durations

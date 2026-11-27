@@ -27,5 +27,18 @@ int main(void) {
     cui_color color = {0};
     assert(cui_theme_color_parse((cui_str){"blue-600/80", 11}, &color) && color.a == 204);
     assert(cui_theme_registry_reset(&registry) && registry.count == 0);
+
+    cui_theme_registry_entry_v2 owned[1], scratch[1];
+    cui_theme_registry_v2 extended;
+    assert(cui_theme_registry_init_v2(&extended, owned, 1, false));
+    const char *json =
+        "{\"themes\":[{\"name\":\"Brand\",\"colors\":{\"skeleton.background\":\"#12345600\"}}]}";
+    assert(cui_theme_registry_import_v2(&extended, (cui_str){json, strlen(json)},
+                                        (cui_theme_import_options){0}, scratch, 1,
+                                        NULL) == CUI_THEME_REGISTRY_OK);
+    const cui_theme_registry_entry_v2 *brand =
+        cui_theme_registry_find_v2(&extended, (cui_str){"Brand", 5});
+    assert(brand && brand->has_skeleton_override && brand->skeleton.background.r == 18 &&
+           brand->skeleton.background.a == 0);
     return 0;
 }

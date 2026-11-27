@@ -750,8 +750,10 @@ Focused worker native/software/WASM proof and root strict/distribution checks
 pass (17 headless checks and 18 skill tests). The additive `cui_skeleton_present` route owns its responsive root layout; read
 `docs/SKELETON_RESPONSIVE.md` and its header. For profile, article-list and table
 loading recipes with app-owned rem and busy/status, see `examples/skeleton_recipes/scene.h`.
-Pass an owned palette directly for an authored Skeleton color. The strict legacy
-ThemeSet importer does not accept `skeleton.background`.
+Pass an owned palette directly for an authored Skeleton color. C's opt-in
+ThemeSet registry v2 imports a dedicated solid `skeleton.background` and uses
+the resulting secondary when it is absent. See `docs/THEME_REGISTRY_GUIDE.md`
+and `include/cui/cui_theme_registry.h`.
 Use the optional retained C bridge in `docs/BRIDGE_SKELETON.md` for copied
 configuration, responsive sizing, and per-node wake hints on the Core clock.
 Use `docs/PYTHON_SKELETON.md` for the optional Python responsive builder and

@@ -1296,10 +1296,11 @@
       "go": "tested_subset",
       "rust": "tested_subset"
     },
-    "legacy": "Existing builders keep their fixed-size Skeleton route. Current Python, JavaScript, TypeScript, Go and Rust builders also provide responsive sizing, preset/secondary/custom paint and owned motion through the optional bridge. Direct palette lookup, custom easing and full box refinement remain C APIs.",
+    "legacy": "Existing builders keep their fixed-size Skeleton route. Current Python, JavaScript, TypeScript, Go and Rust builders also provide responsive sizing, preset/secondary/custom paint and owned motion through the optional bridge. Direct palette lookup, ThemeSet registry v2 import, custom easing and full box refinement remain C APIs.",
     "guides": [
       "docs/SKELETON_PALETTE.md",
       "docs/SKELETON_RESPONSIVE.md",
+      "docs/THEME_REGISTRY_GUIDE.md",
       "docs/BRIDGE_SKELETON.md",
       "docs/GO_SKELETON.md",
       "docs/RUST_SKELETON.md"

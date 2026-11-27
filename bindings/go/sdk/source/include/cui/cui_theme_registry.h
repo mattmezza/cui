@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_THEME_REGISTRY_H
 #define CUI_THEME_REGISTRY_H
+#include "cui_skeleton_palette.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
@@ -111,6 +112,44 @@ cui_theme_registry_error cui_theme_registry_import(cui_theme_registry *, cui_str
                                                    cui_theme_registry_entry *scratch,
                                                    size_t scratch_capacity,
                                                    cui_theme_import_result *);
+/* Opt-in registry with owned resolved Skeleton paint. The original registry
+ * and theme structs keep their layouts and import policy. A v2 record's base
+ * member is a single v1 entry, not a view of a contiguous v1 array. */
+typedef struct {
+    cui_theme_registry_entry base;
+    cui_skeleton_palette skeleton;
+    bool has_skeleton_override;
+} cui_theme_registry_entry_v2;
+typedef struct {
+    cui_theme_registry_entry_v2 *entries;
+    size_t count, capacity;
+    uint64_t revision;
+    bool seed_presets;
+} cui_theme_registry_v2;
+/* Same ownership, capacity, name matching and ordering as v1. Seeded entries
+ * carry the frozen preset palettes as overrides. Query pointers are borrowed
+ * until the next mutation. Pass only complete v2 arrays as storage. */
+bool cui_theme_registry_init_v2(cui_theme_registry_v2 *, cui_theme_registry_entry_v2 *,
+                                size_t capacity, bool seed_presets);
+bool cui_theme_registry_reset_v2(cui_theme_registry_v2 *);
+const cui_theme_registry_entry_v2 *cui_theme_registry_find_v2(const cui_theme_registry_v2 *,
+                                                              cui_str name);
+const cui_theme_registry_entry_v2 *cui_theme_registry_sorted_v2(const cui_theme_registry_v2 *,
+                                                                size_t index);
+/* With has_skeleton_override=false, put resolves skeleton from base.theme.secondary.
+ * With it true, all authored bytes are kept, including RGB with alpha zero. */
+cui_theme_registry_error cui_theme_registry_put_v2(cui_theme_registry_v2 *,
+                                                   const cui_theme_registry_entry_v2 *,
+                                                   bool replace_existing);
+/* Same transactional rules as v1, with complete v2 scratch records. Supports
+ * solid colors at colors["skeleton.background"]. Omitted/null uses the entry's
+ * resulting secondary color. Replacing an entry replaces its override as well.
+ * Unsupported colors/fields follow the common import policy. */
+cui_theme_registry_error cui_theme_registry_import_v2(cui_theme_registry_v2 *, cui_str,
+                                                      cui_theme_import_options,
+                                                      cui_theme_registry_entry_v2 *scratch,
+                                                      size_t scratch_capacity,
+                                                      cui_theme_import_result *);
 typedef enum {
     CUI_THEME_FOLLOW_SYSTEM,
     CUI_THEME_FORCE_LIGHT,
@@ -139,6 +178,17 @@ typedef struct {
 cui_theme_registry_error cui_theme_host_update(cui_theme_host_state *, const cui_theme_registry *,
                                                cui_theme_selection, cui_theme_host_preferences,
                                                float rem_pixels);
+typedef struct {
+    cui_theme_host_state base;
+    cui_skeleton_palette skeleton;
+} cui_theme_host_state_v2;
+/* Resolve both values for the selected entry. High contrast uses its own
+ * secondary fallback. base.changed includes a Skeleton palette change.
+ * On failure the entire output stays unchanged, as with the v1 resolver. */
+cui_theme_registry_error cui_theme_host_update_v2(cui_theme_host_state_v2 *,
+                                                  const cui_theme_registry_v2 *,
+                                                  cui_theme_selection, cui_theme_host_preferences,
+                                                  float rem_pixels);
 #ifdef __cplusplus
 }
 #endif

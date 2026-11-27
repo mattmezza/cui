@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_skeleton_presentation.h"
+#include "cui/cui_theme_registry.h"
 #include <assert.h>
 #include <math.h>
 #include <string.h>
@@ -215,6 +216,35 @@ static void grow_and_precedence(cui_context *ui) {
     assert(cui_skeleton_present(ui, 12, &palette, &state, p, &result));
     assert(cui_end_frame(ui).count == 0 && state.ready && state.started == 8);
 }
+static void imported_palette(cui_context *ui) {
+    static const char source[] =
+        "{\"themes\":[{\"name\":\"Brand\",\"colors\":{\"skeleton.background\":\"#33669980\","
+        "\"secondary.background\":\"#abcdef\"}}]}";
+    cui_theme_registry_entry_v2 entries[1], scratch[1];
+    cui_theme_registry_v2 registry;
+    assert(cui_theme_registry_init_v2(&registry, entries, 1, false));
+    assert(cui_theme_registry_import_v2(&registry, (cui_str){source, sizeof source - 1},
+                                        (cui_theme_import_options){0}, scratch, 1,
+                                        NULL) == CUI_THEME_REGISTRY_OK);
+    cui_theme_host_state_v2 host = {0};
+    assert(cui_theme_host_update_v2(
+               &host, &registry,
+               (cui_theme_selection){.mode = CUI_THEME_FORCE_LIGHT, .light_name = {"Brand", 5}},
+               (cui_theme_host_preferences){0}, 16) == CUI_THEME_REGISTRY_OK);
+    assert(cui_theme_registry_reset_v2(&registry)); /* The host owns its paint snapshot. */
+    cui_skeleton_presentation p = cui_skeleton_presentation_default();
+    p.reduced_motion = true;
+    cui_loading_motion motion = {0};
+    cui_loading_motion_result result;
+    assert(cui_begin_frame(ui, 640, 300, 0));
+    assert(cui_skeleton_present(ui, 12, &host.skeleton, &motion, p, &result));
+    cui_draw_list list = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK && result.next_wake_seconds == 0);
+    assert(list.count == 1 && list.commands[0].type == CUI_DRAW_RECT);
+    cui_color paint = list.commands[0].color;
+    assert(paint.r == 51 && paint.g == 102 && paint.b == 153 && paint.a == 128);
+}
+
 int main(void) {
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 300});
     assert(ui);
@@ -224,6 +254,7 @@ int main(void) {
     failures(ui);
     pulse_border(ui);
     grow_and_precedence(ui);
+    imported_palette(ui);
     cui_destroy(ui);
     return 0;
 }

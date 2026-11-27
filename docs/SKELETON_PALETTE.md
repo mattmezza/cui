@@ -1,13 +1,8 @@
 # Skeleton palette and fixed-size presentation
 
-Unreleased focused proof: strict native C11 and C/C++ headers, actual C38-preset
-oracle, software pixels, frozen compatibility/callback timing, and pinned WASM
-compilation passed. Responsive composition has a separate additive API; read [the responsive guide](SKELETON_RESPONSIVE.md).
-Root strict integration build and 17 targeted private-Xvfb checks pass, including
-selective/umbrella distributions, C/C++ include orders and the actual 38-preset
-C oracle (four methods, zero skips). All 18 consumer-skill tests and canonical
-generated-file checks pass. This is not a whole-family, deployed-gallery or
-installed-package support claim.
+Alpha.4 introduced the owned palette and fixed-size presentation. The
+[responsive guide](SKELETON_RESPONSIVE.md) covers the own-root presentation,
+along with its gallery examples.
 
 Include `cui/cui_skeleton_palette.h` for owned values and pure resolvers, and
 `cui/cui_content.h` for `cui_skeleton_with_palette`. The existing phase API and
@@ -52,6 +47,8 @@ multiplies alpha by .5; pulse opacity1→.5→1 then a single byte truncation ma
 existing ex. Parent opacity/clip remains the existing Core layer. Palette input
 is snapshotted before easing (unlike the preserved legacy ex post-callback theme
 read), and borrowed through submission only; copies need no source lifetime.
+For themes loaded from a file, [ThemeSet registry v2](THEME_REGISTRY_GUIDE.md#import-a-dedicated-skeleton-color)
+provides the same palette from a dedicated solid color or the imported secondary.
 
 Nulls/invalid index leave pure resolver output unchanged. Painter requires nonzero
 ID, positive finite dimensions<=4096, radius0..4096 and duration0..60 (zero uses2s).

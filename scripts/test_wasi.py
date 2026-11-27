@@ -50,6 +50,7 @@ SOURCES = (
     "src/base/cui_dock.c", "src/components/cui_dock.c",
     "src/base/cui_plot.c", "src/components/cui_plot.c", "src/components/cui_plot_motion.c",
     "src/theme/cui_theme.c", "src/theme/cui_theme_registry.c", "src/theme/cui_theme_motion.c",
+    "src/theme/cui_skeleton_palette.c",
     "src/components/cui_components.c", "src/components/cui_label.c",
     "src/base/cui_table.c",
     "src/components/cui_table.c",
@@ -146,7 +147,7 @@ def source_fingerprint(root: pathlib.Path) -> str:
     paths += ["src/text/cui_bidi.c", "tests/unit/test_bidi.c", "tests/unit/test_radio_group_base.c", "tests/unit/test_accepted_activation.c", "tests/unit/test_button_group_base.c"]
     paths += [str(path.relative_to(root)) for path in (root / "third_party/sheenbidi").rglob("*") if path.is_file()]
     paths += ["third_party/clay/clay.h", "tests/integration/popover_appearance_fixture.h", "tests/unit/notification_shadow_fixture.h", "tests/unit/cui_edit_grapheme_tests.inc", "tests/unit/cui_edit_word_tests.inc"]
-    paths += ["tests/unit/cui_kbd_uppercase_cases.inc"]
+    paths += ["tests/unit/cui_kbd_uppercase_cases.inc", "src/theme/cui_skeleton_palette_presets.inc"]
     digest = hashlib.sha256()
     for path in sorted(set(paths)):
         digest.update(path.encode() + b"\0")

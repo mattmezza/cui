@@ -388,11 +388,170 @@ static void motion_host(void) {
     assert(!strcmp(state.semantic.typography.sans, ".SystemUIFont") && state.theme.dark &&
            state.motion.duration_fast == 0);
 }
+static void registry_skeleton_import(void) {
+    char source[] =
+        "{\"themes\":[{\"name\":\"A\",\"colors\":{\"skeleton.background\":\"#12345600\","
+        "\"secondary.background\":\"#33445580\"}},{\"name\":\"Zulu\",\"mode\":\"dark\","
+        "\"colors\":{\"secondary.background\":\"#0a0b0c00\"}},{\"name\":\"Beta\",\"colors\":{"
+        "\"secondary.background\":\"#102030\",\"skeleton.background\":null}}]}";
+    cui_theme_registry_entry_v2 entries[3], scratch[3];
+    cui_theme_registry_v2 registry;
+    cui_theme_import_result report;
+    assert(cui_theme_registry_init_v2(&registry, entries, 3, false));
+    assert(cui_theme_registry_import_v2(&registry, string(source), (cui_theme_import_options){0},
+                                        scratch, 3, &report) == CUI_THEME_REGISTRY_OK);
+    assert(registry.count == 3 && registry.revision == 2 && report.added == 3 && !report.partial &&
+           !report.unsupported_fields);
+    memset(source, 'x', sizeof source);
+    memset(scratch, 0x5a, sizeof scratch);
+    const cui_theme_registry_entry_v2 *a = cui_theme_registry_find_v2(&registry, string("A"));
+    const cui_theme_registry_entry_v2 *b = cui_theme_registry_find_v2(&registry, string("Beta"));
+    const cui_theme_registry_entry_v2 *z = cui_theme_registry_find_v2(&registry, string("Zulu"));
+    assert(a && a->has_skeleton_override &&
+           color(a->skeleton.background, (cui_color){18, 52, 86, 0}));
+    assert(color(a->base.theme.secondary, (cui_color){51, 68, 85, 128}));
+    assert(b && !b->has_skeleton_override &&
+           color(b->skeleton.background, (cui_color){16, 32, 48, 255}));
+    assert(z && z->base.theme.dark && !z->has_skeleton_override &&
+           color(z->skeleton.background, (cui_color){10, 11, 12, 0}));
+    assert(cui_theme_registry_sorted_v2(&registry, 0) == a &&
+           cui_theme_registry_sorted_v2(&registry, 1) == b &&
+           cui_theme_registry_sorted_v2(&registry, 2) == z &&
+           !cui_theme_registry_sorted_v2(&registry, 3));
+
+    const char *replacement =
+        "{\"themes\":[{\"name\":\"A\",\"colors\":{\"secondary.background\":\"#abcdef\"}}]}";
+    const char *invalid =
+        "{\"themes\":[{\"name\":\"A\",\"colors\":{\"skeleton.background\":\"#ffffff\"}},"
+        "{\"name\":\"Beta\",\"colors\":{\"skeleton.background\":true}}]}";
+    const char *unknown =
+        "{\"themes\":[{\"name\":\"Beta\",\"colors\":{\"skeleton.background\":\"#ffffff\","
+        "\"unknown.background\":\"#fff\"}}]}";
+    cui_theme_import_options replace = {.replace_existing = true};
+    unsigned char before[sizeof entries];
+    memcpy(before, entries, sizeof before);
+    assert(cui_theme_registry_import_v2(&registry, string(replacement),
+                                        (cui_theme_import_options){0}, scratch, 3,
+                                        &report) == CUI_THEME_REGISTRY_OK &&
+           report.skipped == 1 && registry.revision == 2);
+    assert(cui_theme_registry_import_v2(&registry, string(invalid), replace, scratch, 3, &report) ==
+               CUI_THEME_REGISTRY_INVALID &&
+           report.byte_offset && !report.replaced);
+    assert(cui_theme_registry_import_v2(&registry, string(unknown), replace, scratch, 3, &report) ==
+               CUI_THEME_REGISTRY_UNSUPPORTED &&
+           !report.partial && report.unsupported_fields == 1);
+    assert(cui_theme_registry_import_v2(&registry, string(replacement), replace, entries, 3,
+                                        &report) == CUI_THEME_REGISTRY_INVALID);
+    assert(cui_theme_registry_import_v2(&registry, string(replacement), replace, scratch, 2,
+                                        &report) == CUI_THEME_REGISTRY_CAPACITY_ERROR);
+    assert(cui_theme_registry_import_v2(&registry, string("{\"themes\":[{\"name\":\"Full\"}]}"),
+                                        replace, scratch, 3,
+                                        NULL) == CUI_THEME_REGISTRY_CAPACITY_ERROR);
+    assert(registry.count == 3 && registry.revision == 2 &&
+           !memcmp(before, entries, sizeof before));
+
+    assert(cui_theme_registry_import_v2(&registry, string(replacement), replace, scratch, 3,
+                                        &report) == CUI_THEME_REGISTRY_OK &&
+           report.replaced == 1 && registry.revision == 3);
+    a = cui_theme_registry_find_v2(&registry, string("A"));
+    assert(a && !a->has_skeleton_override &&
+           color(a->skeleton.background, (cui_color){171, 205, 239, 255}));
+    replace.allow_unsupported = true;
+    assert(cui_theme_registry_import_v2(&registry, string(unknown), replace, scratch, 3, &report) ==
+               CUI_THEME_REGISTRY_OK &&
+           report.partial && report.unsupported_fields == 1);
+    b = cui_theme_registry_find_v2(&registry, string("Beta"));
+    assert(b && b->has_skeleton_override &&
+           color(b->skeleton.background, (cui_color){255, 255, 255, 255}));
+    cui_theme_registry_entry_v2 manual = *b;
+    manual.has_skeleton_override = false;
+    manual.base.theme.secondary = (cui_color){8, 9, 10, 0};
+    assert(cui_theme_registry_put_v2(&registry, &manual, false) == CUI_THEME_REGISTRY_OK &&
+           registry.revision == 4);
+    assert(cui_theme_registry_put_v2(&registry, &manual, true) == CUI_THEME_REGISTRY_OK &&
+           registry.revision == 5);
+    b = cui_theme_registry_find_v2(&registry, string("Beta"));
+    assert(b && !b->has_skeleton_override &&
+           color(b->skeleton.background, manual.base.theme.secondary));
+    assert(cui_theme_registry_reset_v2(&registry) && !registry.count && registry.revision == 6);
+    assert(!cui_theme_registry_find_v2(&registry, string("Beta")));
+
+    const char *skeleton_only =
+        "{\"themes\":[{\"name\":\"Legacy\",\"colors\":{\"skeleton.background\":\"#112233\"}}]}";
+    cui_theme_registry_entry old_entries[1], old_scratch[1];
+    cui_theme_registry old;
+    assert(cui_theme_registry_init(&old, old_entries, 1, false));
+    assert(cui_theme_registry_import(&old, string(skeleton_only), (cui_theme_import_options){0},
+                                     old_scratch, 1, &report) == CUI_THEME_REGISTRY_UNSUPPORTED &&
+           !old.count && old.revision == 1);
+    assert(cui_theme_registry_import(&old, string(skeleton_only),
+                                     (cui_theme_import_options){.allow_unsupported = true},
+                                     old_scratch, 1, &report) == CUI_THEME_REGISTRY_OK &&
+           old.count == 1 && report.partial && report.unsupported_fields == 1);
+}
+
+static void registry_skeleton_host(void) {
+    size_t count = cui_theme_preset_count();
+    cui_theme_registry_entry_v2 *entries = calloc(count, sizeof *entries);
+    assert(entries);
+    cui_theme_registry_v2 registry;
+    assert(cui_theme_registry_init_v2(&registry, entries, count, true));
+    for (size_t i = 0; i < count; ++i) {
+        cui_skeleton_palette preset;
+        assert(cui_skeleton_palette_preset_get(i, &preset));
+        const cui_theme_registry_entry_v2 *entry =
+            cui_theme_registry_find_v2(&registry, cui_theme_preset_name(i));
+        assert(entry && entry->has_skeleton_override &&
+               color(entry->skeleton.background, preset.background));
+    }
+    cui_theme_selection selection = {
+        CUI_THEME_FOLLOW_SYSTEM, {"Aurora Light", 12}, {"Default Dark", 12}};
+    cui_theme_host_preferences prefs = {.revision = 1};
+    cui_theme_host_state_v2 host = {0};
+    assert(cui_theme_host_update_v2(&host, &registry, selection, prefs, 16) ==
+           CUI_THEME_REGISTRY_OK);
+    assert(host.base.changed && color(host.skeleton.background, (cui_color){241, 245, 249, 255}));
+    cui_theme_registry_entry_v2 replacement =
+        *cui_theme_registry_find_v2(&registry, selection.light_name);
+    replacement.skeleton.background = (cui_color){1, 2, 3, 0};
+    assert(cui_theme_registry_put_v2(&registry, &replacement, true) == CUI_THEME_REGISTRY_OK);
+    assert(cui_theme_host_update_v2(&host, &registry, selection, prefs, 16) ==
+           CUI_THEME_REGISTRY_OK);
+    assert(host.base.changed && !host.base.metrics_changed && !host.base.motion_changed &&
+           color(host.skeleton.background, replacement.skeleton.background));
+    assert(cui_theme_host_update_v2(&host, &registry, selection, prefs, 16) ==
+               CUI_THEME_REGISTRY_OK &&
+           !host.base.changed);
+    prefs.high_contrast = true;
+    prefs.revision++;
+    assert(cui_theme_host_update_v2(&host, &registry, selection, prefs, 16) ==
+               CUI_THEME_REGISTRY_OK &&
+           host.base.changed && color(host.skeleton.background, host.base.theme.secondary));
+    unsigned char before[sizeof host];
+    memcpy(before, &host, sizeof before);
+    --prefs.revision;
+    assert(cui_theme_host_update_v2(&host, &registry, selection, prefs, 16) ==
+               CUI_THEME_REGISTRY_INVALID &&
+           !memcmp(before, &host, sizeof before));
+    prefs.revision++;
+    assert(cui_theme_host_update_v2(&host, &registry, selection, prefs, NAN) ==
+               CUI_THEME_REGISTRY_INVALID &&
+           !memcmp(before, &host, sizeof before));
+    assert(cui_theme_registry_reset_v2(&registry));
+    const cui_theme_registry_entry_v2 *aurora =
+        cui_theme_registry_find_v2(&registry, selection.light_name);
+    assert(aurora && color(aurora->skeleton.background, (cui_color){241, 245, 249, 255}));
+    free(entries);
+    assert(color(host.skeleton.background, host.base.theme.secondary));
+}
+
 int main(void) {
     colors();
     semantic();
     bounds();
     registry();
     motion_host();
+    registry_skeleton_import();
+    registry_skeleton_host();
     return 0;
 }

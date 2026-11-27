@@ -924,6 +924,8 @@
         "cui_loading_motion_sample",
         "cui_skeleton_palette_from_theme",
         "cui_skeleton_palette_preset_get",
+        "cui_theme_registry_import_v2",
+        "cui_theme_host_update_v2",
         "cui_skeleton_with_palette",
         "cui_skeleton_presentation_default",
         "cui_skeleton_present",
@@ -945,11 +947,12 @@
       ],
       "state_ownership": "Caller owns phase for the legacy route, or one persistent loading motion per placeholder and an owned palette for fixed and responsive painting. Easing userdata is borrowed synchronously. Reset motion explicitly to restart. The retained C bridge copies configuration and owns motion per configured node.",
       "interaction": "Decorative presentation adds no action, focus or busy semantics. Optional easing runs synchronously during sampling; application loading semantics remain separate.",
-      "usage": "Use cui_skeleton_present for full/fraction/flex sizing. Explore profile, article-list and table-row recipes with a selectable base size and loading state. Download the shared C recipe header and copy the call for the selected layout. Retain independent motion, schedule the earliest absolute wake and replace placeholders with content when loading completes. For fixed-size painting, use cui_skeleton_ex or cui_skeleton_with_palette.",
+      "usage": "Use cui_skeleton_present for full/fraction/flex sizing. ThemeSet registry v2 imports an owned solid Skeleton palette. Explore profile, article-list and table-row recipes with a selectable base size and loading state. Download the shared C recipe header and copy the call for the selected layout. Retain independent motion, schedule the earliest absolute wake and replace placeholders with content when loading completes. For fixed-size painting, use cui_skeleton_ex or cui_skeleton_with_palette.",
       "docs": [
         "docs/CONTENT.md",
         "docs/SKELETON_PALETTE.md",
         "docs/SKELETON_RESPONSIVE.md",
+        "docs/THEME_REGISTRY_GUIDE.md",
         "docs/BRIDGE_SKELETON.md",
         "docs/PYTHON_SKELETON.md",
         "docs/NODE_SKELETON.md",
@@ -964,7 +967,8 @@
       "public_header": "include/cui/cui_skeleton_presentation.h",
       "composition": "immediate frame submission",
       "additional_public_headers": [
-        "include/cui/cui_bridge.h"
+        "include/cui/cui_bridge.h",
+        "include/cui/cui_theme_registry.h"
       ],
       "examples": [
         "examples/skeleton_recipes/scene.h",
@@ -2288,6 +2292,8 @@
       "api_symbols": [
         "cui_theme_light",
         "cui_theme_preset_get",
+        "cui_theme_registry_import_v2",
+        "cui_theme_host_update_v2",
         "cui_software_query_v2",
         "cui_software_render_v2"
       ],
@@ -2299,6 +2305,7 @@
       "usage": "Choose/copy a preset and pass its address to styled controls; invalidate after changing it. Unreleased cui_background values/sample helpers are pure C-only math. For actual opt-in rendering, use cui_software_query_v2 before Core V2 composition and cui_software_render_v2 afterwards; V1 routes remain unchanged. The other four renderer paths, foreign authoring and all78 part coverage remain pending.",
       "docs": [
         "docs/THEME_GUIDE.md",
+        "docs/THEME_REGISTRY_GUIDE.md",
         "docs/TYPOGRAPHY.md",
         "docs/BACKGROUND_VALUES.md",
         "docs/CORE_DRAW_V2.md",
@@ -2313,6 +2320,7 @@
       "public_header": "include/cui/cui_theme.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
+        "include/cui/cui_theme_registry.h",
         "include/cui/cui_background.h",
         "include/cui/cui_draw_v2.h",
         "include/cui/cui_software.h"

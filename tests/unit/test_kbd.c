@@ -365,12 +365,99 @@ static void styled_hints(void) {
     cui_destroy(ui);
 }
 
+typedef struct {
+    unsigned calls;
+    cui_kbd_binding_query query;
+    cui_kbd_stroke strokes[2];
+    size_t count;
+    bool null_sequence;
+} test_binding_source;
+
+static size_t read_binding(void *user, const cui_kbd_binding_query *query,
+                           const cui_kbd_stroke **strokes) {
+    test_binding_source *source = user;
+    ++source->calls;
+    source->query = *query;
+    *strokes = source->null_sequence ? NULL : source->strokes;
+    return source->count;
+}
+
+static void resolved_hint(void) {
+    char key[] = "p";
+    test_binding_source fixture = {
+        .strokes = {{.modifiers = CUI_MOD_CTRL, .key = {key, 1}}, {.key = CUI_STR("escape")}},
+        .count = 2,
+    };
+    cui_kbd_binding_source source = {read_binding, &fixture};
+    cui_kbd_stroke output = {0};
+    CHECK(!cui_kbd_binding_stroke(source, (cui_kbd_binding_query){0}, &output));
+    CHECK(!cui_kbd_binding_stroke(source, (cui_kbd_binding_query){10, -1, 0}, &output));
+    CHECK(!cui_kbd_binding_stroke(source, (cui_kbd_binding_query){10, CUI_KBD_BINDING_GLOBAL, 3},
+                                  &output));
+    CHECK(!cui_kbd_binding_stroke(source, (cui_kbd_binding_query){10, CUI_KBD_BINDING_FOCUS, 0},
+                                  &output));
+    CHECK(!cui_kbd_binding_stroke(source, (cui_kbd_binding_query){.action = 10}, NULL));
+    CHECK(fixture.calls == 0);
+    cui_kbd_binding_query queries[] = {{10, CUI_KBD_BINDING_CURRENT, 0},
+                                       {10, CUI_KBD_BINDING_CONTEXT, 3},
+                                       {10, CUI_KBD_BINDING_FOCUS, 4},
+                                       {10, CUI_KBD_BINDING_GLOBAL, 0}};
+    for (size_t i = 0; i < sizeof queries / sizeof queries[0]; ++i) {
+        CHECK(cui_kbd_binding_stroke(source, queries[i], &output));
+        CHECK(fixture.calls == i + 1 && fixture.query.action == queries[i].action &&
+              fixture.query.scope == queries[i].scope && fixture.query.target == queries[i].target);
+        CHECK(output.modifiers == CUI_MOD_CTRL && output.key.length == 1 && output.key.data == key);
+    }
+    fixture.count = 0;
+    CHECK(!cui_kbd_binding_stroke(source, queries[0], &output));
+    fixture.count = 2;
+    fixture.null_sequence = true;
+    CHECK(!cui_kbd_binding_stroke(source, queries[0], &output));
+    fixture.null_sequence = false;
+    fixture.strokes[0].modifiers = 64;
+    CHECK(!cui_kbd_binding_stroke(source, queries[0], &output));
+    CHECK(output.modifiers == CUI_MOD_CTRL && output.key.data == key);
+    fixture.strokes[0].modifiers = CUI_MOD_SHIFT;
+    key[0] = 'k';
+
+    cui_context *ui = create();
+    cui_theme theme = cui_theme_light();
+    CHECK(cui_begin_frame(ui, 320, 160, .016f));
+    cui_begin_box(ui, 11, (cui_box){.row = true});
+    cui_color tint = {18, 50, 90, 255};
+    CHECK(cui_set_text_defaults(
+        ui, (cui_text_defaults){.font_size = 26, .color = tint, .custom_color = true}));
+    CHECK(cui_kbd_binding_stroke(source, queries[0], &output));
+    CHECK(cui_kbd_ex(ui, 12, &theme, output, (cui_kbd_options){.plain = true}));
+    key[0] = 'x'; /* Host bytes can change after submission. */
+    CHECK(cui_kbd_ex(ui, 13, &theme, output, (cui_kbd_options){0}));
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    CHECK(cui_last_error(ui) == CUI_OK);
+    size_t count = 0;
+    for (size_t i = 0; i < draw.count; ++i) {
+        const cui_draw_command *text = &draw.commands[i];
+        if (text->type != CUI_DRAW_TEXT)
+            continue;
+        bool first = count++ == 0;
+        CHECK(text->font_size == (first ? 26 : theme.font_size * .75f));
+        CHECK(text->text.length == 7 && !memcmp(text->text.data, first ? "Shift+K" : "Shift+X", 7));
+        CHECK(!memcmp(&text->color, first ? &tint : &theme.muted, sizeof tint));
+    }
+    CHECK(count == 2);
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    CHECK(count == 2 && semantics[0].name.length == 7 &&
+          !memcmp(semantics[0].name.data, "Shift+K", 7));
+    cui_destroy(ui);
+}
+
 int main(void) {
     formats();
     unicode_mappings();
     render();
     failures();
     styled_hints();
+    resolved_hint();
     puts("Kbd source slice: ok");
     return 0;
 }

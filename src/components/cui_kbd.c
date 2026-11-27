@@ -13,8 +13,11 @@ static bool kbd_ready(cui_context *ui, cui_id id, const cui_theme *theme) {
 static bool kbd_draw_label(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
                            cui_kbd_options options, const cui_kbd_style *style, bool literal) {
     float scale = theme->font_size / 16;
-    if (options.plain)
+    cui_text_defaults defaults = {0};
+    if (options.plain) {
         style = NULL;
+        defaults = cui_get_text_defaults(ui);
+    }
     const cui_typography_token *custom_type = style ? style->typography : NULL;
     const cui_text_paint *custom_paint = style ? style->text_paint : NULL;
     cui_typography_token type = {.size = literal         ? theme->font_size * .8f
@@ -25,6 +28,8 @@ static bool kbd_draw_label(cui_context *ui, cui_id id, const cui_theme *theme, c
                                  .wrap = true};
     if (custom_type)
         type = *custom_type;
+    if (defaults.font_size > 0)
+        type.size = defaults.font_size;
     if (!cui_typography_token_valid(type) || !isfinite(type.style.letter_spacing) ||
         (type.style.letter_spacing && !(cui_text_capabilities(ui) & CUI_TEXT_CAP_LETTER_SPACING)) ||
         (custom_paint && !cui_text_paint_valid(*custom_paint, false)))
@@ -58,6 +63,8 @@ static bool kbd_draw_label(cui_context *ui, cui_id id, const cui_theme *theme, c
                  options.accessible_name.length ? options.accessible_name : label, false, false, 0);
     cui_set_tab_stop(ui, id, false);
     cui_color color = literal || options.plain ? theme->text : theme->muted;
+    if (defaults.custom_color)
+        color = defaults.color;
     bool submitted = true;
     if (label.length) {
         if (custom_paint)

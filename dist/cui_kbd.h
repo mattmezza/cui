@@ -23,19 +23,48 @@ typedef struct {
  * This can expand a scalar to several. Required count is at most 151 bytes.
  * Legacy cui_kbd_format preserves the key bytes. Output may overlap the input. */
 size_t cui_kbd_format_stroke(cui_kbd_stroke, bool mac_symbols, char *output, size_t capacity);
+
+typedef enum {
+    CUI_KBD_BINDING_CURRENT, /* Host's active key context. */
+    CUI_KBD_BINDING_CONTEXT, /* target identifies an explicit host context. */
+    CUI_KBD_BINDING_FOCUS,   /* target identifies a focus target known to the host. */
+    CUI_KBD_BINDING_GLOBAL   /* Host lookup with an empty key context. */
+} cui_kbd_binding_scope;
+typedef struct {
+    cui_id action;
+    cui_kbd_binding_scope scope;
+    cui_id target; /* Required for CONTEXT/FOCUS; zero for CURRENT/GLOBAL. */
+} cui_kbd_binding_query;
+/* Return the stroke count of the winning binding and set *strokes to the
+ * host-owned sequence. Return zero for an unbound action. The host determines
+ * precedence and focus-to-context mapping. Query and output pointer are borrowed
+ * for this synchronous call. Sequence and key storage must outlive the call. */
+typedef size_t (*cui_kbd_lookup_fn)(void *user, const cui_kbd_binding_query *,
+                                    const cui_kbd_stroke **strokes);
+typedef struct {
+    cui_kbd_lookup_fn lookup;
+    void *user;
+} cui_kbd_binding_source;
+/* Calls lookup at most once. On success copies the first stroke; its key bytes
+ * remain borrowed from the host until the host next invalidates them. Submit or
+ * copy immediately. Invalid arguments, no match, or an invalid first stroke
+ * return false and leave *out unchanged. No allocation, registration or dispatch. */
+bool cui_kbd_binding_stroke(cui_kbd_binding_source, cui_kbd_binding_query, cui_kbd_stroke *out);
+
 typedef struct {
     bool plain, outline, mac_symbols; /* plain ignores outline; zero is normal pill. */
     /* Optional strict single-line UTF-8, max1024 bytes; no NUL/ASCII controls. */
     cui_str accessible_name;
 } cui_kbd_options;
-/* Decorative, noninteractive shortcut label; no bindings or activation. All
+/* Decorative, noninteractive shortcut label. All
  * invalid arguments fail before submission. One copied label semantic defaults
  * to formatted text. Source-shaped pill uses theme font_size/16 rem scaling:
  * X4/Y2 padding, min width20, text12, half radius; outline adds 1-unit border.
  * Theme font must be finite(0,512], radius finite>=0.
- * Plain uses theme text/font without pill geometry. Inputs are copied into Core
+ * Plain uses scoped size and solid color or theme defaults, without pill geometry.
+ * Inputs are copied into Core
  * frame storage on submission; no retained state or resources. Compose several
- * calls in a normal parent row for grouped hints; no sequence/binding lookup. */
+ * calls in a normal parent row for grouped hints. */
 bool cui_kbd_ex(cui_context *, cui_id, const cui_theme *, cui_kbd_stroke, cui_kbd_options);
 typedef struct {
     const cui_box *box;                     /* Optional complete pill box. */
@@ -1688,10 +1717,39 @@ static size_t cui_kbd_uppercase_first(const char *key, size_t bytes, char *outpu
     return bytes;
 }
 
+static bool stroke_valid(cui_kbd_stroke stroke) {
+    return !(stroke.modifiers & ~(CUI_MOD_CTRL | CUI_MOD_ALT | CUI_MOD_SHIFT | CUI_MOD_META)) &&
+           stroke.key.data && stroke.key.length && stroke.key.length <= CUI_KBD_KEY_MAX_BYTES &&
+           cui_kbd_line_valid(stroke.key);
+}
+
+bool cui_kbd_binding_stroke(cui_kbd_binding_source source, cui_kbd_binding_query query,
+                            cui_kbd_stroke *out) {
+    if (!source.lookup || !query.action || !out)
+        return false;
+    switch (query.scope) {
+    case CUI_KBD_BINDING_CURRENT:
+    case CUI_KBD_BINDING_GLOBAL:
+        if (query.target)
+            return false;
+        break;
+    case CUI_KBD_BINDING_CONTEXT:
+    case CUI_KBD_BINDING_FOCUS:
+        if (!query.target)
+            return false;
+        break;
+    default:
+        return false;
+    }
+    const cui_kbd_stroke *strokes = NULL;
+    if (!source.lookup(source.user, &query, &strokes) || !strokes || !stroke_valid(strokes[0]))
+        return false;
+    *out = strokes[0];
+    return true;
+}
+
 size_t cui_kbd_format_stroke(cui_kbd_stroke stroke, bool mac, char *output, size_t capacity) {
-    if ((stroke.modifiers & ~(CUI_MOD_CTRL | CUI_MOD_ALT | CUI_MOD_SHIFT | CUI_MOD_META)) ||
-        !stroke.key.data || !stroke.key.length || stroke.key.length > CUI_KBD_KEY_MAX_BYTES ||
-        !cui_kbd_line_valid(stroke.key))
+    if (!stroke_valid(stroke))
         return SIZE_MAX;
     static const struct {
         const char *key, *normal, *mac;
@@ -1842,8 +1900,11 @@ static bool kbd_ready(cui_context *ui, cui_id id, const cui_theme *theme) {
 static bool kbd_draw_label(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
                            cui_kbd_options options, const cui_kbd_style *style, bool literal) {
     float scale = theme->font_size / 16;
-    if (options.plain)
+    cui_text_defaults defaults = {0};
+    if (options.plain) {
         style = NULL;
+        defaults = cui_get_text_defaults(ui);
+    }
     const cui_typography_token *custom_type = style ? style->typography : NULL;
     const cui_text_paint *custom_paint = style ? style->text_paint : NULL;
     cui_typography_token type = {.size = literal         ? theme->font_size * .8f
@@ -1854,6 +1915,8 @@ static bool kbd_draw_label(cui_context *ui, cui_id id, const cui_theme *theme, c
                                  .wrap = true};
     if (custom_type)
         type = *custom_type;
+    if (defaults.font_size > 0)
+        type.size = defaults.font_size;
     if (!cui_typography_token_valid(type) || !isfinite(type.style.letter_spacing) ||
         (type.style.letter_spacing && !(cui_text_capabilities(ui) & CUI_TEXT_CAP_LETTER_SPACING)) ||
         (custom_paint && !cui_text_paint_valid(*custom_paint, false)))
@@ -1887,6 +1950,8 @@ static bool kbd_draw_label(cui_context *ui, cui_id id, const cui_theme *theme, c
                  options.accessible_name.length ? options.accessible_name : label, false, false, 0);
     cui_set_tab_stop(ui, id, false);
     cui_color color = literal || options.plain ? theme->text : theme->muted;
+    if (defaults.custom_color)
+        color = defaults.color;
     bool submitted = true;
     if (label.length) {
         if (custom_paint)

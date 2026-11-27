@@ -36,6 +36,10 @@ def main():
               }throw Error('Missing target '+name);}'''
             def target(name):
                 return page.evaluate(target_js, name)
+            def click(name):
+                t = target(name)
+                b = page.locator('#preview').bounding_box()
+                page.mouse.click(b['x']+t['x']+t['width']/2, b['y']+t['y']+t['height']/2)
             hints = [target(name) for name in ('Ctrl+Shift+SS', 'Esc', 'Enter')]
             assert all(h['width'] > 0 and h['height'] > 0 for h in hints)
             assert hints[0]['x'] < hints[1]['x'] < hints[2]['x']
@@ -43,6 +47,7 @@ def main():
             styled = target('Alt+Page Down')
             assert styled['y'] > hints[0]['y'] and abs(styled['width'] - 176) < 1
             assert 'cui_kbd_styled' in page.locator('#snippet').inner_text()
+            assert 'cui_kbd_binding_stroke' in page.locator('#snippet').inner_text()
             assert page.locator('#component-guides a').filter(has_text='Keyboard').count() >= 1
             def painted(text):
                 expression = """()=>{const w=cuiGallery.exports,d=new TextDecoder();
@@ -68,12 +73,27 @@ def main():
                 }
                 return false;
             }''')
+            assert page.evaluate('''() => {
+                const w = cuiGallery.exports, decoder = new TextDecoder();
+                return Array.from({length:w.gallery_count()}, (_, i) =>
+                    w.gallery_command(i, 11) === 20 &&
+                    decoder.decode(new Uint8Array(w.memory.buffer, w.gallery_command_text(i),
+                        w.gallery_command_length(i))) === 'Enter').some(Boolean);
+            }''')
+            page.locator('#preview').focus()
+            painted('Shift+P')
+            page.keyboard.press('Shift+P')
+            painted('Refresh count: 1')
+            click('Use alternate shortcut')
+            painted('Shift+K')
+            page.locator('#preview').focus()
+            page.keyboard.press('Shift+P')
+            page.keyboard.press('Shift+K')
+            painted('Refresh count: 2')
+            click('Refresh results')
+            painted('Refresh count: 3')
             page.goto(f'http://127.0.0.1:{server.server_port}/#Stepper')
             page.wait_for_function('window.cuiGallery?.renderedComponent==="Stepper"')
-            def click(name):
-                t = target(name)
-                b = page.locator('#preview').bounding_box()
-                page.mouse.click(b['x']+t['x']+t['width']/2, b['y']+t['y']+t['height']/2)
             painted('Step 1 of 3')
             click('Review')
             painted('Confirm details to continue.')
@@ -115,7 +135,7 @@ def main():
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
             assert not errors, errors
             browser.close()
-            print('PASS: Unicode and styled Kbd labels, pointer/key Stepper validation, same-item requests, disabled suppression and mobile containment')
+            print('PASS: Unicode and styled Kbd labels, live shortcut rebinding, pointer/key Stepper validation, same-item requests, disabled suppression and mobile containment')
     finally:
         server.shutdown()
         server.server_close()

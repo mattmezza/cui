@@ -1601,10 +1601,39 @@ static size_t cui_kbd_uppercase_first(const char *key, size_t bytes, char *outpu
     return bytes;
 }
 
+static bool stroke_valid(cui_kbd_stroke stroke) {
+    return !(stroke.modifiers & ~(CUI_MOD_CTRL | CUI_MOD_ALT | CUI_MOD_SHIFT | CUI_MOD_META)) &&
+           stroke.key.data && stroke.key.length && stroke.key.length <= CUI_KBD_KEY_MAX_BYTES &&
+           cui_kbd_line_valid(stroke.key);
+}
+
+bool cui_kbd_binding_stroke(cui_kbd_binding_source source, cui_kbd_binding_query query,
+                            cui_kbd_stroke *out) {
+    if (!source.lookup || !query.action || !out)
+        return false;
+    switch (query.scope) {
+    case CUI_KBD_BINDING_CURRENT:
+    case CUI_KBD_BINDING_GLOBAL:
+        if (query.target)
+            return false;
+        break;
+    case CUI_KBD_BINDING_CONTEXT:
+    case CUI_KBD_BINDING_FOCUS:
+        if (!query.target)
+            return false;
+        break;
+    default:
+        return false;
+    }
+    const cui_kbd_stroke *strokes = NULL;
+    if (!source.lookup(source.user, &query, &strokes) || !strokes || !stroke_valid(strokes[0]))
+        return false;
+    *out = strokes[0];
+    return true;
+}
+
 size_t cui_kbd_format_stroke(cui_kbd_stroke stroke, bool mac, char *output, size_t capacity) {
-    if ((stroke.modifiers & ~(CUI_MOD_CTRL | CUI_MOD_ALT | CUI_MOD_SHIFT | CUI_MOD_META)) ||
-        !stroke.key.data || !stroke.key.length || stroke.key.length > CUI_KBD_KEY_MAX_BYTES ||
-        !cui_kbd_line_valid(stroke.key))
+    if (!stroke_valid(stroke))
         return SIZE_MAX;
     static const struct {
         const char *key, *normal, *mac;

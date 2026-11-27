@@ -55,9 +55,10 @@ void sync_label(cui_context *ui, const cui_theme *theme) {
 
 Icons use the scoped size and tint as fallbacks. Labels including
 `cui_label_source` pick up both defaults. Rich labels use a natural line height
-when inheriting size and keep their highlight and secondary colors. A Spinner
-uses the scoped tint and keeps its configured size. Component-specific explicit
-values override the defaults.
+when inheriting size and keep their highlight and secondary colors. Plain typed
+Kbd hints use both defaults. Keycap and literal hints keep their own styles.
+A Spinner uses the scoped tint and keeps its configured size. Component-specific
+explicit values override the defaults.
 
 For nested boxes, a zero font size or `custom_color = false` inherits the
 corresponding field from the enclosing box. Setting defaults again replaces

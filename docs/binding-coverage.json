@@ -279,9 +279,9 @@
         {
           "header": "include/cui/cui_kbd.h",
           "languages": ["python", "javascript", "typescript", "go", "rust"],
-          "types": ["cui_kbd_stroke", "cui_kbd_options", "cui_kbd_style"],
-          "symbols": ["cui_kbd_ex", "cui_kbd_format_stroke", "cui_kbd_styled", "cui_kbd_label_styled"],
-          "note": "An optional retained provider formats a typed Unicode stroke with platform labels, outline or plain appearance, and a copied accessibility name in all five languages. A separate optional retained style supports responsive width, wrapping, box paint, typography and solid or block-linear text paint. Exact immediate-mode types, arbitrary box overrides, font-family IDs, letter spacing, line-anchored gradients and standalone formatting remain C-only. Earlier providers keep the default pill."
+          "types": ["cui_kbd_stroke", "cui_kbd_options", "cui_kbd_style", "cui_kbd_binding_scope", "cui_kbd_binding_query", "cui_kbd_lookup_fn", "cui_kbd_binding_source"],
+          "symbols": ["cui_kbd_ex", "cui_kbd_format_stroke", "cui_kbd_styled", "cui_kbd_label_styled", "cui_kbd_binding_stroke"],
+          "note": "An optional retained provider formats a typed Unicode stroke with platform labels, outline or plain appearance, and a copied accessibility name in all five languages. Plain hints pick up scoped size and solid color on supporting providers. A separate optional retained style supports responsive width, wrapping, box paint, typography and solid or block-linear text paint. Exact immediate-mode types, host lookup hook, arbitrary box overrides, font-family IDs, letter spacing, line-anchored gradients and standalone formatting remain C-only. Bindings pass their host's resolved stroke to the retained node. Earlier providers keep the default pill."
         }
       ]
     },

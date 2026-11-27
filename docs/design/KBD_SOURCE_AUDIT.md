@@ -70,3 +70,17 @@ scalar-safe capacities, validation, normal/outline/plain draw geometry and
 software pixels, semantics/no activation, theme scaling, ordinary row-group
 composition, and source-owned lifetimes. A guide example must compile as C11.
 No claim of complete Kbd parity or runtime validation is made by this audit.
+
+## Host keymap integration and plain appearance
+
+The frozen binding constructors ask the host for the highest-precedence action
+binding in the current or explicit context, a supplied focus target's context,
+or the empty context. The label uses the first stroke. Plain appearance returns
+text directly, while pills set their own size and muted color.
+[Frozen Kbd source](https://github.com/longbridge/gpui-kit/blob/87d10ae5e1299d1be18670a37570c5402f952e34/crates/component/src/kbd.rs#L53-L91)
+
+CUI exposes those scope queries through `cui_kbd_binding_stroke`. The host
+supplies the winning sequence and retains its own action identity, context
+matching, focus history, precedence and dispatch. Plain typed hints opt into
+scoped size and solid color. The same paint path serves immediate and retained
+C as well as the language builders.

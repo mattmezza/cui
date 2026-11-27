@@ -2,8 +2,8 @@
 
 `cui/cui_kbd.h` adds `cui_kbd_ex` for a typed **single chord**, preserving the
 existing literal `cui_kbd` and byte-preserving `cui_kbd_format` APIs unchanged.
-It displays hints only: no shortcut registration, action lookup, sequence
-recognition, activation or global event dispatch occurs.
+It displays hints. An application can look up the stroke through a host-owned
+keymap and use that same keymap to handle input.
 
 The frozen source stores one Keystroke. Binding lookup takes the first stroke;
 several hints in its story are ordinary sibling components. The earlier
@@ -56,8 +56,9 @@ need the legacy byte-preserving behavior.
 Zero options draw the source-shaped muted pill: muted foreground/background,
 12-unit text at16-unit rem, horizontal padding4, vertical padding2, minimum
 width20 and half theme radius. Outline adds a1-unit border and uses the theme
-background. `plain=true` wins over outline and renders text at the theme font
-and color without pill padding/border/minimum. CUI maps rem to
+background. `plain=true` wins over outline and renders text using the enclosing
+box's scoped size and solid color, falling back to the theme per field. Plain
+hints have no pill padding, border or minimum width. CUI maps rem to
 `theme.font_size/16`; the font must be finite(0,512], radius finite/nonnegative.
 
 Hints are noninteractive LABEL semantics, excluded from tab traversal. The
@@ -67,6 +68,55 @@ or ASCII controls. Invalid arguments fail before layout or semantics. Input
 strings and local formatted output are copied into Core frame storage at
 submission and survive through that frame's renderer consumption. No retained
 component state, allocator or cleanup is required.
+
+## Display a configurable binding
+
+Give the hint the same keymap used by the host to dispatch actions. A scope of
+`CUI_KBD_BINDING_CURRENT` asks for the active key context.
+`CUI_KBD_BINDING_CONTEXT` takes an application context ID in `target`.
+`CUI_KBD_BINDING_FOCUS` takes a focus target ID in `target`, which the host maps
+to its context. `CUI_KBD_BINDING_GLOBAL` asks for the empty context. The host
+resolves precedence, context and dispatch, including multi-stroke sequences.
+
+```c
+#include "cui/cui_kbd.h"
+
+enum { REFRESH_RESULTS = 1 };
+
+/* Pass the winning sequence for the active area from your application keymap. */
+typedef struct {
+    const cui_kbd_stroke *refresh;
+    size_t refresh_count;
+} workspace_keymap;
+
+static size_t lookup_workspace(void *user, const cui_kbd_binding_query *query,
+                               const cui_kbd_stroke **strokes) {
+    const workspace_keymap *keys = user;
+    if (query->action != REFRESH_RESULTS || query->scope != CUI_KBD_BINDING_CURRENT)
+        return 0;
+    *strokes = keys->refresh;
+    return keys->refresh_count;
+}
+
+void draw_refresh_hint(cui_context *ui, cui_id hint, const cui_theme *theme,
+                       workspace_keymap *keys) {
+    cui_kbd_stroke first;
+    if (cui_kbd_binding_stroke((cui_kbd_binding_source){lookup_workspace, keys},
+                               (cui_kbd_binding_query){.action = REFRESH_RESULTS}, &first))
+        cui_kbd_ex(ui, hint, theme, first, (cui_kbd_options){0});
+}
+```
+
+Return the full winning sequence from the lookup. CUI validates and borrows
+the first stroke. Keep its key bytes alive until you submit the hint or copy
+them. A missing or invalid binding leaves the output unchanged. An unbound
+action can simply omit its hint. The gallery's **Use alternate shortcut**
+option rebinds **Refresh results** from Shift+P to Shift+K. Focus the preview
+and press the displayed shortcut to refresh.
+
+Python, JavaScript, TypeScript, Go and Rust resolve actions in application
+code and pass the selected first stroke through the typed builder or update
+method below. The synchronous lookup hook is available in C.
 
 ## Style the keycap
 
@@ -105,8 +155,8 @@ bool draw_styled_shortcut(cui_context *ui, const cui_theme *theme, cui_id id) {
 ```
 
 Use `cui_kbd_label_styled` to apply the same style to a preformatted literal.
-The given label is also its accessible name. Plain typed hints keep their
-theme typography and ignore keycap overrides. Style values are read during
+The given label is also its accessible name. Plain typed hints use the enclosing
+size and solid color and ignore keycap overrides. Style values are read during
 the call. Gradient stops are copied for that
 frame, so local arrays are safe. Invalid typography and gradient definitions
 fail before the hint is submitted. To add a shadow, use
@@ -116,9 +166,8 @@ See [shared typography](TYPOGRAPHY.md) for renderer and provider requirements.
 
 Ordinary row composition fits its contents; it does not automatically turn a
 shortcut list into a responsive wrapping grid. For narrow help panels, let the
-owner split rows using the host's available-width/layout policy. Joining multiple
-strokes into one sequence or looking up host Action/context/focus/global
-bindings remains outside this API.
+owner split rows using the host's available-width/layout policy. A hint renders
+one stroke. The host owns sequence recognition and activation.
 
 ## Show a shortcut in a retained UI
 

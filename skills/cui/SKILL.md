@@ -325,7 +325,10 @@ typed strokes and accessible names when the provider exports
 `cui_bridge_set_kbd_stroke_v1`. Use a literal with older providers.
 Use `cui_kbd_styled` for typed hints or `cui_kbd_label_styled` for a literal.
 Retained builders probe `cui_bridge_set_kbd_style_v1` separately for responsive
-width, wrapping, box paint and typography. Plain hints skip style overrides.
+width, wrapping, box paint and typography. Plain typed hints pick up the nearest
+text defaults for size and solid color. Use `cui_kbd_binding_stroke` in C to read
+the first stroke from a host's winning binding. In the language builders,
+resolve the keymap in application code and update the typed stroke.
 See `docs/KBD.md` for language examples and renderer requirements.
 For loading placeholders, see `docs/SKELETON_RESPONSIVE.md`. Keep motion per
 shape, schedule the earliest wake and attach busy state to the application region.

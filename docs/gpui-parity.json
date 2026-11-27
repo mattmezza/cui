@@ -2047,7 +2047,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Typed single-stroke hints are available in immediate C, retained C and all five language bindings. Retained C and all five language bindings offer optional width constraints, wrapping, padding, border, rounding, typography and solid or block-linear text paint. Host Action/keybinding lookup and general inherited styling remain open; see docs/KBD.md."
+        "Typed single-stroke hints are available in immediate C, retained C and all five language bindings. Retained C and all five language bindings offer optional width constraints, wrapping, padding, border, rounding, typography and solid or block-linear text paint. The C binding lookup accepts a host resolver; application action identity, context predicates, focus history and dispatch remain host responsibilities. Plain hints inherit scoped size and solid color; further inheritance is open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2078,7 +2078,25 @@
             "docs/KBD.md"
           ],
           "limitations": [
-            "Pinned source models one stroke; grouped hints are ordinary sibling composition, demonstrated by the compiled guide. No sequence recognition or host binding lookup is claimed."
+            "Pinned source models one displayed stroke; grouped hints are ordinary sibling composition, demonstrated by the compiled guide. The host recognizes sequences."
+          ]
+        },
+        {
+          "name": "host-resolved current, explicit, focus and global key contexts",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_kbd.c",
+            "tests/web/test_kbd_stepper_gallery.py",
+            "docs/KBD.md"
+          ]
+        },
+        {
+          "name": "plain hint scoped size and solid color",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_kbd.c",
+            "tests/unit/test_bridge_kbd.c",
+            "tests/web/test_kbd_stepper_gallery.py"
           ]
         },
         {

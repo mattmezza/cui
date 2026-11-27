@@ -602,28 +602,33 @@
         "cui_kbd_format",
         "cui_kbd_ex",
         "cui_kbd_format_stroke",
+        "cui_kbd_binding_stroke",
         "cui_kbd_styled",
-        "cui_kbd_label_styled"
+        "cui_kbd_label_styled",
+        "cui_set_text_defaults"
       ],
       "state_types": [
         "cui_kbd_stroke",
         "cui_kbd_options",
-        "cui_kbd_style"
+        "cui_kbd_style",
+        "cui_kbd_binding_query",
+        "cui_kbd_binding_source"
       ],
-      "state_ownership": "Caller owns shortcut text and optional formatting buffer.",
+      "state_ownership": "Caller owns keymap, shortcut text and optional formatting buffer.",
       "interaction": "Presentation only; shortcut dispatch belongs to the application.",
-      "usage": "Submit typed single-stroke hints with Unicode first-scalar uppercase or supply a literal. Style a keycap's width, wrapping, typography and text paint in immediate C or through the optional retained API. The host owns shortcut registration.",
+      "usage": "Submit typed single-stroke hints with Unicode first-scalar uppercase or supply a literal. Read the first stroke of a resolved host binding in C. Plain typed hints inherit scoped size and solid color. Style a keycap's width, wrapping, typography and text paint in immediate C or through the optional retained API.",
       "docs": [
         "docs/CONTENT.md",
         "docs/KBD.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": ["cui_kbd_lookup_fn"],
       "scope": "styled frame component",
       "name": "Kbd",
       "public_header": "include/cui/cui_content.h",
       "composition": "immediate frame submission",
       "additional_public_headers": [
-        "include/cui/cui_kbd.h"
+        "include/cui/cui_kbd.h",
+        "include/cui/cui.h"
       ]
     },
     {

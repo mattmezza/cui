@@ -218,6 +218,24 @@ static cui_progress_circle_state progress_circle_state = {progress_circle_pixels
                                                           sizeof progress_circle_pixels, 0};
 static cui_progress_motion progress_motion;
 static cui_loading_motion spinner_motion;
+static bool kbd_alternate;
+static unsigned kbd_refreshes;
+enum { GALLERY_KBD_REFRESH = 1 };
+static const struct {
+    cui_key key;
+    cui_kbd_stroke stroke;
+} kbd_refresh_bindings[] = {
+    {CUI_KEY_P, {CUI_MOD_SHIFT, CUI_STR("p")}},
+    {CUI_KEY_K, {CUI_MOD_SHIFT, CUI_STR("k")}},
+};
+static size_t gallery_kbd_lookup(void *user, const cui_kbd_binding_query *query,
+                                 const cui_kbd_stroke **strokes) {
+    const bool *alternate = user;
+    if (query->action != GALLERY_KBD_REFRESH || query->scope != CUI_KBD_BINDING_CURRENT)
+        return 0;
+    *strokes = &kbd_refresh_bindings[*alternate].stroke;
+    return 1;
+}
 static skeleton_example_state skeleton_recipe;
 static bool skeleton_loading = true;
 static int skeleton_appearance;
@@ -5969,8 +5987,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                    (cui_kbd_options){0});
         cui_kbd_ex(ui, cui_id_from(ui, "kbd-outline"), &t,
                    (cui_kbd_stroke){.key = CUI_STR("escape")}, (cui_kbd_options){.outline = true});
+        cui_begin_box(ui, cui_id_from(ui, "kbd-inline"), (cui_box){0});
+        cui_set_text_defaults(
+            ui, (cui_text_defaults){.font_size = 20, .custom_color = true, .color = t.accent});
         cui_kbd_ex(ui, cui_id_from(ui, "kbd-plain"), &t, (cui_kbd_stroke){.key = CUI_STR("enter")},
                    (cui_kbd_options){.plain = true});
+        cui_end_box(ui);
         cui_end_box(ui);
         cui_box keycap = {.width = -1,
                           .max_width = 176,
@@ -5991,7 +6013,33 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                        (cui_kbd_stroke){.modifiers = CUI_MOD_ALT, .key = CUI_STR("pagedown")},
                        (cui_kbd_options){0},
                        &(cui_kbd_style){.box = &keycap, .typography = &type, .text_paint = &paint});
-        cui_label(ui, &t, cui_string("Hints do not register shortcuts."));
+        cui_checkbox(ui, cui_id_from(ui, "kbd-alternate"), &t, cui_string("Use alternate shortcut"),
+                     &kbd_alternate, disabled);
+        cui_begin_box(ui, cui_id_from(ui, "kbd-action-row"),
+                      (cui_box){.row = true, .gap = t.gap, .align_y = CUI_ALIGN_CENTER});
+        if (cui_button(ui, cui_id_from(ui, "kbd-refresh"), &t, cui_string("Refresh results"),
+                       disabled))
+            ++kbd_refreshes;
+        cui_kbd_stroke stroke;
+        if (cui_kbd_binding_stroke((cui_kbd_binding_source){gallery_kbd_lookup, &kbd_alternate},
+                                   (cui_kbd_binding_query){.action = GALLERY_KBD_REFRESH},
+                                   &stroke)) {
+            cui_kbd_ex(ui, cui_id_from(ui, "kbd-refresh-hint"), &t, stroke, (cui_kbd_options){0});
+            size_t count;
+            const cui_event *events = cui_frame_events(ui, &count);
+            for (size_t i = 0; !disabled && i < count; ++i) {
+                const cui_event *event = &events[i];
+                if (event->type == CUI_EVENT_KEY_DOWN && !event->repeat && !event->ime_composing &&
+                    event->key == kbd_refresh_bindings[kbd_alternate].key &&
+                    event->modifiers == stroke.modifiers && !cui_event_consumed(ui, i) &&
+                    cui_consume_event(ui, i))
+                    ++kbd_refreshes;
+            }
+        }
+        cui_end_box(ui);
+        char refreshes[40];
+        snprintf(refreshes, sizeof refreshes, "Refresh count: %u", kbd_refreshes);
+        cui_label(ui, &t, cui_string(refreshes));
         break;
     }
     case 18:

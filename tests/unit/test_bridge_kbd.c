@@ -18,7 +18,8 @@ static void expect_label(cui_bridge_app *app, cui_bridge_node handle, const char
     assert(!"missing shortcut label");
 }
 
-static void expect_visual(cui_bridge_app *app, const char *text, bool pill, bool outline) {
+static void expect_visual_with_text(cui_bridge_app *app, const char *text, bool pill, bool outline,
+                                    float size, cui_color color) {
     assert(cui_begin_frame(app->ui, app->width, app->height, .016f));
     bridge_render_node(app, app->root);
     cui_draw_list draw = cui_end_frame(app->ui);
@@ -29,6 +30,11 @@ static void expect_visual(cui_bridge_app *app, const char *text, bool pill, bool
         if (op->type == CUI_DRAW_TEXT) {
             assert(op->text.length == strlen(text) &&
                    !memcmp(op->text.data, text, op->text.length));
+            if (size) {
+                assert(op->font_size == size);
+                assert(op->color.r == color.r && op->color.g == color.g && op->color.b == color.b &&
+                       op->color.a == color.a);
+            }
             ++text_count;
         } else if (op->type == CUI_DRAW_RECT)
             ++fills;
@@ -36,6 +42,10 @@ static void expect_visual(cui_bridge_app *app, const char *text, bool pill, bool
             ++borders;
     }
     assert(text_count == 1 && fills == (size_t)pill && borders == (size_t)outline);
+}
+
+static void expect_visual(cui_bridge_app *app, const char *text, bool pill, bool outline) {
+    expect_visual_with_text(app, text, pill, outline, 0, (cui_color){0});
 }
 
 static cui_bridge_rect expect_styled(cui_bridge_app *app, cui_bridge_node hint, float width,
@@ -226,7 +236,9 @@ int main(void) {
     assert(cui_bridge_set_kbd_stroke_v1(app, hint, CUI_BRIDGE_MOD_CTRL | CUI_BRIDGE_MOD_SHIFT,
                                         CUI_BRIDGE_KBD_PLAIN_V1 | CUI_BRIDGE_KBD_OUTLINE_V1,
                                         "escape", 6, NULL, 0) == CUI_BRIDGE_OK);
-    expect_visual(app, "Ctrl+Shift+Esc", false, false);
+    assert(cui_bridge_set_text_defaults_v1(app, root, 27, 0x1c6578ff, 1) == CUI_BRIDGE_OK);
+    expect_visual_with_text(app, "Ctrl+Shift+Esc", false, false, 27,
+                            (cui_color){28, 101, 120, 255});
     expect_label(app, hint, "Ctrl+Shift+Esc");
     cui_bridge_rect hit;
     assert(cui_bridge_node_bounds(app, hint, &hit) == CUI_BRIDGE_OK);
@@ -240,7 +252,9 @@ int main(void) {
 
     assert(cui_bridge_set_kbd_stroke_v1(app, hint, 0, 0, NULL, 0, NULL, 0) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_kbd_stroke_v1(app, hint, 0, 0, NULL, 0, NULL, 0) == CUI_BRIDGE_OK);
-    expect_visual(app, "New literal", true, true);
+    expect_visual_with_text(app, "New literal", true, true, app->theme.font_size * .8f,
+                            app->theme.text);
+    assert(cui_bridge_set_text_defaults_v1(app, root, 0, 0, 0) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_kbd_stroke_v1(app, hint, 0, 0, "enter", 5, NULL, 0) == CUI_BRIDGE_OK);
     assert(cui_bridge_node_remove(app, hint) == CUI_BRIDGE_OK);
     cui_bridge_node replaced = {0};

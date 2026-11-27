@@ -587,7 +587,10 @@ before hover, use C `cui_notifications_responsive` or set
 submission. Honor the returned wake deadline. See `docs/ROOT.md#responsive-notifications`
 and `docs/STATUS_COMPONENTS.md#notification`. Retained Python, Node, TypeScript,
 Go and Rust can opt in per app using an optional bridge setter. Probe support
-before configuring a shared provider. See `docs/BINDING_BUILDERS.md#notification-cards`.
+before configuring a shared provider. For a retained action, probe the optional
+`cui_bridge_notification_action_create_v1` capability, then attach one ordinary
+Button to the card. Its click leaves the card open. See
+`docs/BINDING_BUILDERS.md#notification-cards`.
 Scroller row IDs follow retained keys, not stable indices. Language-builder
 MAIN/ROOT/subpart shadow targets remain pending.
 For grapheme-safe one-line Attachment labels, use `cui_attachment_with_metadata`

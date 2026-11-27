@@ -617,8 +617,8 @@ Set a card's title and detail before opening it. Body activation emits Click and
 starts dismissal. Close emits only the Close event after the exit animation.
 `is_open()` becomes false as soon as dismissal starts. To reopen the same node,
 wait for its Close event. The bridge currently exposes in-app delivery and
-manual dismissal. OS delivery, auto-hide and custom actions remain immediate C
-features.
+manual dismissal. Immediate C also offers timed dismissal, custom rendering
+and hooks for host-managed OS delivery.
 
 Enable wrapping and a separate Close control before hover for the app's shared
 stack. The option applies from the next step, including cards that are already
@@ -633,10 +633,32 @@ an installed shared provider. Both presentations deliver the same queued events.
 | Go | `supported, err := app.SupportsResponsiveNotifications()` | `app.SetResponsiveNotifications(true)` |
 | Rust | `app.supports_responsive_notifications()` | `app.set_responsive_notifications(true)?` |
 
-The workspace example opens a real card through a button, disables the button
-until dismissal completes, and updates the workspace status in the Close
-handler. With a built bridge, run it from the repository root. Omit `--font`
-to exercise the same UI headlessly. [Workspace example](../bindings/bridge/examples/notification_workspace.py)
+A retained card can own one optional Button action. The Button fills a dedicated
+row below the message, leaving the Close lane clear at narrow widths. The action
+card uses wrapping and a separate Close target even when the app uses the original
+presentation for its other cards. The action delivers a normal Button click with
+the Button as its event target. It leaves the card open so your handler can update
+the view or dismiss the card explicitly. Removing the card removes the Button.
+Removing the Button in the C bridge frees the slot for a replacement.
+
+| Binding | Probe | Create a Review action |
+| --- | --- | --- |
+| C | Look up `cui_bridge_notification_action_create_v1` with a shared provider | `cui_bridge_notification_action_create_v1(app, notice, "review", &review)`, then `cui_bridge_set_text(app, review, "Review")` |
+| Python | `app.supports_notification_action()` | `notice.action(button("review").label("Review").on_click(review_report))` |
+| JavaScript and TypeScript | `app.supports_notification_action()` | `notice.action(button("review").label("Review").on_click(reviewReport))` |
+| Go | `supported, err := app.SupportsNotificationAction()` | `notice.Action(cui.Button("review").Text("Review").OnClick(reviewReport))` |
+| Rust | `app.supports_notification_action()` | `let review = app.notification_action(notice, "review", "Review")?;` |
+
+Use the ordinary Button callback or poll its event through the retained event
+API. Polling and callback dispatch in the bindings drain the same queue. Use one
+path for each action's side effect. Python, JavaScript, TypeScript and Go attach
+the action before mounting. Older providers can mount the same card without an
+action. Probe first when your app supports more than one provider version.
+
+The workspace example disables the trigger until the card has closed, and the
+Review action updates the workspace status while the card stays open. With a
+built bridge, run it from the repository root. Omit `--font` to exercise the
+same interactions headlessly. [Workspace example](../bindings/bridge/examples/notification_workspace.py)
 
 ```sh
 PYTHONPATH=bindings/python CUI_BRIDGE_LIBRARY="$PWD/build/libcui_bridge.so" \

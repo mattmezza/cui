@@ -658,7 +658,8 @@ static void cui_status_notification_icon(cui_context *ui, cui_id id, const cui_t
 }
 static void cui_status_notification_body(cui_context *ui, cui_id card, const cui_theme *t,
                                          const cui_theme *theme, const cui_notification *n,
-                                         float alpha, float card_width) {
+                                         float alpha, float card_width,
+                                         cui_notification_retained_action_fn retained_action) {
     float row_width = fmaxf(1, card_width - 2 * CUI_STATUS_NOTIFICATION_PADDING -
                                    CUI_STATUS_NOTIFICATION_CLOSE_LANE);
     bool has_icon = n->kind != CUI_NOTIFICATION_UNTYPED || n->icon.length;
@@ -674,7 +675,7 @@ static void cui_status_notification_body(cui_context *ui, cui_id card, const cui
                                    2 * t->padding * .8f + 12
                              : 0;
     float inline_width = body_width - action_width - CUI_STATUS_NOTIFICATION_GAP;
-    bool action_below = action_width > 0 && inline_width < 6 * t->font_size;
+    bool action_below = retained_action || (action_width > 0 && inline_width < 6 * t->font_size);
     float content_width = !action_below && action_width > 0 ? inline_width : body_width;
     cui_begin_box(ui, cui_status_child_id(card, 311), (cui_box){.row = true, .gap = icon_gap});
     if (has_icon)
@@ -704,7 +705,16 @@ static void cui_status_notification_body(cui_context *ui, cui_id card, const cui
         n->content(ui, cui_status_child_id(card, 303), n->content_user, t->font_size, theme->text,
                    alpha);
     cui_end_box(ui);
-    if (action_width > 0) {
+    if (retained_action) {
+        cui_begin_box(ui, cui_status_child_id(card, 317),
+                      (cui_box){.width = body_width,
+                                .fixed_width = true,
+                                .clip = true,
+                                .custom_opacity = true,
+                                .opacity = alpha});
+        retained_action(n->action_user, body_width);
+        cui_end_box(ui);
+    } else if (action_width > 0) {
         action_width = action_below && n->action ? body_width : fminf(action_width, body_width);
         cui_begin_box(ui, cui_status_child_id(card, 317),
                       (cui_box){.width = action_width, .fixed_width = true, .clip = true});
@@ -784,7 +794,9 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
                                                                 const cui_theme *t,
                                                                 cui_notification_state *s,
                                                                 cui_rect viewport, double now,
-                                                                bool responsive, bool *submitted) {
+                                                                bool responsive,
+                                                                cui_notification_retained_action_fn action,
+                                                                bool *submitted) {
     cui_notification_advance result = {0};
     if (!ui || !t || !s || !isfinite(now) || now < 0 || !isfinite(viewport.x) ||
         !isfinite(viewport.y) || !isfinite(viewport.w) || viewport.w <= 0 ||
@@ -964,11 +976,13 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
             float card_x = x + (width - card_width) / 2;
             float card_y = y + e->motion_y + slide;
             bool ending = e->phase == CUI_NOTIFICATION_ENDING;
+            cui_notification_retained_action_fn retained_action = n.action_user ? action : NULL;
+            bool responsive_card = responsive || retained_action;
             cui_begin_portal(ui, card,
                              (cui_box){.width = card_width,
                                        .height = n.height,
                                        .padding = CUI_STATUS_NOTIFICATION_PADDING,
-                                       .row = !responsive,
+                                       .row = !responsive_card,
                                        .radius = t->radius_lg,
                                        .background = theme.popover,
                                        .border = theme.border,
@@ -999,19 +1013,20 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
             cui_set_tab_stop(ui, card, n.on_click != NULL);
             if (n.title.length)
                 cui_set_semantic_details(ui, card, (cui_semantic_details){.description = n.title});
-            if (responsive)
-                cui_status_notification_body(ui, card, t, &theme, &n, alpha, card_width);
+            if (responsive_card)
+                cui_status_notification_body(ui, card, t, &theme, &n, alpha, card_width,
+                                             retained_action);
             else
                 cui_status_notification_legacy_body(ui, card, t, &theme, n, alpha, card_width);
             bool close = false;
             /* The top card is independently dismissible before hover, including
              * for a passive alert with no other keyboard or touch target. */
-            bool show_close = responsive ? !hidden && (geometry.rank == 0 || expanded[anchor])
+            bool show_close = responsive_card ? !hidden && (geometry.rank == 0 || expanded[anchor])
                                          : cui_hovered(ui, card) || expanded[anchor];
             if (show_close) {
                 cui_rect close_bounds = {card_x + card_width - 24, card_y + 4, 20, 20};
                 float button_height = 0;
-                if (responsive) {
+                if (responsive_card) {
                     float close_width = fminf(CUI_STATUS_NOTIFICATION_CLOSE_SIZE, card_width);
                     float close_height = n.height > 0
                                              ? fminf(CUI_STATUS_NOTIFICATION_CLOSE_SIZE, n.height)
@@ -1028,7 +1043,7 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
                 cui_begin_portal(ui, cui_status_child_id(card, 313),
                                  (cui_box){.width = close_bounds.w,
                                            .height = close_bounds.h,
-                                           .inert = responsive && ending},
+                                           .inert = responsive_card && ending},
                                  close_bounds, (int16_t)(21 + position));
                 cui_status_close_icon close_icon = {&theme, cui_status_child_id(card, 315)};
                 close = cui_button_ex(
@@ -1078,9 +1093,10 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
     return result;
 }
 
-static bool cui_notifications_dispatch(cui_context *ui, cui_id id, const cui_theme *theme,
-                                       cui_notification_state *state, cui_rect viewport, double now,
-                                       bool responsive, cui_notification_advance *out) {
+bool cui_notifications_retained(cui_context *ui, cui_id id, const cui_theme *theme,
+                                cui_notification_state *state, cui_rect viewport, double now,
+                                bool responsive, cui_notification_retained_action_fn action,
+                                cui_notification_advance *out) {
     if (!ui || !theme || !state || !out || !state->entries || !state->capacity ||
         state->capacity > CUI_NOTIFICATION_MAX_ITEMS || state->count > state->capacity ||
         state->system_count > 100 || !cui_notification_settings_valid(state->settings) ||
@@ -1106,7 +1122,7 @@ static bool cui_notifications_dispatch(cui_context *ui, cui_id id, const cui_the
     }
     bool submitted = true;
     cui_notification_advance next = cui_status_notifications_render(ui, id, theme, state, viewport,
-                                                                    now, responsive, &submitted);
+                                                                    now, responsive, action, &submitted);
     if (!submitted)
         return false;
     *out = next;
@@ -1115,12 +1131,12 @@ static bool cui_notifications_dispatch(cui_context *ui, cui_id id, const cui_the
 bool cui_notifications_checked(cui_context *ui, cui_id id, const cui_theme *theme,
                                cui_notification_state *state, cui_rect viewport, double now,
                                cui_notification_advance *out) {
-    return cui_notifications_dispatch(ui, id, theme, state, viewport, now, false, out);
+    return cui_notifications_retained(ui, id, theme, state, viewport, now, false, NULL, out);
 }
 bool cui_notifications_responsive(cui_context *ui, cui_id id, const cui_theme *theme,
                                   cui_notification_state *state, cui_rect viewport, double now,
                                   cui_notification_advance *out) {
-    return cui_notifications_dispatch(ui, id, theme, state, viewport, now, true, out);
+    return cui_notifications_retained(ui, id, theme, state, viewport, now, true, NULL, out);
 }
 cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui_theme *theme,
                                            cui_notification_state *state, cui_rect viewport,

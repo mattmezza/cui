@@ -52,6 +52,10 @@ add_executable(test_bridge_attachment_slots ${CUI_BRIDGE_ROOT}/tests/unit/test_b
 target_link_libraries(test_bridge_attachment_slots PRIVATE cui)
 cui_warnings(test_bridge_attachment_slots)
 add_test(NAME bridge_attachment_slots COMMAND test_bridge_attachment_slots)
+add_executable(test_bridge_notification_action ${CUI_BRIDGE_ROOT}/tests/unit/test_bridge_notification_action.c)
+target_link_libraries(test_bridge_notification_action PRIVATE cui)
+cui_warnings(test_bridge_notification_action)
+add_test(NAME bridge_notification_action COMMAND test_bridge_notification_action)
 add_executable(bridge_attachment_slots_example
  ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/attachment_slots.c)
 target_link_libraries(bridge_attachment_slots_example PRIVATE cui_bridge)
@@ -811,6 +815,10 @@ add_test(NAME bridge_python_responsive_notifications COMMAND ${CMAKE_COMMAND} -E
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  CUI_EXPECT_RESPONSIVE_NOTIFICATIONS=1
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_responsive_notifications.py)
+add_test(NAME bridge_python_notification_action COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ CUI_EXPECT_NOTIFICATION_ACTION=1
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_notification_action.py)
 add_test(NAME bridge_python_notification_workspace COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/notification_workspace.py)

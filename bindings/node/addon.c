@@ -277,6 +277,36 @@ static napi_value make_node(napi_env env, napi_callback_info info) {
 }
 static int optional_bridge_symbol(void *out, size_t size, const char *name);
 /* Optional symbol keeps addons usable with older bridge providers. */
+static napi_value notification_actions(napi_env env, napi_callback_info info) {
+    napi_value v[1], result;
+    js_app *app;
+    void (*symbol)(void) = NULL;
+    if (!args(env, info, 1, v) || !app_arg(env, v[0], &app))
+        return NULL;
+    bool supported =
+        optional_bridge_symbol(&symbol, sizeof symbol, "cui_bridge_notification_action_create_v1");
+    return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
+}
+static napi_value notification_action(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *parent, *node;
+    char *key = NULL;
+    cui_bridge_status (*create)(cui_bridge_app *, cui_bridge_node, const char *,
+                                cui_bridge_node *) = NULL;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &parent))
+        return NULL;
+    if (!optional_bridge_symbol(&create, sizeof create, "cui_bridge_notification_action_create_v1"))
+        return fail(env, "Notification action unavailable");
+    if (!string_arg(env, v[2], &key)) return NULL;
+    node = calloc(1, sizeof(*node));
+    if (!node) { free(key); return fail(env, "allocation failed"); }
+    node->owner = app;
+    cui_bridge_status code = create(app->bridge, parent->node, key, &node->node);
+    free(key);
+    if (code != CUI_BRIDGE_OK) { free(node); return status(env, code); }
+    return expose_node(env, v[0], node);
+}
 static napi_value attachment_slots(napi_env env, napi_callback_info info) {
     napi_value v[1], result;
     js_app *app;
@@ -3078,6 +3108,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("makeNode", make_node, 0);
     EXPORT("carouselSlots", carousel_slots, 0);
     EXPORT("carouselSlot", carousel_slot, 0);
+    EXPORT("notificationActions", notification_actions, 0);
+    EXPORT("notificationAction", notification_action, 0);
     EXPORT("attachmentSlots", attachment_slots, 0);
     EXPORT("attachmentSlot", attachment_slot, 0);
     EXPORT("nodeId", node_id, 0);

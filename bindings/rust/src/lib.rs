@@ -1,5 +1,6 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
 mod attachment;
+mod notification_action;
 pub use attachment::{
     AttachmentAction, AttachmentActionNotificationV1, AttachmentActionPart, AttachmentActionSource,
     AttachmentActions, AttachmentOptions, AttachmentSlot, AttachmentTextStyle,

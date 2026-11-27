@@ -1010,6 +1010,14 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_get_window_visible(cui_bridge_app *,
  * original presentation (default). Existing CLICK/CLOSE events are unchanged. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_responsive_notifications_v1(cui_bridge_app *,
                                                                             uint32_t enabled);
+/* Create the Notification's sole action as an ordinary retained Button. The
+ * key is copied; failed creation leaves out_button untouched. Removing that
+ * Button frees the slot, and removing the card removes the Button. Its click
+ * is independent of the card body and Close, and leaves the card open unless
+ * the application closes it. Action cards use a bounded row below the body. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_notification_action_create_v1(
+    cui_bridge_app *, cui_bridge_node notification, const char *key_utf8,
+    cui_bridge_node *out_button);
 CUI_BRIDGE_API void cui_bridge_destroy(cui_bridge_app *app);
 /* Zero parent creates the single root. Keys are copied, unique among live nodes;
  * stale handles never alias a replacement node within an app. Handle provenance

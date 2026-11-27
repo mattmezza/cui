@@ -250,7 +250,7 @@ export interface Disclosure {is_open(): boolean}
 export interface Item {on_click(callback: (event: ClickEvent<Item>) => void): this}
 export interface Form extends Visual, Composite {disabled(value?: boolean): this}
 export interface InputGroup extends Input, Composite {detail(text: string): this; visual_size(width: number, height: number): this}
-export interface Notification extends Surface {on_click(callback: (event: ClickEvent<Notification>) => void): this}
+export interface Notification extends Surface {action(button: Button): this; on_click(callback: (event: ClickEvent<Notification>) => void): this}
 export function form(key?: string, text?: string): Form;
 export function input_group(key?: string, text?: string): InputGroup;
 export function notification(key?: string, text?: string): Notification;
@@ -972,3 +972,5 @@ export type KbdStyle = {
   & ({textColor?: number; textGradient?: never} | {textColor?: never; textGradient?: KbdGradient});
 export interface Kbd extends Label { setKbdStyle(style?: KbdStyle | null): this; }
 export interface App { supportsKbdStyle(): boolean; }
+
+export interface App { supports_notification_action(): boolean }

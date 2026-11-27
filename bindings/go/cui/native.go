@@ -707,12 +707,16 @@ static cui_bridge_status (*attachment_configure)(cui_bridge_app *, cui_bridge_no
 static cui_bridge_status (*attachment_preview)(cui_bridge_app *, cui_bridge_node,
  const uint8_t *, uint32_t, uint32_t, uint32_t, uint32_t);
 static cui_bridge_status (*attachment_slot_create)(cui_bridge_app *, cui_bridge_node, uint32_t, const char *, float, cui_bridge_node *);
+static cui_bridge_status (*notification_action_create)(cui_bridge_app *, cui_bridge_node, const char *, cui_bridge_node *);
+static int go_notification_action_supported(void) { return notification_action_create != NULL; }
+static cui_bridge_status go_notification_action_create(cui_bridge_app *a, cui_bridge_node n, const char *key, cui_bridge_node *out) { return notification_action_create(a,n,key,out); }
 static int go_attachment_slots_supported(void) { return attachment_slot_create != NULL; }
 static cui_bridge_status go_attachment_slot_create(cui_bridge_app *a, cui_bridge_node n, uint32_t role, const char *key, float width, cui_bridge_node *out) { return attachment_slot_create(a,n,role,key,width,out); }
 static cui_bridge_status (*attachment_set_actions)(cui_bridge_app *, cui_bridge_node, uint32_t);
 
 static void go_attachment_initialize(void) {
  if (bridge_lib) {
+  go_load_optional_symbol(&notification_action_create, sizeof notification_action_create, "cui_bridge_notification_action_create_v1");
   go_load_optional_symbol(&attachment_slot_create, sizeof attachment_slot_create, "cui_bridge_attachment_slot_create_v1");
   go_load_optional_symbol(&attachment_configure, sizeof attachment_configure,
                           "cui_bridge_attachment_configure_v1");
@@ -723,6 +727,7 @@ static void go_attachment_initialize(void) {
  }
 #if defined(CUI_GO_STATIC)
  else {
+  notification_action_create = cui_bridge_notification_action_create_v1;
   attachment_slot_create = cui_bridge_attachment_slot_create_v1;
   attachment_configure = cui_bridge_attachment_configure_v1;
   attachment_preview = cui_bridge_attachment_set_preview_rgba_v1;
@@ -1001,6 +1006,7 @@ type Options struct {
 	MaxNodes, MaxEvents      uint32
 }
 type Node struct {
+	notificationAction                   bool
 	timeLocalized                        *TimeFieldConfig
 	spinnerIconResource                  *IconResource
 	spinnerConfig                        *SpinnerConfig
@@ -2244,6 +2250,9 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("Notification cannot be nested inside an Attachment slot")
 		}
 		seen[n] = true
+		if err := a.validateNotificationAction(n, parent); err != nil {
+			return err
+		}
 		if err := a.validateAttachmentSlots(n, parent); err != nil {
 			return err
 		}
@@ -2467,7 +2476,7 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("duplicate key")
 		}
 		keys[n.key] = true
-		if n.kind >= 3 && n.kind != 52 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 63 && n.kind != 64 && n.kind != 65 && n.kind != 66 && n.kind != 70 && n.kind != 73 && n.kind != 74 && n.kind != 75 && n.kind != 76 && n.kind != 78 && n.kind != 79 && n.kind != 80 && n.kind != configuredBadgeKind && len(n.children) > 0 {
+		if n.kind >= 3 && n.kind != 52 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 62 && n.kind != 63 && n.kind != 64 && n.kind != 65 && n.kind != 66 && n.kind != 70 && n.kind != 73 && n.kind != 74 && n.kind != 75 && n.kind != 76 && n.kind != 78 && n.kind != 79 && n.kind != 80 && n.kind != configuredBadgeKind && len(n.children) > 0 {
 			return errors.New("leaf has children")
 		}
 		if (n.kind == 54 || n.kind == 60 || n.kind == 64 || n.kind == 66 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 79) && len(n.children) > 64 {
@@ -2508,7 +2517,11 @@ func (a *App) Mount(root *Node) error {
 		key := cs(n.key)
 		defer C.free(unsafe.Pointer(key))
 		var h C.cui_bridge_node
-		if n.attachmentSlot != 0 {
+		if n.notificationAction {
+			if e := result(C.go_notification_action_create(a.ptr, p, key, &h)); e != nil {
+				return e
+			}
+		} else if n.attachmentSlot != 0 {
 			if e := result(C.go_attachment_slot_create(a.ptr, p, C.uint32_t(n.attachmentSlot), key, C.float(n.attachmentSlotWidth), &h)); e != nil {
 				return e
 			}
@@ -3428,6 +3441,9 @@ func (n *Node) Remove() error {
 	mark = func(x *Node) {
 		delete(x.app.nodes, keyID(x.handle))
 		x.removed = true
+		if x.notificationAction {
+			x.click = nil
+		}
 		x.timeChange = nil
 		x.iconConfig, x.badgeConfig, x.paginationConfig, x.ratingConfig = nil, nil, nil, nil
 		x.disclosureConfig, x.disclosureStyle = nil, nil
@@ -7002,4 +7018,12 @@ func makeKbdStyleWire(s KbdStyleOptions) *C.cui_bridge_kbd_style_v1 {
 		}
 	}
 	return &w
+}
+
+// SupportsNotificationAction reports whether the provider can retain a Notification action Button.
+func (a *App) SupportsNotificationAction() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_notification_action_supported() != 0, nil
 }

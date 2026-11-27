@@ -171,6 +171,10 @@ class _API:
         if hasattr(lib, "cui_bridge_carousel_slot_create_v1"):
             self.create_carousel_slot = bind("carousel_slot_create_v1", C.c_int, C.c_void_p,
                                             _Handle, C.c_uint32, C.c_char_p, C.POINTER(_Handle))
+        self.create_notification_action = None
+        if hasattr(lib, "cui_bridge_notification_action_create_v1"):
+            self.create_notification_action = bind("notification_action_create_v1", C.c_int, C.c_void_p,
+                                                   _Handle, C.c_char_p, C.POINTER(_Handle))
         self.create_attachment_slot = None
         if hasattr(lib, "cui_bridge_attachment_slot_create_v1"):
             self.create_attachment_slot = bind("attachment_slot_create_v1", C.c_int, C.c_void_p,
@@ -658,6 +662,20 @@ class Widget:
         assert self._handle is not None
         fn = getattr(app._api, name)
         app._api.check(fn(app._ptr, self._handle, *args))
+
+    def action(self, button: "Widget") -> "Widget":
+        if self.kind != "notification":
+            raise ValueError("action requires a Notification owner")
+        if self._app is not None or self._disposed:
+            raise RuntimeError("Set action before mounting")
+        if not isinstance(button, Widget) or button.kind != "button":
+            raise TypeError("Notification action requires a Button")
+        if self._children:
+            raise ValueError("Notification accepts one action")
+        if button._app is not None or button._disposed:
+            raise ValueError("Notification action must be unattached")
+        self._children.append(button)
+        return self
 
     def children(self, *children: "Widget") -> "Widget":
         is_attachment = self.kind == "attachment"
@@ -2469,6 +2487,11 @@ class App:
                     raise RuntimeError("Carousel slots unavailable in this bridge")
             if any(ancestor._carousel_slot for ancestor in lineage) and node.kind not in _RADIO_CONTENT_KINDS:
                 raise ValueError("Carousel slots require passive children")
+            if parent is not None and parent.kind == "notification":
+                if node.kind != "button" or len(parent._children) != 1:
+                    raise ValueError("Notification accepts one Button action")
+                if not self.supports_notification_action():
+                    raise RuntimeError("Notification action unavailable in this bridge")
             if node._attachment_slot is not None:
                 if parent is None or parent.kind != "attachment":
                     raise ValueError("Attachment slots require a direct Attachment parent")
@@ -2578,6 +2601,9 @@ class App:
                 elif node._carousel_slot is not None:
                     self._api.check(self._api.create_carousel_slot(self._ptr, parent_handle,
                         node._carousel_slot, _utf8(key), C.byref(handle)))
+                elif parent is not None and parent.kind == "notification":
+                    self._api.check(self._api.create_notification_action(self._ptr, parent_handle,
+                                                                         _utf8(key), C.byref(handle)))
                 elif node._attachment_slot is not None:
                     role, width = node._attachment_slot
                     self._api.check(self._api.create_attachment_slot(self._ptr, parent_handle, role,
@@ -3153,6 +3179,10 @@ class App:
     def supports_carousel_slots(self) -> bool:
         self._ensure_open()
         return self._api.create_carousel_slot is not None
+
+    def supports_notification_action(self) -> bool:
+        self._ensure_open()
+        return self._api.create_notification_action is not None
 
     def supports_attachment_slots(self) -> bool:
         self._ensure_open()

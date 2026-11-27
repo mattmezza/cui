@@ -328,7 +328,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The per-app responsive presenter is available through an optional bridge setter in Python, JavaScript, TypeScript, Go and Rust. Older providers keep legacy rendering. Action slots, stacked action layout, auto-hide and system delivery are immediate C only."
+        "Python, JavaScript, TypeScript, Go and Rust can enable responsive cards per app and attach one retained Button action. Both APIs are optional with older providers. General custom rendering, auto-hide, system delivery and host scheduling results are outside the retained API."
       ]
     },
     {

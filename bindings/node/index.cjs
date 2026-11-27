@@ -146,6 +146,11 @@ function preflightNodeOptions(app, node, insideDecoration = false, insideAttachm
   for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent)
     if (ancestor[CAROUSEL_SLOT] && !radioContentKinds.has(node.kind))
       throw new TypeError('Carousel slots require passive children');
+  if (node.parent?.kind === 62) {
+    if (node.kind !== 4 || node.parent.childrenValue.length !== 1)
+      throw new TypeError('Notification accepts one Button action');
+    if (!app.supports_notification_action()) throw new Error('Notification action unavailable');
+  }
   const slot = node[ATTACHMENT_SLOT];
   if (slot) {
     if (node.parent?.kind !== 52) throw new TypeError('Attachment slot requires direct Attachment parent');
@@ -262,6 +267,14 @@ class Node {
     if (this.owner) throw new Error('key cannot change after mount');
     if (typeof value !== 'string' || !value) throw new TypeError('key must be a nonempty string');
     this.keyValue = value; return this;
+  }
+  action(button) {
+    if (this.kind !== 62) throw new TypeError('action requires a Notification owner');
+    if (this.owner) throw new Error('Set action before mounting');
+    if (!(button instanceof Node) || button.kind !== 4 || button.parent || button.owner)
+      throw new TypeError('Notification action requires an unattached Button');
+    if (this.childrenValue.length) throw new TypeError('Notification accepts one action');
+    button.parent = this; this.childrenValue.push(button); return this;
   }
   children(...items) {
     const isAttachment = this.kind === 52;
@@ -1016,6 +1029,7 @@ class App {
       const parentHandle = parent && parent[NODE];
       const slot = node[ATTACHMENT_SLOT];
       if (node[CAROUSEL_SLOT]) node[NODE] = native.carouselSlot(this.handle, parentHandle, node[CAROUSEL_SLOT], node.keyValue);
+      else if (parent?.kind === 62) node[NODE] = native.notificationAction(this.handle, parentHandle, node.keyValue);
       else if (slot) node[NODE] = native.attachmentSlot(this.handle, parentHandle, slot.role, node.keyValue, slot.width);
       else if (node.kind === 81) node[NODE] = sliderModels.mount(this, node, parentHandle);
       else if (node.kind === iconBadges.badgeKind) node[NODE] = iconBadges.createBadge(this, node, parentHandle);
@@ -1334,6 +1348,11 @@ class App {
   supports_carousel_slots() {
     this._alive();
     return typeof native.carouselSlots === 'function' && typeof native.carouselSlot === 'function' && native.carouselSlots(this.handle);
+  }
+  supports_notification_action() {
+    this._alive();
+    return typeof native.notificationActions === 'function' && typeof native.notificationAction === 'function' &&
+      native.notificationActions(this.handle);
   }
   supports_attachment_slots() {
     this._alive();

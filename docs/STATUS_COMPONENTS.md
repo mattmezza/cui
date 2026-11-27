@@ -138,7 +138,9 @@ including hover or focus to reveal Close. A C application that binds the stack t
 Root can opt into responsive cards and receive the wake deadline through
 `cui_root_render_with_options`. Both presentations use the same manager, callbacks,
 logical IDs, shadow policies and scheduling contract. Retained language builders
-can opt into responsive cards per app with a compatible bridge.
+can opt into responsive cards per app with a compatible bridge. They can also
+attach one styled Button action. Action cards use their own bounded action row,
+and Button activation leaves the card open.
 [Root example](ROOT.md#responsive-notifications) · [Retained Notification guide](BINDING_BUILDERS.md#notification-cards)
 
 To use OS delivery, explicitly configure portable host `send`, `retract`, and

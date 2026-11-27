@@ -2,6 +2,7 @@
 #include "../base/cui_kbd_internal.h"
 #include "../base/cui_table_internal.h"
 #include "../components/cui_media_internal.h"
+#include "../components/cui_status_internal.h"
 #include "../core/cui_text_paint_internal.h"
 #include "cui/cui_kbd.h"
 #include "cui/cui_media.h"
@@ -1843,7 +1844,7 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app);
 }
 /* Tags used only by the versioned factories. Attachment owns values 1–4. */
-enum { BRIDGE_CAROUSEL_SLOT_BASE = 8 };
+enum { BRIDGE_NOTIFICATION_ACTION = 5, BRIDGE_CAROUSEL_SLOT_BASE = 8 };
 static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
                                             cui_bridge_kind kind, const char *key_utf8,
                                             uint32_t slot_tag, cui_bridge_node *out_node) {
@@ -1857,7 +1858,8 @@ static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node
     bool root = parent.slot == 0 && parent.generation == 0;
     uint32_t carousel_role =
         slot_tag > BRIDGE_CAROUSEL_SLOT_BASE ? slot_tag - BRIDGE_CAROUSEL_SLOT_BASE : 0;
-    uint32_t attachment_role = carousel_role ? 0 : slot_tag;
+    bool notification_action = slot_tag == BRIDGE_NOTIFICATION_ACTION;
+    uint32_t attachment_role = carousel_role || notification_action ? 0 : slot_tag;
     cui_bridge_node_record *p = NULL;
     if (root) {
         if (app->root ||
@@ -1900,7 +1902,8 @@ static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node
             p->kind != CUI_BRIDGE_VIRTUAL_LIST && p->kind != CUI_BRIDGE_SIDEBAR &&
             p->kind != CUI_BRIDGE_DOCK && p->kind != CUI_BRIDGE_SETTINGS &&
             p->kind != CUI_BRIDGE_BADGE_CONFIGURED &&
-            !(p->kind == CUI_BRIDGE_ATTACHMENT && attachment_role))
+            !(p->kind == CUI_BRIDGE_ATTACHMENT && attachment_role) &&
+            !(p->kind == CUI_BRIDGE_NOTIFICATION && notification_action))
             return CUI_BRIDGE_INVALID_STATE;
         if (p->kind == CUI_BRIDGE_ITEM && p->parent &&
             app->nodes[p->parent].kind == CUI_BRIDGE_ITEM &&
@@ -2200,6 +2203,26 @@ cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node pa
                                          cui_bridge_node *out_node) {
     return bridge_node_create(app, parent, kind, key_utf8, 0, out_node);
 }
+cui_bridge_status cui_bridge_notification_action_create_v1(cui_bridge_app *app,
+                                                           cui_bridge_node handle,
+                                                           const char *key_utf8,
+                                                           cui_bridge_node *out_button) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_NOTIFICATION || node->first_child)
+        return CUI_BRIDGE_INVALID_STATE;
+    status = bridge_node_create(app, handle, CUI_BRIDGE_BUTTON, key_utf8,
+                                BRIDGE_NOTIFICATION_ACTION, out_button);
+    if (status == CUI_BRIDGE_OK) {
+        cui_notification_entry *entry = bridge_notification_entry(app, node->id);
+        if (entry)
+            entry->notification.action_user = node;
+        cui_invalidate(app->ui);
+    }
+    return status;
+}
 static void bridge_remove_subtree(cui_bridge_app *app, uint32_t slot) {
     cui_bridge_node_record *node = &app->nodes[slot];
     if (node->kind == CUI_BRIDGE_NOTIFICATION && app->notifications)
@@ -2246,6 +2269,12 @@ cui_bridge_status cui_bridge_node_remove(cui_bridge_app *app, cui_bridge_node ha
             return CUI_BRIDGE_INVALID_STATE;
     if (node->parent) {
         cui_bridge_node_record *parent = &app->nodes[node->parent];
+        if (parent->kind == CUI_BRIDGE_NOTIFICATION) {
+            cui_notification_entry *entry = bridge_notification_entry(app, parent->id);
+            if (entry)
+                entry->notification.action_user = NULL;
+            cui_invalidate(app->ui);
+        }
         if (node->kind == CUI_BRIDGE_ITEM &&
             (parent->kind == CUI_BRIDGE_RADIO_GROUP || parent->kind == CUI_BRIDGE_TABS ||
              parent->kind == CUI_BRIDGE_SELECT || parent->kind == CUI_BRIDGE_COMBOBOX ||
@@ -3373,6 +3402,7 @@ cui_bridge_status cui_bridge_set_open(cui_bridge_app *app, cui_bridge_node handl
         note.message = cui_string(node->detail);
         note.autohide = false;
         note.user = node;
+        note.action_user = node->first_child ? node : NULL;
         note.on_click = bridge_notification_click;
         note.on_close = bridge_notification_close;
         return cui_notification_push(app->notifications, note, app->now_seconds)
@@ -6499,6 +6529,44 @@ static void bridge_render_questionnaire(cui_bridge_app *app, uint32_t slot,
     node->checked = owned->state.complete;
     (void)slot;
 }
+static void bridge_render_button(cui_bridge_app *app, uint32_t slot,
+                                 cui_bridge_node_record *node, float width, bool disabled) {
+    cui_button_options options = {.variant = (cui_button_variant)node->variant,
+                                  .size = CUI_CONTROL_MEDIUM,
+                                  .design_size = (cui_design_size)node->size,
+                                  .rounding = (cui_button_rounding)node->rounding,
+                                  .radius = node->custom_radius,
+                                  .width = width,
+                                  .disabled = disabled,
+                                  .state = &node->button_state};
+    bridge_click_binding binding = {app, slot};
+    options.on_click_event = bridge_click;
+    options.action_user = &binding;
+    if (node->custom_hover) {
+        cui_theme_button_kind kind =
+            node->variant == CUI_BRIDGE_BUTTON_SECONDARY ? CUI_THEME_BUTTON_SECONDARY
+            : node->variant == CUI_BRIDGE_BUTTON_OUTLINE ? CUI_THEME_BUTTON_DEFAULT
+                                                         : CUI_THEME_BUTTON_PRIMARY;
+        options.custom_colors = true;
+        options.colors = app->theme.buttons[kind];
+        if (node->variant == CUI_BRIDGE_BUTTON_OUTLINE)
+            options.colors.outline_hover = node->hover;
+        else
+            options.colors.hover = node->hover;
+    }
+    (void)cui_button_ex(app->ui, node->id, &app->theme, cui_string(node->text), options);
+}
+static void bridge_render_notification_action(void *user, float width) {
+    cui_bridge_node_record *card = user;
+    cui_bridge_app *app = card->owner;
+    uint32_t slot = card->first_child;
+    cui_bridge_node_record *button = &app->nodes[slot];
+    bool disabled = button->disabled;
+    for (uint32_t ancestor = card->own_slot; ancestor; ancestor = app->nodes[ancestor].parent)
+        disabled = disabled || app->nodes[ancestor].disabled;
+    bridge_render_button(app, slot, button, width, disabled);
+    bridge_apply_shadows(app, button);
+}
 static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
     cui_bridge_node_record *node = &app->nodes[slot];
     bool previous_disabled = node->disabled;
@@ -6965,29 +7033,7 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
             bridge_change(app, slot);
         }
     } else {
-        cui_button_options options = {.variant = (cui_button_variant)node->variant,
-                                      .size = CUI_CONTROL_MEDIUM,
-                                      .design_size = (cui_design_size)node->size,
-                                      .rounding = (cui_button_rounding)node->rounding,
-                                      .radius = node->custom_radius,
-                                      .disabled = node->disabled,
-                                      .state = &node->button_state};
-        bridge_click_binding binding = {app, slot};
-        options.on_click_event = bridge_click;
-        options.action_user = &binding;
-        if (node->custom_hover) {
-            cui_theme_button_kind kind =
-                node->variant == CUI_BRIDGE_BUTTON_SECONDARY ? CUI_THEME_BUTTON_SECONDARY
-                : node->variant == CUI_BRIDGE_BUTTON_OUTLINE ? CUI_THEME_BUTTON_DEFAULT
-                                                             : CUI_THEME_BUTTON_PRIMARY;
-            options.custom_colors = true;
-            options.colors = app->theme.buttons[kind];
-            if (node->variant == CUI_BRIDGE_BUTTON_OUTLINE)
-                options.colors.outline_hover = node->hover;
-            else
-                options.colors.hover = node->hover;
-        }
-        (void)cui_button_ex(app->ui, node->id, &app->theme, cui_string(node->text), options);
+        bridge_render_button(app, slot, node, 0, node->disabled);
     }
     if (cui_bridge_box_shadows_supported_v1(node->kind))
         bridge_apply_shadows(app, node);
@@ -7087,13 +7133,10 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
     if (app->notifications) {
         const cui_id scope = UINT64_C(0x4e4f544946594255);
         cui_rect viewport = {0, 0, app->width, app->height};
-        if (app->responsive_notifications) {
-            cui_notification_advance advance;
-            (void)cui_notifications_responsive(app->ui, scope, &app->theme, app->notifications,
-                                               viewport, app->now_seconds, &advance);
-        } else
-            (void)cui_notifications(app->ui, scope, &app->theme, app->notifications, viewport,
-                                    app->now_seconds);
+        cui_notification_advance advance;
+        (void)cui_notifications_retained(app->ui, scope, &app->theme, app->notifications,
+                                         viewport, app->now_seconds, app->responsive_notifications,
+                                         bridge_render_notification_action, &advance);
     }
     cui_draw_list list = cui_end_frame(app->ui);
     status = cui_last_error(app->ui) == CUI_OK ? CUI_BRIDGE_OK : CUI_BRIDGE_CORE_ERROR;

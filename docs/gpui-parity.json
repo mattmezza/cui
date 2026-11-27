@@ -2525,7 +2525,13 @@
         "bindings/node/test/responsive-notifications.test.cjs",
         "bindings/node/test/responsive-notifications.types.ts",
         "bindings/go/cui/responsive_notifications_test.go",
-        "bindings/rust/tests/responsive_notifications.rs"
+        "bindings/rust/tests/responsive_notifications.rs",
+        "tests/unit/test_bridge_notification_action.c",
+        "bindings/python/test_notification_action.py",
+        "bindings/node/test/notification-action.test.cjs",
+        "bindings/node/test/notification-action.types.ts",
+        "bindings/go/cui/notification_action_test.go",
+        "bindings/rust/tests/notification_action.rs"
       ],
       "status": "tested",
       "platforms": {
@@ -2533,7 +2539,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Portable host callbacks are opt-in; built-in OS adapters and physical assistive technology acceptance remain open. Severity icons use themed SVG assets. Legacy presentation uses the original typography and supports an opt-in drop-shadow policy. The responsive presenter wraps and uses semibold titles, keeps Close reachable before hover, and protects its lane on narrow cards. Immediate C Root mounting can opt in and report its next wake. Retained C, Python, JavaScript, TypeScript, Go and Rust can enable wrapping and separate Close per app with a compatible provider. Retained builders omit custom actions, auto-hide, system delivery and host scheduling results. Immediate C custom content and action descriptors remain borrowed through lifecycle callbacks."
+        "Portable host callbacks are opt-in; built-in OS adapters and physical assistive technology acceptance remain open. Severity icons use themed SVG assets. Legacy presentation uses the original typography and supports an opt-in drop-shadow policy. The responsive presenter wraps and uses semibold titles, keeps Close reachable before hover, and protects its lane on narrow cards. Immediate C Root mounting can opt in and report its next wake. Retained C, Python, JavaScript, TypeScript, Go and Rust can enable wrapping and separate Close per app with a compatible provider. Retained cards can own one Button action in a bounded row below the message. Retained builders omit arbitrary action content, auto-hide, system delivery and host scheduling results. Immediate C custom content and action descriptors remain borrowed through lifecycle callbacks."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2587,6 +2593,20 @@
             "docs/BINDING_BUILDERS.md"
           ],
           "scope": "Reversible C bridge option with optional-provider probing in Python, JavaScript, TypeScript, Go and Rust. Preserves queued Click and Close and allows Close on the first pointer interaction. The original presentation remains the default."
+        },
+        {
+          "name": "retained Button action and independent card dismissal",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_notification_action.c",
+            "bindings/python/test_notification_action.py",
+            "bindings/node/test/notification-action.test.cjs",
+            "bindings/node/test/notification-action.types.ts",
+            "bindings/go/cui/notification_action_test.go",
+            "bindings/rust/tests/notification_action.rs",
+            "docs/BINDING_BUILDERS.md"
+          ],
+          "scope": "One styled Button owned by the retained card in C, Python, JavaScript, TypeScript, Go and Rust. Its ordinary Click leaves the card open, and Close remains separate. C headless checks cover multiple activations, pointer, touch, keyboard, accessibility, disabled and exiting cards, and generation-safe removal."
         },
         {
           "name": "portable transactional system delivery hooks and bounded registry",

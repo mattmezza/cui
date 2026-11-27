@@ -160,16 +160,17 @@ jobs:
           node-version: '25.8.0'
       - run: cmake -S bindings/node -B build-node -DCUI_BUILD_NATIVE=OFF
       # The standalone build excludes the root project from the default target set.
-      - run: cmake --build build-node --parallel 2 --target all test_bridge_part_shadows test_bridge_shadows test_bridge_avatar_style test_bridge_stepper_visual test_bridge_popover test_bridge_dialog_composition test_bridge_radio_motion test_bridge_rating test_bridge_attachment test_bridge_attachment_actions test_bridge_attachment_slots test_bridge_notification_action bridge_attachment_slots_example
+      - run: cmake --build build-node --parallel 2 --target all test_bridge_part_shadows test_bridge_shadows test_bridge_avatar_style test_bridge_stepper_visual test_bridge_popover test_bridge_dialog_composition test_bridge_radio_motion test_bridge_rating test_bridge_attachment test_bridge_attachment_actions test_bridge_attachment_slots test_bridge_notification_action test_bridge_button_focus bridge_attachment_slots_example
       - run: python scripts/test_local.py --build-dir build-node -R '^(bridge_|node_)'
       - run: node bindings/node/examples/save.cjs --headless
       - run: node bindings/node/examples/workspace.cjs --headless
       - run: npm exec --yes --package typescript@5.8.3 -- tsc --noEmit --strict --target ES2022 bindings/typescript/components.typecheck.ts
-      - run: npm exec --yes --package typescript@5.8.3 -- tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext bindings/node/test/notifications-v1.types.ts bindings/node/test/value-notifications-v1.types.ts bindings/node/test/shadows.types.ts bindings/node/test/part-shadows.types.ts bindings/node/test/keyed-data-table.types.ts bindings/node/test/data-table-paging.types.ts bindings/node/test/rating-options.types.ts bindings/node/test/attachment-options.types.ts bindings/node/test/attachment-actions.types.ts bindings/typescript/examples/attachment_actions.ts bindings/node/test/attachment-slots.types.ts bindings/node/test/notification-action.types.ts bindings/node/test/notification-auto-hide.types.ts bindings/typescript/examples/attachment_slots.ts bindings/node/test/spinner-presentation.types.ts bindings/typescript/examples/spinner_status.ts bindings/node/test/popover-options.types.ts bindings/typescript/examples/account_menu.ts bindings/node/test/dialog-composition.types.ts bindings/typescript/examples/dialog_composition.ts
+      - run: npm exec --yes --package typescript@5.8.3 -- tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext bindings/node/test/notifications-v1.types.ts bindings/node/test/value-notifications-v1.types.ts bindings/node/test/shadows.types.ts bindings/node/test/part-shadows.types.ts bindings/node/test/keyed-data-table.types.ts bindings/node/test/data-table-paging.types.ts bindings/node/test/rating-options.types.ts bindings/node/test/attachment-options.types.ts bindings/node/test/attachment-actions.types.ts bindings/typescript/examples/attachment_actions.ts bindings/node/test/attachment-slots.types.ts bindings/node/test/notification-action.types.ts bindings/node/test/notification-auto-hide.types.ts bindings/typescript/examples/attachment_slots.ts bindings/node/test/spinner-presentation.types.ts bindings/typescript/examples/spinner_status.ts bindings/node/test/popover-options.types.ts bindings/typescript/examples/account_menu.ts bindings/node/test/dialog-composition.types.ts bindings/typescript/examples/dialog_composition.ts bindings/typescript/examples/button_focus.ts
       - run: node bindings/typescript/examples/save.ts --headless
       - run: node bindings/typescript/examples/spinner_status.ts
       - run: node bindings/typescript/examples/account_menu.ts
       - run: node bindings/typescript/examples/dialog_composition.ts
+      - run: node bindings/typescript/examples/button_focus.ts
 
   installed-binding-packages:
     runs-on: ubuntu-latest

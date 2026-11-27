@@ -73,6 +73,9 @@ add_test(NAME node_sidebar_workspace COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME node_notifications_v1 COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/test/notifications-v1.test.cjs)
+add_test(NAME node_button_focus COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_EXPECT_BUTTON_FOCUS=1 ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/button-focus.test.cjs)
 add_test(NAME node_notification_auto_hide COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_EXPECT_NOTIFICATION_AUTO_HIDE=1
  ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/notification-auto-hide.test.cjs)

@@ -216,3 +216,9 @@ const stepperCenteredFillSupported: boolean = app.supports_stepper_centered_fill
 visualStepper().stepper_centered_fill(false, 'huge');
 // @ts-expect-error dimensions are numeric
 visualStepper().stepper_centered_fill(false, 'md', '300');
+const buttonFocus: c.ButtonFocus = 'outer-ring';
+if (app.supports_button_focus()) c.button('save').focus_treatment(buttonFocus).focus_treatment('legacy');
+// @ts-expect-error named Button focus modes only
+c.button().focus_treatment(2);
+// @ts-expect-error focus treatment is Button-only
+c.column().focus_treatment('variant');

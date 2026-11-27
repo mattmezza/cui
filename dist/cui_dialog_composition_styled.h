@@ -2,7 +2,7 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_DIALOG_COMPOSITION_STYLED_H
 #define CUI_DIALOG_COMPOSITION_STYLED_H
-#include "cui_components.h"
+#include "cui_button_styles.h"
 #include "cui_dialog_composition.h"
 #ifdef __cplusplus
 extern "C" {
@@ -10,6 +10,10 @@ extern "C" {
 /* Standard button options/callbacks run before owner close reduction. */
 bool cui_dialog_action_v1(cui_context *, const cui_dialog_frame *, const cui_theme *, cui_id,
                           cui_str, cui_dialog_action_kind, cui_button_options);
+/* Same admission and close reduction, with an optional Button focus treatment. */
+bool cui_dialog_action_focus_v1(cui_context *, const cui_dialog_frame *, const cui_theme *, cui_id,
+                                cui_str, cui_dialog_action_kind, cui_button_options,
+                                cui_button_focus_mode);
 #ifdef __cplusplus
 }
 #endif
@@ -54,8 +58,9 @@ bool cui_dialog_action_reduce(cui_context *, const cui_dialog_frame *, cui_dialo
 
 
 #include <math.h>
-bool cui_dialog_action_v1(cui_context *ui, const cui_dialog_frame *f, const cui_theme *t, cui_id id,
-                          cui_str name, cui_dialog_action_kind kind, cui_button_options o) {
+bool cui_dialog_action_focus_v1(cui_context *ui, const cui_dialog_frame *f, const cui_theme *t,
+                                cui_id id, cui_str name, cui_dialog_action_kind kind,
+                                cui_button_options o, cui_button_focus_mode focus_mode) {
     if (!ui || !f || !f->active || f->ui != ui || !t || !id || (unsigned)kind > CUI_DIALOG_CLOSE ||
         !cui_frame_is_submitting(ui)) {
         if (ui)
@@ -63,10 +68,14 @@ bool cui_dialog_action_v1(cui_context *ui, const cui_dialog_frame *f, const cui_
         return false;
     }
     o.disabled |= !f->layout->surface->overlay.open;
-    bool activated = cui_button_ex(ui, id, t, name, o);
+    bool activated = cui_button_focus_ex(ui, id, t, name, o, focus_mode);
     if (activated)
         (void)cui_dialog_action_reduce(ui, f, kind);
     return activated;
+}
+bool cui_dialog_action_v1(cui_context *ui, const cui_dialog_frame *f, const cui_theme *t, cui_id id,
+                          cui_str name, cui_dialog_action_kind kind, cui_button_options o) {
+    return cui_dialog_action_focus_v1(ui, f, t, id, name, kind, o, CUI_BUTTON_FOCUS_LEGACY);
 }
 static void cui_dialog_styled_close(cui_context *ui, const cui_dialog_frame *f, const void *user) {
     const cui_theme *t = user;

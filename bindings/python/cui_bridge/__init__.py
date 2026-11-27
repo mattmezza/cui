@@ -22,6 +22,9 @@ from .radio_paint import RadioPaint, RadioPaintLayer, bind_radio_paint, radio_pa
 if TYPE_CHECKING:
     from .dialog_composition import DialogAction, DialogOptions
 
+ButtonFocus = Literal["legacy", "variant", "outer-ring"]
+_BUTTON_FOCUS = {"legacy": 0, "variant": 1, "outer-ring": 2}
+
 _DATA_TABLE_LEGACY_ROWS = 32
 _DATA_TABLE_MAX_ROWS = 10_000
 
@@ -178,6 +181,9 @@ class _API:
         if hasattr(lib, "cui_bridge_carousel_slot_create_v1"):
             self.create_carousel_slot = bind("carousel_slot_create_v1", C.c_int, C.c_void_p,
                                             _Handle, C.c_uint32, C.c_char_p, C.POINTER(_Handle))
+        self.set_button_focus = None
+        if hasattr(lib, "cui_bridge_set_button_focus_v1"):
+            self.set_button_focus = bind("set_button_focus_v1", C.c_int, C.c_void_p, _Handle, C.c_uint32)
         self.notification_set_auto_hide = None
         if hasattr(lib, "cui_bridge_notification_set_auto_hide_v1"):
             self.notification_set_auto_hide = bind("notification_set_auto_hide_v1", C.c_int,
@@ -621,6 +627,7 @@ class Widget:
         self._detail = ""
         self._open = False
         self._open_set = False
+        self._button_focus: ButtonFocus = "legacy"
         self._notification_auto_hide = None
         self._checked_set = False
         self._selected: Widget | None = None
@@ -940,6 +947,22 @@ class Widget:
             if self._app.supports_radio_motion():
                 self._change("radio_set_motion", int(enabled))
         self._radio_motion = enabled
+        return self
+
+    def focus_treatment(self, mode: ButtonFocus) -> "Widget":
+        """Select Button keyboard focus paint; legacy restores the provider default."""
+        if self.kind != "button":
+            raise ValueError("focus_treatment requires Button")
+        if not isinstance(mode, str) or mode not in _BUTTON_FOCUS:
+            raise ValueError("focus treatment must be legacy, variant or outer-ring")
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is not None:
+            if self._app.supports_button_focus():
+                self._change("set_button_focus", _BUTTON_FOCUS[mode])
+            elif mode != "legacy":
+                raise RuntimeError("Button focus requires cui_bridge_set_button_focus_v1")
+        self._button_focus = mode
         return self
 
     def tab_index(self, index: int | None) -> "Widget":
@@ -2480,6 +2503,11 @@ class App:
         if not self.supports_stepper_centered_fill():
             raise RuntimeError("Stepper centered Fill requires cui_bridge_set_stepper_centered_fill_v1")
 
+    def supports_button_focus(self) -> bool:
+        """Whether this App's provider supports explicit Button focus treatment."""
+        self._ensure_open()
+        return self._api.set_button_focus is not None
+
     def supports_radio_tab_index(self) -> bool:
         """Report whether the loaded bridge offers signed Radio and RadioGroup Tab order."""
         self._ensure_open()
@@ -2602,6 +2630,8 @@ class App:
                     raise RuntimeError("Carousel slots unavailable in this bridge")
             if any(ancestor._carousel_slot for ancestor in lineage) and node.kind not in _RADIO_CONTENT_KINDS:
                 raise ValueError("Carousel slots require passive children")
+            if node._button_focus != "legacy" and not self.supports_button_focus():
+                raise RuntimeError("Button focus requires cui_bridge_set_button_focus_v1")
             if node._notification_auto_hide is not None and not self.supports_notification_auto_hide():
                 raise RuntimeError("Notification auto-hide unavailable in this bridge")
             if parent is not None and parent.kind == "notification":
@@ -2862,6 +2892,8 @@ class App:
                     enabled, name = node._avatar_placeholder
                     node._change("set_avatar_placeholder", int(enabled), _utf8(name))
                 if node.kind == "button":
+                    if node._button_focus != "legacy":
+                        node._change("set_button_focus", _BUTTON_FOCUS[node._button_focus])
                     node._change("set_variant", _VARIANT[node._variant])
                     node._change("set_size", _SIZE[node._size])
                     node._change("set_rounding", _ROUND[node._rounding], node._radius)
@@ -3549,7 +3581,7 @@ __all__ += ["settings"]
 __all__ += ["ValueNotificationV1", "ScalarChangeNotificationV1", "TextChangeNotificationV1",
             "SelectionChangeNotificationV1"]
 
-__all__ += ["DesignSize", "RadioPaint", "RadioPaintLayer"]
+__all__ += ["ButtonFocus", "DesignSize", "RadioPaint", "RadioPaintLayer"]
 
 __all__ += ["BoxShadow", "CSSBoxShadow", "ShadowStyle", "PresetShadowStyle", "ShadowKind", "ShadowPreset", "CornerRadii"]
 

@@ -108,9 +108,9 @@
         {
           "header": "include/cui/cui_button_styles.h",
           "languages": ["python", "javascript", "typescript", "go", "rust"],
-          "types": ["cui_button_focus_mode"],
-          "symbols": ["cui_button_focus_ex"],
-          "note": "Variant focus and the outside ring are available in immediate C. Retained language builders use their existing Button focus paint."
+          "types": ["cui_button_surface_styles"],
+          "symbols": ["cui_button_surface_ex", "cui_button_surface_paint_only"],
+          "note": "Per-phase C style callbacks with owned shadow layers remain immediate C. The separate retained Button focus setter supports variant focus and the outside ring across all five builders."
         }
       ]
     },

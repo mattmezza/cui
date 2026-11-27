@@ -4392,6 +4392,22 @@ static cui_bridge_status bridge_button(cui_bridge_app *app, cui_bridge_node hand
         return status;
     return (*out)->kind == CUI_BRIDGE_BUTTON ? CUI_BRIDGE_OK : CUI_BRIDGE_INVALID_STATE;
 }
+_Static_assert((int)CUI_BRIDGE_BUTTON_FOCUS_LEGACY_V1 == (int)CUI_BUTTON_FOCUS_LEGACY &&
+                   (int)CUI_BRIDGE_BUTTON_FOCUS_VARIANT_V1 == (int)CUI_BUTTON_FOCUS_VARIANT &&
+                   (int)CUI_BRIDGE_BUTTON_FOCUS_OUTER_RING_V1 == (int)CUI_BUTTON_FOCUS_OUTER_RING,
+               "Button focus mode values");
+cui_bridge_status cui_bridge_set_button_focus_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                 uint32_t mode) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_button(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (mode > CUI_BRIDGE_BUTTON_FOCUS_OUTER_RING_V1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->button_focus_mode = (uint8_t)mode;
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
 cui_bridge_status cui_bridge_set_button_variant(cui_bridge_app *app, cui_bridge_node handle,
                                                 cui_bridge_button_variant variant) {
     cui_bridge_node_record *node;
@@ -6812,11 +6828,13 @@ static void bridge_render_button(cui_bridge_app *app, uint32_t slot, cui_bridge_
             options.colors.hover = node->hover;
     }
     cui_str label = cui_string(node->text);
+    cui_button_focus_mode focus_mode = (cui_button_focus_mode)node->button_focus_mode;
     if (dialog && node->dialog_action)
-        (void)cui_dialog_action_v1(app->ui, dialog, &app->theme, node->id, label,
-                                   (cui_dialog_action_kind)(node->dialog_action - 1), options);
+        (void)cui_dialog_action_focus_v1(app->ui, dialog, &app->theme, node->id, label,
+                                         (cui_dialog_action_kind)(node->dialog_action - 1), options,
+                                         focus_mode);
     else
-        (void)cui_button_ex(app->ui, node->id, &app->theme, label, options);
+        (void)cui_button_focus_ex(app->ui, node->id, &app->theme, label, options, focus_mode);
 }
 static void bridge_render_notification_action(void *user, float width) {
     cui_bridge_node_record *card = user;

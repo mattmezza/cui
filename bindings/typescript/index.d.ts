@@ -15,7 +15,9 @@ export interface Label extends Node { label(value: string): this }
 export type DesignSize = 'inherit' | 'xs' | 'sm' | 'base' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | '8xl' | '9xl';
 /** Shared scale is currently supported by Button, Avatar and Stepper. */
 export interface DesignSized {design_size(value: DesignSize): this}
+export type ButtonFocus = 'legacy' | 'variant' | 'outer-ring';
 export interface Button extends Node, DesignSized {
+  focus_treatment(mode: ButtonFocus): this;
   dialog_action(action: DialogAction): this;
   label(value: string): this; primary(): this; secondary(): this; outline(): this; ghost(): this;
   inherit(): this; xs(): this; sm(): this; small(): this; base(): this; md(): this; medium(): this; lg(): this; large(): this; xl(): this; size(value: "inherit" | "xs" | "sm" | "base" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl" | "8xl" | "9xl"): this;
@@ -28,6 +30,7 @@ export function column(): Column & ShadowStyled & PartShadowStyled<0|1>;
 export function label(text?: string): Label & ShadowStyled & PartShadowStyled<0|1>;
 export function button(key?: string): Button & ShadowStyled & PartShadowStyled<0|1>;
 export class App {
+  supports_button_focus(): boolean;
   supportsVirtualListAxis(): boolean;
   supportsVirtualListRows(): boolean;
   /** Submit without dispatch. Caller owns draining the shared queue. */

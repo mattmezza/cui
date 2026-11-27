@@ -4,9 +4,10 @@ Historical design checkpoint, 2026-10-31; audited CUI baseline `b9c2f3d1`.
 The approved first shadow-aware facade has since been implemented; use
 [BUTTON_STYLES.md](../BUTTON_STYLES.md), `include/cui/cui_button_styles.h` and
 `src/components/cui_components.c` for its actual bounded contract. Immediate C
-also supports variant focus lines and an opt-in outside band. Theme-level
-selection, exact per-edge ring spacing, and retained and compound integration
-remain open. The background, text and border proposals below remain historical.
+and the retained builders also support variant focus lines and an opt-in
+outside band. Theme-level selection, exact per-edge ring spacing, and
+ButtonGroup integration remain open. The background, text and border
+proposals below remain historical.
 The Button ledger's “complete source state-style refinement” remains pending.
 
 ## Pinned evidence

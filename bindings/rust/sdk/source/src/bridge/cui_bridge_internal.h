@@ -179,6 +179,7 @@ typedef struct {
     float pagination_custom_size;
     int radio_tab_index;
     cui_text_defaults text_defaults;
+    uint8_t button_focus_mode;
 } cui_bridge_node_record;
 typedef struct {
     uint32_t node_kind, payload_kind;

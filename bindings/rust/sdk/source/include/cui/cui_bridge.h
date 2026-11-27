@@ -788,6 +788,11 @@ typedef enum {
     CUI_BRIDGE_BUTTON_OUTLINE,
     CUI_BRIDGE_BUTTON_GHOST
 } cui_bridge_button_variant;
+enum {
+    CUI_BRIDGE_BUTTON_FOCUS_LEGACY_V1 = 0,
+    CUI_BRIDGE_BUTTON_FOCUS_VARIANT_V1 = 1,
+    CUI_BRIDGE_BUTTON_FOCUS_OUTER_RING_V1 = 2
+};
 typedef enum {
     CUI_BRIDGE_SIZE_INHERIT = 0,
     CUI_BRIDGE_SIZE_XS,
@@ -1750,6 +1755,12 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_text_defaults_v1(cui_bridge_app 
                                                                  float font_size,
                                                                  uint32_t color_rgba,
                                                                  uint32_t custom_color);
+/* Optional Button focus treatment, including named Dialog and Notification
+ * actions. Mode zero restores classic paint. Call between steps on the app's
+ * owner thread. Rejected calls preserve the mode. Applies to focus-visible paint;
+ * layout, focus policy, queued clicks and Dialog action reduction are unchanged. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_focus_v1(cui_bridge_app *, cui_bridge_node,
+                                                                uint32_t mode);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_variant(cui_bridge_app *app,
                                                                cui_bridge_node node,
                                                                cui_bridge_button_variant variant);

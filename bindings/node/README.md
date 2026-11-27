@@ -141,3 +141,9 @@ support existing builders and reject this extension only when used.
 Run `node examples/text-defaults.cjs` for the headless example, or pass a font
 path to open it with SDL. Python exposes the equivalent
 `.text_defaults(size=None, tint=None)` method.
+
+Buttons offer `focus_treatment('legacy' | 'variant' | 'outer-ring')` before or
+after mounting. Probe `app.supports_button_focus()` before opting in. `legacy`
+restores the default and works with older providers; other modes require optional
+`cui_bridge_set_button_focus_v1`. This applies to plain Buttons and Button actions.
+See `examples/button-focus.cjs`.

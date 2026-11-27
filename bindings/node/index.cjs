@@ -14,6 +14,7 @@ const NODE = Symbol('CUI node');
 const CAROUSEL_SLOT = Symbol('Carousel slot');
 const ATTACHMENT_SLOT = Symbol('Attachment slot');
 const attachmentStatuses = Object.freeze({pending:0, uploading:1, processing:2, failed:3, complete:4});
+const buttonFocusModes = Object.freeze({legacy: 0, variant: 1, 'outer-ring': 2});
 let nextKey = 1;
 const disabledKinds = new Set([4,5,6,7,8,9,12,13,14,15,17,18,19,20,21,22,23,28,29,40,41,42,43,44,48,54,55,56,57,58,59,60,61,65,66,67,68,69,71,73,74,75,77,78,79]);
 const surfaces = new Set([24,25,26,27,62]);
@@ -139,6 +140,8 @@ function preflightNodeOptions(app, node, insideDecoration = false, insideAttachm
       throw new TypeError('radio_tooltip requires a direct RadioGroup Item');
     if (!app.supports_radio_tooltip()) throw new Error(radioTooltipUnavailable);
   }
+  if (node.buttonFocusValue !== 'legacy' && !app.supports_button_focus())
+    throw new Error('Button focus requires cui_bridge_set_button_focus_v1');
   if (node.radioTabIndexValue !== null && !app.supports_radio_tab_index())
     throw new Error(radioTabIndexUnavailable);
   const carouselSlot = node[CAROUSEL_SLOT];
@@ -238,6 +241,7 @@ class Node {
     this.carouselFitValue = false;
     this.carouselBasisValue = 0;
     this.radioMotionValue = false;
+    this.buttonFocusValue = 'legacy';
     this.radioTabIndexValue = null;
     this.radioContentValue = false;
     this.radioTooltipValue = null;
@@ -424,6 +428,18 @@ class Node {
       else if (enabled) throw new Error(radioMotionUnavailable);
     }
     this.radioMotionValue = enabled;
+    return this;
+  }
+  focus_treatment(mode) {
+    if (this.kind !== 4) throw new TypeError('focus_treatment requires Button');
+    if (typeof mode !== 'string' || !Object.hasOwn(buttonFocusModes, mode))
+      throw new TypeError('focus treatment must be legacy, variant or outer-ring');
+    if (this.owner) {
+      if (this.owner.supports_button_focus())
+        native.setButtonFocus(this.owner.handle, this[NODE], buttonFocusModes[mode]);
+      else if (mode !== 'legacy') throw new Error('Button focus requires cui_bridge_set_button_focus_v1');
+    }
+    this.buttonFocusValue = mode;
     return this;
   }
   tab_index(index) {
@@ -1108,6 +1124,8 @@ class App {
       if (node.carouselFitValue) native.setCarouselFit(this.handle, node[NODE], true);
       if (node.carouselBasisValue) native.setCarouselBasis(this.handle, node[NODE], node.carouselBasisValue);
       if (node.radioMotionValue) native.setRadioMotion(this.handle, node[NODE], true);
+      if (node.kind === 4 && node.buttonFocusValue !== 'legacy')
+        native.setButtonFocus(this.handle, node[NODE], buttonFocusModes[node.buttonFocusValue]);
       if (node.radioTabIndexValue !== null)
         native.setRadioTabIndex(this.handle, node[NODE], true, node.radioTabIndexValue);
       if (node.radioContentValue) native.setRadioItemContent(this.handle, node[NODE], true);
@@ -1391,6 +1409,11 @@ class App {
     this._alive();
     return typeof native.supportsRadioMotion === 'function' &&
       typeof native.setRadioMotion === 'function' && native.supportsRadioMotion();
+  }
+  supports_button_focus() {
+    this._alive();
+    return typeof native.supportsButtonFocus === 'function' &&
+      typeof native.setButtonFocus === 'function' && native.supportsButtonFocus(this.handle);
   }
   supports_radio_tab_index() {
     this._alive();

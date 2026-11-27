@@ -52,6 +52,7 @@
         "cui_dialog_compose_v1",
         "cui_base_dialog_action_v1",
         "cui_dialog_action_v1",
+        "cui_dialog_action_focus_v1",
         "cui_root_dialog_open_composed_v1",
         "cui_bridge_dialog_configure_v1",
         "cui_bridge_dialog_slot_create_v1",
@@ -283,6 +284,7 @@
         "cui_button_surface_ex",
         "cui_button_surface_paint_only",
         "cui_button_focus_ex",
+        "cui_bridge_set_button_focus_v1",
         "cui_set_outline_offset"
       ],
       "state_types": [
@@ -294,13 +296,14 @@
       ],
       "state_ownership": "Caller owns application data and options. Button style callbacks/user are borrowed through submission; surface shadow arrays are copied by value, bounded to eight layers; no callback/list persists across frames.",
       "interaction": "Returns true on activation; invoke the application action in that branch.",
-      "usage": "For Save, call save_document only when cui_button returns true. In immediate C, choose variant-specific keyboard focus paint or an outside ring with cui_button_focus_ex. Content callbacks compose children.",
+      "usage": "For Save, call save_document only when cui_button returns true. Choose variant-specific keyboard focus paint or an outside ring with cui_button_focus_ex in immediate C or cui_bridge_set_button_focus_v1 on a retained Button. Content callbacks compose children.",
       "docs": [
         "docs/BUTTON.md",
         "docs/BUTTON_GROUP.md",
         "docs/CONTROL_EVENTS.md",
         "docs/ELEMENT_SHADOWS.md",
         "docs/BUTTON_STYLES.md",
+        "docs/BINDING_BUILDERS.md",
         "docs/CONTROL_SURFACE_SHADOW_GALLERY.md"
       ],
       "callback_symbols": [
@@ -314,6 +317,7 @@
       "composition": "immediate frame submission",
       "additional_public_headers": [
         "include/cui/cui_button_styles.h",
+        "include/cui/cui_bridge.h",
         "include/cui/cui.h"
       ]
     },
@@ -1956,6 +1960,7 @@
         "cui_dialog_compose_v1",
         "cui_base_dialog_action_v1",
         "cui_dialog_action_v1",
+        "cui_dialog_action_focus_v1",
         "cui_root_dialog_open_composed_v1",
         "cui_bridge_dialog_configure_v1",
         "cui_bridge_dialog_slot_create_v1",

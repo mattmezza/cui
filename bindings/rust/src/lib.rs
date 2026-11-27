@@ -1,4 +1,6 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
+mod button_focus;
+pub use button_focus::ButtonFocusMode;
 mod text_defaults;
 pub use text_defaults::TextDefaults;
 mod dialog;

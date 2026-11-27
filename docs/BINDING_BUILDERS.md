@@ -524,6 +524,33 @@ The [Rust inbox](RUST_ICON_BADGE.md) adds a shared retained Icon and Badge plus 
 The older [C-host examples](LANGUAGE_BINDINGS.md) remain useful for embedding an
 existing C-authored application.
 
+## Choose Button focus paint
+
+Use Variant for variant-specific keyboard focus lines or Outer Ring for a
+three-pixel band around the button. Classic paint is the default. The mode
+applies to ordinary Buttons and Button actions in Dialogs and Notifications.
+The [Button style guide](BUTTON_STYLES.md#choose-how-keyboard-focus-appears)
+describes the paint.
+
+| Builder | Provider capability | Set the mode |
+| --- | --- | --- |
+| Python | `app.supports_button_focus()` | `button.focus_treatment("outer-ring")` |
+| JavaScript and TypeScript | `app.supports_button_focus()` | `button.focus_treatment("outer-ring")` |
+| Go | `app.SupportsButtonFocus()` | `button.ButtonFocus(cui.ButtonFocusOuterRing)` |
+| Rust | `app.supports_button_focus()` | `builder.button_focus(ButtonFocusMode::OuterRing)?` or `app.button_focus(node, ButtonFocusMode::OuterRing)?` |
+
+The capability checks whether the bridge provider exports the additive setter.
+Classic mode also works with earlier providers. Check for support before
+explicitly choosing Variant or Outer Ring on a runtime-selected provider.
+
+Each example builds a small Save view and steps it headlessly. Use the setup
+instructions for the chosen language above or in its linked guide.
+[Python](../bindings/python/examples/button_focus.py) ·
+[JavaScript](../bindings/node/examples/button-focus.cjs) ·
+[TypeScript](../bindings/typescript/examples/button_focus.ts) ·
+[Go](../bindings/go/examples/button_focus/main.go) ·
+[Rust](../bindings/rust/examples/button_focus.rs)
+
 ## Form controls and copied change events
 
 `on_change` receives a snapshot captured when the C component changed. Read

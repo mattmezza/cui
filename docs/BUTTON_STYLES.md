@@ -153,9 +153,11 @@ bool draw_save_button(cui_context *ui, cui_id id, const cui_theme *theme,
   `hide_focus_ring`. A mode outside the enum omits the button for that frame.
 
 In the Button gallery, choose **Variant focus**, **Outer focus ring** or
-**Classic focus**, then tab into the preview to inspect the variants. The mode
-is selected per Button in immediate C. Compound ButtonGroup, the separate style-callback
-facades and retained language builders keep their existing focus route.
+**Classic focus**, then tab into the preview to inspect the variants. Retained
+builders select the same modes for individual Buttons, including named Dialog
+and Notification actions. Combining the new paint with ButtonGroup or the
+separate style-callback facades remains open.
+[Retained builder examples](BINDING_BUILDERS.md#choose-button-focus-paint)
 Native assistive-technology and physical GPU validation remain open.
 
 The variant line placements follow the frozen Button and focus-helper sources.

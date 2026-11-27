@@ -304,6 +304,31 @@ static napi_value set_text_defaults(napi_env env, napi_callback_info info) {
     return status(env, set(app->bridge, node->node, (float)size, rgba, custom));
 }
 /* Optional symbol keeps addons usable with older bridge providers. */
+static napi_value supports_button_focus(napi_env env, napi_callback_info info) {
+    napi_value v[1], result;
+    js_app *app;
+    void (*symbol)(void) = NULL;
+    if (!args(env, info, 1, v) || !app_arg(env, v[0], &app))
+        return NULL;
+    bool supported =
+        optional_bridge_symbol(&symbol, sizeof symbol, "cui_bridge_set_button_focus_v1");
+    return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
+}
+static napi_value set_button_focus(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *node;
+    uint32_t mode;
+    cui_bridge_status (*set)(cui_bridge_app *, cui_bridge_node, uint32_t) = NULL;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &mode))
+        return NULL;
+    if (mode > 2)
+        return fail(env, "invalid Button focus treatment");
+    if (!optional_bridge_symbol(&set, sizeof set, "cui_bridge_set_button_focus_v1"))
+        return fail(env, "Button focus unavailable");
+    return status(env, set(app->bridge, node->node, mode));
+}
 static napi_value notification_auto_hide(napi_env env, napi_callback_info info) {
     napi_value v[1], result;
     js_app *app;
@@ -3217,6 +3242,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("carouselSlots", carousel_slots, 0);
     EXPORT("carouselSlot", carousel_slot, 0);
     EXPORT("notificationAutoHide", notification_auto_hide, 0);
+    EXPORT("supportsButtonFocus", supports_button_focus, 0);
+    EXPORT("setButtonFocus", set_button_focus, 0);
     EXPORT("setNotificationAutoHide", set_notification_auto_hide, 0);
     EXPORT("notificationActions", notification_actions, 0);
     EXPORT("notificationAction", notification_action, 0);

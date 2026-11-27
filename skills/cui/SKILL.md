@@ -370,8 +370,11 @@ eight mixed layers, preserves instance replay, and reports rejected phase
 patches independently of activation. Existing styled structs keep their ABI.
 The separate C `cui_button_focus_ex` route adds variant-specific focus paint
 or an outer ring with the existing focus-visible policy. The generic
-`cui_set_outline_offset` places a paint-only box outline. Retained builders
-and compound Button groups keep the existing focus route.
+`cui_set_outline_offset` places a paint-only box outline. Retained Button and
+named Dialog/Notification actions use `cui_bridge_set_button_focus_v1`.
+Probe provider support before opting in on a runtime-selected bridge. Read
+`docs/BINDING_BUILDERS.md#choose-button-focus-paint` for language methods and
+examples. ButtonGroup and style-callback integration remain open.
 
 Typed builder root shadows cover only Row, Column, Label, Button, Badge and
 Input. Read `docs/BRIDGE_SHADOWS.md` and the owning `include/cui/cui_bridge.h`

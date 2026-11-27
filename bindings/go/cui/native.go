@@ -793,6 +793,20 @@ static cui_bridge_status go_disclosure_title(cui_bridge_app *app, cui_bridge_nod
 static cui_bridge_status go_disclosure_divider(cui_bridge_app *app, cui_bridge_node node,
  const cui_bridge_disclosure_divider_v1 *style) { return disclosure_divider(app, node, style); }
 
+static cui_bridge_status (*button_focus)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static void go_button_focus_initialize(void) {
+ if (bridge_lib)
+  go_load_optional_symbol(&button_focus, sizeof button_focus, "cui_bridge_set_button_focus_v1");
+#if defined(CUI_GO_STATIC)
+ else
+  button_focus = cui_bridge_set_button_focus_v1;
+#endif
+}
+static int go_button_focus_supported(void) { return button_focus != NULL; }
+static cui_bridge_status go_button_focus(cui_bridge_app *a, cui_bridge_node n, uint32_t mode) {
+ return button_focus(a, n, mode);
+}
+
 static cui_bridge_status (*text_defaults)(cui_bridge_app *, cui_bridge_node, float, uint32_t, uint32_t);
 static void go_text_defaults_initialize(void) {
  if (bridge_lib)
@@ -1003,6 +1017,7 @@ static int bridge_open(const char *path) {
  go_virtual_list_initialize();
  go_disclosure_initialize();
  go_text_defaults_initialize();
+ go_button_focus_initialize();
  go_attachment_initialize();
  go_carousel_initialize();
  go_kbd_stroke_initialize();
@@ -1052,6 +1067,7 @@ static int bridge_open(const char *path) {
  go_virtual_list_initialize();
  go_disclosure_initialize();
  go_text_defaults_initialize();
+ go_button_focus_initialize();
  go_attachment_initialize();
  go_carousel_initialize();
  go_kbd_stroke_initialize();
@@ -1131,6 +1147,7 @@ type Node struct {
 	dialogAction   DialogAction
 
 	notificationAction                   bool
+	buttonFocus                          *ButtonFocusMode
 	textDefaults                         *TextDefaults
 	notificationAutoHide                 *bool
 	timeLocalized                        *TimeFieldConfig
@@ -2424,6 +2441,9 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("Notification cannot be nested inside an Attachment slot")
 		}
 		seen[n] = true
+		if n.buttonFocus != nil && *n.buttonFocus != ButtonFocusLegacy && C.go_button_focus_supported() == 0 {
+			return ErrButtonFocusUnavailable
+		}
 		if n.textDefaults != nil && C.go_text_defaults_supported() == 0 {
 			return ErrTextDefaultsUnavailable
 		}
@@ -3071,6 +3091,11 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 			mountedAttachmentPreviews = append(mountedAttachmentPreviews, n)
+		}
+		if n.buttonFocus != nil && C.go_button_focus_supported() != 0 {
+			if e := result(C.go_button_focus(a.ptr, h, C.uint32_t(*n.buttonFocus))); e != nil {
+				return e
+			}
 		}
 		if n.textDefaults != nil {
 			color, custom := n.textDefaults.rawColor()
@@ -7436,5 +7461,44 @@ func (n *Node) TextDefaults(options TextDefaults) *Node {
 		options.ColorRGBA = &color
 	}
 	n.textDefaults = &options
+	return n
+}
+
+// SupportsButtonFocus probes the optional retained Button focus treatment.
+func (a *App) SupportsButtonFocus() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_button_focus_supported() != 0, nil
+}
+
+// ButtonFocus selects the Button focus treatment. Legacy is also the default.
+// Legacy remains usable with older providers and explicitly resets new providers.
+func (n *Node) ButtonFocus(mode ButtonFocusMode) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 4 || mode > ButtonFocusOuterRing {
+		n.err = errors.New("invalid Button focus treatment")
+		return n
+	}
+	if n.app != nil {
+		supported, err := n.app.SupportsButtonFocus()
+		if err != nil {
+			n.err = err
+			return n
+		}
+		if !supported && mode != ButtonFocusLegacy {
+			n.err = ErrButtonFocusUnavailable
+			return n
+		}
+		if supported {
+			if err := result(C.go_button_focus(n.app.ptr, n.handle, C.uint32_t(mode))); err != nil {
+				n.err = err
+				return n
+			}
+		}
+	}
+	n.buttonFocus = &mode
 	return n
 }

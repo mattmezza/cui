@@ -2,8 +2,9 @@
 #include "../base/cui_dialog_composition_private.h"
 #include "cui/cui_dialog_composition_styled.h"
 #include <math.h>
-bool cui_dialog_action_v1(cui_context *ui, const cui_dialog_frame *f, const cui_theme *t, cui_id id,
-                          cui_str name, cui_dialog_action_kind kind, cui_button_options o) {
+bool cui_dialog_action_focus_v1(cui_context *ui, const cui_dialog_frame *f, const cui_theme *t,
+                                cui_id id, cui_str name, cui_dialog_action_kind kind,
+                                cui_button_options o, cui_button_focus_mode focus_mode) {
     if (!ui || !f || !f->active || f->ui != ui || !t || !id || (unsigned)kind > CUI_DIALOG_CLOSE ||
         !cui_frame_is_submitting(ui)) {
         if (ui)
@@ -11,10 +12,14 @@ bool cui_dialog_action_v1(cui_context *ui, const cui_dialog_frame *f, const cui_
         return false;
     }
     o.disabled |= !f->layout->surface->overlay.open;
-    bool activated = cui_button_ex(ui, id, t, name, o);
+    bool activated = cui_button_focus_ex(ui, id, t, name, o, focus_mode);
     if (activated)
         (void)cui_dialog_action_reduce(ui, f, kind);
     return activated;
+}
+bool cui_dialog_action_v1(cui_context *ui, const cui_dialog_frame *f, const cui_theme *t, cui_id id,
+                          cui_str name, cui_dialog_action_kind kind, cui_button_options o) {
+    return cui_dialog_action_focus_v1(ui, f, t, id, name, kind, o, CUI_BUTTON_FOCUS_LEGACY);
 }
 static void cui_dialog_styled_close(cui_context *ui, const cui_dialog_frame *f, const void *user) {
     const cui_theme *t = user;

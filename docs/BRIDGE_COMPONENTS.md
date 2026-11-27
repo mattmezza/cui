@@ -7,7 +7,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | --- | --- | --- | --- |
 | Row, Column | `cui_begin_box` | Gap and optional size and color defaults | One root, depth 128. [Text defaults](TYPOGRAPHY.md#share-defaults-in-a-retained-ui) |
 | Label | `cui_label` | Copied UTF-8 text | Text only, inherits scoped size and color when set |
-| Button | `cui_button_ex` | copied text, click | Existing options |
+| Button | `cui_button_focus_ex` | Copied text, queued click, optional per-Button keyboard focus paint | [Retained focus options](#choose-focus-paint-for-a-retained-button) |
 | Checkbox | `cui_checkbox` | checked, change, disabled | Boolean only |
 | Radio | `cui_radio_present` | checked, change, disabled, optional animated selection | Standalone radio; use RadioGroup for exclusivity |
 | Switch | `cui_switch_ex` | checked, change, disabled | Boolean only |
@@ -120,6 +120,18 @@ means no selected row. The legacy setter assigns one-based row keys, so its
 event values keep their original meaning. Columns and sort columns stay
 one-based. The application can supply a reordered matrix after a step to apply
 a sort request.
+
+### Choose focus paint for a retained Button
+
+Call `cui_bridge_set_button_focus_v1(app, button, CUI_BRIDGE_BUTTON_FOCUS_OUTER_RING_V1)`
+on the app owner thread between steps. The bridge copies the mode and uses it
+whenever keyboard focus is visible. Choose `CUI_BRIDGE_BUTTON_FOCUS_VARIANT_V1` for
+variant-specific paint or `CUI_BRIDGE_BUTTON_FOCUS_LEGACY_V1` to reset to classic
+paint. An invalid mode or node is rejected before any mutation. Dialog and
+Notification action Buttons accept the same setter. Dialog activation queues
+Click before reducing the owner action and queuing the Close result.
+[Button focus paint](BUTTON_STYLES.md#choose-how-keyboard-focus-appears) ·
+[Language examples](BINDING_BUILDERS.md#choose-button-focus-paint)
 
 ### Animate retained Radio selection from C
 

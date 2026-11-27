@@ -23,7 +23,7 @@ The latter adds the Styled action helper and includes standard component types.
 | Open/reset a closed owner | `cui_dialog_open_v1` | Same |
 | Resolve default sizing | `cui_dialog_sizing_default_v1` | Same |
 | Submit complete tree | `cui_base_dialog_compose_v1` | `cui_dialog_compose_v1` |
-| Submit owner action | `cui_base_dialog_action_v1` | `cui_dialog_action_v1` |
+| Submit owner action | `cui_base_dialog_action_v1` | `cui_dialog_action_v1` or `cui_dialog_action_focus_v1` |
 | Inspect resolved slot style | `cui_dialog_slot_style_v1_get` | Same |
 | Balanced child wrapper | `cui_dialog_slot_begin_v1` / `cui_dialog_slot_end_v1` | Same |
 
@@ -131,6 +131,12 @@ CONFIRM/CANCEL/CLOSE map to ACCEPTED/CANCELLED/CLOSED. The existing synchronous
 through existing surface behavior. No queued veto or global Enter mapping is
 introduced. `cui_surface_request_close` remains deferred to the next ordinary
 update; it is not an immediate between-frame close callback.
+
+Use `cui_dialog_action_focus_v1` to choose the keyboard focus mode for a Styled
+action. It submits the same Button and runs the same action reducer in order.
+For retained Footer actions, set focus treatment on the Button handle.
+[Immediate focus modes](BUTTON_STYLES.md#choose-how-keyboard-focus-appears) ·
+[Retained focus options](BRIDGE_COMPONENTS.md#choose-focus-paint-for-a-retained-button)
 
 Slot/action/decide/on_close callbacks may close the owner through supported
 helpers. Stop emitting application children after that close. They must not free

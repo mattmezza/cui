@@ -6,6 +6,7 @@
   whitespace rules. Custom matching and raw query callbacks keep their contracts.
 - Custom Command rows measure against the current width when a Dialog opens
   or resizes. Growing palettes in fixed-width columns use the same behavior.
+  Short lists keep that width when their scrollbar track narrows.
 - Retained C, Python, JavaScript, TypeScript, Go and Rust can compose typed Kbd
   hints with platform labels, plain or outline styles, and accessible names.
   Providers without typed Kbd continue to accept literal shortcuts.

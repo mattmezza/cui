@@ -281,20 +281,28 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
                          font, t->muted);
             cui_end_box(ui);
         }
+        float gutter_remainder = 0;
         if (s->row_count) {
-            /* Let the scrollbar and insets take their space before attaching rows. */
+            /* Very short viewports can have a thinner track. Custom heights were measured
+             * with the gutter at max_height. Keep that row width without enlarging the
+             * viewport or track. A spacer preserves fractional widths. */
+            float viewport_width = 0;
+            if (custom_measure) {
+                viewport_width = cui_scroll_layout(cui_scroll_resolve(t, scroll)).viewport.width;
+                gutter_remainder = fmaxf(0, viewport_width - 2 * inset - content);
+            }
             cui_id allocation = unresolved_width && custom_measure ? id ^ UINT64_C(0x9a875c00) : 0;
             cui_begin_box(ui, allocation,
                           (cui_box){.width = -1,
                                     .height = -1,
+                                    .row = gutter_remainder > 0,
                                     .custom_padding = true,
                                     .padding_edges = {.left = inset, .right = inset}});
             if (allocation) {
-                float estimated = cui_scroll_layout(cui_scroll_resolve(t, scroll)).viewport.width;
                 (void)cui_set_prepaint(
                     ui, (cui_prepaint_options){.callback = cui_command_remeasure_grow_width,
-                                               .payload = &estimated,
-                                               .payload_bytes = sizeof estimated,
+                                               .payload = &viewport_width,
+                                               .payload_bytes = sizeof viewport_width,
                                                .command_budget = 1});
             }
             cui_begin_box(ui, 0, (cui_box){.width = -1, .height = -1});
@@ -408,6 +416,10 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
         s->hovered_row = hovered;
         if (s->row_count) {
             cui_end_box(ui);
+            if (gutter_remainder > 0) {
+                cui_begin_box(ui, 0, (cui_box){.width = gutter_remainder, .height = 1});
+                cui_end_box(ui);
+            }
             cui_end_box(ui);
         }
         cui_scrollable_end_ex(ui, list, t, &s->scroll, scroll);

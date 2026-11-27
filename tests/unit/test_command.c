@@ -513,6 +513,66 @@ static void test_grow_custom_measure(void) {
     cui_destroy(ui);
 }
 
+static float measure_short_row(float width, float font, void *user) {
+    (void)font;
+    *(float *)user = width;
+    return width >= 225 ? 5 : 7;
+}
+
+static void test_short_custom_row_matches_measurement(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    char buffer[32] = {0};
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_command_state state;
+    cui_command_row rows[2];
+    float measured_width = 0;
+    cui_command_entry entry = {.kind = CUI_COMMAND_ITEM,
+                               .item = {.label = cui_string("Short entry"),
+                                        .measure = measure_short_row,
+                                        .content_user = &measured_width}};
+    cui_command_options options = cui_command_default();
+    options.searchable = false;
+    options.on_confirm = confirm;
+    options.user = order;
+    assert(ui && edit && cui_command_init(&state, rows, 2, edit));
+    cui_id list_id = cui_command_list_id(42);
+    cui_id track_id = cui_scrollbar_id(list_id, true);
+    cui_id row_id = cui_command_row_id(42, (cui_command_index){0, 0});
+    const float widths[] = {244, -1};
+    for (size_t i = 0; i < sizeof widths / sizeof *widths; ++i) {
+        options.width = widths[i];
+        grow_panel(ui, &state, &entry, 1, 260, options, false);
+        cui_rect row = cui_bounds(ui, row_id), list = cui_bounds(ui, list_id);
+        cui_rect track = cui_bounds(ui, track_id);
+        const cui_semantic *option = semantic(ui, row_id);
+        assert(list.h == 15 && track.w == 7.5f && track.x + track.w == list.x + list.w);
+        assert(measured_width == 224 && row.w == measured_width && row.h == 7);
+        assert(option && option->bounds.w == row.w && !cui_needs_redraw(ui));
+
+        order_count = 0;
+        for (unsigned inside = 0; inside < 2; ++inside) {
+            cui_event tap = {.type = CUI_EVENT_POINTER_DOWN,
+                             .pointer_type = CUI_POINTER_TOUCH,
+                             .pointer_id = 2,
+                             .x = row.x + row.w + (inside ? -1 : 1),
+                             .y = row.y + row.h / 2};
+            assert(cui_queue_event(ui, tap));
+            grow_panel(ui, &state, &entry, 1, 260, options, false);
+            tap.type = CUI_EVENT_POINTER_UP;
+            assert(cui_queue_event(ui, tap));
+            grow_panel(ui, &state, &entry, 1, 260, options, false);
+            assert(order_count == inside);
+        }
+
+        grow_panel(ui, &state, &entry, 1, 260, options, true);
+        row = cui_bounds(ui, row_id);
+        assert(measured_width == 234 && row.w == measured_width && row.h == 5);
+        assert(cui_bounds(ui, list_id).h == 13 && cui_bounds(ui, track_id).w == 0);
+    }
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+
 static void test_custom_height_reflow_keeps_visible_selection(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     char buffer[32] = {0};
@@ -567,7 +627,7 @@ static void test_custom_height_reflow_keeps_visible_selection(void) {
     cui_destroy(ui);
 }
 
-static void test_custom_height_with_later_sibling(void) {
+static void test_custom_height_with_later_sibling(bool short_row) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     char buffer[32] = {0};
     cui_edit *edit = editor(buffer, sizeof buffer);
@@ -576,7 +636,7 @@ static void test_custom_height_with_later_sibling(void) {
     float measured_width = 0;
     cui_command_entry entry = {.kind = CUI_COMMAND_ITEM,
                                .item = {.label = cui_string("Wrapped entry"),
-                                        .measure = measure_width,
+                                        .measure = short_row ? measure_short_row : measure_width,
                                         .content_user = &measured_width}};
     cui_command_options options = cui_command_default();
     options.width = -1;
@@ -593,7 +653,8 @@ static void test_custom_height_with_later_sibling(void) {
         (void)cui_end_frame(ui);
         assert(cui_last_error(ui) == CUI_OK);
         cui_rect row = cui_bounds(ui, cui_command_row_id(42, (cui_command_index){0, 0}));
-        assert(row.w == 222 && row.h == (frame ? 60 : 32));
+        float expected_height = short_row ? (frame ? 7 : 5) : (frame ? 60 : 32);
+        assert(row.w == 222 && row.h == expected_height);
         assert(cui_needs_redraw(ui) == !frame);
         if (frame)
             assert(row.w == measured_width);
@@ -830,8 +891,10 @@ int main(void) {
     test_panel_width();
     test_grow_panel_width();
     test_grow_custom_measure();
+    test_short_custom_row_matches_measurement();
     test_custom_height_reflow_keeps_visible_selection();
-    test_custom_height_with_later_sibling();
+    test_custom_height_with_later_sibling(false);
+    test_custom_height_with_later_sibling(true);
     test_dialog();
     test_slots_and_loading();
 #endif

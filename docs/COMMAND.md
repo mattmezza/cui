@@ -101,15 +101,16 @@ heights, supply `measure` and `content` callbacks. The measure callback receives
 the available row width and font size and returns the complete outer height.
 Inside a fixed-width, unclipped column such as a Dialog body, a growing
 palette measures against the current width on opening and resizing. The
-scrollbar gutter and list insets still apply. Custom headers may extend wider
-than the list within the palette's clip.
+scrollbar gutter and list insets still apply. When a short viewport narrows the
+scrollbar track, the custom row keeps its measured width by reserving the gutter
+at `max_height`. The viewport still fits its content up to that maximum. A hidden
+scrollbar reserves no space. Custom headers may extend wider than the list within
+the palette's clip.
 
 When a parent still needs to resolve the width, such as a row with other
 growing siblings, Command starts with its scaled default width and then uses
 the last allocation. The row width follows layout and a follow-up frame
-updates custom heights. In very short lists, the scrollbar can also reduce
-its gutter after measuring the rows, making the measurement width an
-estimate. Hiding the scrollbar removes that dependence on list height.
+updates custom heights.
 
 When heights change, the virtual
 list keeps a previously fully visible selection in view. Scrolling the

@@ -8104,7 +8104,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Grouped filtering, original item paths, wrapping keyboard selection, pointer confirmation, virtual rows, actual Input/Scroll and Dialog cancellation are tested. Custom heights use current width under fixed-width, unclipped columns and preserve a fully visible selection. Unresolved allocations still take a follow-up and very short lists can estimate a narrower scrollbar gutter differently. The default filter supports Unicode lowercase substring matching. Native Action/window lifecycle and deferred callbacks remain open or host responsibilities; see docs/COMMAND.md."
+        "Grouped filtering, original item paths, wrapping keyboard selection, pointer confirmation, virtual rows, actual Input/Scroll and Dialog cancellation are tested. Custom heights use current width under fixed-width, unclipped columns and preserve a fully visible selection. Short lists keep custom widths consistent with measurement as the scrollbar track shrinks. Unresolved allocations still take a follow-up. The default filter supports Unicode lowercase substring matching. Native Action/window lifecycle and deferred callbacks remain open or host responsibilities; see docs/COMMAND.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -8166,6 +8166,12 @@
           "status": "tested",
           "evidence": ["tests/unit/test_command.c", "docs/COMMAND.md"],
           "scope": "Fixed-width unclipped columns provide the allocation synchronously. Visible and hidden gutters, oversized header clipping, same-frame selection anchoring and fallback for later siblings have headless regression coverage."
+        },
+        {
+          "name": "keep short custom row widths consistent with measurement",
+          "status": "tested",
+          "evidence": ["tests/unit/test_command.c", "docs/COMMAND.md"],
+          "scope": "Fixed-width and growing palettes preserve the measured width, fractional track geometry, compact height and semantic bounds. The hidden scrollbar path gives its space back to rows."
         }
       ],
       "upstream_doc": {

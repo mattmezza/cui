@@ -39,7 +39,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the six-slot C composition API or the Core focus-scope input cancellation helper."
+        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the six-slot C composition API, Root-managed composed dialogs, or the Core focus-scope input cancellation helper."
       ]
     },
     {
@@ -780,7 +780,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the six-slot C composition API or the Core focus-scope input cancellation helper."
+        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the six-slot C composition API, Root-managed composed dialogs, or the Core focus-scope input cancellation helper."
       ]
     },
     {
@@ -846,7 +846,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Automatic responsive notifications and the optional notification scheduling result in cui_root_render_with_options are immediate C APIs."
+        "Automatic responsive notifications, notification scheduling results and the composed Dialog/AlertDialog stack are styled C APIs."
       ]
     },
     {

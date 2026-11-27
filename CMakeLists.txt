@@ -1953,6 +1953,11 @@ endif()
 cui_warnings(test_command_base)
 add_test(NAME command_base_only COMMAND test_command_base)
 
+add_executable(test_root_dialog_composition tests/unit/test_root_dialog_composition.c)
+target_link_libraries(test_root_dialog_composition PRIVATE cui)
+cui_warnings(test_root_dialog_composition)
+add_test(NAME root_dialog_composition COMMAND test_root_dialog_composition)
+
 add_executable(test_root_base tests/unit/test_root.c src/base/cui_root.c src/core/cui.c src/base/cui_surface.c src/base/cui_overlay.c src/base/cui_models.c src/base/cui_status.c)
 target_include_directories(test_root_base PRIVATE include third_party/clay)
 target_compile_definitions(test_root_base PRIVATE CUI_ROOT_BASE_ONLY=1)

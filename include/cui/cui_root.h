@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_ROOT_H
 #define CUI_ROOT_H
+#include "cui_dialog_composition.h"
 #include "cui_status.h"
 #include "cui_surface.h"
 #ifdef __cplusplus
@@ -70,6 +71,26 @@ void *cui_root_plugin_state(const cui_root *, uint64_t key);
 bool cui_root_bind_facilities(cui_root *, cui_root_surface *dialogs, size_t dialog_capacity,
                               cui_notification_state *notifications);
 bool cui_root_dialog_open(cui_root *, cui_context *, cui_root_surface, cui_id trigger);
+typedef void (*cui_root_dialog_sizing_fn)(cui_rect viewport, cui_dialog_sizing_v1 *, void *);
+typedef struct {
+    cui_dialog_layout_v1 *layout;
+    cui_surface_options options;
+    const cui_dialog_composition_v1 *composition;
+    cui_root_dialog_sizing_fn refine_sizing;
+    void *sizing_user;
+} cui_root_composed_dialog_v1;
+/* Mount a closed composed Dialog or AlertDialog in Styled Root's existing stack.
+ * Root supplies the current viewport and layer. The optional sizing callback
+ * refines fresh defaults once per submission. Root borrows this descriptor,
+ * the layout, and its referenced data. Keep them live until a Root frame
+ * observes the close and ends, or dispose Root after the last frame. New
+ * dialogs opened during application or Sheet content can mount that frame.
+ * Dialogs opened from another dialog's slots mount on the next Root frame. */
+bool cui_root_dialog_open_composed_v1(cui_root *, cui_context *, cui_root_composed_dialog_v1 *,
+                                      cui_id trigger);
+/* Request close of the top open Dialog or AlertDialog in the shared stack.
+ * Its next submission runs the usual decision and focus policy. */
+bool cui_root_dialog_close_top(cui_root *, cui_context *, cui_surface_result);
 bool cui_root_sheet_open(cui_root *, cui_context *, cui_root_surface, cui_id trigger);
 bool cui_root_notification_push(cui_root *, cui_notification, double now_seconds);
 bool cui_root_set_copy_hook(cui_root *, cui_root_copy_fn, void *user);

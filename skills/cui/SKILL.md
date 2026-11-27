@@ -628,6 +628,10 @@ checks `App::supports_attachment_slots`. See
 `docs/BRIDGE_COMPONENTS.md#compose-a-retained-attachment-from-c`,
 `docs/BRIDGE_COMPONENTS.md#compose-a-retained-attachment-in-a-language-builder` and
 `docs/ATTACHMENT_EVENTS.md#retained-actions-from-language-builders`.
+Use `cui_root_dialog_open_composed_v1` for Root-managed six-slot Dialogs and
+AlertDialogs in styled C. Keep the borrowed descriptor and layout until Root
+observes closure and the frame ends. See
+`docs/ROOT.md#mount-a-composed-dialog-or-alertdialog`.
 
 For a pinned navigation header/footer with body-only scrolling, use
 `cui_sidebar` with a persistent measurement cache. Tab and accessibility focus

@@ -123,7 +123,7 @@ Additional event includes: `cui/cui_disclosure_events.h`.
 
 **Interaction:** cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.
 
-**Usage:** For intrinsic first-frame sizing, retain surface plus dialog layout, open with cui_dialog_open_v1, resolve current sizing, and submit six independent slots with cui_dialog_compose_v1 or its Base counterpart. Keep storage through end_frame; old surface/alert helpers remain unchanged. Held-input reset, Root/host and foreign slot builders remain separate limitations.
+**Usage:** Retain surface and layout, then use cui_dialog_compose_v1 or its Base counterpart for six independent slots and current-frame sizing. Alternatively register the styled composition with cui_root_dialog_open_composed_v1 and let Root submit it. Keep storage through end_frame and through mounted ownership. Language slot builders and native window services remain separate.
 
 API: `cui_surface_init`, `cui_alert_dialog`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
 
@@ -881,7 +881,7 @@ API: `cui_description_list`. [Public header](../include/cui/cui_description.h); 
 
 **Interaction:** cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.
 
-**Usage:** For intrinsic first-frame sizing, retain surface plus dialog layout, open with cui_dialog_open_v1, resolve current sizing, and submit six independent slots with cui_dialog_compose_v1 or its Base counterpart. Keep storage through end_frame; old surface/alert helpers remain unchanged. Held-input reset, Root/host and foreign slot builders remain separate limitations.
+**Usage:** Retain surface and layout, then use cui_dialog_compose_v1 or its Base counterpart for six independent slots and current-frame sizing. Alternatively register the styled composition with cui_root_dialog_open_composed_v1 and let Root submit it. Keep storage through end_frame and through mounted ownership. Language slot builders and native window services remain separate.
 
 API: `cui_surface_init`, `cui_surface_begin`, `cui_surface_end`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
 
@@ -962,7 +962,7 @@ API: `cui_resizable_state_init`, `cui_resizable`. [Public header](../include/cui
 
 **Interaction:** cui_root_content_fn composes application content; cui_root_copy_fn handles copy; plugins have explicit lifecycle hooks.
 
-**Usage:** Initialize root/plugin storage, render content and facilities each frame, then dispose after use.
+**Usage:** Initialize root and plugin storage, render content and facilities each frame, then dispose after use. Use cui_root_dialog_open_composed_v1 for a six-slot Dialog or AlertDialog and cui_root_dialog_close_top to request closure of the top dialog.
 
 API: `cui_root_init`, `cui_root_render`, `cui_root_dispose`. [Public header](../include/cui/cui_root.h); [guide](ROOT.md).
 

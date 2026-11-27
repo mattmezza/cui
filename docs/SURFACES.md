@@ -69,4 +69,6 @@ and Footer ownership using Core layout V2. The legacy helpers documented above
 keep their fixed or previous-measurement behavior. Retain the new layout storage
 through end_frame and use its open helper for each new lifetime. The first
 composed frame drops previous scoped activations and captures, including held
-mouse, touch and Space. Root/host and foreign slot builders remain open.
+mouse, touch and Space. [Styled Root](ROOT.md#mount-a-composed-dialog-or-alertdialog)
+can mount the six-slot surface automatically. Native window-service integration
+and language slot builders remain open.

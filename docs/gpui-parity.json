@@ -170,6 +170,7 @@
       "public_header": "include/cui/cui_surface.h",
       "sample": "web/gallery.c",
       "tests": [
+        "tests/unit/test_root_dialog_composition.c",
         "tests/unit/test_surface.c",
         "tests/unit/test_dialog_composition_actions.c",
         "tests/web/test_browser.py"
@@ -179,7 +180,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending."
+        "Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Styled C Root mounts six-slot dialogs with shared stack ordering. Broader host and language authoring, body focus reveal, custom backdrop, exact default margins and transitions remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -232,6 +233,17 @@
             "tests/unit/test_dialog_composition_actions.c",
             "docs/DIALOG_COMPOSITION.md"
           ]
+        },
+        {
+          "name": "automatic six-slot dialog mounting in Styled Root",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_root_dialog_composition.c",
+            "tests/distribution/dialog_composition.c",
+            "tests/web/test_root_notifications.py",
+            "docs/ROOT.md"
+          ],
+          "scope": "Shared legacy and composed stack, current viewport, deferred top close and focus restoration in headless C. The gallery exercises a Root-managed Dialog with real touch. Retained language and native host services are outside this evidence."
         }
       ],
       "upstream_doc": {
@@ -6259,6 +6271,7 @@
       "public_header": "include/cui/cui_surface.h",
       "sample": "web/gallery.c",
       "tests": [
+        "tests/unit/test_root_dialog_composition.c",
         "tests/unit/test_surface.c",
         "tests/unit/test_dialog_composition_actions.c",
         "tests/web/test_browser.py"
@@ -6268,7 +6281,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending."
+        "Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Styled C Root mounts six-slot dialogs with shared stack ordering. Broader host and language authoring, body focus reveal, custom backdrop, exact default margins and transitions remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -6291,8 +6304,12 @@
         },
         {
           "name": "title/description/action slots",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "include/cui/cui_dialog_composition.h",
+            "tests/unit/test_dialog_composition_actions.c",
+            "tests/unit/test_root_dialog_composition.c"
+          ]
         },
         {
           "name": "composed themed body, title and copied description",
@@ -6318,6 +6335,17 @@
             "tests/unit/test_dialog_composition_actions.c",
             "docs/DIALOG_COMPOSITION.md"
           ]
+        },
+        {
+          "name": "automatic six-slot dialog mounting in Styled Root",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_root_dialog_composition.c",
+            "tests/distribution/dialog_composition.c",
+            "tests/web/test_root_notifications.py",
+            "docs/ROOT.md"
+          ],
+          "scope": "Shared legacy and composed stack, current viewport, deferred top close and focus restoration in headless C. The gallery exercises a Root-managed Dialog with real touch. Retained language and native host services are outside this evidence."
         }
       ],
       "upstream_doc": {
@@ -6919,6 +6947,7 @@
       "public_header": "include/cui/cui_root.h",
       "sample": "web/gallery.c",
       "tests": [
+        "tests/unit/test_root_dialog_composition.c",
         "tests/unit/test_root.c",
         "tests/web/test_root_notifications.py"
       ],
@@ -6928,7 +6957,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Per-window plugin snapshots, ordered render stages, field-specific style overrides, factory rollback, automatic Sheet/Dialog/Notification layers and Sheet-aware notification placement are tested. The C Root renderer has optional responsive notification mounting and wake reporting. Window creation, entity observations, global selection/copy service, tooltip/native-menu/touch-selection hosts and automatic chrome remain incomplete; see docs/ROOT.md."
+        "Per-window plugin snapshots, ordered render stages, field-specific style overrides, factory rollback, automatic Sheet/Dialog/Notification layers and Sheet-aware notification placement are tested. The C Root renderer supports composed dialogs in its shared stack, plus optional responsive notification mounting and wake reporting. Window creation, entity observations, global selection/copy service, tooltip/native-menu/touch-selection hosts and automatic chrome remain incomplete; see docs/ROOT.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -6968,6 +6997,17 @@
           "name": "complete styled window services and host lifecycle parity",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "automatic six-slot dialog mounting in Styled Root",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_root_dialog_composition.c",
+            "tests/distribution/dialog_composition.c",
+            "tests/web/test_root_notifications.py",
+            "docs/ROOT.md"
+          ],
+          "scope": "Shared legacy and composed stack, current viewport, deferred top close and focus restoration in headless C. The gallery exercises a Root-managed Dialog with real touch. Retained language and native host services are outside this evidence."
         }
       ],
       "upstream_doc": {

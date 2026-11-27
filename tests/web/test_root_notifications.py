@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["playwright==1.58.0"]
 # ///
-"""Actual WASM opt-in Root notifications: responsive geometry and real touch at two widths."""
+"""Root-owned Dialog and responsive notifications in actual WASM on two viewports."""
 import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -62,6 +62,20 @@ def main():
                     page.evaluate('(f)=>cuiGallery.exports.gallery_root_stats(f)', f) > 0
                     for f in (1, 2, 3, 4)
                 )
+                audit.tap(audit.target('Open root dialog', 1))
+                page.wait_for_function('cuiGallery.exports.gallery_root_stats(8)===1')
+                assert page.evaluate('cuiGallery.exports.gallery_root_stats(5)') > 0
+                applied = audit.target('Apply root dialog', 1)
+                option = audit.target('Enable plugin option')
+                assert applied['f'][2] > option['f'][2], (applied, option)
+                canvas = page.locator('canvas').bounding_box()
+                panel_width = page.evaluate('cuiGallery.exports.gallery_root_stats(12)')
+                assert 0 < panel_width <= min(420, canvas['width'] - 31), (panel_width, canvas)
+                audit.tap(option)
+                page.wait_for_function('cuiGallery.exports.gallery_root_stats(11)===1')
+                audit.tap(audit.target('Apply root dialog', 1))
+                page.wait_for_function('cuiGallery.exports.gallery_root_stats(8)===0')
+                assert 'cui_root_dialog_open_composed_v1' in page.locator('#snippet').text_content()
                 # CDP touch never introduces mouse hover: Close must already exist.
                 audit.tap(audit.target('Notify workspace', 1))
                 page.wait_for_function('cuiGallery.exports.gallery_root_stats(7)===1')
@@ -79,7 +93,7 @@ def main():
                 assert 'cui_root_render_with_options' in page.locator('#snippet').text_content()
                 assert not audit.errors, audit.errors
                 page.close()
-                print(f'PASS: Root responsive notice Close before hover, action geometry and touch at {width}px', flush=True)
+                print(f'PASS: Root Dialog and responsive notice touch at {width}px', flush=True)
             browser.close()
     finally:
         server.shutdown()

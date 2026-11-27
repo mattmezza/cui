@@ -51,7 +51,8 @@
         "cui_base_dialog_compose_v1",
         "cui_dialog_compose_v1",
         "cui_base_dialog_action_v1",
-        "cui_dialog_action_v1"
+        "cui_dialog_action_v1",
+        "cui_root_dialog_open_composed_v1"
       ],
       "state_types": [
         "cui_surface_state",
@@ -62,10 +63,11 @@
       ],
       "state_ownership": "Caller retains cui_surface_state, cui_dialog_layout_v1 and child data through end_frame; callback tokens are borrowed only during the active callback.",
       "interaction": "cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.",
-      "usage": "For intrinsic first-frame sizing, retain surface plus dialog layout, open with cui_dialog_open_v1, resolve current sizing, and submit six independent slots with cui_dialog_compose_v1 or its Base counterpart. Keep storage through end_frame; old surface/alert helpers remain unchanged. Held-input reset, Root/host and foreign slot builders remain separate limitations.",
+      "usage": "Retain surface and layout, then use cui_dialog_compose_v1 or its Base counterpart for six independent slots and current-frame sizing. Alternatively register the styled composition with cui_root_dialog_open_composed_v1 and let Root submit it. Keep storage through end_frame and through mounted ownership. Language slot builders and native window services remain separate.",
       "docs": [
         "docs/SURFACES.md",
         "docs/SURFACE_EVENTS.md",
+        "docs/ROOT.md",
         "docs/DIALOG_COMPOSITION.md"
       ],
       "callback_symbols": [
@@ -80,7 +82,8 @@
       "additional_public_headers": [
         "include/cui/cui_surface_events.h",
         "include/cui/cui_dialog_composition.h",
-        "include/cui/cui_dialog_composition_styled.h"
+        "include/cui/cui_dialog_composition_styled.h",
+        "include/cui/cui_root.h"
       ]
     },
     {
@@ -1928,7 +1931,8 @@
         "cui_base_dialog_compose_v1",
         "cui_dialog_compose_v1",
         "cui_base_dialog_action_v1",
-        "cui_dialog_action_v1"
+        "cui_dialog_action_v1",
+        "cui_root_dialog_open_composed_v1"
       ],
       "state_types": [
         "cui_surface_state",
@@ -1939,10 +1943,11 @@
       ],
       "state_ownership": "Caller retains cui_surface_state, cui_dialog_layout_v1 and child data through end_frame; callback tokens are borrowed only during the active callback.",
       "interaction": "cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.",
-      "usage": "For intrinsic first-frame sizing, retain surface plus dialog layout, open with cui_dialog_open_v1, resolve current sizing, and submit six independent slots with cui_dialog_compose_v1 or its Base counterpart. Keep storage through end_frame; old surface/alert helpers remain unchanged. Held-input reset, Root/host and foreign slot builders remain separate limitations.",
+      "usage": "Retain surface and layout, then use cui_dialog_compose_v1 or its Base counterpart for six independent slots and current-frame sizing. Alternatively register the styled composition with cui_root_dialog_open_composed_v1 and let Root submit it. Keep storage through end_frame and through mounted ownership. Language slot builders and native window services remain separate.",
       "docs": [
         "docs/SURFACES.md",
         "docs/SURFACE_EVENTS.md",
+        "docs/ROOT.md",
         "docs/ELEMENT_SHADOWS.md",
         "docs/DIALOG_COMPOSITION.md"
       ],
@@ -1958,7 +1963,8 @@
       "additional_public_headers": [
         "include/cui/cui_surface_events.h",
         "include/cui/cui_dialog_composition.h",
-        "include/cui/cui_dialog_composition_styled.h"
+        "include/cui/cui_dialog_composition_styled.h",
+        "include/cui/cui_root.h"
       ]
     },
     {
@@ -2114,22 +2120,26 @@
       "api_symbols": [
         "cui_root_init",
         "cui_root_render",
+        "cui_root_dialog_open_composed_v1",
+        "cui_root_dialog_close_top",
         "cui_root_dispose"
       ],
       "state_types": [
         "cui_root",
-        "cui_root_registry"
+        "cui_root_registry",
+        "cui_root_composed_dialog_v1"
       ],
       "state_ownership": "Caller retains cui_root, plugin instance storage, registry and bound surface/notification storage.",
       "interaction": "cui_root_content_fn composes application content; cui_root_copy_fn handles copy; plugins have explicit lifecycle hooks.",
-      "usage": "Initialize root/plugin storage, render content and facilities each frame, then dispose after use.",
+      "usage": "Initialize root and plugin storage, render content and facilities each frame, then dispose after use. Use cui_root_dialog_open_composed_v1 for a six-slot Dialog or AlertDialog and cui_root_dialog_close_top to request closure of the top dialog.",
       "docs": [
         "docs/ROOT.md"
       ],
       "callback_symbols": [
         "cui_root_content_fn",
         "cui_root_copy_fn",
-        "cui_root_plugin_build_fn"
+        "cui_root_plugin_build_fn",
+        "cui_root_dialog_sizing_fn"
       ],
       "scope": "styled frame component",
       "name": "Root View",

@@ -725,6 +725,7 @@ static cui_root_plugin_instance root_plugin_instances[1];
 static cui_root root_view;
 static cui_root_surface root_dialog_slots[2];
 static cui_surface_state root_dialog_surface, root_sheet_surface;
+static cui_dialog_layout_v1 root_dialog_layout;
 static cui_notification_state root_notices;
 static cui_notification_entry root_notice_entries[4];
 static bool root_dialog_checked;
@@ -765,15 +766,33 @@ static void gallery_root_plugin_overlay(cui_context *context, void *state, cui_r
     cui_text(context, cui_string("Plugin overlay"), 12, current_theme.text);
     cui_end_box(context);
 }
-static void gallery_root_dialog_content(cui_context *context, void *user) {
+static void gallery_root_dialog_body(cui_context *context, const cui_dialog_frame *frame,
+                                     void *user) {
+    (void)frame;
     (void)user;
     root_counts.dialogs++;
     cui_checkbox(context, cui_id_from(context, "root-dialog-option"), &current_theme,
                  cui_string("Enable plugin option"), &root_dialog_checked, false);
-    if (cui_button(context, cui_id_from(context, "root-dialog-apply"), &current_theme,
-                   cui_string("Apply root dialog"), false))
-        cui_surface_close(context, &root_dialog_surface, CUI_SURFACE_ACCEPTED);
 }
+static void gallery_root_dialog_footer(cui_context *context, const cui_dialog_frame *frame,
+                                       void *user) {
+    (void)user;
+    (void)cui_dialog_action_v1(context, frame, &current_theme,
+                               cui_id_from(context, "root-dialog-apply"),
+                               cui_string("Apply root dialog"), CUI_DIALOG_CONFIRM,
+                               (cui_button_options){.variant = CUI_BUTTON_PRIMARY});
+}
+static const cui_dialog_composition_v1 root_dialog_content = {
+    .struct_size = sizeof(cui_dialog_composition_v1),
+    .version = CUI_DIALOG_COMPOSITION_VERSION_1,
+    .name = {"Root dialog", sizeof("Root dialog") - 1},
+    .description = {"Choose which options the plugin enables.",
+                    sizeof("Choose which options the plugin enables.") - 1},
+    .present = (1u << CUI_DIALOG_BODY) | (1u << CUI_DIALOG_FOOTER),
+    .slots = {[CUI_DIALOG_BODY] = {gallery_root_dialog_body, NULL},
+              [CUI_DIALOG_FOOTER] = {gallery_root_dialog_footer, NULL}}};
+static cui_root_composed_dialog_v1 root_dialog = {
+    .layout = &root_dialog_layout, .options = {.margin = 16}, .composition = &root_dialog_content};
 static void gallery_root_sheet_content(cui_context *context, void *user) {
     (void)user;
     root_counts.sheets++;
@@ -790,14 +809,7 @@ static void gallery_root_content(cui_context *context, void *user) {
     cui_label(context, &current_theme, cui_string("Application content renders once"));
     cui_id dialog = cui_id_from(context, "root-dialog-trigger");
     if (cui_button(context, dialog, &current_theme, cui_string("Open root dialog"), root_disabled))
-        (void)cui_root_dialog_open(
-            &root_view, context,
-            (cui_root_surface){.surface = &root_dialog_surface,
-                               .title = cui_string("Root dialog"),
-                               .description = cui_string("Mounted after application content."),
-                               .options = {.width = 400, .height = 220, .margin = 16},
-                               .content = gallery_root_dialog_content},
-            dialog);
+        (void)cui_root_dialog_open_composed_v1(&root_view, context, &root_dialog, dialog);
     cui_id sheet = cui_id_from(context, "root-sheet-trigger");
     if (cui_button(context, sheet, &current_theme, cui_string("Open root sheet"), root_disabled))
         (void)cui_root_sheet_open(
@@ -837,6 +849,8 @@ float gallery_root_stats(int field) {
            : field == 8  ? root_dialog_surface.overlay.open
            : field == 9  ? root_sheet_surface.overlay.open
            : field == 10 ? root_notice_reviews
+           : field == 11 ? root_dialog_checked
+           : field == 12 ? root_dialog_layout.completed[0].w
                          : 0;
 }
 static void gallery_command_action(void *user) {
@@ -3514,6 +3528,8 @@ int gallery_init(void) {
         !cui_root_init(&root_view, root_plugin_instances, 1, &root_registry, NULL))
         return 0;
     cui_surface_init(&root_dialog_surface, cui_id_from(ui, "root-dialog"), CUI_SURFACE_DIALOG);
+    if (!cui_dialog_layout_init_v1(&root_dialog_layout, &root_dialog_surface))
+        return 0;
     cui_surface_init(&root_sheet_surface, cui_id_from(ui, "root-sheet"), CUI_SURFACE_SHEET);
     cui_notification_settings root_notice_settings = cui_notification_settings_default();
     root_notice_settings.shadow_policy = CUI_NOTIFICATION_SHADOW_SOURCE;

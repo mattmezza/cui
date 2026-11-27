@@ -2,6 +2,7 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_ROOT_H
 #define CUI_ROOT_H
+#include "cui_dialog_composition.h"
 #include "cui_status.h"
 #include "cui_surface.h"
 #ifdef __cplusplus
@@ -71,6 +72,26 @@ void *cui_root_plugin_state(const cui_root *, uint64_t key);
 bool cui_root_bind_facilities(cui_root *, cui_root_surface *dialogs, size_t dialog_capacity,
                               cui_notification_state *notifications);
 bool cui_root_dialog_open(cui_root *, cui_context *, cui_root_surface, cui_id trigger);
+typedef void (*cui_root_dialog_sizing_fn)(cui_rect viewport, cui_dialog_sizing_v1 *, void *);
+typedef struct {
+    cui_dialog_layout_v1 *layout;
+    cui_surface_options options;
+    const cui_dialog_composition_v1 *composition;
+    cui_root_dialog_sizing_fn refine_sizing;
+    void *sizing_user;
+} cui_root_composed_dialog_v1;
+/* Mount a closed composed Dialog or AlertDialog in Styled Root's existing stack.
+ * Root supplies the current viewport and layer. The optional sizing callback
+ * refines fresh defaults once per submission. Root borrows this descriptor,
+ * the layout, and its referenced data. Keep them live until a Root frame
+ * observes the close and ends, or dispose Root after the last frame. New
+ * dialogs opened during application or Sheet content can mount that frame.
+ * Dialogs opened from another dialog's slots mount on the next Root frame. */
+bool cui_root_dialog_open_composed_v1(cui_root *, cui_context *, cui_root_composed_dialog_v1 *,
+                                      cui_id trigger);
+/* Request close of the top open Dialog or AlertDialog in the shared stack.
+ * Its next submission runs the usual decision and focus policy. */
+bool cui_root_dialog_close_top(cui_root *, cui_context *, cui_surface_result);
 bool cui_root_sheet_open(cui_root *, cui_context *, cui_root_surface, cui_id trigger);
 bool cui_root_notification_push(cui_root *, cui_notification, double now_seconds);
 bool cui_root_set_copy_hook(cui_root *, cui_root_copy_fn, void *user);
@@ -107,8 +128,19 @@ bool cui_root_render_with_options(cui_context *, cui_id, cui_root *, const cui_t
 
 #if defined(CUI_ROOT_IMPLEMENTATION) && defined(CUI_ROOT_DECLARATIONS_READY) && !defined(CUI_ROOT_IMPLEMENTATION_ONCE)
 #define CUI_ROOT_IMPLEMENTATION_ONCE
+#ifndef CUI_DIALOG_COMPOSITION_STYLED_IMPLEMENTATION
+#define CUI_DIALOG_COMPOSITION_STYLED_IMPLEMENTATION
+#endif
+#include "cui_dialog_composition_styled.h"
 /* src/base/cui_root.c */
 /* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_ROOT_INTERNAL_H
+#define CUI_ROOT_INTERNAL_H
+
+bool cui_root_dialog_stack_valid(const cui_root *);
+bool cui_root_dialog_register(cui_root *, cui_root_surface);
+#endif
 
 #include <math.h>
 #include <string.h>
@@ -202,9 +234,13 @@ static void cui_root_compact_dialogs(cui_root *root) {
             root->dialogs[output++] = root->dialogs[i];
     root->dialog_count = output;
 }
-bool cui_root_dialog_open(cui_root *root, cui_context *ui, cui_root_surface dialog,
-                          cui_id trigger) {
-    if (!root || !root->initialized || !ui || !dialog.surface || !dialog.surface->overlay.id ||
+bool cui_root_dialog_stack_valid(const cui_root *root) {
+    return root && root->initialized && root->dialog_capacity <= 8 &&
+           root->dialog_count <= root->dialog_capacity && (!root->dialog_capacity || root->dialogs);
+}
+
+bool cui_root_dialog_register(cui_root *root, cui_root_surface dialog) {
+    if (!cui_root_dialog_stack_valid(root) || !dialog.surface || !dialog.surface->overlay.id ||
         (dialog.surface->kind != CUI_SURFACE_DIALOG && dialog.surface->kind != CUI_SURFACE_ALERT) ||
         (dialog.title.length && !dialog.title.data) ||
         (dialog.description.length && !dialog.description.data) || !dialog.content)
@@ -217,8 +253,27 @@ bool cui_root_dialog_open(cui_root *root, cui_context *ui, cui_root_surface dial
     if (root->dialog_count == root->dialog_capacity)
         return false;
     root->dialogs[root->dialog_count++] = dialog;
+    return true;
+}
+bool cui_root_dialog_open(cui_root *root, cui_context *ui, cui_root_surface dialog,
+                          cui_id trigger) {
+    if (!ui || !cui_root_dialog_register(root, dialog))
+        return false;
     cui_surface_open(ui, dialog.surface, trigger);
     return true;
+}
+bool cui_root_dialog_close_top(cui_root *root, cui_context *ui, cui_surface_result result) {
+    if (!ui || !cui_root_dialog_stack_valid(root) || result < CUI_SURFACE_ACCEPTED ||
+        result > CUI_SURFACE_CLOSED)
+        return false;
+    for (size_t i = root->dialog_count; i > 0; --i) {
+        cui_surface_state *surface = root->dialogs[i - 1].surface;
+        if (surface && surface->overlay.open) {
+            cui_surface_request_close(ui, surface, result);
+            return true;
+        }
+    }
+    return false;
 }
 bool cui_root_sheet_open(cui_root *root, cui_context *ui, cui_root_surface sheet, cui_id trigger) {
     if (!root || !root->initialized || !ui || !sheet.surface || !sheet.surface->overlay.id ||
@@ -317,6 +372,85 @@ bool cui_base_root_render(cui_context *ui, cui_id id, cui_root *root, cui_rect v
 
 /* src/components/cui_root.c */
 /* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_ROOT_INTERNAL_H
+#define CUI_ROOT_INTERNAL_H
+
+bool cui_root_dialog_stack_valid(const cui_root *);
+bool cui_root_dialog_register(cui_root *, cui_root_surface);
+#endif
+
+
+#include <math.h>
+#include <string.h>
+
+/* The existing callback field tags composed entries without changing the
+ * caller-owned Root or stack record ABI. This callback is never submitted. */
+static void cui_root_composed_dialog_marker(cui_context *ui, void *user) {
+    (void)ui;
+    (void)user;
+}
+
+bool cui_root_dialog_open_composed_v1(cui_root *root, cui_context *ui,
+                                      cui_root_composed_dialog_v1 *dialog, cui_id trigger) {
+    if (!ui || !dialog || !dialog->layout || !dialog->layout->surface ||
+        dialog->layout->surface->overlay.open ||
+        !cui_dialog_composition_valid_v1(dialog->composition) ||
+        !isfinite(dialog->options.margin) || dialog->options.margin < 0)
+        return false;
+    cui_root_surface entry = {.surface = dialog->layout->surface,
+                              .content = cui_root_composed_dialog_marker,
+                              .user = dialog};
+    if (!cui_root_dialog_register(root, entry))
+        return false;
+    if (cui_dialog_open_v1(ui, dialog->layout, trigger))
+        return true;
+    root->dialogs[--root->dialog_count] = (cui_root_surface){0};
+    return false;
+}
+
+static void cui_root_reclaim_composed_dialogs(cui_root *root) {
+    size_t remaining = 0;
+    for (size_t i = 0; i < root->dialog_count; ++i) {
+        cui_root_surface entry = root->dialogs[i];
+        if (entry.content != cui_root_composed_dialog_marker || entry.surface->overlay.open)
+            root->dialogs[remaining++] = entry;
+    }
+    while (root->dialog_count > remaining)
+        root->dialogs[--root->dialog_count] = (cui_root_surface){0};
+}
+
+static bool cui_root_render_dialog(cui_context *ui, const cui_theme *theme, cui_rect viewport,
+                                   int16_t layer, cui_root_surface entry) {
+    if (entry.content == cui_root_composed_dialog_marker) {
+        const cui_root_composed_dialog_v1 *dialog = entry.user;
+        cui_surface_options options = dialog->options;
+        options.viewport = viewport;
+        options.layer = layer;
+        if (!isfinite(options.margin) || options.margin < 0 || !dialog->layout ||
+            dialog->layout->surface != entry.surface) {
+            cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_INVALID_ACTION});
+            return false;
+        }
+        options.margin = fminf(options.margin, fminf(viewport.w, viewport.h) * .49f);
+        cui_dialog_sizing_v1 sizing;
+        if (!cui_dialog_sizing_default_v1(options, &sizing))
+            return false;
+        if (dialog->refine_sizing)
+            dialog->refine_sizing(viewport, &sizing, dialog->sizing_user);
+        return cui_dialog_compose_v1(ui, theme, dialog->layout, options, &sizing,
+                                     dialog->composition)
+            .valid;
+    }
+    entry.options.viewport = viewport;
+    entry.options.layer = layer;
+    if (cui_surface_begin(ui, theme, entry.surface, entry.title, entry.description,
+                          entry.options)) {
+        entry.content(ui, entry.user);
+        cui_surface_end(ui);
+    }
+    return true;
+}
 
 typedef struct {
     cui_root *root;
@@ -326,6 +460,7 @@ typedef struct {
     double now_seconds;
     bool responsive_notifications;
     bool notifications_submitted;
+    bool dialogs_valid;
     cui_notification_advance notification_advance;
 } cui_root_facility_frame;
 static void cui_root_facilities(cui_context *ui, void *user) {
@@ -341,19 +476,20 @@ static void cui_root_facilities(cui_context *ui, void *user) {
             cui_surface_end(ui);
         }
     }
+    /* Take the snapshot before a facility callback can open another dialog.
+     * Application and Sheet content ran first and can mount immediately. */
     size_t count = root->dialog_count;
+    cui_root_surface dialogs[8];
+    if (count)
+        memcpy(dialogs, root->dialogs, count * sizeof dialogs[0]);
     for (size_t i = 0; i < count; i++) {
-        cui_root_surface dialog = root->dialogs[i];
-        if (!dialog.surface || !dialog.surface->overlay.open)
-            continue;
-        dialog.options.viewport = frame->viewport;
-        dialog.options.layer = (int16_t)(3 + i * 2);
-        if (cui_surface_begin(ui, frame->theme, dialog.surface, dialog.title, dialog.description,
-                              dialog.options)) {
-            dialog.content(ui, dialog.user);
-            cui_surface_end(ui);
-        }
+        cui_root_surface dialog = dialogs[i];
+        if (dialog.surface && dialog.surface->overlay.open &&
+            !cui_root_render_dialog(ui, frame->theme, frame->viewport, (int16_t)(3 + i * 2),
+                                    dialog))
+            frame->dialogs_valid = false;
     }
+    cui_root_reclaim_composed_dialogs(root);
     cui_rect notification_viewport = frame->viewport;
     if (root->sheet.surface && root->sheet.surface->overlay.open) {
         cui_surface_options options = root->sheet.options;
@@ -393,20 +529,22 @@ bool cui_root_render_with_options(cui_context *ui, cui_id id, cui_root *root,
                                   const cui_root_style_override *instance_override,
                                   cui_root_content_fn content, void *content_user,
                                   double now_seconds, cui_root_render_options options) {
-    if (!theme || !root || root->dialog_capacity > 8 || (root->dialog_count && !root->dialogs))
+    if (!theme || !cui_root_dialog_stack_valid(root))
         return false;
     cui_root_facility_frame frame = {.root = root,
                                      .theme = theme,
                                      .viewport = viewport,
                                      .id = id,
+                                     .dialogs_valid = true,
                                      .now_seconds = now_seconds,
                                      .responsive_notifications = options.responsive_notifications};
     cui_root_style defaults = {.background = theme->background, .foreground = theme->text};
     bool rendered = cui_base_root_render(ui, id, root, viewport, defaults, instance_override,
                                          content, content_user, cui_root_facilities, &frame);
-    if (rendered && frame.notifications_submitted && options.notification_advance)
+    if (rendered && frame.dialogs_valid && frame.notifications_submitted &&
+        options.notification_advance)
         *options.notification_advance = frame.notification_advance;
-    return rendered;
+    return rendered && frame.dialogs_valid;
 }
 bool cui_root_render(cui_context *ui, cui_id id, cui_root *root, const cui_theme *theme,
                      cui_rect viewport, const cui_root_style_override *instance_override,

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_root.h"
+#include "cui_root_internal.h"
 #include <math.h>
 #include <string.h>
 bool cui_root_registry_init(cui_root_registry *registry, cui_root_plugin *entries,
@@ -92,9 +92,13 @@ static void cui_root_compact_dialogs(cui_root *root) {
             root->dialogs[output++] = root->dialogs[i];
     root->dialog_count = output;
 }
-bool cui_root_dialog_open(cui_root *root, cui_context *ui, cui_root_surface dialog,
-                          cui_id trigger) {
-    if (!root || !root->initialized || !ui || !dialog.surface || !dialog.surface->overlay.id ||
+bool cui_root_dialog_stack_valid(const cui_root *root) {
+    return root && root->initialized && root->dialog_capacity <= 8 &&
+           root->dialog_count <= root->dialog_capacity && (!root->dialog_capacity || root->dialogs);
+}
+
+bool cui_root_dialog_register(cui_root *root, cui_root_surface dialog) {
+    if (!cui_root_dialog_stack_valid(root) || !dialog.surface || !dialog.surface->overlay.id ||
         (dialog.surface->kind != CUI_SURFACE_DIALOG && dialog.surface->kind != CUI_SURFACE_ALERT) ||
         (dialog.title.length && !dialog.title.data) ||
         (dialog.description.length && !dialog.description.data) || !dialog.content)
@@ -107,8 +111,27 @@ bool cui_root_dialog_open(cui_root *root, cui_context *ui, cui_root_surface dial
     if (root->dialog_count == root->dialog_capacity)
         return false;
     root->dialogs[root->dialog_count++] = dialog;
+    return true;
+}
+bool cui_root_dialog_open(cui_root *root, cui_context *ui, cui_root_surface dialog,
+                          cui_id trigger) {
+    if (!ui || !cui_root_dialog_register(root, dialog))
+        return false;
     cui_surface_open(ui, dialog.surface, trigger);
     return true;
+}
+bool cui_root_dialog_close_top(cui_root *root, cui_context *ui, cui_surface_result result) {
+    if (!ui || !cui_root_dialog_stack_valid(root) || result < CUI_SURFACE_ACCEPTED ||
+        result > CUI_SURFACE_CLOSED)
+        return false;
+    for (size_t i = root->dialog_count; i > 0; --i) {
+        cui_surface_state *surface = root->dialogs[i - 1].surface;
+        if (surface && surface->overlay.open) {
+            cui_surface_request_close(ui, surface, result);
+            return true;
+        }
+    }
+    return false;
 }
 bool cui_root_sheet_open(cui_root *root, cui_context *ui, cui_root_surface sheet, cui_id trigger) {
     if (!root || !root->initialized || !ui || !sheet.surface || !sheet.surface->overlay.id ||

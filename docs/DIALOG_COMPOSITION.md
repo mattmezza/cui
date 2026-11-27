@@ -6,8 +6,8 @@ checkpoint `138c3a39`, with the focused native proof and cache correction in
 geometry/current-font software tests, owner actions and the complete example
 have been exercised locally. Configured distribution, canonical generated
 freshness, gallery/browser and wider compatibility checks are tracked separately;
-see the validation receipts before claiming a backend or full parity. This work is
-unreleased; Root/host and all five foreign composition facades remain unfinished. Use
+see the validation receipts before claiming a backend or full parity. Styled Root can mount these dialogs automatically. Native window-service
+integration and all five language composition facades remain unfinished. Use
 headers, sources, SDK and generated resources from one matching revision.
 
 ## API and ownership
@@ -156,8 +156,10 @@ the newly published layout. Use `cui_dialog_open_v1` for each new lifetime.
 
 This applies to C Base and Styled Dialog and AlertDialog, including caller-authored
 controls. Core keeps event targets available for inspection. Application-owned
-gesture models remain the application's responsibility. Root/native-host
-ownership and foreign slot builders remain open.
+gesture models remain the application's responsibility. Use the
+[Root mounting API](ROOT.md#mount-a-composed-dialog-or-alertdialog) to submit
+this composition from the window's Root. Language builders and native
+window-service integration remain open.
 
 Inspect both `cui_dialog_submit_result` and the error after `cui_end_frame`.
 `valid=false` rejects a descriptor or reports a later submission failure;

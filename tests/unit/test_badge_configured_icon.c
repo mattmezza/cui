@@ -240,6 +240,120 @@ static void artwork_failures(void) {
     cui_destroy(ui);
     cui_icon_state_destroy(&state);
 }
+/* Independent decimal oracle using digit division rather than snprintf. */
+static size_t expected_decimal(size_t value, char *output) {
+    char reverse[3 * sizeof(size_t)];
+    size_t digits = 0;
+    do {
+        reverse[digits++] = (char)('0' + value % 10);
+        value /= 10;
+    } while (value);
+    for (size_t i = 0; i < digits; ++i)
+        output[i] = reverse[digits - i - 1];
+    output[digits] = '\0';
+    return digits;
+}
+static void count_boundaries(void) {
+    char largest[3 * sizeof(size_t) + 1], overflow[sizeof(largest) + 1];
+    expected_decimal(SIZE_MAX, largest);
+    size_t digits = expected_decimal(SIZE_MAX - 1, overflow);
+    overflow[digits] = '+';
+    overflow[digits + 1] = '\0';
+    const struct {
+        size_t count, maximum;
+        const char *label;
+    } cases[] = {{0, 99, NULL},
+                 {1, 99, "1"},
+                 {9, 99, "9"},
+                 {10, 99, "10"},
+                 {99, 99, "99"},
+                 {100, 99, "99+"},
+                 {7, 7, "7"},
+                 {8, 7, "7+"},
+                 {0, 0, NULL},
+                 {1, 0, "0+"},
+                 {SIZE_MAX, 0, "0+"},
+                 {SIZE_MAX, SIZE_MAX, largest},
+                 {SIZE_MAX, SIZE_MAX - 1, overflow}};
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 100});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    unsigned before = calls;
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        cui_badge_options o = cui_badge_defaults();
+        o.count = cases[i].count;
+        o.maximum = cases[i].maximum;
+        assert(cui_begin_frame(ui, 400, 100, .016f));
+        assert(cui_badge_ex(ui, 100, &theme, o, content, &calls));
+        cui_draw_list list = cui_end_frame(ui);
+        size_t n;
+        const cui_semantic *sem = cui_semantics(ui, &n);
+        assert(cui_bounds(ui, 100).w == 80 && cui_bounds(ui, 100).h == 40);
+        assert(calls == before + i + 1 && cui_last_error(ui) == CUI_OK);
+        unsigned texts = 0;
+        for (size_t j = 0; j < list.count; ++j) {
+            if (list.commands[j].type != CUI_DRAW_TEXT)
+                continue;
+            ++texts;
+            assert(cases[i].label);
+            assert(list.commands[j].text.length == strlen(cases[i].label));
+            assert(
+                !memcmp(list.commands[j].text.data, cases[i].label, list.commands[j].text.length));
+        }
+        if (!cases[i].label) {
+            assert(n == 0 && texts == 0);
+            assert(cui_bounds(ui, cui_badge_indicator_id(100)).w == 0);
+            continue;
+        }
+        size_t length = strlen(cases[i].label);
+        assert(n == 1 && texts == 1);
+        assert(sem[0].id == cui_badge_indicator_id(100) && sem[0].role == CUI_ROLE_STATUS);
+        assert(sem[0].name.length == length && !memcmp(sem[0].name.data, cases[i].label, length));
+        assert(sem[0].details.parent == 100 && sem[0].details.no_focus);
+        assert(sem[0].tab_index == -1 && !sem[0].focused && !sem[0].disabled);
+        cui_rect mark = cui_bounds(ui, cui_badge_indicator_id(100));
+        float width = fmaxf(14, cui_measure_text(ui, cui_string(cases[i].label), 10).width + 4);
+        assert(mark.w == width && mark.h == 14);
+        assert(fabsf(mark.x + mark.w - (80 + 3 * length)) < .01f && mark.y == -3);
+    }
+    /* Reuse one identity across variants: numeric changes must not leak text or
+     * old names into passive dot/icon markers, and zero count must remove them. */
+    const cui_badge_variant variants[] = {CUI_BADGE_DOT, CUI_BADGE_ICON, CUI_BADGE_COUNT,
+                                          CUI_BADGE_DOT, CUI_BADGE_ICON, CUI_BADGE_COUNT};
+    for (size_t i = 0; i < sizeof(variants) / sizeof(variants[0]); ++i) {
+        cui_badge_options o = cui_badge_defaults();
+        o.variant = variants[i];
+        o.count = i < 3 ? SIZE_MAX : 0;
+        o.maximum = 0;
+        o.icon = cui_string("check");
+        o.name = i == 0 ? cui_string("Unread") : (cui_str){0};
+        assert(cui_begin_frame(ui, 400, 100, .016f));
+        assert(cui_badge_ex(ui, 100, &theme, o, content, &calls));
+        cui_draw_list list = cui_end_frame(ui);
+        size_t n;
+        const cui_semantic *sem = cui_semantics(ui, &n);
+        if (i == 5) {
+            assert(n == 0 && list.count == 0);
+            continue;
+        }
+        const char *name = i == 0                        ? "Unread"
+                           : o.variant == CUI_BADGE_DOT  ? "Notification"
+                           : o.variant == CUI_BADGE_ICON ? "Status"
+                                                         : "0+";
+        assert(n == 1 && sem[0].name.length == strlen(name));
+        assert(!memcmp(sem[0].name.data, name, strlen(name)));
+        assert(sem[0].details.no_focus && sem[0].tab_index == -1 && !sem[0].focused);
+        cui_rect mark = cui_bounds(ui, cui_badge_indicator_id(100));
+        if (o.variant != CUI_BADGE_COUNT) {
+            float extent = o.variant == CUI_BADGE_DOT ? 6 : 16;
+            assert(mark.w == extent && mark.h == extent && mark.x + mark.w == 80);
+            assert(mark.y == (o.variant == CUI_BADGE_DOT ? 0 : 40 - extent));
+            for (size_t j = 0; j < list.count; ++j)
+                assert(list.commands[j].type != CUI_DRAW_TEXT);
+        }
+    }
+    cui_destroy(ui);
+}
 int main(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
     assert(ui);
@@ -291,6 +405,7 @@ int main(void) {
     assert(cui_bounds(ui, marker).w == 16);
     cui_destroy(ui);
     cui_icon_state_destroy(&state);
+    count_boundaries();
     legacy_control();
     pixel_control();
     nested_resize();

@@ -50,13 +50,23 @@ function skeletonControl(id,label,choices){
  input.id='skeleton-'+id;
  input.setAttribute('aria-label','Skeleton '+label);
  for(const [value,text] of choices)input.add(new Option(text,value));
- input.addEventListener('change',requestFrame);
+ input.addEventListener('change',()=>{syncSkeletonControls();requestFrame();});
  skeletonControls.append(input,' ');
  return input;
 }
-const skeletonState=skeletonControl('state','profile state',[[1,'Loading profile'],[0,'Loaded profile']]);
+const skeletonLayout=skeletonControl('layout','layout',[[0,'Profile card'],[1,'Article list'],[2,'Table rows']]);
+const skeletonState=skeletonControl('state','state',[[1,'Loading'],[0,'Loaded']]);
+const skeletonRem=skeletonControl('rem','base size',[[12,'12px base'],[16,'16px base'],[20,'20px base']]);
 const skeletonAppearance=skeletonControl('appearance','appearance',[[0,'Theme'],[1,'Secondary'],[2,'Accent']]);
 $('control-size').after(skeletonControls);
+function syncSkeletonControls(){
+ skeletonAppearance.hidden=skeletonState.value==='0';
+ const color=skeletonAppearance.value==='1'?'style.secondary = true;\n':
+  skeletonAppearance.value==='2'?'style.custom_background = true;\nstyle.root.background = theme.primary;\n':'';
+ $('snippet').textContent=snippets.Skeleton.replace('double next_wake',color+'double next_wake')
+  .replace('SKELETON_EXAMPLE_PROFILE',['SKELETON_EXAMPLE_PROFILE','SKELETON_EXAMPLE_ARTICLES','SKELETON_EXAMPLE_TABLE'][Number(skeletonLayout.value)])
+  .replace('16.0f',skeletonRem.value+'.0f');
+}
 const stepperControls=document.createElement('span');
 stepperControls.id='stepper-controls';stepperControls.hidden=true;
 function stepperControl(id,label,options,value){
@@ -579,40 +589,19 @@ cui_table_end(ui); /* Table */`,
  Bubble:'cui_begin_bubble(ui, id, &theme, CUI_BUBBLE_FILLED, 240);\ncui_label(ui, &theme, cui_string("Message"));\ncui_end_bubble(ui);',
  Empty:'const cui_empty_slot title = {.text = cui_string("No projects yet")};\nconst cui_empty_slot description = {.text = cui_string("Create your first project.")};\nconst cui_empty_header header = {.title = &title, .description = &description};\ncui_empty_ex(ui, id, &theme, (cui_empty_options){\n    .header = &header, .accessible_name = cui_string("Empty workspace")});\n/* content.children accepts a borrowed callback that submits native controls;\n   see the Empty guide for a complete action-button example. */',
  GroupBox:'cui_begin_group_box(ui, id, &theme, cui_string("Preferences"), 320);\ncui_label(ui, &theme, cui_string("Your settings"));\ncui_end_group_box(ui);',
- Skeleton:`/* Include cui/cui_skeleton_presentation.h. Keep one motion array per profile. */
-static cui_loading_motion motion[3];
+ Skeleton:`/* Include the downloadable skeleton_recipes_example.h. */
+static skeleton_example_state recipe;
 cui_skeleton_palette palette;
 cui_skeleton_palette_from_theme(&theme, &palette);
-cui_begin_box(ui, id, (cui_box){.width = 1, .width_percent = true, .max_width = 480,
-                                .padding = 16, .gap = 12});
-cui_interact(ui, id, CUI_ROLE_REGION, cui_string("Profile"), false, false, 0);
-cui_set_tab_stop(ui, id, false);
-cui_set_semantic_details(ui, id, (cui_semantic_details){.busy = loading});
-double next_wake = 0;
-if (loading) {
-    cui_skeleton_presentation p = cui_skeleton_presentation_default();
-    p.now_seconds = now_seconds;
-    p.reduced_motion = reduced_motion;
-    const float widths[] = {40, .65f, 1};
-    const float heights[] = {40, 16, 28};
-    const char *keys[] = {"profile-avatar", "profile-name", "profile-description"};
-    for (size_t i = 0; i < 3; ++i) {
-        p.root.width = widths[i];
-        p.root.width_percent = i != 0;
-        p.root.height = heights[i];
-        p.root.radius = i == 0 ? 20 : 4;
-        cui_loading_motion_result result;
-        if (cui_skeleton_present(ui, cui_id_from(ui, keys[i]), &palette, &motion[i], p, &result) &&
-            result.next_wake_seconds > 0 && (!next_wake || result.next_wake_seconds < next_wake))
-            next_wake = result.next_wake_seconds;
-    }
-} else {
-    for (size_t i = 0; i < 3; ++i)
-        motion[i] = (cui_loading_motion){0};
-    cui_label(ui, &theme, cui_string("Sam Patel · Product designer"));
-}
-cui_end_box(ui);
-/* Schedule next_wake on the same clock as now_seconds. Zero means idle. */`,
+/* For an explicit built-in preset, use cui_skeleton_palette_preset_get. */
+cui_skeleton_presentation style = cui_skeleton_presentation_default();
+style.now_seconds = now_seconds;
+style.reduced_motion = reduced_motion;
+double next_wake = skeleton_example_draw(ui, "loading-sample", &theme,
+    &palette, &recipe, SKELETON_EXAMPLE_PROFILE, loading, 16.0f, style);
+/* Let your application set loading. Schedule next_wake on the same clock;
+   zero means there is no animation to schedule. */
+(void)next_wake;`,
  Spinner:'/* Retain one zero-initialized motion per spinner between frames. */\ncui_loading_motion motion = {0};\ncui_spinner_options options = cui_spinner_options_default();\noptions.now_seconds = now_seconds;\noptions.reduced_motion = reduced_motion;\ncui_loading_motion_result result;\ndouble next_wake = 0; /* Host schedules this deadline. */\nif (cui_spinner_ex(ui, id, &theme, &motion, options, &result))\n    next_wake = result.next_wake_seconds; /* Same clock domain. */\n(void)next_wake; /* Pass to the host scheduler; zero means idle. */',
  Tooltip:'/* Paint trigger before calling the tooltip. */\ncui_tooltip(ui, id, &theme, &hover, cui_string("Helpful detail"),\n    (cui_hover_options){.trigger = trigger_id, .viewport = viewport});',
  'Focus Trap':'if (cui_begin_focus_scope(ui, scope_id, true)) {\n    /* Paint focusable children here. */\n    cui_end_focus_scope(ui);\n}',
@@ -1062,6 +1051,8 @@ function render(){
  const wideDisclosure=largeDisclosureHeadings&&canvasWrap.scrollWidth>canvasWrap.clientWidth;
  canvas.style.touchAction=wideTimeField||widePagination||wideDisclosure?'pan-x':'none';
  const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):timeField?Math.max(width<420?560:360,timeFieldHeight+240):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'?($('popover-mode').value==='1'?520:320):selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<268?240:width-48<488?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?($('virtual-axis').value==='2'?390:360):selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(width,designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value!=='0'?10*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ if(selected.name==='Skeleton'&&skeletonLayout.value!=='0')
+  height=Math.max(height,48+14*Number(skeletonRem.value));
  if(disclosure){
   const rows=accordion?(disclosureMode===3?5:3):1;
   const multiple=$('disclosure-multiple').checked;
@@ -1154,8 +1145,8 @@ function render(){
  wasm.gallery_progress_mode(Number($('progress-mode').value));
  wasm.gallery_progress_shape(Number($('progress-shape').value));
  if(selected.name==='Skeleton'){
-  skeletonAppearance.hidden=skeletonState.value==='0';
-  wasm.gallery_skeleton_options(Number(skeletonState.value),Number(skeletonAppearance.value));
+  wasm.gallery_skeleton_options(Number(skeletonState.value),Number(skeletonAppearance.value),
+                                Number(skeletonLayout.value),Number(skeletonRem.value));
  }
  wasm.gallery_spinner_contract_options(Number($('spinner-sizing').value),Number($('spinner-rem').value));
  wasm.gallery_hover_policy(Number($('hover-policy').value));
@@ -1542,7 +1533,10 @@ function selectComponent(){
 
  sliderControls.hidden=selected.name!=='Slider';resetSliderControls();
  skeletonControls.hidden=selected.name!=='Skeleton';
- skeletonState.value='1';skeletonAppearance.value='0';skeletonAppearance.hidden=false;
+ skeletonLayout.value='0';skeletonState.value='1';skeletonRem.value='16';
+ skeletonAppearance.value='0';skeletonAppearance.hidden=false;
+ $('skeleton-source').hidden=selected.name!=='Skeleton';
+ $('density').hidden=selected.name==='Skeleton';
  $('disabled').parentElement.hidden=selected.name==='Skeleton';
  stepperControls.hidden=selected.name!=='Stepper';resetStepperControls();
  $('hover-policy').hidden=selected.name!=='HoverCard';

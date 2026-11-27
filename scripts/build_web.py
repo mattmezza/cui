@@ -103,6 +103,7 @@ def main():
     shutil.copytree(ROOT / 'web/assets', out / 'assets', dirs_exist_ok=True)
     for name in ['index.html', 'gallery.css', 'secure_input.js']:
         shutil.copyfile(ROOT / 'web' / name, out / name)
+    shutil.copyfile(ROOT / 'examples/skeleton_recipes/scene.h', out / 'skeleton_recipes_example.h')
     index = (ROOT / 'web/index.html').read_text(encoding='utf-8')
     index = versioned_index(index, (ROOT / 'include/cui/cui.h').read_text(encoding='utf-8'))
     (out / 'index.html').write_text(index, encoding='utf-8')

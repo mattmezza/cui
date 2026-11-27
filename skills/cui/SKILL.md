@@ -748,7 +748,11 @@ Explicit preset resolution preserves Skeleton source colors and authored alpha0;
 `from_theme` is a secondary-color fallback, never inferred preset identity.
 Focused worker native/software/WASM proof and root strict/distribution checks
 pass (17 headless checks and 18 skill tests). The additive `cui_skeleton_present` route owns its responsive root layout; read
-`docs/SKELETON_RESPONSIVE.md` and its header. Use the optional retained C bridge in `docs/BRIDGE_SKELETON.md` for copied
+`docs/SKELETON_RESPONSIVE.md` and its header. For profile, article-list and table
+loading recipes with app-owned rem and busy/status, see `examples/skeleton_recipes/scene.h`.
+Pass an owned palette directly for an authored Skeleton color. The strict legacy
+ThemeSet importer does not accept `skeleton.background`.
+Use the optional retained C bridge in `docs/BRIDGE_SKELETON.md` for copied
 configuration, responsive sizing, and per-node wake hints on the Core clock.
 Use `docs/PYTHON_SKELETON.md` for the optional Python responsive builder and
 the runnable profile UI. See `docs/NODE_SKELETON.md`, `docs/GO_SKELETON.md`

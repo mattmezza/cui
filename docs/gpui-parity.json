@@ -3352,11 +3352,21 @@
       },
       "limitations": [
         "Placeholder dimensions/radii, source-audited secondary-opacity quadratic pulse, custom content, caller-owned clocks and finite wake/reduced-motion quiescence tested. Skeleton is decorative in the pinned source; applications own meaningful loading announcements. Richer placeholder layouts remain application composition.",
-        "Alpha.4 ships owned palette and responsive C presentation. The subsequent profile gallery uses preset, secondary and custom colors and replaces decorative shapes with loaded content. The optional retained C bridge and Python, JavaScript, TypeScript, Go and Rust builders support responsive presentation. See docs/SKELETON_RESPONSIVE.md."
+        "Alpha.4 ships owned palette and responsive C presentation. The gallery composes profile, article-list and table-row loading states with app-owned base sizing and real content. Button and form recipes are additional application compositions. The optional retained C bridge and Python, JavaScript, TypeScript, Go and Rust builders support responsive presentation. See docs/SKELETON_RESPONSIVE.md.",
+        "Built-in palettes expose the dedicated Skeleton token. The strict legacy ThemeSet importer cannot retain a custom skeleton.background token. Applications can supply the owned palette directly."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
+        {
+          "name": "profile, article-list and table loading recipes",
+          "status": "tested",
+          "evidence": [
+            "examples/skeleton_recipes/scene.h",
+            "tests/web/test_status_motion.py",
+            "tests/web/test_snippets.py"
+          ]
+        },
         {
           "name": "placeholder sizes/layout",
           "status": "tested",

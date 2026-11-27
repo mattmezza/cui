@@ -2,27 +2,42 @@
 
 Alpha.4 ships the C presentation API. Strict native C11, four C/C++ header-order
 consumers, responsive/contract tests, frozen legacy checks and pinned WASM
-compilation passed. Modern options in the five language builders remain open. See the
+compilation passed. The retained bridge and Python, JavaScript, TypeScript, Go and
+Rust builders shipped responsive options in alpha.5. See the
 [worker receipt](validation/skeleton-responsive-first.json) and
 [root receipt](validation/skeleton-responsive-root.json).
 
 Include `cui/cui_skeleton_presentation.h`. This is a separate additive route;
 `cui_skeleton`, `cui_skeleton_ex` and `cui_skeleton_with_palette` are unchanged.
 
-## Loading a profile
+## Loading a profile, article list or table
 
-The gallery composes a fixed circular avatar, a growing column with two fraction
-width bars, and a full-width block. The Theme appearance reads the current
-preset's owned Skeleton palette. Secondary halves its alpha. Accent supplies an
-explicit custom background using the theme's primary color.
+The gallery's **Layout** control offers three C recipes. **Profile card** combines
+a circular avatar placeholder, two fractional text bars and a full-width block.
+**Article list** pairs a square thumbnail with two lines per row. **Table rows**
+keeps the column headers visible and gives the first column the remaining width
+after reserving a fixed-width status column. Choose **Base size** to scale the
+shapes, text and spacing from an application-owned logical rem.
 
-The application marks the surrounding Profile region busy while loading. Choose
-**Loaded profile** to replace the shapes with content and a completion status.
-Each shape owns independent motion state. A host schedules the earliest positive
-deadline across the shapes. When content replaces the placeholders, the demo
-resets their motion and goes idle. **Copy code** gives you the basic
-loading and content branches for a single profile. The shapes themselves add
-no focus stops or accessibility nodes.
+The **Theme** appearance reads the active preset's owned Skeleton palette.
+**Secondary** halves its alpha. **Accent** uses the theme's primary color as an
+explicit override. For a custom theme, `cui_skeleton_palette_from_theme` copies
+`theme.secondary`. An independently authored Skeleton color can be passed in
+the owned palette. The strict legacy ThemeSet importer currently rejects
+`skeleton.background`; partial imports skip it and report an unsupported field.
+
+Choose **Loaded** to replace the shapes with a profile, article titles or file
+names and statuses. Each recipe keeps its surrounding region and announces the
+completion through an application-owned status. Placeholders are decorative
+and add no focus stops or accessibility nodes. Each shape owns independent
+motion state. The host schedules the earliest positive deadline and goes idle
+when the ready content replaces the placeholders.
+
+**Download the C recipe header** gives you the public-API implementation used
+in the preview. **Copy code** gives you the call for the selected layout, scale
+and paint. Include the downloaded header, keep one zero-initialized
+`skeleton_example_state` per instance, and pass your own loading flag and a
+stable key. The source is also available in [the repository example](../examples/skeleton_recipes/scene.h).
 
 ```c
 /* Persistent application-owned state, one per independent placeholder. */
@@ -101,8 +116,8 @@ API first-frame/resize tests. Percentage HEIGHT remains rejected
 by existing registered scroll admission. A cleared diagnostic cannot make that
 failed geometry valid; rebuild a fresh healthy frame. No Core admission widening,
 GPU/native accessibility or full Styled/platform parity is claimed. The gallery
-browser test separately verifies responsive dimensions at desktop and mobile
-width, preset/secondary/accent pixels and busy/loaded semantics.
+browser test verifies responsive dimensions and busy/loaded semantics at desktop
+and mobile width, plus preset, secondary and accent pixels.
 
 The [retained C bridge](BRIDGE_SKELETON.md) exposes a copied configuration and
 owns the per-node pulse. It keeps the direct frame API separate.

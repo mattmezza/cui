@@ -172,6 +172,7 @@ def main():
     }
     includes = '\n'.join(f'#include "cui/{path.name}"' for path in sorted((ROOT / 'include/cui').glob('*.h'))
                          if not path.stem.startswith(('cui_sdl', 'cui_sokol', 'cui_renderer', 'cui_software')))
+    includes += '\n#include "skeleton_recipes/scene.h"'
     setup = '''
 static void draw_message_row(cui_context *ui, cui_id id, size_t index, void *user, float width) {
     (void)ui; (void)id; (void)index; (void)user; (void)width;
@@ -210,7 +211,8 @@ static void draw_profile(cui_context *ui) { (void)ui; }
                 paths.append(path)
         subprocess.run(['cc', '-std=c11', '-fsyntax-only', '-Wall', '-Wextra',
                         '-Werror', '-Wno-unused-variable', '-Wno-unused-parameter',
-                        '-I', str(ROOT / 'include'), *map(str, paths)], check=True)
+                        '-I', str(ROOT / 'include'), '-I', str(ROOT / 'examples'),
+                        *map(str, paths)], check=True)
     print(f'PASS: {len(stories)} gallery stories covered; {len(excerpts)} displayed excerpts compile')
 
 

@@ -208,7 +208,9 @@ API: `cui_begin_bubble`, `cui_end_bubble`. [Public header](../include/cui/cui_co
 
 **Interaction:** Returns true on activation; invoke the application action in that branch.
 
-**Usage:** For Save, call save_document only when cui_button returns true. content is a composition callback, not an action handler.
+**Usage:** For Save, call save_document only when cui_button returns true. Choose keyboard focus paint with cui_button_focus_ex for a Button, cui_button_group_focus_ex for a joined group, or cui_bridge_set_button_focus_v1 for a retained Button. Use cui_button_styled_focus_ex or cui_button_surface_focus_ex to combine the mode with existing style callbacks.
+
+The `content` callback composes the Button's children.
 
 API: `cui_button`, `cui_button_ex`. [Public header](../include/cui/cui_components.h); [guide](BUTTON.md).
 
@@ -331,7 +333,7 @@ Event API: `cui_hover_update_events`, `cui_begin_hover_card_events`.
 
 **Interaction:** cui_icon_loader_fn resolves SVG resources; no click callback.
 
-**Usage:** Initialize custom icon state, load data/name/path, submit each frame and destroy prepared resources after use.
+**Usage:** Initialize custom icon state, load data/name/path, submit each frame and destroy prepared resources after use. Share size and solid tint through immediate box defaults or a retained Row or Column.
 
 API: `cui_icon`, `cui_icon_named`, `cui_icon_state_init`, `cui_icon_state_destroy`. [Public header](../include/cui/cui_icon.h), [guide](ICON.md).
 
@@ -355,11 +357,11 @@ API: `cui_image`. [Public header](../include/cui/cui_media.h); [guide](MEDIA.md)
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns shortcut text and optional formatting buffer.
+**State:** Caller owns keymap, shortcut text and optional formatting buffer.
 
 **Interaction:** Presentation only; shortcut dispatch belongs to the application.
 
-**Usage:** Submit typed single-stroke hints with Unicode first-scalar uppercase or supply a literal. Style a keycap's width, wrapping, typography and text paint in immediate C or through the optional retained API. The host owns shortcut registration.
+**Usage:** Submit typed single-stroke hints with Unicode first-scalar uppercase or supply a literal. Read the first stroke of a resolved host binding in C. Plain typed hints inherit scoped size and solid color. Style a keycap's width, wrapping, typography and text paint in immediate C or through the optional retained API.
 
 API: `cui_kbd`, `cui_kbd_format`, `cui_kbd_ex`, `cui_kbd_format_stroke`, `cui_kbd_styled`, `cui_kbd_label_styled`. [Public header](../include/cui/cui_content.h) · [Typed hints](../include/cui/cui_kbd.h) · [Guide](KBD.md)
 
@@ -371,7 +373,7 @@ API: `cui_kbd`, `cui_kbd_format`, `cui_kbd_ex`, `cui_kbd_format_stroke`, `cui_kb
 
 **Interaction:** Optional semantic control association; presentation has no action callback.
 
-**Usage:** Compose secondary text, Unicode highlights and private scalar masking with cui_label_options; the plain wrapper remains available.
+**Usage:** Compose secondary text, Unicode highlights and private scalar masking with cui_label_options. Both immediate Label routes can share scoped size and solid color with an Icon.
 
 API: `cui_label`, `cui_label_source`, `cui_label_prepare`. [Public header](../include/cui/cui_components.h); [guide](COMPONENTS.md); [guide](TYPOGRAPHY.md); [guide](LABEL.md).
 
@@ -510,7 +512,7 @@ API: `cui_skeleton`, `cui_loading_phase`, `cui_skeleton_options_default`, `cui_s
 
 **Interaction:** Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.
 
-**Usage:** Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Use optional rem or custom-pixel sizing, a custom SVG painter or finite turns from custom easing. Retained builders offer copied catalog icons and motion settings, and can bind same-app Icon resources for custom SVG after mount.
+**Usage:** Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Set custom sizing or a box's fallback tint, and use a custom SVG painter or easing. Retained builders offer copied settings and mounted same-app Icon resources.
 
 API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loading_phase`, `cui_bridge_spinner_versions`, `cui_bridge_spinner_config_size_v1`, `cui_bridge_spinner_presentation_size_v1`, `cui_bridge_spinner_configure_v1`, `cui_bridge_spinner_get_config_v1`, `cui_bridge_spinner_get_presentation_v1`, `cui_bridge_spinner_icon_resource_versions`, `cui_bridge_spinner_set_icon_resource_v1`, `cui_bridge_spinner_get_icon_resource_v1`. [Public header](../include/cui/cui_content.h); [guide](SPINNER.md).
 

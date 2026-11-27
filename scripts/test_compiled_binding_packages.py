@@ -64,7 +64,7 @@ def main():
         shutil.copy2(ROOT / "tests/packaging/go_smoke.go", consumer / "main.go")
         examples = ("time_field_localized", "pagination_options", "radio_delivery",
                     "rating_options", "stepper_visual", "virtual_list_inbox", "disclosure_preferences",
-                    "attachment_actions", "attachment_slots")
+                    "attachment_actions", "attachment_slots", "dialog_composition")
         for example in examples:
             destination = consumer / example
             destination.mkdir()

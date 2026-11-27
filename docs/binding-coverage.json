@@ -39,7 +39,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The retained C bridge exposes named slots, sizing and typed Footer actions. Python, JavaScript, TypeScript, Go and Rust still expose the legacy surface subset. Immediate C slot callbacks, synchronous decisions, Root-managed composition and Core focus-scope input cancellation are unavailable in those builders."
+        "The retained C bridge and Python, JavaScript, TypeScript, Go and Rust builders expose named slots, copied sizing and typed Footer actions. Their close events are queued after the frame. Immediate C slot callbacks, synchronous decisions, Root-managed composition, and native window modal services remain outside the retained builders."
       ]
     },
     {
@@ -780,7 +780,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The retained C bridge exposes named slots, sizing and typed Footer actions. Python, JavaScript, TypeScript, Go and Rust still expose the legacy surface subset. Immediate C slot callbacks, synchronous decisions, Root-managed composition and Core focus-scope input cancellation are unavailable in those builders."
+        "The retained C bridge and Python, JavaScript, TypeScript, Go and Rust builders expose named slots, copied sizing and typed Footer actions. Their close events are queued after the frame. Immediate C slot callbacks, synchronous decisions, Root-managed composition, and native window modal services remain outside the retained builders."
       ]
     },
     {

@@ -180,7 +180,7 @@ def main():
         subprocess.run([str(python), "appointments.py"], cwd=clean, env=env, check=True)
         for example in ("pagination", "radio_delivery", "rating_options",
                         "stepper_visual", "virtual_list_inbox", "workspace_preferences",
-                        "attachment_actions", "attachment_slots"):
+                        "attachment_actions", "attachment_slots", "dialog_composition"):
             filename = f"{example}.py"
             shutil.copy2(ROOT / "bindings/python/examples" / filename, clean / filename)
             subprocess.run([str(python), filename], cwd=clean, env=env, check=True)
@@ -191,7 +191,7 @@ def main():
         subprocess.run(["node", "node_smoke.cjs"], cwd=clean, env=env, check=True)
         for example in ("time-field-localized", "pagination-options", "radio-delivery",
                         "rating-options", "stepper_visual", "virtual-list-inbox", "workspace-preferences",
-                        "attachment-actions", "attachment-slots"):
+                        "attachment-actions", "attachment-slots", "dialog-composition"):
             filename = f"{example}.cjs"
             code = (ROOT / "bindings/node/examples" / filename).read_text(encoding="utf-8")
             code = code.replace("require('../index.cjs')", "require('@cui/native')")
@@ -202,7 +202,7 @@ def main():
         shutil.copy2(ROOT / "tests/packaging/typescript_smoke.cts", clean / "typescript_smoke.cts")
         typed_examples = ("time_field_localized", "pagination_options", "radio_delivery",
                           "rating_options", "stepper_visual", "virtual_list_inbox", "workspace_preferences",
-                          "attachment_actions", "attachment_slots")
+                          "attachment_actions", "attachment_slots", "dialog_composition")
         for example in typed_examples:
             code = (ROOT / "bindings/typescript/examples" / f"{example}.ts").read_text(encoding="utf-8")
             code = code.replace("'../../node/index.cjs'", "'@cui/native'")

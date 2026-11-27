@@ -23,6 +23,8 @@
     "skeleton-presentation.cjs",
     "spinner-presentation.cjs",
     "popover-options.cjs",
+    "dialog-composition.cjs",
+    "dialog_composition_internal.h",
     "popover_options_internal.h",
     "pagination-options.cjs",
     "icon-resources.cjs",

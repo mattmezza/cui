@@ -133,6 +133,12 @@ add_test(NAME bridge_python
   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python
   CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
   ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_bridge.py)
+add_test(NAME bridge_python_dialog_composition COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_dialog_composition.py)
+add_test(NAME bridge_python_dialog_composition_example COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/examples/dialog_composition.py)
 add_test(NAME bridge_python_pagination COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_pagination_options.py)

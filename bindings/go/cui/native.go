@@ -475,6 +475,43 @@ static cui_bridge_status go_popover_configure(cui_bridge_app *app, cui_bridge_no
   : CUI_BRIDGE_INVALID_STATE;
 }
 
+#if defined(CUI_GO_STATIC)
+#pragma weak cui_bridge_dialog_configure_v1
+#pragma weak cui_bridge_dialog_slot_create_v1
+#pragma weak cui_bridge_dialog_set_action_v1
+#endif
+static cui_bridge_status (*dialog_configure)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                                            const cui_bridge_dialog_config_v1 *);
+static cui_bridge_status (*dialog_slot_create)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                                              const char *, cui_bridge_node *);
+static cui_bridge_status (*dialog_action_set)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static void go_dialog_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&dialog_configure, sizeof dialog_configure, "cui_bridge_dialog_configure_v1");
+  go_load_optional_symbol(&dialog_slot_create, sizeof dialog_slot_create, "cui_bridge_dialog_slot_create_v1");
+  go_load_optional_symbol(&dialog_action_set, sizeof dialog_action_set, "cui_bridge_dialog_set_action_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else {
+  dialog_configure = cui_bridge_dialog_configure_v1;
+  dialog_slot_create = cui_bridge_dialog_slot_create_v1;
+  dialog_action_set = cui_bridge_dialog_set_action_v1;
+ }
+#endif
+}
+static int go_dialog_supported(void) { return dialog_configure && dialog_slot_create && dialog_action_set; }
+static cui_bridge_status go_dialog_configure(cui_bridge_app *app, cui_bridge_node node,
+                                             const cui_bridge_dialog_config_v1 *config) {
+ return dialog_configure(app, node, config ? sizeof(*config) : 0, config);
+}
+static cui_bridge_status go_dialog_slot_create(cui_bridge_app *app, cui_bridge_node node,
+                                               uint32_t role, const char *key, cui_bridge_node *out) {
+ return dialog_slot_create(app, node, role, key, out);
+}
+static cui_bridge_status go_dialog_set_action(cui_bridge_app *app, cui_bridge_node node, uint32_t action) {
+ return dialog_action_set(app, node, action);
+}
+
 static cui_bridge_status (*radio_tooltip_set)(cui_bridge_app *, cui_bridge_node, const char *, uint32_t);
 static void go_radio_tooltip_initialize(void) {
  if (bridge_lib) {
@@ -934,6 +971,7 @@ static int bridge_open(const char *path) {
  go_stepper_wrapped_fill_initialize();
  go_stepper_centered_fill_initialize();
  go_popover_initialize();
+ go_dialog_initialize();
  go_virtual_list_initialize();
  go_disclosure_initialize();
  go_attachment_initialize();
@@ -981,6 +1019,7 @@ static int bridge_open(const char *path) {
  go_stepper_wrapped_fill_initialize();
  go_stepper_centered_fill_initialize();
  go_popover_initialize();
+ go_dialog_initialize();
  go_virtual_list_initialize();
  go_disclosure_initialize();
  go_attachment_initialize();
@@ -1057,6 +1096,9 @@ type Options struct {
 }
 type Node struct {
 	popoverOptions *PopoverOptions
+	dialogOptions  *DialogOptions
+	dialogSlot     DialogSlotRole
+	dialogAction   DialogAction
 
 	notificationAction                   bool
 	notificationAutoHide                 *bool
@@ -2279,7 +2321,7 @@ func (n *Node) Disabled(v bool) *Node {
 	if n.err != nil {
 		return n
 	}
-	if !(n.attachmentSlot != 0 || n.kind == 52 || n.kind == 4 || n.kind == configuredBadgeKind || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || (n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79) {
+	if !(n.dialogSlot != 0 || n.dialogOptions != nil || n.attachmentSlot != 0 || n.kind == 52 || n.kind == 4 || n.kind == configuredBadgeKind || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || (n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79) {
 		n.err = errors.New("disabled requires control")
 		return n
 	}
@@ -2355,6 +2397,9 @@ func (a *App) Mount(root *Node) error {
 			return ErrNotificationAutoHideUnavailable
 		}
 		if err := a.validateNotificationAction(n, parent); err != nil {
+			return err
+		}
+		if err := a.validateDialogComposition(n, parent); err != nil {
 			return err
 		}
 		if err := a.validateAttachmentSlots(n, parent); err != nil {
@@ -2583,7 +2628,7 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("duplicate key")
 		}
 		keys[n.key] = true
-		if n.kind >= 3 && n.kind != 52 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 62 && n.kind != 63 && n.kind != 64 && n.kind != 65 && n.kind != 66 && n.kind != 70 && n.kind != 73 && n.kind != 74 && n.kind != 75 && n.kind != 76 && n.kind != 78 && n.kind != 79 && n.kind != 80 && n.kind != configuredBadgeKind && len(n.children) > 0 {
+		if n.kind >= 3 && n.kind != 52 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 62 && n.kind != 63 && n.kind != 64 && n.kind != 65 && n.kind != 66 && n.kind != 70 && n.kind != 73 && n.kind != 74 && n.kind != 75 && n.kind != 76 && n.kind != 78 && n.kind != 79 && n.kind != 80 && n.kind != configuredBadgeKind && n.dialogOptions == nil && len(n.children) > 0 {
 			return errors.New("leaf has children")
 		}
 		if (n.kind == 54 || n.kind == 60 || n.kind == 64 || n.kind == 66 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 79) && len(n.children) > 64 {
@@ -2628,6 +2673,10 @@ func (a *App) Mount(root *Node) error {
 			if e := result(C.go_notification_action_create(a.ptr, p, key, &h)); e != nil {
 				return e
 			}
+		} else if n.dialogSlot != 0 {
+			if e := result(C.go_dialog_slot_create(a.ptr, p, C.uint32_t(n.dialogSlot), key, &h)); e != nil {
+				return e
+			}
 		} else if n.attachmentSlot != 0 {
 			if e := result(C.go_attachment_slot_create(a.ptr, p, C.uint32_t(n.attachmentSlot), key, C.float(n.attachmentSlotWidth), &h)); e != nil {
 				return e
@@ -2655,6 +2704,16 @@ func (a *App) Mount(root *Node) error {
 		n.app = a
 		n.handle = h
 		a.nodes[keyID(h)] = n
+		if n.dialogOptions != nil {
+			if err := n.configureDialog(n.dialogOptions); err != nil {
+				return err
+			}
+		}
+		if n.dialogAction != DialogActionNone {
+			if err := n.setDialogAction(n.dialogAction); err != nil {
+				return err
+			}
+		}
 		for layer, paint := range n.radioPaints {
 			if err := n.SetRadioPaint(layer, paint); err != nil {
 				return err
@@ -2989,7 +3048,7 @@ func (a *App) Mount(root *Node) error {
 				return e
 			}
 		}
-		if n.gap != 0 {
+		if n.gap != 0 || n.dialogSlot == DialogFooter {
 			if err := result(C.go_set_gap(a.ptr, h, C.float(n.gap))); err != nil {
 				return err
 			}
@@ -2999,7 +3058,7 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 		}
-		if (n.attachmentSlot != 0 || n.kind == 52 || n.kind == 81 || n.kind == configuredBadgeKind || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || ((n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79)) && n.disabled {
+		if (n.dialogSlot != 0 || n.dialogOptions != nil || n.attachmentSlot != 0 || n.kind == 52 || n.kind == 81 || n.kind == configuredBadgeKind || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || ((n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79)) && n.disabled {
 			if err := result(C.go_set_disabled(a.ptr, h, 1)); err != nil {
 				return err
 			}
@@ -7220,4 +7279,43 @@ func (n *Node) configurePopover(o *PopoverOptions) error {
 		c.offset = C.float(o.Offset)
 	}
 	return result(C.go_popover_configure(n.app.ptr, n.handle, &c))
+}
+
+// SupportsDialogComposition reports all three operations for the retained layout.
+func (a *App) SupportsDialogComposition() (bool, error) {
+	if e := a.check(); e != nil {
+		return false, e
+	}
+	return C.go_dialog_supported() != 0, nil
+}
+
+func (n *Node) configureDialog(o *DialogOptions) error {
+	supported, err := n.app.SupportsDialogComposition()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrDialogCompositionUnavailable
+	}
+	if o == nil {
+		return result(C.go_dialog_configure(n.app.ptr, n.handle, nil))
+	}
+	config := C.cui_bridge_dialog_config_v1{width: C.float(o.Width), height: C.float(o.Height), margin: C.float(o.Margin)}
+	for bit, enabled := range []bool{o.Centered, o.NoEscapeDismiss, o.NoOutsideDismiss, o.HideClose, o.ShowClose, o.OutsideDismiss} {
+		if enabled {
+			config.flags |= 1 << bit
+		}
+	}
+	return result(C.go_dialog_configure(n.app.ptr, n.handle, &config))
+}
+
+func (n *Node) setDialogAction(action DialogAction) error {
+	supported, err := n.app.SupportsDialogComposition()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrDialogCompositionUnavailable
+	}
+	return result(C.go_dialog_set_action(n.app.ptr, n.handle, C.uint32_t(action)))
 }

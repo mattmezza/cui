@@ -15,6 +15,7 @@ export type DesignSize = 'inherit' | 'xs' | 'sm' | 'base' | 'md' | 'lg' | 'xl' |
 /** Shared scale is currently supported by Button, Avatar and Stepper. */
 export interface DesignSized {design_size(value: DesignSize): this}
 export interface Button extends Node, DesignSized {
+  dialog_action(action: DialogAction): this;
   label(value: string): this; primary(): this; secondary(): this; outline(): this; ghost(): this;
   inherit(): this; xs(): this; sm(): this; small(): this; base(): this; md(): this; medium(): this; lg(): this; large(): this; xl(): this; size(value: "inherit" | "xs" | "sm" | "base" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl" | "8xl" | "9xl"): this;
   rounded_theme(): this; rounded_none(): this; rounded_sm(): this; rounded_md(): this; rounded_px(radius: number): this;
@@ -149,8 +150,25 @@ export function dropdown_button(key?: string, text?: string): DropdownButton;
 export interface CloseEvent { node: Node; frame: number; result: 1 | 2 | 3 }
 export interface OpenState extends Node {open(value?: boolean): this; is_open(): boolean}
 export interface Surface extends Label, OpenState {detail(text: string): this; on_close(callback: (event: CloseEvent) => void): this}
-export interface Dialog extends Surface, Composite {}
-export interface AlertDialog extends Surface {}
+export type DialogAction = 'none' | 'confirm' | 'cancel' | 'close';
+export type DialogSlotRole = 'header' | 'title' | 'description' | 'content' | 'body' | 'footer';
+/** Zero dimensions use default width, automatic height and default margin. */
+export interface DialogOptions {
+  width?: number; height?: number; margin?: number;
+  centered?: boolean; no_escape_dismiss?: boolean; no_outside_dismiss?: boolean;
+  hide_close?: boolean; show_close?: boolean; outside_dismiss?: boolean;
+}
+export interface DialogSlot extends Container {disabled(value?: boolean): this}
+export function dialog_slot(key: string, role: DialogSlotRole): DialogSlot;
+export interface Dialog extends Surface, Composite {
+  dialog_options(options: DialogOptions | null): this;
+  disabled(value?: boolean): this;
+}
+export interface AlertDialog extends Surface {
+  dialog_options(options: DialogOptions | null): this;
+  children(...items: (DialogSlot | DialogSlot[])[]): this;
+  disabled(value?: boolean): this;
+}
 export interface Sheet extends Surface, Composite {}
 /** Anchor: 0 top-left, 1 top-center, 2 top-right, 3 bottom-left,
  * 4 bottom-center, 5 bottom-right, 6 left-center, 7 right-center. Zero dimensions use defaults. */
@@ -591,6 +609,7 @@ export interface App {
   supports_spinner_presentation(): boolean;
   supports_pagination_custom_size(): boolean;
   supports_rating_options(): boolean;
+  supports_dialog_composition(): boolean;
   supports_popover_options(): boolean;
   supports_pagination_options(): boolean;
 }

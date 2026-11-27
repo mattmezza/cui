@@ -1,15 +1,14 @@
-# Dialog and AlertDialog composition in C
+# Dialog and AlertDialog composition
 
-This guide describes the additive C implementation originating in source
-checkpoint `138c3a39`, with the focused native proof and cache correction in
-`db888055`. Strict C11 builds, native and WASM32 record checks, first-frame
-geometry/current-font software tests, owner actions and the complete example
-have been exercised locally. Configured distribution, canonical generated
-freshness, gallery/browser and wider compatibility checks are tracked separately;
-see the validation receipts for backend coverage. Styled Root can mount these
-dialogs automatically, and the retained C bridge exposes the same six slots.
-Native window-service integration and language composition facades remain open. Use
-headers, sources, SDK and generated resources from one matching revision.
+Compose Dialog and AlertDialog with six independent slots. Styled C Root can
+mount both automatically. The retained C bridge and the Python, JavaScript,
+TypeScript, Go and Rust builders expose the same slots. The immediate C API
+offers a synchronous decision callback. The retained APIs deliver queued Button
+clicks and dialog close results.
+
+Use headers, sources, SDK and generated resources from one matching revision. See
+the [beta roadmap](../BETA_VERSION_ROADMAP.md#active-work-and-acceptance-gaps) for
+release and platform validation.
 
 ## API and ownership
 
@@ -70,7 +69,7 @@ set the independent Description's `omit` bit and use a balanced manual child
 wrapper inside Header. Manual wrappers cannot span callbacks.
 
 `name` and `description` supply explicit accessibility text. Arbitrary visual
-callback children do not replace those strings. The draft links the owner to its
+callback children do not replace those strings. The composition links the owner to its
 Title label only when the Title wrapper is admitted. Caller-created child IDs
 must be distinct from structural IDs; use stable IDs from the owning context.
 
@@ -118,8 +117,8 @@ Styled compose and Styled actions.
 
 Core layout record V2 is unrelated to draw ABI2/background negotiation. This
 route uses ordinary V1 drawing and real track/thumb nodes; it does not require
-another renderer ABI. Its draft scrollbar/input behavior still needs runtime
-validation. Hidden bars do not imply disabling wheel scrolling.
+another renderer ABI. Body scrolling keeps Footer fixed. Wheel scrolling
+remains available with hidden bars.
 
 ## Actions, timing and failure
 
@@ -159,8 +158,8 @@ This applies to C Base and Styled Dialog and AlertDialog, including caller-autho
 controls. Core keeps event targets available for inspection. Application-owned
 gesture models remain the application's responsibility. Use the
 [Root mounting API](ROOT.md#mount-a-composed-dialog-or-alertdialog) to submit
-this composition from the window's Root. Language builders and native
-window-service integration remain open.
+this composition from the window's Root. The retained APIs are described below.
+Native window-service integration remains open.
 
 Inspect both `cui_dialog_submit_result` and the error after `cui_end_frame`.
 `valid=false` rejects a descriptor or reports a later submission failure;
@@ -425,5 +424,56 @@ python scripts/test_local.py --build-dir build -- -R '^bridge_dialog_composition
 
 The test also exercises pointer and keyboard input, the fixed Footer while Body
 scrolls, nested Escape and focus restoration, removal and the legacy helpers.
-The retained C functions are versioned symbols in `cui_bridge.h`. The Python,
-JavaScript, TypeScript, Go and Rust builders still expose their legacy dialogs.
+The retained functions are versioned symbols in `cui_bridge.h`.
+Probe capability when loading an older bridge.
+
+## Compose a dialog in a language builder
+
+Call the capability probe if your app may load an older bridge. Configure the
+modal before adding named slots. Connect typed Buttons directly to Footer and
+do the application work from the owner close result. Use an ordinary Footer
+Button when the app must validate before closing.
+
+| Language | Layout and slots | Close action | Capability |
+| --- | --- | --- | --- |
+| Python, JavaScript, TypeScript | `dialog_options(...)`, `dialog_slot(key, role)` | `button(...).dialog_action('confirm')` | `app.supports_dialog_composition()` |
+| Go | `.DialogOptions(&cui.DialogOptions{...})`, `cui.DialogSlot(key, role)` | `.DialogAction(cui.DialogActionConfirm)` | `app.SupportsDialogComposition()` |
+| Rust | `.dialog_options(Some(options))`, `app.create_dialog_slot(dialog, role, key)` | `.dialog_action(DialogAction::Confirm)` | `app.supports_dialog_composition()` |
+
+The `confirm`, `cancel` and `close` actions produce accepted, cancelled and
+closed results. They keep any ordinary Button click handler. One event is
+queued for the Button and one for the dialog. Immediate C supplies the
+synchronous decision API. These retained options affect dialogs inside the
+CUI surface and use its existing owner-thread lifecycle.
+
+Each example opens an account dialog, submits a typed confirmation and checks
+that the status UI changed. Build the matching portable bridge and Node addon
+from the repository root on Linux.
+
+```sh
+cmake -S bindings/node -B build-node -G Ninja -DCUI_BUILD_NATIVE=OFF
+cmake --build build-node --target cui_node_bindings
+bridge_dir=$(dirname "$(find build-node -name libcui_bridge.so -print -quit)")
+export CUI_BRIDGE_LIB_DIR="$PWD/$bridge_dir"
+export CUI_BRIDGE_LIBRARY="$CUI_BRIDGE_LIB_DIR/libcui_bridge.so"
+export CUI_NODE_ADDON="$PWD/$(find build-node -name cui.node -print -quit)"
+PYTHONPATH=bindings/python python bindings/python/examples/dialog_composition.py
+node bindings/node/examples/dialog-composition.cjs
+node bindings/typescript/examples/dialog_composition.ts
+go -C bindings/go run ./examples/dialog_composition
+cargo run --manifest-path bindings/rust/Cargo.toml --example dialog_composition
+```
+
+The TypeScript command uses the Node runtime with type stripping. The repo's
+CI also type-checks the example.
+
+The Linux headless package checks run the examples from clean consumers of the
+Python wheel, prebuilt npm tarball (JavaScript and TypeScript), embedded-bridge
+and source-only Go modules, and Rust crate. These checks cover the local package
+artifacts. Native desktop behavior and public publication are tracked separately.
+
+To run a visible native UI, build the matching
+SDL-enabled bridge and addon and pass `--font /path/to/font.ttf` to the Python
+or Node examples, `-font /path/to/font.ttf` to Go, or `-- /path/to/font.ttf`
+after Cargo's example arguments. See the [native setup guide](NATIVE_APP_STARTER.md)
+for build prerequisites.

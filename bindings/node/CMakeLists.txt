@@ -772,3 +772,16 @@ if(CUI_NODE_TSC_EXECUTABLE)
   --noEmit --strict --target ES2022 --module node16 --moduleResolution node16
   ${CMAKE_CURRENT_SOURCE_DIR}/test/carousel-slots.types.ts)
 endif()
+
+add_test(NAME node_dialog_composition COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/dialog-composition.test.cjs)
+add_test(NAME node_dialog_composition_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/dialog-composition.cjs)
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_dialog_composition_types COMMAND "${CUI_NODE_TSC_EXECUTABLE}" --noEmit --strict
+  --target ES2022 --module NodeNext --moduleResolution NodeNext
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/dialog-composition.types.ts
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/dialog_composition.ts)
+endif()

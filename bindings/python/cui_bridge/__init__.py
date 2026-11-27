@@ -13,11 +13,14 @@ import math
 import os
 from pathlib import Path
 from threading import current_thread
-from typing import Callable, ClassVar, Iterable, Iterator, Literal
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterable, Iterator, Literal
 
 from .kbd_style import KbdStyleWire, style_wire
 
 from .radio_paint import RadioPaint, RadioPaintLayer, bind_radio_paint, radio_paint_wire
+
+if TYPE_CHECKING:
+    from .dialog_composition import DialogAction, DialogOptions
 
 _DATA_TABLE_LEGACY_ROWS = 32
 _DATA_TABLE_MAX_ROWS = 10_000
@@ -161,6 +164,8 @@ class _API:
         bind_spinner_api(self, bind)
         from .popover_options import bind_api as bind_popover_api
         bind_popover_api(self, bind)
+        from .dialog_composition import bind_api as bind_dialog_api
+        bind_dialog_api(self, bind)
         from .pagination_options import bind_api as bind_pagination_api
         bind_pagination_api(self, bind)
         from .rating_options import bind_api as bind_rating_api
@@ -453,7 +458,7 @@ _SURFACE |= {"notification"}
 _CHANGE = (_DISABLED - {"button", "accordion", "form"}) | {"message_scroller", "settings"}
 _DISABLED.add("slider_model")  # No legacy CHANGE callback for the controlled route.
 _DISABLED.add("configured_badge")
-_CONSTRUCTOR_CONTAINER = {"root_view","row", "column", "collapsible", "item", "dialog", "sheet", "popover", "hover_card", "group_box", "scrollable", "focus_trap"}
+_CONSTRUCTOR_CONTAINER = {"root_view","row", "column", "collapsible", "item", "dialog", "alert_dialog", "sheet", "popover", "hover_card", "group_box", "scrollable", "focus_trap"}
 _CONTAINER = _CONSTRUCTOR_CONTAINER | _GROUP | {"configured_badge"}
 _VARIANT = {"primary": 0, "secondary": 1, "outline": 2, "ghost": 3}
 _ROUND = {"theme": 0, "none": 1, "small": 2, "large": 3, "custom": 4}
@@ -635,6 +640,9 @@ class Widget:
         self._panel_size = None
         self._attachment = 0
         self._carousel_slot = None
+        self._dialog_slot = None
+        self._dialog_config = None
+        self._dialog_action = 0
         self._attachment_slot: tuple[int, float] | None = None
         self._image = None
         self._time = (0, 0, 0)
@@ -690,6 +698,8 @@ class Widget:
         return self
 
     def children(self, *children: "Widget") -> "Widget":
+        from .dialog_composition import validate_children
+        validate_children(self, children)
         is_attachment = self.kind == "attachment"
         if not is_attachment and self.kind not in _CONTAINER:
             raise ValueError("component does not accept children")
@@ -863,8 +873,19 @@ class Widget:
         self._rounding, self._radius = value, radius
         return self
 
+    def dialog_options(self, value: DialogOptions | None = None, **kwargs) -> "Widget":
+        """Copy layout options for a Dialog or AlertDialog. None restores legacy layout."""
+        from .dialog_composition import options
+        return options(self, value, kwargs)
+
+    def dialog_action(self, value: DialogAction) -> "Widget":
+        """Give a direct Footer Button a typed close result."""
+        from .dialog_composition import action
+        return action(self, value)
+
     def disabled(self, value: bool = True) -> "Widget":
-        if self.kind not in _DISABLED and self._attachment_slot is None:
+        if (self.kind not in _DISABLED and self._attachment_slot is None and
+                self._dialog_slot is None and self._dialog_config is None):
             raise ValueError("component does not support disabled")
         if type(value) is not bool:
             raise TypeError("disabled must be a bool")
@@ -2534,6 +2555,8 @@ class App:
                 raise ValueError("widget belongs to a disposed App")
             seen.add(id(node))
             popover_preflight(node, self)
+            from .dialog_composition import preflight as dialog_preflight
+            dialog_preflight(node, parent, self)
             disclosure_preflight(node, parent, self)
             from .attachment_options import preflight as attachment_preflight
             attachment_preflight(node, self)
@@ -2669,6 +2692,8 @@ class App:
                 elif parent is not None and parent.kind == "notification":
                     self._api.check(self._api.create_notification_action(self._ptr, parent_handle,
                                                                          _utf8(key), C.byref(handle)))
+                elif node._dialog_slot is not None:
+                    self._api.check(self._api.dialog_slot(self._ptr, parent_handle, node._dialog_slot, _utf8(key), C.byref(handle)))
                 elif node._attachment_slot is not None:
                     role, width = node._attachment_slot
                     self._api.check(self._api.create_attachment_slot(self._ptr, parent_handle, role,
@@ -2680,6 +2705,8 @@ class App:
                 node._app, node._handle = self, handle
                 created.append(node)
                 self._by_handle[(handle.slot, handle.generation)] = node
+                from .dialog_composition import mount as dialog_mount
+                dialog_mount(node)
                 if node.kind == "root_view": node._change("set_root_padding",node._root_padding)
                 if node.kind == "otp_input": node._change("set_total",node._total)
                 if node._carousel_slot is not None and node._text:
@@ -2767,7 +2794,8 @@ class App:
                 if node._step_status is not None:
                     node._change("set_step_status", node._step_status)
                 if ((node.kind in _DISABLED and (node.kind != "item" or node._disabled)) or
-                    node._attachment_slot is not None):
+                    node._attachment_slot is not None or node._dialog_slot is not None or
+                    node._dialog_config is not None):
                     node._change("set_disabled", int(node._disabled))
                 if node.kind == "collapsible" or (node.kind == "item" and node._open_set):
                     node._change("set_open", int(node._open))
@@ -3238,6 +3266,11 @@ class App:
         from .disclosure import supported
         return supported(self)
 
+    def supports_dialog_composition(self) -> bool:
+        """Return whether the loaded C bridge exposes all three composition operations."""
+        from .dialog_composition import supported
+        return supported(self)
+
     def supports_attachment_options(self) -> bool:
         from .attachment_options import supported
         return supported(self)
@@ -3530,3 +3563,6 @@ from .spinner_presentation import __all__ as _spinner_exports
 __all__ += _spinner_exports
 
 from . import popover_options as _popover_options
+
+from .dialog_composition import dialog_slot, DialogOptions, DialogSlotRole, DialogAction
+__all__ += ["dialog_slot", "DialogOptions", "DialogSlotRole", "DialogAction"]

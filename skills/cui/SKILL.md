@@ -636,8 +636,11 @@ For retained C, use `cui_bridge_dialog_configure_v1`,
 `cui_bridge_dialog_slot_create_v1` and `cui_bridge_dialog_set_action_v1` between
 steps. A typed Footer Button queues a click and an owner CLOSE notification.
 Use an ordinary Button for app validation before `set_open(false)`. See
-`docs/DIALOG_COMPOSITION.md#compose-a-retained-c-dialog`. The five language
-builders still use the legacy modal subset.
+`docs/DIALOG_COMPOSITION.md#compose-a-retained-c-dialog`. For Python or JS/TS,
+use `dialog_options`, `dialog_slot`, `dialog_action` and the capability probe
+`supports_dialog_composition`. Go uses `DialogOptions`, `DialogSlot` and
+`DialogAction`. Rust uses `dialog_options`, `create_dialog_slot` and
+`DialogAction`. See `docs/DIALOG_COMPOSITION.md#compose-a-dialog-in-a-language-builder`.
 
 For a pinned navigation header/footer with body-only scrolling, use
 `cui_sidebar` with a persistent measurement cache. Tab and accessibility focus

@@ -71,5 +71,5 @@ through end_frame and use its open helper for each new lifetime. The first
 composed frame drops previous scoped activations and captures, including held
 mouse, touch and Space. [Styled Root](ROOT.md#mount-a-composed-dialog-or-alertdialog)
 can mount the six-slot surface automatically. The [retained C bridge](DIALOG_COMPOSITION.md#compose-a-retained-c-dialog)
-exposes named child containers and queued typed close results. Native
-window-service integration and language slot builders remain open.
+and all five language builders expose named child containers and queued typed
+close results. Native window-service integration remains open.

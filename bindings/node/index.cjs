@@ -24,7 +24,7 @@ const booleans = new Set([5,6,7,8,20]);
 const numerics = new Set([9,10,14,42,43,52]);
 const editable = new Set([12,13,14,22,59,61,67,68,73]);
 const groups = new Set([17,18,19,21,22,23,40,41,44,45,47,48,49,54,60,61,64,65,66,70,73,74,75,78,79,80]);
-const containers = new Set([1,2,15,17,18,19,20,21,22,23,24,26,27,29,33,40,41,44,45,46,47,48,49,54,60,61,63,64,65,66,70,73,74,75,76,78,79,80]);
+const containers = new Set([1,2,15,17,18,19,20,21,22,23,24,25,26,27,29,33,40,41,44,45,46,47,48,49,54,60,61,63,64,65,66,70,73,74,75,76,78,79,80]);
 const RadioPaintLayer = Object.freeze({
   BASE: 0, CHECKED: 1, HOVERED: 2, PRESSED: 3, FOCUSED: 4, DISABLED: 5,
 });
@@ -281,6 +281,7 @@ class Node {
     button.parent = this; this.childrenValue.push(button); return this;
   }
   children(...items) {
+    dialogs.validateChildren(this, items.flat());
     const isAttachment = this.kind === 52;
     if (!containers.has(this.kind) && !isAttachment) throw new Error('component does not accept children');
     if (this.owner) throw new Error('children cannot change after mount');
@@ -377,7 +378,7 @@ class Node {
     if (this.owner) native.setCustomRounding(this.owner.handle, this[NODE], 4, value);
     return this;
   }
-  disabled(value = true) { if (!disabledKinds.has(this.kind) && !this[ATTACHMENT_SLOT]) throw new Error('component does not support disabled'); if (typeof value !== 'boolean') throw new TypeError('disabled must be boolean'); if (this.owner) native.setDisabled(this.owner.handle, this[NODE], value ? 1 : 0); this.disabledValue = value; return this; }
+  disabled(value = true) { if (!disabledKinds.has(this.kind) && !this[ATTACHMENT_SLOT] && !this.dialogSlot && !this.dialogConfig) throw new Error('component does not support disabled'); if (typeof value !== 'boolean') throw new TypeError('disabled must be boolean'); if (this.owner) native.setDisabled(this.owner.handle, this[NODE], value ? 1 : 0); this.disabledValue = value; return this; }
   checked(value = true) {
     if (!booleans.has(this.kind) || typeof value !== 'boolean') throw new TypeError('checked requires a boolean component and value');
     if(this.owner) native.setChecked(this.owner.handle,this[NODE],value ? 1 : 0);
@@ -1007,6 +1008,8 @@ containers.add(iconBadges.badgeKind);
 const spinners = require('./spinner-presentation.cjs')(native, Node, NODE, icons);
 const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
 const popoverOptions = require('./popover-options.cjs')(native, Node, NODE);
+const dialogs = require('./dialog-composition.cjs')(native, Node, NODE);
+const dialog_slot = dialogs.slot;
 const paginationOptions = require('./pagination-options.cjs')(native, Node, NODE);
 const ratingOptions = require('./rating-options.cjs')(native, Node, NODE, icons, designSizes);
 const attachments = require('./attachment-options.cjs')(native, Node, NODE, attachmentStatuses);
@@ -1045,6 +1048,7 @@ class App {
     skeletons.preflight(this, root);
     spinners.preflight(this, root);
     popoverOptions.preflight(this, root);
+    dialogs.preflight(this, root);
     paginationOptions.preflight(this, root);
     ratingOptions.preflight(this, root);
     disclosures.preflight(this, root);
@@ -1055,7 +1059,8 @@ class App {
     const attach = (node, parent) => {
       const parentHandle = parent && parent[NODE];
       const slot = node[ATTACHMENT_SLOT];
-      if (node[CAROUSEL_SLOT]) node[NODE] = native.carouselSlot(this.handle, parentHandle, node[CAROUSEL_SLOT], node.keyValue);
+      if (node.dialogSlot) node[NODE] = native.dialogSlot(this.handle,parentHandle,node.dialogSlot,node.keyValue);
+      else if (node[CAROUSEL_SLOT]) node[NODE] = native.carouselSlot(this.handle, parentHandle, node[CAROUSEL_SLOT], node.keyValue);
       else if (parent?.kind === 62) node[NODE] = native.notificationAction(this.handle, parentHandle, node.keyValue);
       else if (slot) node[NODE] = native.attachmentSlot(this.handle, parentHandle, slot.role, node.keyValue, slot.width);
       else if (node.kind === 81) node[NODE] = sliderModels.mount(this, node, parentHandle);
@@ -1063,6 +1068,7 @@ class App {
       else node[NODE] = native.makeNode(this.handle, parentHandle, node.kind, node.keyValue);
       node.owner = this;
       const id = native.nodeId(node[NODE]); this.nodes.set(keyFor(id), node);
+      dialogs.mount(this, node);
       if(node.kind===76)native.setRootPadding(this.handle,node[NODE],node.rootPaddingValue);
       if(node.kind===59)native.setTotal(this.handle,node[NODE],node.totalValue);
       if (node.textValue !== undefined) native.setText(this.handle, node[NODE], node.textValue);
@@ -1089,7 +1095,7 @@ class App {
       if ([9,14].includes(node.kind)) native.setRange(this.handle,node[NODE],...node.rangeValue);
       if([42,43].includes(node.kind))native.setTotal(this.handle,node[NODE],node.totalValue);
       if (numerics.has(node.kind)) native.setValue(this.handle,node[NODE],node.numericValue);
-      if ((node[ATTACHMENT_SLOT] || node.kind===81 || disabledKinds.has(node.kind)) && (node.kind!==20 || node.disabledValue)) native.setDisabled(this.handle,node[NODE],node.disabledValue ? 1 : 0);
+      if ((node.dialogSlot || node.dialogConfig || node[ATTACHMENT_SLOT] || node.kind===81 || disabledKinds.has(node.kind)) && (node.kind!==20 || node.disabledValue)) native.setDisabled(this.handle,node[NODE],node.disabledValue ? 1 : 0);
       if(node.notificationAutoHideValue !== undefined) native.setNotificationAutoHide(this.handle,node[NODE],node.notificationAutoHideValue);
       if(node.kind===15 || (node.kind===20 && node.openSet))native.setOpen(this.handle,node[NODE],node.openValue?1:0);
       if(detailKinds.has(node.kind))native.setDetail(this.handle,node[NODE],node.detailValue);
@@ -1400,6 +1406,7 @@ class App {
   supports_attachment_options() { return attachments.supports(this); }
   supports_attachment_preview() { return attachments.supports(this,true); }
   supports_rating_options() { return ratingOptions.supports(this); }
+  supports_dialog_composition() { return dialogs.supports(this); }
   supports_popover_options() { return popoverOptions.supports(this); }
   supports_pagination_options() { return paginationOptions.supports(this); }
   supports_spinner_icon_resource() { return spinners.supportsResource(this); }
@@ -1453,7 +1460,7 @@ class App {
   close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);ratingOptions.release(node);if(node.kind===81)node.requestValue=null;} return this; }
   dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values()){localizedTimes.release(node);iconBadges.release(node);ratingOptions.release(node);if(node.kind===81)node.requestValue=null;} this.nodes.clear(); } }
 }
-module.exports = {carousel_slot,RadioPaintLayer,radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,kbdStroke,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,attachment_slot,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
+module.exports = {dialog_slot,carousel_slot,RadioPaintLayer,radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,kbdStroke,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,attachment_slot,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
 
 Object.assign(module.exports, sliderModels.exports);
 

@@ -1,3 +1,23 @@
+# Published prerelease v0.1.0-alpha.15
+
+CUI v0.1.0-alpha.15 was published on 2026-11-27 from `cee76848eb8ceca6c95be1f79a7c1ca554bade7e`. It includes the
+native starter, source archive, static Linux C libraries, and Python, npm,
+Go and Rust packages. The gallery and release served identical starter bytes
+at publication. [GitHub release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.15)
+
+All 16 hosted CI jobs, the native callback job and all three headless browser
+shards passed. Clean installations probed the four additive retained layouts
+and ran the wrapped Stepper example in all five language bindings. The native
+starter apps and static C consumers passed in private Xvfb.
+All 11 draft assets matched the staged files, and all 717 public Go
+module files matched the tested package.
+[Release validation record](validation/alpha15-release.json)
+
+Rebuild C consumers with matching headers and libraries. The Python wheel
+uses `0.1.0a15`. The Linux x86_64 binary assets require system dependencies.
+Physical platform acceptance, full-family verification, and registry publication
+for PyPI, npm and crates.io remain open.
+
 # Published prerelease v0.1.0-alpha.14
 
 CUI v0.1.0-alpha.14 was published on 2026-11-27 from `b8eb5e4ce0f7c079530a0972d0a362132fa1022d`. It includes the

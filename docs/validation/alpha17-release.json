@@ -1,0 +1,150 @@
+{
+  "release": {
+    "isDraft": false,
+    "isPrerelease": true,
+    "publishedAt": "2026-11-27T12:53:35Z",
+    "url": "https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.17"
+  },
+  "source_revision": "e528edce796e69e535f1067f5dfe5b50ff2e5d07",
+  "hosted_gates": {
+    "native_callbacks": {
+      "attempt": 1,
+      "conclusion": "success",
+      "headBranch": "main",
+      "headSha": "e528edce796e69e535f1067f5dfe5b50ff2e5d07",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45999546296",
+      "jobs_passed": 1
+    },
+    "pages": {
+      "attempt": 1,
+      "conclusion": "success",
+      "headBranch": "main",
+      "headSha": "e528edce796e69e535f1067f5dfe5b50ff2e5d07",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45999545730",
+      "jobs_passed": 5
+    },
+    "ci": {
+      "attempt": 1,
+      "conclusion": "success",
+      "headBranch": "main",
+      "headSha": "e528edce796e69e535f1067f5dfe5b50ff2e5d07",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45999546655",
+      "jobs_passed": 16
+    }
+  },
+  "website": {
+    "verification": {
+      "source_revision": "e528edce796e69e535f1067f5dfe5b50ff2e5d07",
+      "public_url": "https://matteo.merola.co/cui/",
+      "version": "0.1.0-alpha.17",
+      "native_starter": {
+        "bytes": 2198962,
+        "sha256": "aefa1710e9df894392f9d309ae9f29cc77d88046dcdfe1d350a81145f1698429"
+      },
+      "gallery_wasm_cache_key": "8a603ae4803711c1"
+    },
+    "native_starter": {
+      "file": "cui-0.1.0-alpha.17-native-starter.tar.gz",
+      "bytes": 2198962,
+      "sha256": "aefa1710e9df894392f9d309ae9f29cc77d88046dcdfe1d350a81145f1698429"
+    }
+  },
+  "local_validation": {
+    "installed_checks": [
+      "native starter",
+      "static C",
+      "Python, JavaScript, TypeScript",
+      "Go and Rust"
+    ],
+    "clean_consumer_checks": "The installed wheel, npm package, Go module and Rust crate all verified retained Button focus treatment, including the TypeScript declaration.",
+    "compiled_payload_checks": "All 737 Go source members and 590 Rust crate members match the artifacts exercised in Xvfb.",
+    "text_checks": "Native wheel and npm bridge rendering compared with canonical text using primary and RTL fonts.",
+    "gallery": {
+      "source_revision": "e528edce796e69e535f1067f5dfe5b50ff2e5d07",
+      "version": "0.1.0-alpha.17",
+      "checks": [
+        "kbd_stepper_gallery",
+        "button_collection_gallery",
+        "control_surface_shadow_gallery",
+        "selected_usage_gallery"
+      ]
+    }
+  },
+  "draft_asset_verification": {
+    "release_tag": "v0.1.0-alpha.17",
+    "source_revision": "e528edce796e69e535f1067f5dfe5b50ff2e5d07",
+    "assets": {
+      "cui-builders-0.1.0-alpha.17.crate": {
+        "bytes": 2211774,
+        "sha256": "4c447a73e4ab898a15bacdf8c21d31ea50a612be8bdd4249169a95c128b5a76c"
+      },
+      "cui-0.1.0-alpha.17-go-source-proxy.tar.gz": {
+        "bytes": 2500382,
+        "sha256": "f6fef3727fea2eb6d62fe191c1e5d21787128ff9c0a5e357aa277bea28dcafec"
+      },
+      "SHA256SUMS": {
+        "bytes": 1001,
+        "sha256": "e85ff64005534f0a528b0e22681d7bb6152fca95b216dce526eded615fe63302"
+      },
+      "cui-0.1.0-alpha.17-linux-x86_64-static.tar.gz": {
+        "bytes": 2442000,
+        "sha256": "ee08a1c7e66f08c671fcb62d8ddc4995891348a8a080828febd7a2b3bd1a2293"
+      },
+      "source-artifact-inspection.json": {
+        "bytes": 497,
+        "sha256": "074b90592011d9f179ec8e0c1725805ac3e4b87b5152e881a7c4d30ec6d3639a"
+      },
+      "cui-0.1.0-alpha.17-source.tar.gz": {
+        "bytes": 31667167,
+        "sha256": "362fa9795c2f9c439ce0ec8e18ced5fd86c4d1f2acc474b52f41bfc2c868c6ac"
+      },
+      "ASSET_MANIFEST.json": {
+        "bytes": 5670,
+        "sha256": "cfb588b668fe02429b8eb772ee18cb7acf634cf81ccc1deac00c4f0058100281"
+      },
+      "cui-0.1.0-alpha.17-native-starter.tar.gz": {
+        "bytes": 2198962,
+        "sha256": "aefa1710e9df894392f9d309ae9f29cc77d88046dcdfe1d350a81145f1698429"
+      },
+      "cui-native-0.1.0-alpha.17.tgz": {
+        "bytes": 13860002,
+        "sha256": "9abc1d40655f6aba8fc43be069e3b7399266e8ff82d7bedb237d481b54f2c3b4"
+      },
+      "RELEASE_NOTES.md": {
+        "bytes": 1469,
+        "sha256": "6b6a9e0ba0497f7ea7f89a39ab4da3e6c6ffd41ae9389feb5492b4dc31295002"
+      },
+      "cui_bridge-0.1.0a17-py3-none-linux_x86_64.whl": {
+        "bytes": 16704104,
+        "sha256": "eb37ded505a0a5a14ff4703a0fd0c42d0bab82d5e2b9a6c0dbb5f3a323c6bcec"
+      }
+    }
+  },
+  "public_go_module": {
+    "source_revision": "e528edce796e69e535f1067f5dfe5b50ff2e5d07",
+    "version": "v0.1.0-alpha.17",
+    "endpoint": "https://proxy.golang.org/github.com/mattmezza/cui/bindings/go/@v/v0.1.0-alpha.17",
+    "public_zip_sha256": "85d72fa1a0fd11d5872d7da5323950919d1d2ce21c4ca4c092a5d4423b48b8a0",
+    "verified_files": 737,
+    "version_info": {
+      "Version": "v0.1.0-alpha.17",
+      "Time": "2026-11-27T12:31:59Z",
+      "Origin": {
+        "VCS": "git",
+        "URL": "https://github.com/mattmezza/cui",
+        "Subdir": "bindings/go",
+        "Hash": "e528edce796e69e535f1067f5dfe5b50ff2e5d07",
+        "Ref": "refs/tags/bindings/go/v0.1.0-alpha.17"
+      }
+    }
+  },
+  "limitations": [
+    "Native binaries target Linux x86_64 and require system dependencies.",
+    "Physical devices, hardware GPU rendering and assistive-technology qualification remain open.",
+    "All 78 scoped component families have tested subsets. Full feature verification remains open.",
+    "Python, npm and Rust are GitHub release assets. Separate package registry publication remains open."
+  ]
+}

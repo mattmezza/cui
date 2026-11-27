@@ -11,11 +11,11 @@ use the checklists below to track acceptance and delivery.
 
 | Track | Current status |
 | --- | --- |
-| Public release | **v0.1.0-alpha.16**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.16) |
+| Public release | **v0.1.0-alpha.17**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.17) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
-| Public website | Interactive WASM gallery and docs at alpha.16. The Pages deployment from `1b7b3f36` served the release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45981378441) |
-| Working integration | Unreleased box-scoped text defaults for Icon, Label and Spinner, host-resolved Kbd labels, and opt-in Button focus paint in immediate C, the gallery and retained builders. |
-| Packages | Alpha.16 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
+| Public website | Interactive WASM gallery and docs at alpha.17. The Pages deployment from `e528edce` served the release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45999545730) |
+| Working integration | Alpha.17 ships box-scoped text defaults for Icon, Label and Spinner, host-resolved Kbd labels, and opt-in Button focus paint in immediate C, the gallery and retained builders. |
+| Packages | Alpha.17 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
 feature test does not establish complete component parity.
@@ -28,6 +28,11 @@ feature test does not establish complete component parity.
 - **Released / deployed:** verified published artifacts, tracked separately from source.
 
 ## Release wrap-up
+
+Alpha.17 ships box-scoped text defaults in immediate and retained builders,
+host-resolved Kbd labels, and Button focus treatments for immediate C,
+joined Button groups and retained builders.
+[Release evidence](docs/validation/alpha17-release.json)
 
 Alpha.16 ships six-slot Dialog and AlertDialog in Styled Root, retained C and the
 five language builders. It adds Popover placement, focus and right-click,
@@ -105,7 +110,7 @@ packages match the validated source. [Release evidence](docs/validation/alpha6-r
 | Native starter | Working source switches from a pinned Sidebar to a compact Sheet below MD. Private X11 checks verify intermediate rendering and focused page input across six widths. Headless checks cover navigation focus handoff, pinned account controls, clipped links, held mouse/touch and unsaved edits. Short Settings pages scroll by wheel, touch and form focus. Projects has a resizable list/detail pair and bounded tabs, verified with 48 private-X11 presentations across six widths and headless interaction tests. The extracted alpha.5 starter passes installed checks. Physical drag and other hosts remain open. See the [starter guide](docs/NATIVE_APP_STARTER.md) and [Linux evidence](docs/LINUX_LIVE_RESIZE.md). |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix remains open. Alpha.4 contains the typed model and foreign bridge subsets. The subsequent opt-in Linux C adapter passes native AT-SPI Set Value and headless numeric mailbox checks. Foreign host opt-in, other OS adapters and physical screen-reader acceptance remain open. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; released in alpha.4. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), SDL integration is now covered by focused checks; the other three adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
-| Validation | Alpha.16 passed the hosted matrix, native callbacks, all three browser shards and clean installed consumers. The deployed and released native starters had identical bytes. [Release evidence](docs/validation/alpha16-release.json) |
+| Validation | Alpha.17 passed the hosted matrix, native callbacks, all three browser shards, clean installed bindings and isolated native starter checks. [Release evidence](docs/validation/alpha17-release.json) |
 
 **Resource rule:** reuse existing build directories, serialize heavy builds, and keep automated windows off the desktop. Remove only confirmed disposable artifacts; preserve source and independently landed work.
 
@@ -122,6 +127,21 @@ Beta is ready only when all five outcomes below have evidence:
 3. **Reliable hosts:** native/window/media behavior and supported renderer/platform coverage verified, with deferred hardware checks labeled.
 4. **Easy adoption:** reproducible app examples, concise human/agent docs and installable packages.
 5. **Matching delivery:** integrated regressions pass and published library, packages and website match the validated source.
+
+## Implementation priorities
+
+1. **Component APIs and bindings.** Extend typed interactions and compound
+   styling in retained builders, starting with Button groups, composed
+   Dialog actions and notification content.
+2. **Layout and typography.** Finish resize reflow, font families and weights,
+   spacing and wrapping, and text gradients across supported renderers.
+3. **Native platforms.** Verify live resize, high-DPI rendering, hidden windows
+   and renderer recovery on supported systems. Complete native video and audio
+   acceptance.
+4. **Accessibility and input.** Close semantic adapter gaps and verify support
+   with real screen readers, touch hardware and input methods.
+5. **Distribution.** Complete the PyPI, npm and crates.io publication gates and
+   keep GitHub release assets and the Go module reproducible.
 
 ## Remaining beta scope
 
@@ -246,7 +266,7 @@ Historical source evidence and remaining acceptance:
 | Dialog composition | `ef893a34` idle fix; focused native checks and full browser gate on artifact `f728908e` pass | Broader lifecycle. Alpha.5 deploys the focused behavior and nested-touch checks pass. |
 | Localized TimeField | Integrated `49267cc4`; native/source/ABI checks and keyboard gallery gates pass. Working source covers ordered IME and formatted semantic values. Chromium AX and Linux AT-SPI verify the current time, discrete values and segment focus. Released language artifacts pass headless examples. | Physical IME, assistive-technology editing and screen-reader qualification, and interactive native binding acceptance. |
 
-Receipts travel with their source changes. Use the alpha.16 receipt above for
+Receipts travel with their source changes. Use the alpha.17 receipt above for
 exact-source acceptance and delivery.
 
 Detailed validation receipts live in [docs/validation](docs/validation).

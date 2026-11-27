@@ -1,6 +1,6 @@
 # Build your first native CUI app
 
-The versioned alpha.16 starter includes the minimal app, fonts and CUI sources. [GitHub release archive](https://github.com/mattmezza/cui/releases/download/v0.1.0-alpha.16/cui-0.1.0-alpha.16-native-starter.tar.gz)
+The versioned alpha.17 starter includes the minimal app, fonts and CUI sources. [GitHub release archive](https://github.com/mattmezza/cui/releases/download/v0.1.0-alpha.17/cui-0.1.0-alpha.17-native-starter.tar.gz)
 
 For the smallest standalone build, use the **native source bundle**.
 [Download the archive](https://matteo.merola.co/cui/downloads/cui-native.tar.gz)

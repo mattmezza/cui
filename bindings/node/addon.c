@@ -2915,6 +2915,27 @@ static void wire_big_out(unsigned char *wire, const void *record, size_t at) {
 typedef cui_bridge_status (*virtual_rows_fn)(cui_bridge_app *, cui_bridge_node, uint32_t,
                                              const cui_bridge_virtual_list_row_v1 *, uint32_t);
 typedef cui_bridge_status (*virtual_anchor_fn)(cui_bridge_app *, cui_bridge_node, uint32_t);
+typedef cui_bridge_status (*virtual_axis_fn)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static napi_value supports_virtual_list_axis(napi_env env, napi_callback_info info) {
+    (void)info;
+    return supports_bridge_flag(env, "cui_bridge_virtual_list_set_axis_v1");
+}
+static napi_value set_virtual_list_axis(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *list;
+    double axis;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &list) ||
+        !number_arg(env, v[2], &axis))
+        return NULL;
+    if (axis != 0 && axis != 1)
+        return fail(env, "axis must be 0 or 1");
+    virtual_axis_fn set = NULL;
+    if (!optional_bridge_symbol(&set, sizeof set, "cui_bridge_virtual_list_set_axis_v1"))
+        return fail(env, "VirtualList axis requires cui_bridge_virtual_list_set_axis_v1");
+    cui_bridge_status code = set(app->bridge, list->node, (uint32_t)axis);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
 static napi_value virtual_rows_options(napi_env env, napi_callback_info info) {
     napi_value v[4], result;
     js_app *app;
@@ -3140,6 +3161,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("disclosureOptions", disclosure_options, 0);
     EXPORT("disclosureHeadingOptions", disclosure_heading_options, 0);
     EXPORT("virtualRowsOptions", virtual_rows_options, 0);
+    EXPORT("supportsVirtualListAxis", supports_virtual_list_axis, 0);
+    EXPORT("setVirtualListAxis", set_virtual_list_axis, 0);
     EXPORT("paginationCustomSize", pagination_custom_size, 0);
     EXPORT("iconResource", icon_resource, 0);
     EXPORT("iconNode", icon_node, 0);

@@ -962,7 +962,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust support complete copied order and extent projections with optional anchoring, up to 64 existing direct Items in a vertical viewport. Earlier providers retain uniform rows. Horizontal, host measurement and larger model capacities remain in immediate C. Row focus, selection and navigation are app-owned."
+        "Python, JavaScript, TypeScript, Go and Rust support up to 64 direct Items, copied order and extent projections, optional anchoring and separately probed main-axis selection. Alpha.14 supports vertical live rows. Providers without the live-row extension keep uniform item extents. Cross-axis scrolling, host measurement and larger model capacities remain in immediate C. Row focus, selection and navigation are app-owned."
       ]
     },
     {

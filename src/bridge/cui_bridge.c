@@ -2845,7 +2845,32 @@ cui_bridge_status cui_bridge_command_item_bounds(cui_bridge_app *app, cui_bridge
         }
     return CUI_BRIDGE_INVALID_ARGUMENT;
 }
-enum { BRIDGE_VIRTUAL_CAPACITY = 64, BRIDGE_VIRTUAL_DEFAULT_HEIGHT = 32 };
+enum { BRIDGE_VIRTUAL_CAPACITY = 64, BRIDGE_VIRTUAL_DEFAULT_EXTENT = 32 };
+
+static float *bridge_virtual_offset(cui_bridge_node_record *node) {
+    return node->virtual_horizontal ? &node->virtual_state.scroll.x : &node->virtual_state.scroll.y;
+}
+
+cui_bridge_status cui_bridge_virtual_list_set_axis_v1(cui_bridge_app *app, cui_bridge_node list,
+                                                      uint32_t axis) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, list, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_VIRTUAL_LIST)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (axis != CUI_BRIDGE_VIRTUAL_LIST_VERTICAL && axis != CUI_BRIDGE_VIRTUAL_LIST_HORIZONTAL)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    bool horizontal = axis == CUI_BRIDGE_VIRTUAL_LIST_HORIZONTAL;
+    if (node->virtual_horizontal != horizontal) {
+        float offset = *bridge_virtual_offset(node);
+        node->virtual_state.scroll = (cui_scroll_state){0};
+        node->virtual_horizontal = horizontal;
+        *bridge_virtual_offset(node) = offset;
+        cui_invalidate(app->ui);
+    }
+    return CUI_BRIDGE_OK;
+}
 
 _Static_assert(sizeof(cui_bridge_virtual_list_row_v1) == 12 &&
                    offsetof(cui_bridge_virtual_list_row_v1, extent) == 8,
@@ -3799,7 +3824,7 @@ cui_bridge_status cui_bridge_set_value(cui_bridge_app *app, cui_bridge_node hand
     if (node->kind == CUI_BRIDGE_VIRTUAL_LIST) {
         if (!isfinite(value) || value < 0 || value > 1000000)
             return CUI_BRIDGE_INVALID_ARGUMENT;
-        node->virtual_state.scroll.y = (float)value;
+        *bridge_virtual_offset(node) = (float)value;
         node->virtual_scroll_requested = true;
         node->value = value;
         return CUI_BRIDGE_OK;
@@ -5880,53 +5905,54 @@ static void bridge_render_virtual_list(cui_bridge_app *app, uint32_t slot,
                                        cui_bridge_node_record *node) {
     if (!node->virtual_list) {
         node->virtual_list = cui_virtual_create(
-            (cui_virtual_config){BRIDGE_VIRTUAL_CAPACITY, BRIDGE_VIRTUAL_DEFAULT_HEIGHT});
+            (cui_virtual_config){BRIDGE_VIRTUAL_CAPACITY, BRIDGE_VIRTUAL_DEFAULT_EXTENT});
         if (!node->virtual_list) {
             app->frame_error = CUI_BRIDGE_OUT_OF_MEMORY;
             return;
         }
     }
     uint64_t keys[BRIDGE_VIRTUAL_CAPACITY];
-    double heights[BRIDGE_VIRTUAL_CAPACITY];
+    double extents[BRIDGE_VIRTUAL_CAPACITY];
     bridge_virtual_binding binding = {.app = app};
     for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {
         size_t index = binding.count++;
         const cui_bridge_node_record *item = &app->nodes[child];
         keys[index] = item->id;
-        heights[index] =
-            item->virtual_extent > 0 ? item->virtual_extent : BRIDGE_VIRTUAL_DEFAULT_HEIGHT;
+        extents[index] =
+            item->virtual_extent > 0 ? item->virtual_extent : BRIDGE_VIRTUAL_DEFAULT_EXTENT;
         binding.slots[index] = child;
     }
     cui_virtual_widget_options options = {
         .scroll = {.width = node->visual_width > 0 ? node->visual_width : 300,
                    .height = node->visual_height > 0 ? node->visual_height : 160,
-                   .vertical = true,
+                   .vertical = !node->virtual_horizontal,
+                   .axis_lock = node->virtual_horizontal,
                    .disabled = node->disabled,
                    .wheel_step = 32},
+        .horizontal = node->virtual_horizontal,
         .overscan = 1};
+    float *offset = bridge_virtual_offset(node);
+    float viewport = options.horizontal ? options.scroll.width : options.scroll.height;
+    float previous_viewport = options.horizontal ? node->virtual_state.last_viewport.width
+                                                 : node->virtual_state.last_viewport.height;
     cui_virtual_list *model = node->virtual_list;
-    if (bridge_virtual_model_changed(model, keys, heights, binding.count)) {
-        bool keep = node->virtual_keep_anchor && !node->virtual_scroll_requested &&
-                    node->virtual_state.last_viewport.height > 0;
+    if (bridge_virtual_model_changed(model, keys, extents, binding.count)) {
+        bool keep =
+            node->virtual_keep_anchor && !node->virtual_scroll_requested && previous_viewport > 0;
         cui_virtual_anchor anchor = {0};
         if (keep)
-            anchor =
-                bridge_virtual_anchor(model, node->virtual_state.scroll.y, keys, binding.count);
-        cui_virtual_result built = cui_virtual_rebuild(model, keys, heights, binding.count);
+            anchor = bridge_virtual_anchor(model, *offset, keys, binding.count);
+        cui_virtual_result built = cui_virtual_rebuild(model, keys, extents, binding.count);
         if (built != CUI_VIRTUAL_OK) {
             app->frame_error =
                 built == CUI_VIRTUAL_CAPACITY ? CUI_BRIDGE_CAPACITY : CUI_BRIDGE_CORE_ERROR;
             return;
         }
-        if (keep) {
-            /* This retained list only enables vertical scrolling. Its height
-             * is the vertical viewport even when a vertical bar is shown. */
-            node->virtual_state.scroll.y =
-                (float)cui_virtual_restore_anchor(model, anchor, options.scroll.height);
-        }
+        if (keep)
+            *offset = (float)cui_virtual_restore_anchor(model, anchor, viewport);
     }
 
-    float before = node->virtual_state.scroll.y;
+    float before = *offset;
     cui_virtual_widget_result result =
         cui_virtual_list_draw(app->ui, node->id, &app->theme, model, &node->virtual_state, options,
                               bridge_virtual_item, &binding);
@@ -5936,8 +5962,8 @@ static void bridge_render_virtual_list(cui_bridge_app *app, uint32_t slot,
         return;
     }
     node->virtual_scroll_requested = false;
-    node->value = node->virtual_state.scroll.y;
-    if (result.scroll_changed && before != node->virtual_state.scroll.y)
+    node->value = *offset;
+    if (result.scroll_changed && before != *offset)
         bridge_change(app, slot);
 }
 static void bridge_sidebar_activate(void *user) {

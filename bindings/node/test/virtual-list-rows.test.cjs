@@ -46,6 +46,47 @@ try {
  }
 } finally {app.dispose();}
 assert.throws(()=>app.supportsVirtualListRows(),/disposed/);
+{
+  const axisApp = new c.App({backend: 'headless'});
+  try {
+    const supported = axisApp.supportsVirtualListAxis();
+    if (process.env.CUI_EXPECT_VIRTUAL_AXIS !== undefined)
+      assert.equal(supported, process.env.CUI_EXPECT_VIRTUAL_AXIS === '1');
+    const clips = Array.from({length: 6}, (_, i) => c.item(`clip-${i}`, `Clip ${i}`));
+    const view = c.virtual_list('timeline').visual_size(96, 80).children(...clips)
+      .setVirtualListAxis('horizontal');
+    const root = c.column().children(view);
+    if (!supported) {
+      assert.throws(() => axisApp.mount(root), /VirtualList axis/);
+      view.setVirtualListAxis('vertical');
+      axisApp.mount(root);
+      axisApp.step();
+      assert.equal(view.item_bounds(clips[0]).height, 32);
+    } else {
+      axisApp.mount(root);
+      let extent = 32;
+      if (axisApp.supportsVirtualListRows()) {
+        extent = 48;
+        view.setVirtualListRows(clips.map(item => ({item, extent})));
+      }
+      view.scroll_to(20);
+      axisApp.step();
+      const first = view.item_bounds(clips[0]);
+      const second = view.item_bounds(clips[1]);
+      assert.equal(first.x - view.bounds().x, -20);
+      assert.equal(first.width, extent);
+      assert.equal(second.x - first.x, extent);
+      assert.equal(first.y, second.y);
+      assert.throws(() => view.setVirtualListAxis('diagonal'), /vertical or horizontal/);
+      view.setVirtualListAxis('vertical');
+      axisApp.step();
+      assert.equal(view.scroll_offset(), 20);
+      assert.equal(view.item_bounds(clips[0]).height, extent);
+    }
+  } finally {
+    axisApp.dispose();
+  }
+}
 const composedApp=new c.App({backend:'headless'});
 try {
  if(composedApp.supportsVirtualListRows()) {

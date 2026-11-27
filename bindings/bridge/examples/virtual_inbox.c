@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* An inbox that keeps your place when new messages arrive. */
+/* A virtual inbox or clip timeline that keeps your place during updates. */
 #include <cui/cui_bridge.h>
 
 #include <math.h>
@@ -14,6 +14,7 @@ typedef struct {
     cui_bridge_node list, prepend, resize;
     cui_bridge_virtual_list_row_v1 rows[INBOX_CAPACITY];
     uint32_t count;
+    bool horizontal;
 } inbox;
 
 static bool make_node(inbox *view, cui_bridge_node parent, cui_bridge_kind kind, const char *key,
@@ -27,11 +28,12 @@ static cui_bridge_status submit_rows(const inbox *view) {
                                                view->rows, view->count);
 }
 
-static cui_bridge_status prepend_message(inbox *view) {
+static cui_bridge_status prepend_item(inbox *view) {
     if (view->count == INBOX_CAPACITY)
         return CUI_BRIDGE_OK;
     char label[32];
-    snprintf(label, sizeof label, "New message %u", (unsigned)view->count);
+    snprintf(label, sizeof label, view->horizontal ? "New clip %u" : "New message %u",
+             (unsigned)view->count);
     cui_bridge_node row;
     cui_bridge_status status =
         cui_bridge_node_create(view->app, view->list, CUI_BRIDGE_ITEM, label, &row);
@@ -43,7 +45,7 @@ static cui_bridge_status prepend_message(inbox *view) {
         return status;
     }
     memmove(view->rows + 1, view->rows, view->count * sizeof view->rows[0]);
-    view->rows[0] = (cui_bridge_virtual_list_row_v1){row, 60};
+    view->rows[0] = (cui_bridge_virtual_list_row_v1){row, view->horizontal ? 100 : 60};
     view->count++;
     status = submit_rows(view);
     if (status != CUI_BRIDGE_OK) {
@@ -65,10 +67,12 @@ static cui_bridge_status after_frame(void *user) {
         if (event.type != CUI_BRIDGE_EVENT_CLICK)
             continue;
         if (event.node.slot == view->prepend.slot)
-            status = prepend_message(view);
+            status = prepend_item(view);
         else if (event.node.slot == view->resize.slot) {
             float before = view->rows[0].extent;
-            view->rows[0].extent = before == 86 ? 60 : 86;
+            float small = view->horizontal ? 100 : 60;
+            float large = view->horizontal ? 136 : 86;
+            view->rows[0].extent = before == large ? small : large;
             status = submit_rows(view);
             if (status != CUI_BRIDGE_OK)
                 view->rows[0].extent = before;
@@ -99,41 +103,55 @@ static bool press(inbox *view, cui_bridge_node button) {
     } while (0)
 
 int main(int argc, char **argv) {
-    if (argc > 2) {
-        fprintf(stderr, "Usage: %s [font.ttf]\n", argv[0]);
+    bool horizontal = argc > 1 && strcmp(argv[1], "--horizontal") == 0;
+    int font_arg = horizontal ? 2 : 1;
+    if (argc > font_arg + 1) {
+        fprintf(stderr, "Usage: %s [--horizontal] [font.ttf]\n", argv[0]);
         return EXIT_FAILURE;
     }
-    const char *font = argc == 2 ? argv[1] : NULL;
+    const char *font = argc > font_arg ? argv[font_arg] : NULL;
+    const char *title_text = horizontal ? "Clip timeline" : "Live inbox";
     cui_bridge_options options = {.struct_size = sizeof options,
                                   .abi_version = CUI_BRIDGE_ABI_VERSION,
                                   .backend =
                                       font ? CUI_BRIDGE_BACKEND_SDL : CUI_BRIDGE_BACKEND_NONE,
-                                  .title_utf8 = "Live inbox",
+                                  .title_utf8 = title_text,
                                   .font_path_utf8 = font,
                                   .width = 480,
                                   .height = 320};
     cui_bridge_status status;
-    inbox view = {.app = cui_bridge_create(&options, &status)};
+    inbox view = {.app = cui_bridge_create(&options, &status), .horizontal = horizontal};
     CHECK(view.app && status == CUI_BRIDGE_OK);
     cui_bridge_node root, title, controls;
     CHECK(make_node(&view, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "inbox", "", &root));
-    CHECK(make_node(&view, root, CUI_BRIDGE_LABEL, "heading", "Live inbox", &title));
+    CHECK(make_node(&view, root, CUI_BRIDGE_LABEL, "heading", title_text, &title));
     CHECK(make_node(&view, root, CUI_BRIDGE_ROW, "controls", "", &controls));
-    CHECK(
-        make_node(&view, controls, CUI_BRIDGE_BUTTON, "prepend", "Prepend message", &view.prepend));
-    CHECK(
-        make_node(&view, controls, CUI_BRIDGE_BUTTON, "resize", "Resize first row", &view.resize));
+    CHECK(make_node(&view, controls, CUI_BRIDGE_BUTTON, "prepend",
+                    horizontal ? "Prepend clip" : "Prepend message", &view.prepend));
+    CHECK(make_node(&view, controls, CUI_BRIDGE_BUTTON, "resize",
+                    horizontal ? "Resize first clip" : "Resize first row", &view.resize));
     CHECK(make_node(&view, root, CUI_BRIDGE_VIRTUAL_LIST, "messages", "", &view.list));
-    CHECK(cui_bridge_set_visual_size(view.app, view.list, 380, 176) == CUI_BRIDGE_OK);
+    CHECK(cui_bridge_set_visual_size(view.app, view.list, 380, horizontal ? 96 : 176) ==
+          CUI_BRIDGE_OK);
+    if (horizontal)
+        CHECK(cui_bridge_virtual_list_set_axis_v1(
+                  view.app, view.list, CUI_BRIDGE_VIRTUAL_LIST_HORIZONTAL) == CUI_BRIDGE_OK);
     CHECK(cui_bridge_virtual_list_preserve_anchor_v1(view.app, view.list, 1) == CUI_BRIDGE_OK);
     for (; view.count < 12; ++view.count) {
         char label[32];
-        snprintf(label, sizeof label, "Inbox message %u", (unsigned)(view.count + 1));
+        snprintf(label, sizeof label, horizontal ? "Clip %u" : "Inbox message %u",
+                 (unsigned)(view.count + 1));
+        if (horizontal)
+            view.rows[view.count].extent = (float)(96 + (view.count % 3) * 24);
         CHECK(make_node(&view, view.list, CUI_BRIDGE_ITEM, label, label,
                         &view.rows[view.count].item));
     }
     CHECK(submit_rows(&view) == CUI_BRIDGE_OK);
-    CHECK(cui_bridge_set_value(view.app, view.list, 105.5) == CUI_BRIDGE_OK);
+    /* Position the viewport 9.5 px into the fourth item in either layout. */
+    double initial_offset = 9.5;
+    for (int i = 0; i < 3; i++)
+        initial_offset += horizontal ? view.rows[i].extent : 32;
+    CHECK(cui_bridge_set_value(view.app, view.list, initial_offset) == CUI_BRIDGE_OK);
     if (font) {
         status = cui_bridge_run(view.app, after_frame, &view);
         CHECK(status == CUI_BRIDGE_OK || status == CUI_BRIDGE_CLOSED);
@@ -146,12 +164,13 @@ int main(int argc, char **argv) {
         double offset;
         cui_bridge_rect list, row;
         CHECK(cui_bridge_get_value(view.app, view.list, &offset) == CUI_BRIDGE_OK &&
-              offset == 191.5);
+              offset == initial_offset + (horizontal ? 136 : 86));
         CHECK(cui_bridge_node_bounds(view.app, view.list, &list) == CUI_BRIDGE_OK);
         CHECK(cui_bridge_virtual_list_item_bounds(view.app, view.list, anchor, &row) ==
               CUI_BRIDGE_OK);
-        CHECK(fabsf(row.y - list.y + 9.5f) < .001f);
-        printf("Message 4 is still first at %.1f pixels into the row\n", (double)(list.y - row.y));
+        float within_item = horizontal ? list.x - row.x : list.y - row.y;
+        CHECK(fabsf(within_item - 9.5f) < .001f);
+        printf("Item 4 is still first at %.1f pixels from its leading edge\n", (double)within_item);
     }
     cui_bridge_destroy(view.app);
     return EXIT_SUCCESS;

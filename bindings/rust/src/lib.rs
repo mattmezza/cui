@@ -53,7 +53,7 @@ use std::{
 pub use time_localized::{
     TimeCycle, TimeFieldChange, TimeFieldConfig, TimeFieldResult, TimePrecision,
 };
-pub use virtual_list::VirtualListRow;
+pub use virtual_list::{VirtualListAxis, VirtualListRow};
 
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash)]

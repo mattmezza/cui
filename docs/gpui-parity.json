@@ -7884,7 +7884,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Styled visible-window rendering, both orientations, variable extents, scrollbars/keyboard and Auto/Infer sizing are headless tested. The retained C bridge and all five language builders add optional anchoring on vertical updates with up to 64 explicitly sized rows. Intrinsic measurement is an immediate host callback. Row selection and controls remain application-owned."
+        "Styled visible-window rendering, both orientations, variable extents, scrollbars/keyboard and Auto/Infer sizing are headless tested. The retained C bridge and all five language builders support either main axis with optional anchoring and up to 64 explicitly sized items. Cross-axis scrolling and intrinsic measurement remain immediate C capabilities. Row selection and controls remain application-owned."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -7944,6 +7944,21 @@
             "docs/VIRTUAL_LIST.md"
           ],
           "scope": "Headless row geometry, live membership and order, invalid input, the ordinary path on the released alpha.7 provider, and TypeScript declaration checks."
+        },
+        {
+          "name": "Retained horizontal layout with variable-width items",
+          "status": "tested",
+          "evidence": [
+            "bindings/bridge/tests/test_bridge_components.c",
+            "bindings/bridge/examples/virtual_inbox.c",
+            "bindings/python/test_virtual_list_rows.py",
+            "bindings/node/test/virtual-list-rows.test.cjs",
+            "bindings/node/test/virtual-list-rows.types.ts",
+            "bindings/go/cui/virtual_list_test.go",
+            "bindings/rust/tests/virtual_list.rs",
+            "docs/VIRTUAL_LIST.md"
+          ],
+          "scope": "Headless width and offset checks, stable first visible item through live edits, wheel and keyboard scrolling in C, and vertical fallback on the released alpha.14 provider."
         },
         {
           "name": "1K/10K/100K benchmark",

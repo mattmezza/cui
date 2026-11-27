@@ -26,6 +26,7 @@ export function column(): Column & ShadowStyled & PartShadowStyled<0|1>;
 export function label(text?: string): Label & ShadowStyled & PartShadowStyled<0|1>;
 export function button(key?: string): Button & ShadowStyled & PartShadowStyled<0|1>;
 export class App {
+  supportsVirtualListAxis(): boolean;
   supportsVirtualListRows(): boolean;
   /** Submit without dispatch. Caller owns draining the shared queue. */
   step_only(dt?: number): this;
@@ -318,9 +319,11 @@ export function table(key?: string,text?: string): Table;
 export function data_table(key?: string,text?: string): DataTable;
 export function plot(key?: string,text?: string): Plot;
 export interface Command extends Label, Composite {current_text(): string; selected(): Item | undefined; item_bounds(item: Item): Bounds; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
-/** A complete direct-Item projection; zero extent uses the default 32 logical pixels. */
+/** Main-axis width or height in logical pixels; zero uses the default 32. */
 export interface VirtualListRow {item: Item; extent: number}
+export type VirtualListAxis = 'vertical' | 'horizontal';
 export interface VirtualList extends Label, Composite {
+  setVirtualListAxis(axis: VirtualListAxis): this;
   /** All current direct Items, each once; at most 64, extents zero or finite in [1,4096]. */
   setVirtualListRows(rows: readonly VirtualListRow[]): this;
   preserveVirtualListAnchor(enabled?: boolean): this;

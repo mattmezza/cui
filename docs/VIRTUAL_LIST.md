@@ -103,13 +103,20 @@ uses the existing model helpers.
 ### Live updates in the retained C bridge
 
 Create a `CUI_BRIDGE_VIRTUAL_LIST` with direct `CUI_BRIDGE_ITEM` children.
-`cui_bridge_virtual_list_set_rows_v1` atomically replaces their order and heights.
-Pass each current child once in display order. Height zero uses the default
-32 logical pixels. The bridge copies the array. A malformed or stale handle,
-duplicate row, invalid height or mismatched count leaves the previous order
-and heights intact. Use the existing node APIs to change membership between
-steps. The projection covers up to 64 retained rows. The immediate model
-supports larger application-owned lists.
+`cui_bridge_virtual_list_set_rows_v1` atomically replaces their order and
+main-axis extents. Pass each current child once in display order. An extent of
+zero uses 32 logical pixels. The bridge copies the array. A malformed or stale
+handle, duplicate item, invalid extent or mismatched count leaves the previous
+order and extents intact. Use the existing node APIs to change membership
+between steps. The projection covers up to 64 retained items.
+
+Lists start vertical. Call
+`cui_bridge_virtual_list_set_axis_v1(app, list, CUI_BRIDGE_VIRTUAL_LIST_HORIZONTAL)`
+to make each extent a width. Change back with
+`CUI_BRIDGE_VIRTUAL_LIST_VERTICAL`. An axis switch keeps the same numeric
+scroll offset, subject to clamping against the new viewport. Scroll values,
+change events and item handles keep their existing forms. Use the immediate C
+model for larger lists, cross-axis scrolling or a host measurement callback.
 
 ```c
 #include <cui/cui_bridge.h>
@@ -128,37 +135,41 @@ cui_bridge_status update_inbox(cui_bridge_app *app, cui_bridge_node inbox,
 
 Call `cui_bridge_virtual_list_preserve_anchor_v1(app, inbox, 1)` when creating
 the list. After its first layout, subsequent row edits retain the first visible
-Item and the number of pixels scrolled inside it, clamped to the row and new
+Item and the number of pixels scrolled inside it, clamped to the item and new
 viewport. If that Item is removed, the next surviving Item in the previous
-order starts at the top. If none follows, the nearest previous survivor is
-used. When every previous Item has gone, the list starts at its beginning.
+order starts at the leading edge. If none follows, the nearest previous
+survivor is used. When every previous Item has gone, the list starts at its
+beginning.
 An explicit `cui_bridge_set_value` before the next step takes precedence.
 Query `cui_bridge_get_value` for the resolved offset after the step.
 Restoration itself is silent. Wheel and keyboard scrolling keep their queued
 change behavior, including when they occur in the same step as an edit.
 Turning preservation off keeps the numeric scroll offset, subject to clamping.
 
-The runnable C inbox wires two buttons to prepend a message and resize the
-first row. With a portable bridge build, the example drives those buttons
-headlessly and checks that the same row stays visible at the same offset.
+The runnable C example offers a vertical inbox and a horizontal clip
+timeline. Each wires buttons to prepend and resize items. With a portable
+bridge build, the example drives those buttons headlessly and checks that
+the same item stays visible at the same offset.
 
 ```sh
 cmake -S . -B build -G Ninja -DCUI_BUILD_BRIDGE=ON -DCUI_BUILD_NATIVE=OFF
 cmake --build build --target bridge_virtual_inbox_example
 ./build/bridge_virtual_inbox_example
+./build/bridge_virtual_inbox_example --horizontal
 ```
 
 To open an actual window, build with an SDL-enabled C bridge and pass the path
-to a TrueType font as the first argument. [C example](../bindings/bridge/examples/virtual_inbox.c) ·
+to a TrueType font after any `--horizontal` flag. [C example](../bindings/bridge/examples/virtual_inbox.c) ·
 [Native bridge prerequisites](BINDING_BUILDERS.md)
 
 ### Live updates from the language builders
 
 Run the projection between frames, including from an ordinary queued Button
-callback. Check the provider before enabling edit controls. The ordinary
-VirtualList still works with 32-pixel rows on earlier releases. The live API
-covers up to 64 rows in a vertical viewport. Use the immediate C API for
-horizontal lists or a host measurement callback.
+callback. Check the provider before enabling edit controls or offering a
+horizontal layout. The axis and live-row APIs have separate capability probes.
+Alpha.14 supports live rows in the vertical layout. Keep the default axis on
+providers that lack the axis setter. Providers without the live-row API use
+the default 32-pixel extent.
 
 | Language | Probe | Set anchoring and order | Change membership after mount |
 | --- | --- | --- | --- |
@@ -167,12 +178,19 @@ horizontal lists or a host measurement callback.
 | Go | `app.SupportsVirtualListRows()` | `inbox.PreserveVirtualListAnchor(true)`, `inbox.SetVirtualListRows(rows)` with `[]cui.VirtualListRow` | `inbox.AppendVirtualListItem(key, label)`, `item.Remove()` |
 | Rust | `app.supports_virtual_list_rows()` | `app.preserve_virtual_list_anchor(inbox, true)`, `app.set_virtual_list_rows(inbox, &rows)` with `VirtualListRow` values | `app.child(inbox, Kind::Item, key)`, `app.remove(item)` |
 
+| Language | Probe axis support | Select horizontal layout |
+| --- | --- | --- |
+| Python | `app.supports_virtual_list_axis()` | `timeline.virtual_list_axis("horizontal")` |
+| JavaScript / TypeScript | `app.supportsVirtualListAxis()` | `timeline.setVirtualListAxis("horizontal")` |
+| Go | `app.SupportsVirtualListAxis()` | `timeline.VirtualListAxis(cui.VirtualListHorizontal)` |
+| Rust | `app.supports_virtual_list_axis()` | `app.virtual_list_axis(timeline, VirtualListAxis::Horizontal)?` |
+
 Keep a row array in the application. To prepend, create an Item with a unique
 key, add that Item at index zero in your array and submit the full projection.
 Paths for app-owned Items with child controls still use the host's original
 tree construction. Live Python and JavaScript/TypeScript append helpers and
 Go's text helper append a leaf Item. An invalid projection leaves the last
-admitted order and heights intact. Membership edits are separate operations.
+admitted order and extents intact. Membership edits are separate operations.
 After the next layout, query the current offset or row bounds using the same
 handles.
 

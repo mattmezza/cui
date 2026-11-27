@@ -591,10 +591,13 @@ static struct {
  cui_bridge_status (*set_rows)(cui_bridge_app *, cui_bridge_node, uint32_t,
                                const cui_bridge_virtual_list_row_v1 *, uint32_t);
  cui_bridge_status (*preserve_anchor)(cui_bridge_app *, cui_bridge_node, uint32_t);
+ cui_bridge_status (*set_axis)(cui_bridge_app *, cui_bridge_node, uint32_t);
 } virtual_list_api;
 
 static void go_virtual_list_initialize(void) {
  if (bridge_lib) {
+  go_load_optional_symbol(&virtual_list_api.set_axis, sizeof virtual_list_api.set_axis,
+                          "cui_bridge_virtual_list_set_axis_v1");
   go_load_optional_symbol(&virtual_list_api.set_rows, sizeof virtual_list_api.set_rows,
                           "cui_bridge_virtual_list_set_rows_v1");
   go_load_optional_symbol(&virtual_list_api.preserve_anchor, sizeof virtual_list_api.preserve_anchor,
@@ -602,10 +605,16 @@ static void go_virtual_list_initialize(void) {
  }
 #if defined(CUI_GO_STATIC)
  else {
+  virtual_list_api.set_axis = cui_bridge_virtual_list_set_axis_v1;
   virtual_list_api.set_rows = cui_bridge_virtual_list_set_rows_v1;
   virtual_list_api.preserve_anchor = cui_bridge_virtual_list_preserve_anchor_v1;
  }
 #endif
+}
+
+static int go_virtual_list_axis_supported(void) { return virtual_list_api.set_axis != NULL; }
+static cui_bridge_status go_virtual_list_set_axis(cui_bridge_app *app, cui_bridge_node list, uint32_t axis) {
+ return virtual_list_api.set_axis(app, list, axis);
 }
 
 static int go_virtual_list_rows_supported(void) {
@@ -1023,6 +1032,7 @@ type Node struct {
 	carouselBasis                        float32
 	carouselFit                          bool
 	kbdStroke                            *kbdStrokeConfig
+	virtualListAxis                      VirtualListAxis
 	carouselAxis                         CarouselAxis
 	carouselLooping                      bool
 	carouselControls                     C.uint32_t
@@ -2166,6 +2176,9 @@ func (a *App) Mount(root *Node) error {
 		if n.kbdStroke != nil && C.go_kbd_stroke_supported() == 0 {
 			return ErrKbdStrokeUnavailable
 		}
+		if n.virtualListAxis == VirtualListHorizontal && C.go_virtual_list_axis_supported() == 0 {
+			return ErrVirtualListAxisUnavailable
+		}
 		if n.carouselAxis == CarouselVertical && C.go_carousel_axis_supported() == 0 {
 			return ErrCarouselAxisUnavailable
 		}
@@ -2701,6 +2714,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if sizes := n.carouselControlSizes; sizes != (CarouselControlSizes{}) {
 			if err := n.setCarouselControlSizes(sizes); err != nil {
+				return err
+			}
+		}
+		if n.virtualListAxis == VirtualListHorizontal {
+			if err := result(C.go_virtual_list_set_axis(a.ptr, h, C.uint32_t(n.virtualListAxis))); err != nil {
 				return err
 			}
 		}
@@ -4588,10 +4606,57 @@ func Command(key string) *Node     { return &Node{kind: 73, key: key} }
 func VirtualList(key string) *Node { return &Node{kind: 74, key: key} }
 func Sidebar(key string) *Node     { return &Node{kind: 75, key: key} }
 
+// VirtualListAxis selects the main direction of a retained VirtualList.
+type VirtualListAxis uint32
+
+const (
+	VirtualListVertical VirtualListAxis = iota
+	VirtualListHorizontal
+)
+
+// ErrVirtualListAxisUnavailable means the bridge lacks the optional axis setter.
+var ErrVirtualListAxisUnavailable = errors.New("VirtualList axis requires cui_bridge_virtual_list_set_axis_v1")
+
+// SupportsVirtualListAxis reports support for horizontal retained lists.
+func (a *App) SupportsVirtualListAxis() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_virtual_list_axis_supported() != 0, nil
+}
+
+// VirtualListAxis sets the direction for the next frame, preserving the scalar
+// main offset subject to clamping. Row extents are widths when horizontal.
+func (n *Node) VirtualListAxis(axis VirtualListAxis) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 74 || n.removed || (axis != VirtualListVertical && axis != VirtualListHorizontal) {
+		n.err = errors.New("VirtualListAxis requires a live VirtualList and a valid axis")
+		return n
+	}
+	if n.app != nil && axis != n.virtualListAxis {
+		supported, err := n.app.SupportsVirtualListAxis()
+		if err != nil {
+			n.err = err
+		} else if !supported {
+			n.err = ErrVirtualListAxisUnavailable
+		} else {
+			n.err = result(C.go_virtual_list_set_axis(n.app.ptr, n.handle, C.uint32_t(axis)))
+		}
+		if n.err != nil {
+			return n
+		}
+	}
+	n.virtualListAxis = axis
+	return n
+}
+
 // VirtualListRow places an existing direct Item in the next layout.
 type VirtualListRow struct {
 	Item *Node
-	// Extent is in logical pixels. Use zero for 32, or a value from 1 through 4096.
+	// Extent is the main-axis width or height in logical pixels.
+	// Use zero for 32, or a value from 1 through 4096.
 	Extent float32
 }
 

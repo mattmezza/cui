@@ -2338,6 +2338,90 @@ static void expect_virtual_offset(cui_bridge_app *app, cui_bridge_node list, dou
     assert(cui_bridge_poll_event_ex(app, &event, text, sizeof text, &required) == CUI_BRIDGE_EMPTY);
 }
 
+static void test_virtual_list_horizontal(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .width = 640,
+                                  .height = 480};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root, list, cards[7], inserted;
+    assert(cui_bridge_node_create(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root", &root) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_VIRTUAL_LIST, "timeline", &list) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, list, 180, 96) == CUI_BRIDGE_OK);
+    assert(cui_bridge_virtual_list_set_axis_v1(app, root, CUI_BRIDGE_VIRTUAL_LIST_HORIZONTAL) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_virtual_list_set_axis_v1(app, list, CUI_BRIDGE_VIRTUAL_LIST_HORIZONTAL) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_virtual_list_set_axis_v1(app, list, 2) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_virtual_list_preserve_anchor_v1(app, list, 1) == CUI_BRIDGE_OK);
+    cui_bridge_virtual_list_row_v1 rows[8];
+    for (unsigned i = 0; i < 7; ++i) {
+        char key[16];
+        snprintf(key, sizeof key, "clip-%u", i);
+        assert(cui_bridge_node_create(app, list, CUI_BRIDGE_ITEM, key, &cards[i]) == CUI_BRIDGE_OK);
+        assert(cui_bridge_set_text(app, cards[i], key) == CUI_BRIDGE_OK);
+        rows[i + 1] = (cui_bridge_virtual_list_row_v1){cards[i], i == 2 ? 100 : 70};
+    }
+    assert(cui_bridge_virtual_list_set_rows_v1(app, list, sizeof rows[0], rows + 1, 7) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_value(app, list, 151.5) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_virtual_offset(app, list, 151.5, false);
+    cui_bridge_rect surface, anchor, neighbor;
+    assert(cui_bridge_node_bounds(app, list, &surface) == CUI_BRIDGE_OK);
+    assert(cui_bridge_virtual_list_item_bounds(app, list, cards[2], &anchor) == CUI_BRIDGE_OK);
+    assert(cui_bridge_virtual_list_item_bounds(app, list, cards[3], &neighbor) == CUI_BRIDGE_OK);
+    assert(anchor.x - surface.x == -11.5f && anchor.width == 100);
+    assert(neighbor.x - anchor.x == 100 && neighbor.y == anchor.y);
+
+    assert(cui_bridge_node_create(app, list, CUI_BRIDGE_ITEM, "inserted", &inserted) ==
+           CUI_BRIDGE_OK);
+    rows[0] = (cui_bridge_virtual_list_row_v1){inserted, 40};
+    rows[1].extent = 90;
+    assert(cui_bridge_virtual_list_set_rows_v1(app, list, sizeof rows[0], rows, 8) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_virtual_offset(app, list, 211.5, false);
+    cui_bridge_rect fixed;
+    assert(cui_bridge_virtual_list_item_bounds(app, list, cards[2], &fixed) == CUI_BRIDGE_OK);
+    assert(fixed.x == anchor.x && fixed.y == anchor.y);
+
+    assert(cui_bridge_queue_scroll(app, surface.x + 20, surface.y + 20, 0, -1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_virtual_offset(app, list, 211.5, false);
+    assert(cui_bridge_queue_scroll(app, surface.x + 20, surface.y + 20, -1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_virtual_offset(app, list, 243.5, true);
+    assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, CUI_BRIDGE_KEY_TAB, 0, 0) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, CUI_BRIDGE_KEY_RIGHT, 0, 0) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_virtual_offset(app, list, 275.5, true);
+
+    assert(cui_bridge_virtual_list_set_axis_v1(app, list, CUI_BRIDGE_VIRTUAL_LIST_VERTICAL) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_virtual_offset(app, list, 275.5, false);
+    expect_virtual_row(app, list, cards[2], -75.5f, 100);
+    assert(cui_bridge_virtual_list_set_axis_v1(app, list, CUI_BRIDGE_VIRTUAL_LIST_HORIZONTAL) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_value(app, list, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_virtual_offset(app, list, 0, false);
+    assert(cui_bridge_virtual_list_item_bounds(app, list, inserted, &fixed) == CUI_BRIDGE_OK);
+    assert(fixed.x == surface.x && fixed.width == 40);
+    assert(cui_bridge_node_remove(app, list) == CUI_BRIDGE_OK);
+    assert(cui_bridge_virtual_list_set_axis_v1(app, list, CUI_BRIDGE_VIRTUAL_LIST_VERTICAL) ==
+           CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+}
+
 static void test_virtual_list_live_rows(void) {
     cui_bridge_options options = {.struct_size = sizeof options,
                                   .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -3136,6 +3220,7 @@ int main(void) {
     test_plot();
     test_command();
     test_virtual_list();
+    test_virtual_list_horizontal();
     test_virtual_list_live_rows();
     test_sidebar();
     test_theme_presets();

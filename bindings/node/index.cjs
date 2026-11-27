@@ -101,6 +101,7 @@ function requestsRadioMotion(node) {
 const stepperFillUnavailable = 'Stepper Fill requires cui_bridge_set_stepper_fill';
 function preflightNodeOptions(app, node, insideDecoration = false, insideAttachmentSlot = false) {
   if (node.kbdStrokeValue && !app.supportsKbdStroke()) throw new Error('Typed Kbd requires cui_bridge_set_kbd_stroke_v1');
+  if (node.virtualListAxisValue === 'horizontal' && !app.supportsVirtualListAxis()) throw new Error('VirtualList axis unavailable');
   if (node.carouselAxisValue === 'vertical' && !app.supports_carousel_axis()) throw new Error('Carousel axis unavailable');
   if (node.carouselControlSizesValue.some(Boolean) && !app.supports_carousel_control_sizes()) throw new Error('Carousel control sizes unavailable');
   if (node.carouselControlsValue && !app.supports_carousel_controls()) throw new Error('Carousel controls unavailable');
@@ -213,6 +214,7 @@ class Node {
     this.roundingValue = 0; this.radiusValue = 0; this.disabledValue = false;
     this.extentValue=null; this.anchorValue=null; this.visualValue=null; this.closeValue=null; this.totalValue=kind===43?5:kind===59?6:10; this.attachmentValue=0; this.imageValue=null;this.chartDataValue=[];this.chartKindValue=0;this.plotPointsValue=[];this.matrixValue=null;this.selectionModeValue=0;this.textFormatValue=0;this.panelValue=null; this.timeValue=[0,0,0];this.dateValue=[2026,1,1];this.colorValue=0x000000ff; this.statusValue=null; this.openValue = false;this.openSet=false;this.checkedSet=false; this.detailValue = ""; this.selectedValue = null; this.checkedValue = false; this.numericValue = kind===42?1:0; this.rangeValue = kind===42?[1,10,1]:kind===43?[0,5,1]:[0,1,.01]; this.changeValue = undefined;
     this.radioPaintValues = null;
+    this.virtualListAxisValue = 'vertical';
     this.carouselAxisValue = 'horizontal';
     this.carouselControlSizesValue = [0, 0];
     this.carouselControlsValue = 0;
@@ -701,6 +703,17 @@ class Node {
   table_state() {if(this.kind!==71||!this.owner)throw new TypeError('mounted DataTable required');return native.getMatrixState(this.owner.handle,this[NODE]);}
   table_cell_bounds(row,column) {if(this.kind!==71||!this.owner||![row,column].every(v=>Number.isInteger(v)&&v>=0&&v<=0xffffffff))throw new TypeError('invalid mounted cell');return native.matrixCellBounds(this.owner.handle,this[NODE],row,column);}
   table_header_bounds(column) {if(this.kind!==71||!this.owner||!Number.isInteger(column)||column<0||column>0xffffffff)throw new TypeError('invalid mounted header');return native.matrixHeaderBounds(this.owner.handle,this[NODE],0,column);}
+  setVirtualListAxis(axis) {
+    if (this.kind !== 74) throw new TypeError('VirtualList required');
+    if (axis !== 'vertical' && axis !== 'horizontal') throw new TypeError('axis must be vertical or horizontal');
+    this.owner?._alive();
+    if (this.owner && axis !== this.virtualListAxisValue) {
+      if (!this.owner.supportsVirtualListAxis()) throw new Error('VirtualList axis unavailable');
+      native.setVirtualListAxis(this.owner.handle, this[NODE], axis === 'horizontal' ? 1 : 0);
+    }
+    this.virtualListAxisValue = axis;
+    return this;
+  }
   _liveVirtualList() {
     if (this.kind !== 74 || !this.owner) throw new TypeError('mounted VirtualList required');
     this.owner._alive();
@@ -941,6 +954,11 @@ class App {
       maxNodes: options.maxNodes ?? 1024, maxEvents: options.maxEvents ?? 1024,
       title: options.title, fontPath: options.fontPath, initiallyHidden: options.initiallyHidden ? 1 : 0});
   }
+  supportsVirtualListAxis() {
+    this._alive();
+    return typeof native.supportsVirtualListAxis === 'function' && typeof native.setVirtualListAxis === 'function' &&
+      native.supportsVirtualListAxis();
+  }
   supportsVirtualListRows() {
     this._alive();
     return native.virtualRowsOptions(this.handle, 0);
@@ -986,6 +1004,7 @@ class App {
         for (const [layer, paint] of node.radioPaintValues)
           native.setRadioPaint(this.handle, node[NODE], layer, paint);
       }
+      if (node.virtualListAxisValue === 'horizontal') native.setVirtualListAxis(this.handle, node[NODE], 1);
       if (node.carouselAxisValue === 'vertical') native.setCarouselAxis(this.handle, node[NODE], 1);
       if (node.carouselControlSizesValue.some(Boolean)) native.setCarouselControlSizes(this.handle, node[NODE], ...node.carouselControlSizesValue);
       if (node.carouselControlsValue) native.setCarouselControls(this.handle, node[NODE], node.carouselControlsValue);

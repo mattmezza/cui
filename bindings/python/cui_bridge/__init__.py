@@ -214,6 +214,10 @@ class _API:
                                               C.c_uint32, C.POINTER(_DataTableLoadMoreV1))
         self.command_bounds = bind("command_item_bounds", C.c_int, C.c_void_p, _Handle, _Handle, C.POINTER(_Rect))
         self.virtual_bounds = bind("virtual_list_item_bounds", C.c_int, C.c_void_p, _Handle, _Handle, C.POINTER(_Rect))
+        self.virtual_axis = None
+        if hasattr(lib, "cui_bridge_virtual_list_set_axis_v1"):
+            self.virtual_axis = bind("virtual_list_set_axis_v1", C.c_int,
+                                     C.c_void_p, _Handle, C.c_uint32)
         self.virtual_rows = self.virtual_anchor = None
         if all(hasattr(lib, "cui_bridge_" + name) for name in
                ("virtual_list_set_rows_v1", "virtual_list_preserve_anchor_v1")):
@@ -585,6 +589,7 @@ class Widget:
         self._selected: Widget | None = None
         self._anchor: Widget | None = None
         self._extent: tuple[float, float] | None = None
+        self._virtual_list_axis = "vertical"
         self._carousel_axis = "horizontal"
         self._carousel_control_sizes = (0, 0)
         self._carousel_controls = 0
@@ -1623,6 +1628,19 @@ class Widget:
         if self.kind != "data_table" or self._app is None or isinstance(column,bool) or not isinstance(column,int) or not 0<=column<=0xffffffff: raise ValueError("invalid mounted table header")
         rect=_Rect();self._change("matrix_header_bounds",column,C.byref(rect));return rect.x,rect.y,rect.width,rect.height
 
+    def virtual_list_axis(self, axis: str) -> "Widget":
+        """Choose the VirtualList's main axis. Horizontal item extents are widths."""
+        if self.kind != "virtual_list" or self._disposed:
+            raise ValueError("live VirtualList required")
+        if axis not in ("vertical", "horizontal"):
+            raise ValueError("axis must be vertical or horizontal")
+        if self._app is not None and axis != self._virtual_list_axis:
+            if not self._app.supports_virtual_list_axis():
+                raise RuntimeError("VirtualList axis requires cui_bridge_virtual_list_set_axis_v1")
+            self._change("virtual_axis", int(axis == "horizontal"))
+        self._virtual_list_axis = axis
+        return self
+
     def _live_virtual_list(self) -> App:
         if self.kind != "virtual_list" or self._app is None or self._disposed:
             raise ValueError("mounted VirtualList required")
@@ -2412,6 +2430,8 @@ class App:
                 raise RuntimeError("Typed Kbd requires cui_bridge_set_kbd_stroke_v1")
             if node._stepper_fill is not None:
                 self._require_stepper_fill()
+            if node._virtual_list_axis == "horizontal" and not self.supports_virtual_list_axis():
+                raise RuntimeError("VirtualList axis requires cui_bridge_virtual_list_set_axis_v1")
             if node._carousel_axis == "vertical" and not self.supports_carousel_axis():
                 raise RuntimeError("Carousel axis requires cui_bridge_set_carousel_axis_v1")
             if any(node._carousel_control_sizes) and not self.supports_carousel_control_sizes():
@@ -2518,6 +2538,8 @@ class App:
                     node._change("set_gap", node._gap)
                 if node.kind in _BOOLEAN or (node.kind == "item" and node._checked_set):
                     node._change("set_checked", int(node._checked))
+                if node._virtual_list_axis == "horizontal":
+                    node._change("virtual_axis", 1)
                 if node._carousel_axis == "vertical":
                     node._change("set_carousel_axis", 1)
                 if any(node._carousel_control_sizes):
@@ -2998,6 +3020,10 @@ class App:
         if self._time_field_enabled and self._ptr:
             count += self.dispatch_time_changes()
         return count
+
+    def supports_virtual_list_axis(self) -> bool:
+        self._ensure_open()
+        return self._api.virtual_axis is not None
 
     def supports_virtual_list_rows(self) -> bool:
         self._ensure_open()

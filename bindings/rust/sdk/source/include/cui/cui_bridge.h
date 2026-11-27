@@ -556,8 +556,16 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_virtual_list_item_bounds(cui_bridge_
                                                                      cui_bridge_node list,
                                                                      cui_bridge_node item,
                                                                      cui_bridge_rect *out_bounds);
+enum { CUI_BRIDGE_VIRTUAL_LIST_VERTICAL, CUI_BRIDGE_VIRTUAL_LIST_HORIZONTAL };
+/* Optional main-axis selection. Vertical is the default. An axis change takes
+ * effect at the next step. The pixel offset and item handles are kept, with
+ * normal clamping to the new range. set_value/get_value and CHANGE refer to the
+ * active axis. Call between steps on the owning thread. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_virtual_list_set_axis_v1(cui_bridge_app *,
+                                                                     cui_bridge_node list,
+                                                                     uint32_t axis);
 /* A complete projection of the list's existing direct Item children. The
- * bridge copies each height and uses the array order for the child links.
+ * bridge copies each main-axis extent (height or width) and uses array order.
  * Each Item must appear once. Extents are finite logical pixels between
  * 1 and 4096, or zero for the default 32. Existing handles stay live.
  * Create or remove membership through the node APIs before submitting the
@@ -573,7 +581,7 @@ cui_bridge_virtual_list_set_rows_v1(cui_bridge_app *, cui_bridge_node list, uint
                                     const cui_bridge_virtual_list_row_v1 *rows, uint32_t count);
 /* Opt in to keeping the first visible Item and its within-row offset across
  * layout edits. The next surviving old successor (or preceding survivor)
- * starts at the top if the anchor is removed. The viewport clamps all offsets.
+ * starts at the leading edge if the anchor is removed. The viewport clamps all offsets.
  * Explicit set_value takes precedence until the next successful composition.
  * Automatic correction queues no change. The default keeps the pixel offset. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_virtual_list_preserve_anchor_v1(cui_bridge_app *,

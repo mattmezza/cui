@@ -108,8 +108,9 @@ and queued scalar changes. Python, JS/TS, Go and Rust expose copied
 feedback forms in `docs/BRIDGE_COMPONENTS.md`.
 
 For retained C VirtualList, use `cui_bridge_virtual_list_set_rows_v1` for copied
-row order and extents and opt into anchor preservation. Send scroll input
-through the existing host path. See live updates in `docs/VIRTUAL_LIST.md`.
+item order and extents and opt into anchor preservation. Select a horizontal
+layout with `cui_bridge_virtual_list_set_axis_v1` to interpret extents as widths.
+Send scroll input through the existing host path. See `docs/VIRTUAL_LIST.md`.
 
 For RadioGroup descriptions, decorative content, tooltips, signed tab order
 and C-only paint callbacks, read `docs/RADIO_GROUP.md`. For a controlled
@@ -530,9 +531,10 @@ For variable-height VirtualList updates in C, capture an anchor before
 rebuilding keys or changing heights and restore it before the next draw.
 Retain the within-row offset for surviving keys. Clear it if a removed item's
 replacement should begin at the viewport edge. The retained C, Python, JS/TS,
-Go and Rust APIs copy a complete projection of up to 64 vertical Items. Probe
-live-row support before enabling anchoring. Explicit scroll wins. Earlier
-providers keep uniform rows. See the runnable inboxes in `docs/VIRTUAL_LIST.md`.
+Go and Rust APIs copy a complete projection of up to 64 Items. Probe live-row
+support for anchoring and axis support for horizontal layout. Explicit scroll
+wins. Earlier providers may support only vertical or uniform rows. See the
+runnable inbox and clip timeline in `docs/VIRTUAL_LIST.md`.
 For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots alive
 through frame completion and ensure the container fits the panels' combined
 min/max range. A pane at its constraint cannot move farther in that direction.

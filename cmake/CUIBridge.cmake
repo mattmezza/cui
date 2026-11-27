@@ -101,6 +101,7 @@ add_executable(bridge_virtual_inbox_example ${CUI_BRIDGE_ROOT}/bindings/bridge/e
 target_link_libraries(bridge_virtual_inbox_example PRIVATE cui_bridge)
 cui_warnings(bridge_virtual_inbox_example)
 add_test(NAME bridge_virtual_inbox_example COMMAND bridge_virtual_inbox_example)
+add_test(NAME bridge_virtual_inbox_horizontal_example COMMAND bridge_virtual_inbox_example --horizontal)
 add_executable(test_bridge_data_table_capacity
  ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_data_table_capacity.c)
 target_link_libraries(test_bridge_data_table_capacity PRIVATE cui_bridge)
@@ -141,6 +142,7 @@ add_test(NAME bridge_python_rating_example COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/examples/rating_options.py)
 add_test(NAME bridge_python_virtual_list_rows COMMAND ${CMAKE_COMMAND} -E env
+ CUI_EXPECT_VIRTUAL_AXIS=1
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_virtual_list_rows.py)
 add_test(NAME bridge_python_virtual_list_inbox COMMAND ${CMAKE_COMMAND} -E env

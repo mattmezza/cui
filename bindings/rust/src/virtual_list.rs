@@ -3,11 +3,48 @@
 use super::{check, App, Builder, Error, Node, RawNode, Result};
 use std::{ffi::c_void, mem::size_of};
 
+/// The main direction of a retained VirtualList.
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VirtualListAxis {
+    Vertical = 0,
+    Horizontal = 1,
+}
+
+type SetAxis = unsafe extern "C" fn(*mut c_void, RawNode, u32) -> u32;
+
+#[cfg(cui_bridge_static)]
+fn axis_function() -> Option<SetAxis> {
+    extern "C" {
+        fn cui_bridge_virtual_list_set_axis_v1(app: *mut c_void, list: RawNode, axis: u32) -> u32;
+    }
+    Some(cui_bridge_virtual_list_set_axis_v1)
+}
+
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn axis_function() -> Option<SetAxis> {
+    unsafe {
+        let symbol =
+            super::notification_symbol_v1(b"cui_bridge_virtual_list_set_axis_v1\0".as_ptr().cast());
+        if symbol.is_null() {
+            None
+        } else {
+            Some(std::mem::transmute::<*mut c_void, SetAxis>(symbol))
+        }
+    }
+}
+
+#[cfg(all(not(cui_bridge_static), not(any(unix, windows))))]
+fn axis_function() -> Option<SetAxis> {
+    None
+}
+
 /// An existing direct Item and its extent in the next layout.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VirtualListRow {
     pub item: Node,
-    /// Logical pixels from 1 through 4096, or zero for the default 32.
+    /// Main-axis logical pixels (width horizontally, height vertically),
+    /// from 1 through 4096, or zero for the default 32.
     pub extent: f32,
 }
 
@@ -70,11 +107,27 @@ fn functions() -> Option<(SetRows, PreserveAnchor)> {
 }
 
 impl Error {
+    /// The loaded bridge lacks the optional VirtualList axis setter.
+    pub const VIRTUAL_LIST_AXIS_UNAVAILABLE: Self = Self(0x564c41);
     /// The loaded bridge lacks the complete live VirtualList API.
     pub const VIRTUAL_LIST_ROWS_UNAVAILABLE: Self = Self(0x564c52);
 }
 
 impl App {
+    /// Reports support for horizontal retained VirtualLists.
+    pub fn supports_virtual_list_axis(&self) -> bool {
+        axis_function().is_some()
+    }
+
+    /// Set the direction on the next step, preserving the scalar main offset
+    /// subject to clamping. Row extents are widths when horizontal.
+    pub fn virtual_list_axis(&mut self, list: Node, axis: VirtualListAxis) -> Result<&mut Self> {
+        let list = self.valid(list)?;
+        let set = axis_function().ok_or(Error::VIRTUAL_LIST_AXIS_UNAVAILABLE)?;
+        check(unsafe { set(self.raw, list, axis as u32) })?;
+        Ok(self)
+    }
+
     /// Reports support for complete row projections and opt-in anchoring.
     pub fn supports_virtual_list_rows(&self) -> bool {
         functions().is_some()
@@ -127,6 +180,12 @@ impl App {
 }
 
 impl<'a> Builder<'a> {
+    /// Set the main direction of the list being built.
+    pub fn virtual_list_axis(self, axis: VirtualListAxis) -> Result<Self> {
+        self.app.virtual_list_axis(self.node, axis)?;
+        Ok(self)
+    }
+
     /// The list keeps its first visible Item when the application edits rows.
     /// Probe the provider before building when supporting earlier releases.
     pub fn preserve_virtual_list_anchor(self, enabled: bool) -> Result<Self> {

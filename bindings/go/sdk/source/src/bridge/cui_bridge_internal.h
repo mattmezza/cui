@@ -153,7 +153,7 @@ typedef struct {
     cui_virtual_list *virtual_list;
     cui_virtual_widget_state virtual_state;
     float virtual_extent;
-    bool virtual_keep_anchor, virtual_scroll_requested;
+    bool virtual_keep_anchor, virtual_scroll_requested, virtual_horizontal;
     cui_sidebar_state sidebar_state;
     cui_sidebar_cache *sidebar_cache;
     cui_sidebar_item_state sidebar_item_state;

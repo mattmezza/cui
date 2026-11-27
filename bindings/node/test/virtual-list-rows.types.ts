@@ -5,6 +5,11 @@ const message = item('message');
 const inbox = virtual_list('inbox').children(message);
 app.mount(column().children(inbox));
 const rows: readonly VirtualListRow[] = [{item: message, extent: 32}];
+if (app.supportsVirtualListAxis()) {
+  inbox.setVirtualListAxis('horizontal').setVirtualListAxis('vertical');
+  // @ts-expect-error only the two main axes are accepted
+  inbox.setVirtualListAxis('diagonal');
+}
 if (app.supportsVirtualListRows()) {
   inbox.preserveVirtualListAnchor().setVirtualListRows(rows)
     .appendVirtualListItem(item('new')).removeVirtualListItem(message);

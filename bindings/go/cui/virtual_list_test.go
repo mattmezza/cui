@@ -116,3 +116,56 @@ func TestVirtualListLiveRows(t *testing.T) {
 	check(t, a.Step(.016))
 	expectRow(newItem, 7.25, -7.25, 80)
 }
+
+func TestVirtualListHorizontalAxis(t *testing.T) {
+	a := app(t)
+	items := []*Node{Item("a", "A"), Item("b", "B"), Item("c", "C"), Item("d", "D")}
+	list := VirtualList("rail").VisualSize(96, 80).Children(items...).VirtualListAxis(VirtualListHorizontal)
+	root := Column("root").Children(list)
+	supported, err := a.SupportsVirtualListAxis()
+	check(t, err)
+	if expected, ok := os.LookupEnv("CUI_EXPECT_VIRTUAL_AXIS"); ok && supported != (expected == "1") {
+		t.Fatalf("axis capability is %v, expected %s", supported, expected)
+	}
+	if !supported {
+		if !errors.Is(a.Mount(root), ErrVirtualListAxisUnavailable) {
+			t.Fatal("mount must reject horizontal on a bridge without the optional setter")
+		}
+		list.VirtualListAxis(VirtualListVertical)
+		check(t, a.Mount(root))
+		check(t, a.Step(.016))
+		row, err := a.VirtualListItemBounds(list, items[0])
+		check(t, err)
+		if row.Height != 32 {
+			t.Fatalf("vertical fallback geometry: %+v", row)
+		}
+		if !errors.Is(list.VirtualListAxis(VirtualListHorizontal).Err(), ErrVirtualListAxisUnavailable) {
+			t.Fatal("missing optional axis did not report unavailable")
+		}
+		return
+	}
+	check(t, a.Mount(root))
+	check(t, list.SetVirtualListRows([]VirtualListRow{{items[0], 48}, {items[1], 64}, {items[2], 80}, {items[3], 0}}))
+	list.Value(20)
+	check(t, list.Err())
+	check(t, a.Step(.016))
+	bounds, err := a.Bounds(list)
+	check(t, err)
+	first, err := a.VirtualListItemBounds(list, items[0])
+	check(t, err)
+	second, err := a.VirtualListItemBounds(list, items[1])
+	check(t, err)
+	if first.X-bounds.X != -20 || first.Width != 48 || second.X-first.X != 48 || second.Width != 64 || second.Y != first.Y {
+		t.Fatalf("horizontal geometry: list=%+v first=%+v second=%+v", bounds, first, second)
+	}
+	list.VirtualListAxis(VirtualListVertical)
+	check(t, list.Err())
+	check(t, a.Step(.016))
+	first, err = a.VirtualListItemBounds(list, items[0])
+	check(t, err)
+	value, err := a.Value(list)
+	check(t, err)
+	if value != 20 || first.Y-bounds.Y != -20 || first.Height != 48 {
+		t.Fatalf("axis switch lost scalar offset: %v, %+v", value, first)
+	}
+}

@@ -7,6 +7,41 @@ import cui_bridge as c
 
 
 class VirtualRows(unittest.TestCase):
+    def test_horizontal_axis(self):
+        with c.App() as app:
+            supported = app.supports_virtual_list_axis()
+            expected = os.getenv("CUI_EXPECT_VIRTUAL_AXIS")
+            if expected is not None:
+                self.assertEqual(supported, expected == "1")
+            clips = [c.item(f"clip-{i}", f"Clip {i}") for i in range(6)]
+            view = c.virtual_list("timeline").visual_size(96, 80).children(*clips)
+            view.virtual_list_axis("horizontal")
+            root = c.column("root").children(view)
+            if not supported:
+                with self.assertRaisesRegex(RuntimeError, "VirtualList axis"):
+                    app.mount(root)
+                view.virtual_list_axis("vertical")
+                app.mount(root)
+                app.step()
+                self.assertEqual(view.item_bounds(clips[0])[3], 32)
+                return
+            app.mount(root)
+            extent = 32
+            if app.supports_virtual_list_rows():
+                extent = 48
+                view.set_virtual_list_rows([(clip, extent) for clip in clips])
+            view.scroll_to(20)
+            app.step()
+            x, y, width, _ = view.item_bounds(clips[0])
+            self.assertEqual((x - app.bounds(view)[0], width), (-20, extent))
+            self.assertEqual(view.item_bounds(clips[1])[:2], (x + extent, y))
+            with self.assertRaises(ValueError):
+                view.virtual_list_axis("diagonal")
+            view.virtual_list_axis("vertical")
+            app.step()
+            self.assertEqual(view.scroll_offset(), 20)
+            self.assertEqual(view.item_bounds(clips[0])[3], extent)
+
     def test_partial_symbol_groups_keep_ordinary_list(self):
         import ctypes
         original = ctypes.CDLL

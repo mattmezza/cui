@@ -133,3 +133,58 @@ fn live_rows_preserve_position_and_input_evidence() {
     app.step(0.016).unwrap();
     expect_row(&app, list, new_item, 7.25, -7.25, 80.);
 }
+
+#[test]
+fn horizontal_axis_uses_widths_and_preserves_scalar_offset() {
+    use cui_builders::VirtualListAxis;
+    let mut app = App::headless(400., 300.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let supported = app.supports_virtual_list_axis();
+    if let Ok(expected) = std::env::var("CUI_EXPECT_VIRTUAL_AXIS") {
+        assert_eq!(supported, expected == "1");
+    }
+    let builder = app
+        .build_child(root, Kind::VirtualList, "rail")
+        .unwrap()
+        .visual_size(96., 80.)
+        .unwrap();
+    let list = if supported {
+        builder
+            .virtual_list_axis(VirtualListAxis::Horizontal)
+            .unwrap()
+            .finish()
+    } else {
+        builder.finish()
+    };
+    if !supported {
+        assert_eq!(
+            app.virtual_list_axis(list, VirtualListAxis::Horizontal)
+                .err(),
+            Some(Error::VIRTUAL_LIST_AXIS_UNAVAILABLE)
+        );
+        return;
+    }
+    let items: Vec<_> = (0..4)
+        .map(|i| app.child(list, Kind::Item, &format!("item-{i}")).unwrap())
+        .collect();
+    let rows: Vec<_> = items
+        .iter()
+        .zip([48., 64., 80., 0.])
+        .map(|(&item, extent)| VirtualListRow { item, extent })
+        .collect();
+    app.set_virtual_list_rows(list, &rows).unwrap();
+    app.value(list, 20.).unwrap();
+    app.step(0.016).unwrap();
+    let bounds = app.bounds(list).unwrap();
+    let first = app.virtual_list_item_bounds(list, items[0]).unwrap();
+    let second = app.virtual_list_item_bounds(list, items[1]).unwrap();
+    assert_eq!(first.x - bounds.x, -20.);
+    assert_eq!(first.width, 48.);
+    assert_eq!(second.x - first.x, 48.);
+    assert_eq!(second.width, 64.);
+    assert_eq!(first.y, second.y);
+    app.virtual_list_axis(list, VirtualListAxis::Vertical)
+        .unwrap();
+    app.step(0.016).unwrap();
+    expect_row(&app, list, items[0], 20., -20., 48.);
+}

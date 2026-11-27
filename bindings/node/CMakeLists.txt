@@ -605,6 +605,7 @@ if(CUI_NODE_TSC_EXECUTABLE)
 endif()
 
 add_test(NAME node_virtual_list_rows COMMAND ${CMAKE_COMMAND} -E env
+ CUI_EXPECT_VIRTUAL_AXIS=1
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/test/virtual-list-rows.test.cjs)
 add_test(NAME node_virtual_list_inbox COMMAND ${CMAKE_COMMAND} -E env
@@ -633,6 +634,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_compile_options(cui_node_virtual_legacy PRIVATE -Wall -Wextra -Wpedantic -Werror)
   set_target_properties(cui_node_virtual_legacy PROPERTIES PREFIX "" SUFFIX ".node")
   add_test(NAME node_virtual_list_legacy COMMAND ${CMAKE_COMMAND} -E env
+   CUI_EXPECT_VIRTUAL_AXIS=0
    CUI_NODE_ADDON=$<TARGET_FILE:cui_node_virtual_legacy> CUI_EXPECT_VIRTUAL_LEGACY=1
    LD_PRELOAD=${CUI_NODE_VIRTUAL_LEGACY_LIBRARY} ${NODE_EXECUTABLE}
    ${CMAKE_CURRENT_SOURCE_DIR}/test/virtual-list-rows.test.cjs)

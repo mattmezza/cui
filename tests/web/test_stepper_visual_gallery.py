@@ -53,8 +53,21 @@ def main():
                 def painted(text):
                     page.wait_for_function('(text)=>('+COMMANDS+')().some(c=>c.text.includes(text))', arg=text)
                 def change(id, value):
-                    before = page.evaluate('cuiGallery.frame')
-                    page.locator('#'+id).select_option(str(value))
+                    control = page.locator('#'+id)
+                    # A pending paint can run while Playwright locates the control.
+                    # Read the frame at the change event so we wait for its paint.
+                    change_frame = control.evaluate_handle('''select => {
+                        const change = {frame: null};
+                        select.addEventListener('change', () => { change.frame = cuiGallery.frame; },
+                                                {capture: true, once: true});
+                        return change;
+                    }''')
+                    try:
+                        control.select_option(str(value))
+                        before = change_frame.evaluate('change => change.frame')
+                    finally:
+                        change_frame.dispose()
+                    assert before is not None, id
                     page.wait_for_function('(f)=>cuiGallery.frame>f', arg=before)
                 def click(name):
                     t = page.evaluate(TARGET, name)

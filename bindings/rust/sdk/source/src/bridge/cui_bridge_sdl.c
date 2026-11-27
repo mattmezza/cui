@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl3.h"
+#include "../../backends/sdl3/cui_sdl3_timed_frames_internal.h"
 #include "cui_bridge_internal.h"
 #include <stdlib.h>
 #include <string.h>
@@ -120,6 +121,8 @@ static int bridge_run_frame(void *user, cui_sdl3 *host, cui_context *ui) {
     if (dt > 1)
         dt = 1;
     run->status = cui_bridge_step(run->app, dt);
+    if (run->status == CUI_BRIDGE_OK && run->app->notification_wake_seconds > 0)
+        cui_sdl3_request_timed_frame(host);
     if (run->status == CUI_BRIDGE_OK && run->callback) {
         run->app->run_dispatching = true;
         run->status = run->callback(run->user);

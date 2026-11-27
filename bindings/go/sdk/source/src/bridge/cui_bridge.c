@@ -3353,6 +3353,20 @@ cui_bridge_status cui_bridge_set_scroll_extent(cui_bridge_app *app, cui_bridge_n
     node->content_height = height;
     return CUI_BRIDGE_OK;
 }
+cui_bridge_status cui_bridge_notification_set_auto_hide_v1(cui_bridge_app *app,
+                                                             cui_bridge_node handle,
+                                                             uint32_t enabled) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_NOTIFICATION)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (enabled > 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->notification_auto_hide = enabled != 0;
+    return CUI_BRIDGE_OK;
+}
 cui_bridge_status cui_bridge_set_open(cui_bridge_app *app, cui_bridge_node handle, uint32_t open) {
     cui_bridge_node_record *node;
     cui_bridge_status status = bridge_valid_node(app, handle, &node);
@@ -3400,7 +3414,7 @@ cui_bridge_status cui_bridge_set_open(cui_bridge_app *app, cui_bridge_node handl
         note.id = (cui_notification_id){1, node->id};
         note.title = cui_string(node->text);
         note.message = cui_string(node->detail);
-        note.autohide = false;
+        note.autohide = node->notification_auto_hide;
         note.user = node;
         note.action_user = node->first_child ? node : NULL;
         note.on_click = bridge_notification_click;
@@ -7130,13 +7144,15 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
                   (cui_box){.width = -1, .height = -1, .background = app->theme.background});
     bridge_render_node(app, app->root);
     cui_end_box(app->ui);
+    app->notification_wake_seconds = 0;
     if (app->notifications) {
         const cui_id scope = UINT64_C(0x4e4f544946594255);
         cui_rect viewport = {0, 0, app->width, app->height};
         cui_notification_advance advance;
-        (void)cui_notifications_retained(app->ui, scope, &app->theme, app->notifications,
-                                         viewport, app->now_seconds, app->responsive_notifications,
-                                         bridge_render_notification_action, &advance);
+        if (cui_notifications_retained(app->ui, scope, &app->theme, app->notifications,
+                                       viewport, app->now_seconds, app->responsive_notifications,
+                                       bridge_render_notification_action, &advance))
+            app->notification_wake_seconds = advance.next_wake_seconds;
     }
     cui_draw_list list = cui_end_frame(app->ui);
     status = cui_last_error(app->ui) == CUI_OK ? CUI_BRIDGE_OK : CUI_BRIDGE_CORE_ERROR;

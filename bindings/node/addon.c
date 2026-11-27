@@ -277,6 +277,29 @@ static napi_value make_node(napi_env env, napi_callback_info info) {
 }
 static int optional_bridge_symbol(void *out, size_t size, const char *name);
 /* Optional symbol keeps addons usable with older bridge providers. */
+static napi_value notification_auto_hide(napi_env env, napi_callback_info info) {
+    napi_value v[1], result;
+    js_app *app;
+    void (*symbol)(void) = NULL;
+    if (!args(env, info, 1, v) || !app_arg(env, v[0], &app)) return NULL;
+    bool supported = optional_bridge_symbol(&symbol, sizeof symbol,
+                                            "cui_bridge_notification_set_auto_hide_v1");
+    return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
+}
+static napi_value set_notification_auto_hide(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *node;
+    bool enabled;
+    cui_bridge_status (*set)(cui_bridge_app *, cui_bridge_node, uint32_t) = NULL;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) ||
+        !node_arg(env, v[1], app, &node)) return NULL;
+    if (napi_get_value_bool(env, v[2], &enabled) != napi_ok)
+        return fail(env, "auto_hide requires boolean");
+    if (!optional_bridge_symbol(&set, sizeof set, "cui_bridge_notification_set_auto_hide_v1"))
+        return fail(env, "Notification auto-hide unavailable");
+    return status(env, set(app->bridge, node->node, enabled ? 1u : 0u));
+}
 static napi_value notification_actions(napi_env env, napi_callback_info info) {
     napi_value v[1], result;
     js_app *app;
@@ -3108,6 +3131,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("makeNode", make_node, 0);
     EXPORT("carouselSlots", carousel_slots, 0);
     EXPORT("carouselSlot", carousel_slot, 0);
+    EXPORT("notificationAutoHide", notification_auto_hide, 0);
+    EXPORT("setNotificationAutoHide", set_notification_auto_hide, 0);
     EXPORT("notificationActions", notification_actions, 0);
     EXPORT("notificationAction", notification_action, 0);
     EXPORT("attachmentSlots", attachment_slots, 0);

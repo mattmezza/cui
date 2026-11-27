@@ -708,6 +708,9 @@ static cui_bridge_status (*attachment_preview)(cui_bridge_app *, cui_bridge_node
  const uint8_t *, uint32_t, uint32_t, uint32_t, uint32_t);
 static cui_bridge_status (*attachment_slot_create)(cui_bridge_app *, cui_bridge_node, uint32_t, const char *, float, cui_bridge_node *);
 static cui_bridge_status (*notification_action_create)(cui_bridge_app *, cui_bridge_node, const char *, cui_bridge_node *);
+static cui_bridge_status (*notification_auto_hide)(cui_bridge_app *, cui_bridge_node, uint32_t);
+static int go_notification_auto_hide_supported(void) { return notification_auto_hide != NULL; }
+static cui_bridge_status go_notification_auto_hide(cui_bridge_app *a, cui_bridge_node n, uint32_t enabled) { return notification_auto_hide(a,n,enabled); }
 static int go_notification_action_supported(void) { return notification_action_create != NULL; }
 static cui_bridge_status go_notification_action_create(cui_bridge_app *a, cui_bridge_node n, const char *key, cui_bridge_node *out) { return notification_action_create(a,n,key,out); }
 static int go_attachment_slots_supported(void) { return attachment_slot_create != NULL; }
@@ -716,6 +719,7 @@ static cui_bridge_status (*attachment_set_actions)(cui_bridge_app *, cui_bridge_
 
 static void go_attachment_initialize(void) {
  if (bridge_lib) {
+  go_load_optional_symbol(&notification_auto_hide, sizeof notification_auto_hide, "cui_bridge_notification_set_auto_hide_v1");
   go_load_optional_symbol(&notification_action_create, sizeof notification_action_create, "cui_bridge_notification_action_create_v1");
   go_load_optional_symbol(&attachment_slot_create, sizeof attachment_slot_create, "cui_bridge_attachment_slot_create_v1");
   go_load_optional_symbol(&attachment_configure, sizeof attachment_configure,
@@ -727,6 +731,7 @@ static void go_attachment_initialize(void) {
  }
 #if defined(CUI_GO_STATIC)
  else {
+  notification_auto_hide = cui_bridge_notification_set_auto_hide_v1;
   notification_action_create = cui_bridge_notification_action_create_v1;
   attachment_slot_create = cui_bridge_attachment_slot_create_v1;
   attachment_configure = cui_bridge_attachment_configure_v1;
@@ -1007,6 +1012,7 @@ type Options struct {
 }
 type Node struct {
 	notificationAction                   bool
+	notificationAutoHide                 *bool
 	timeLocalized                        *TimeFieldConfig
 	spinnerIconResource                  *IconResource
 	spinnerConfig                        *SpinnerConfig
@@ -2250,6 +2256,9 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("Notification cannot be nested inside an Attachment slot")
 		}
 		seen[n] = true
+		if n.notificationAutoHide != nil && C.go_notification_auto_hide_supported() == 0 {
+			return ErrNotificationAutoHideUnavailable
+		}
 		if err := a.validateNotificationAction(n, parent); err != nil {
 			return err
 		}
@@ -2866,6 +2875,11 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 			mountedAttachmentPreviews = append(mountedAttachmentPreviews, n)
+		}
+		if n.notificationAutoHide != nil {
+			if e := result(C.go_notification_auto_hide(a.ptr, h, C.uint32_t(btoi(*n.notificationAutoHide)))); e != nil {
+				return e
+			}
 		}
 		if n.hasOpen && (n.kind < 24 || n.kind == 58 || n.kind == 62 || n.kind == 63 || n.kind == 75) {
 			if e := result(C.go_set_open(a.ptr, h, C.uint32_t(btoi(n.opened)))); e != nil {
@@ -7026,4 +7040,40 @@ func (a *App) SupportsNotificationAction() (bool, error) {
 		return false, err
 	}
 	return C.go_notification_action_supported() != 0, nil
+}
+
+// SupportsNotificationAutoHide reports whether optional timed Notification dismissal is available.
+func (a *App) SupportsNotificationAutoHide() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_notification_auto_hide_supported() != 0, nil
+}
+
+// AutoHide configures the next successful open. Enabled notifications dismiss
+// after five seconds present, pausing while hovered or focused. The default is persistent.
+func (n *Node) AutoHide(enabled bool) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 62 {
+		n.err = errors.New("AutoHide requires Notification")
+		return n
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		if C.go_notification_auto_hide_supported() == 0 {
+			n.err = ErrNotificationAutoHideUnavailable
+			return n
+		}
+		if e := result(C.go_notification_auto_hide(n.app.ptr, n.handle, C.uint32_t(btoi(enabled)))); e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.notificationAutoHide = &enabled
+	return n
 }

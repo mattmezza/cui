@@ -589,7 +589,9 @@ and `docs/STATUS_COMPONENTS.md#notification`. Retained Python, Node, TypeScript,
 Go and Rust can opt in per app using an optional bridge setter. Probe support
 before configuring a shared provider. For a retained action, probe the optional
 `cui_bridge_notification_action_create_v1` capability, then attach one ordinary
-Button to the card. Its click leaves the card open. See
+Button to the card. Its click leaves the card open. Retained cards are persistent
+by default. With a compatible provider, configure the optional five-second
+auto-hide before opening. Expiry delivers the existing queued Close. See
 `docs/BINDING_BUILDERS.md#notification-cards`.
 Scroller row IDs follow retained keys, not stable indices. Language-builder
 MAIN/ROOT/subpart shadow targets remain pending.

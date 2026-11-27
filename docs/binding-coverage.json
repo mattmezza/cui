@@ -328,7 +328,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust can enable responsive cards per app and attach one retained Button action. Both APIs are optional with older providers. General custom rendering, auto-hide, system delivery and host scheduling results are outside the retained API."
+        "Python, JavaScript, TypeScript, Go and Rust can enable responsive cards per app, attach one Button action and opt into five-second auto-hide. These APIs are optional with older providers. General custom rendering, system delivery and public scheduling results for manually stepped retained hosts remain outside the API."
       ]
     },
     {

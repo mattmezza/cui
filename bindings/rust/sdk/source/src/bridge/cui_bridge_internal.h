@@ -69,6 +69,7 @@ typedef struct {
     bool stepper_vertical;
     cui_bridge_button_rounding rounding;
     bool disabled, custom_hover, radio_item_content, radio_custom_tab_index;
+    bool notification_auto_hide;
     cui_color hover;
     cui_bridge_box_shadows_v1 shadows;
     bridge_part_shadows *part_shadows;
@@ -194,6 +195,7 @@ struct cui_bridge_app {
     bool stepping, closed;
     bool running, run_dispatching, destroy_requested;
     bool responsive_notifications;
+    double notification_wake_seconds;
     float width, height;
     double now_seconds;
     cui_notification_state *notifications;

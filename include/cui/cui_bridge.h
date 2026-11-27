@@ -1018,6 +1018,12 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_responsive_notifications_v1(cui_
 CUI_BRIDGE_API cui_bridge_status cui_bridge_notification_action_create_v1(
     cui_bridge_app *, cui_bridge_node notification, const char *key_utf8,
     cui_bridge_node *out_button);
+/* Configure the next opening of an in-app Notification. 0 is persistent
+ * (the default) and 1 opts into five seconds of unpaused visible time after
+ * entrance. Changing this setting while open leaves that lifetime intact.
+ * Auto-hide emits the existing queued Close after exit and no body Click. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_notification_set_auto_hide_v1(
+    cui_bridge_app *, cui_bridge_node notification, uint32_t enabled);
 CUI_BRIDGE_API void cui_bridge_destroy(cui_bridge_app *app);
 /* Zero parent creates the single root. Keys are copied, unique among live nodes;
  * stale handles never alias a replacement node within an app. Handle provenance

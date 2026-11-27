@@ -10,6 +10,7 @@
 #include "../software/cui_bitmap.h"
 #include "../software/cui_shadow.h"
 #include "cui_sdl3_mesh.h"
+#include "cui_sdl3_timed_frames_internal.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <math.h>
@@ -51,7 +52,7 @@ struct cui_sdl3 {
     size_t bitmap_bytes, shadow_bytes;
     size_t glyph_bytes;
     uint64_t clock, hits, misses, frame, frame_ticks;
-    bool frame_clock_started, event_pending, callback_mode;
+    bool frame_clock_started, event_pending, callback_mode, timed_frame;
     bool motion_pending;
     cui_event motion;
     SDL_Event pending_event;
@@ -1525,6 +1526,11 @@ bool cui_sdl3_wait_events(cui_sdl3 *s, int timeout_ms) {
     return s->event_pending;
 }
 
+void cui_sdl3_request_timed_frame(cui_sdl3 *s) {
+    if (s && s->callback_mode && !sdl_v2_blocked(s))
+        s->timed_frame = true;
+}
+
 /* SDL owns modal-loop iteration; application drawing never runs in our watch. */
 typedef struct {
     cui_sdl3_app app;
@@ -1557,11 +1563,16 @@ static SDL_AppResult SDLCALL app_frame(void *state) {
     flush_motion(app->host, app->ui);
     if (app->idle)
         app->host->frame_ticks = SDL_GetTicksNS();
+    app->host->timed_frame = false;
     int result = app->app.frame(app->app.user, app->host, app->ui);
     app->iterating = false;
-    app->idle = !cui_needs_redraw(app->ui);
-    SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, app->idle ? "waitevent" : "0");
-    return result < 0 ? SDL_APP_FAILURE : result > 0 ? SDL_APP_SUCCESS : SDL_APP_CONTINUE;
+    if (result)
+        return result < 0 ? SDL_APP_FAILURE : SDL_APP_SUCCESS;
+    bool redraw = cui_needs_redraw(app->ui);
+    bool timed = app->host->timed_frame;
+    app->idle = !redraw && !timed;
+    SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, redraw ? "0" : timed ? "20" : "waitevent");
+    return SDL_APP_CONTINUE;
 }
 static void SDLCALL app_quit(void *state, SDL_AppResult result) {
     callback_app *app = state;

@@ -777,6 +777,16 @@ add_test(NAME bridge_python_workspace COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/workspace.py --headless)
 
+if(TARGET cui_sdl3 AND CUI_BRIDGE_NATIVE_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ add_executable(test_bridge_notification_idle_sdl
+  ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_notification_idle_sdl.c)
+ target_link_libraries(test_bridge_notification_idle_sdl PRIVATE cui_bridge cui_sdl3_dependency)
+ cui_warnings(test_bridge_notification_idle_sdl)
+ add_test(NAME bridge_notification_idle_sdl COMMAND ${CMAKE_COMMAND} -E env
+  CUI_TEST_FONT=${CUI_TEST_FONT} SDL_RENDER_DRIVER=software
+  $<TARGET_FILE:test_bridge_notification_idle_sdl>)
+ set_tests_properties(bridge_notification_idle_sdl PROPERTIES TIMEOUT 15)
+endif()
 if(TARGET cui_sdl3)
  add_executable(test_bridge_components_sdl ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_components_sdl.c)
  target_link_libraries(test_bridge_components_sdl PRIVATE cui_bridge)
@@ -815,6 +825,10 @@ add_test(NAME bridge_python_responsive_notifications COMMAND ${CMAKE_COMMAND} -E
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  CUI_EXPECT_RESPONSIVE_NOTIFICATIONS=1
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_responsive_notifications.py)
+add_test(NAME bridge_python_notification_auto_hide COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ CUI_EXPECT_NOTIFICATION_AUTO_HIDE=1
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_notification_auto_hide.py)
 add_test(NAME bridge_python_notification_action COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  CUI_EXPECT_NOTIFICATION_ACTION=1
@@ -822,6 +836,9 @@ add_test(NAME bridge_python_notification_action COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_notification_workspace COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/notification_workspace.py)
+add_test(NAME bridge_python_notification_workspace_auto_hide COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/notification_workspace.py --auto-hide)
 
 add_executable(test_bridge_window_visibility ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_window_visibility.c)
 target_link_libraries(test_bridge_window_visibility PRIVATE cui_bridge)

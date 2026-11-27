@@ -196,8 +196,65 @@ static void render_and_dispatch(bool responsive) {
     cui_bridge_destroy(app);
 }
 
+static void auto_hide(void) {
+    cui_bridge_app *app = create(8);
+    cui_bridge_node root = add(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root", NULL);
+    cui_bridge_node note = add(app, root, CUI_BRIDGE_NOTIFICATION, "note", "Saving finished");
+    cui_bridge_node action;
+    assert(cui_bridge_notification_action_create_v1(app, note, "review", &action) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, action, "Review") == CUI_BRIDGE_OK);
+    assert(cui_bridge_notification_set_auto_hide_v1(app, action, 1) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_notification_set_auto_hide_v1(app, note, 2) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_notification_set_auto_hide_v1(app, note, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_open(app, note, 1) == CUI_BRIDGE_OK);
+    step(app);
+    assert(app->notifications->count == 1 && app->notification_wake_seconds > app->now_seconds);
+    cui_notification_entry *entry = &app->notifications->entries[0];
+    assert(entry->phase == CUI_NOTIFICATION_PRESENT && entry->remaining == 5);
+
+    assert(cui_bridge_step(app, 1) == CUI_BRIDGE_OK);
+    assert(entry->remaining == 4);
+    assert(cui_bridge_notification_set_auto_hide_v1(app, note, 0) == CUI_BRIDGE_OK);
+    assert(entry->remaining == 4);
+    cui_focus(app->ui, id(app, action));
+    assert(cui_bridge_step(app, 1) == CUI_BRIDGE_OK);
+    assert(entry->remaining == 4); /* Focus can pause an explicit timer on an action card. */
+
+    cui_rect card = entry->bounds;
+    cui_focus(app->ui, 0);
+    assert(cui_queue_event(app->ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                              .x = card.x + card.w / 2,
+                                              .y = card.y + card.h / 2}));
+    assert(cui_bridge_step(app, 1) == CUI_BRIDGE_OK);
+    assert(entry->remaining == 4);
+    assert(cui_queue_event(app->ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 0, .y = 0}));
+    for (int i = 0; i < 3; ++i)
+        assert(cui_bridge_step(app, 1) == CUI_BRIDGE_OK);
+    assert(entry->remaining == 1 && open(app, note));
+    assert(cui_bridge_step(app, 1) == CUI_BRIDGE_OK);
+    assert(!open(app, note) && entry->phase == CUI_NOTIFICATION_ENDING);
+    expect_empty(app);
+    step(app);
+    expect_event(app, note, CUI_BRIDGE_EVENT_CLOSE);
+    assert(app->notifications->count == 0);
+    step(app);
+    expect_empty(app);
+    assert(app->notification_wake_seconds == 0);
+
+    /* Reopen with the policy configured while the prior instance was visible. */
+    assert(cui_bridge_set_open(app, note, 1) == CUI_BRIDGE_OK);
+    for (int i = 0; i < 7; ++i)
+        assert(cui_bridge_step(app, 1) == CUI_BRIDGE_OK);
+    assert(entry->remaining == -1 && open(app, note));
+    expect_empty(app);
+    assert(cui_bridge_node_remove(app, note) == CUI_BRIDGE_OK);
+    assert(cui_bridge_notification_set_auto_hide_v1(app, note, 1) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+}
+
 int main(void) {
     ownership();
+    auto_hide();
     render_and_dispatch(false);
     render_and_dispatch(true);
     return 0;

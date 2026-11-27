@@ -171,6 +171,10 @@ class _API:
         if hasattr(lib, "cui_bridge_carousel_slot_create_v1"):
             self.create_carousel_slot = bind("carousel_slot_create_v1", C.c_int, C.c_void_p,
                                             _Handle, C.c_uint32, C.c_char_p, C.POINTER(_Handle))
+        self.notification_set_auto_hide = None
+        if hasattr(lib, "cui_bridge_notification_set_auto_hide_v1"):
+            self.notification_set_auto_hide = bind("notification_set_auto_hide_v1", C.c_int,
+                                                    C.c_void_p, _Handle, C.c_uint32)
         self.create_notification_action = None
         if hasattr(lib, "cui_bridge_notification_action_create_v1"):
             self.create_notification_action = bind("notification_action_create_v1", C.c_int, C.c_void_p,
@@ -600,6 +604,7 @@ class Widget:
         self._detail = ""
         self._open = False
         self._open_set = False
+        self._notification_auto_hide = None
         self._checked_set = False
         self._selected: Widget | None = None
         self._anchor: Widget | None = None
@@ -1062,6 +1067,19 @@ class Widget:
         """Copy feedback to a Collapsible or a direct Accordion Item. None clears it."""
         from .disclosure import trigger_style
         trigger_style(self, style)
+        return self
+
+    def auto_hide(self, enabled: bool = True) -> "Widget":
+        """Set the next opening's five-second Notification timer; visible cards keep their timer."""
+        if self.kind != "notification":
+            raise ValueError("auto_hide requires Notification")
+        if type(enabled) is not bool:
+            raise TypeError("auto_hide requires bool")
+        if self._app is not None:
+            if not self._app.supports_notification_auto_hide():
+                raise RuntimeError("Notification auto-hide unavailable in this bridge")
+            self._change("notification_set_auto_hide", int(enabled))
+        self._notification_auto_hide = enabled
         return self
 
     def open(self, value: bool = True) -> "Widget":
@@ -2487,6 +2505,8 @@ class App:
                     raise RuntimeError("Carousel slots unavailable in this bridge")
             if any(ancestor._carousel_slot for ancestor in lineage) and node.kind not in _RADIO_CONTENT_KINDS:
                 raise ValueError("Carousel slots require passive children")
+            if node._notification_auto_hide is not None and not self.supports_notification_auto_hide():
+                raise RuntimeError("Notification auto-hide unavailable in this bridge")
             if parent is not None and parent.kind == "notification":
                 if node.kind != "button" or len(parent._children) != 1:
                     raise ValueError("Notification accepts one Button action")
@@ -2745,6 +2765,8 @@ class App:
                         raise ValueError("anchor belongs to another App or unmounted tree")
                     node._change("set_anchor", node._anchor._handle)
             for node, _, _ in order:
+                if node._notification_auto_hide is not None:
+                    node._change("notification_set_auto_hide", int(node._notification_auto_hide))
                 if node.kind in _SURFACE | {"date_picker", "focus_trap", "sidebar"} and node._open:
                     node._change("set_open", 1)
                 if node._selected is not None:
@@ -3179,6 +3201,10 @@ class App:
     def supports_carousel_slots(self) -> bool:
         self._ensure_open()
         return self._api.create_carousel_slot is not None
+
+    def supports_notification_auto_hide(self) -> bool:
+        self._ensure_open()
+        return self._api.notification_set_auto_hide is not None
 
     def supports_notification_action(self) -> bool:
         self._ensure_open()

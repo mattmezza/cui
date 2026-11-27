@@ -146,6 +146,8 @@ function preflightNodeOptions(app, node, insideDecoration = false, insideAttachm
   for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent)
     if (ancestor[CAROUSEL_SLOT] && !radioContentKinds.has(node.kind))
       throw new TypeError('Carousel slots require passive children');
+  if (node.notificationAutoHideValue !== undefined && !app.supports_notification_auto_hide())
+    throw new Error("Notification auto-hide unavailable");
   if (node.parent?.kind === 62) {
     if (node.kind !== 4 || node.parent.childrenValue.length !== 1)
       throw new TypeError('Notification accepts one Button action');
@@ -457,6 +459,15 @@ class Node {
   current_text() { if(!editable.has(this.kind)) throw new Error('no editable text'); return this.owner ? native.getText(this.owner.handle,this[NODE]) : this.textValue; }
   on_change(callback) { if((!disabledKinds.has(this.kind) && ![46,64,74,80].includes(this.kind) || [4,19,60].includes(this.kind)) || typeof callback!=='function') throw new TypeError('invalid change callback'); this.changeValue=callback; return this; }
   detail(text) { if(!detailKinds.has(this.kind) || typeof text!=='string') throw new TypeError('detail requires alert text');if(this.owner)native.setDetail(this.owner.handle,this[NODE],text);this.detailValue=text;return this; }
+  auto_hide(enabled=true) {
+    if (this.kind !== 62 || typeof enabled !== 'boolean') throw new TypeError('auto_hide requires Notification and boolean');
+    if (this.owner) {
+      if (!this.owner.supports_notification_auto_hide()) throw new Error('Notification auto-hide unavailable');
+      native.setNotificationAutoHide(this.owner.handle, this[NODE], enabled);
+    }
+    this.notificationAutoHideValue = enabled;
+    return this;
+  }
   open(value=true) {if(!([15,20,58,63,75].includes(this.kind)||surfaces.has(this.kind))||typeof value!=='boolean')throw new TypeError('invalid open state');if(this.owner)native.setOpen(this.owner.handle,this[NODE],value?1:0);this.openValue=value;this.openSet=true;return this;}
   select(item) {if(!selectedKinds.has(this.kind)||!this.childrenValue.includes(item))throw new TypeError('selection must belong to group');if(this.owner)native.setSelected(this.owner.handle,this[NODE],item[NODE]);this.selectedValue=item;return this;}
   selected() {if(!selectedKinds.has(this.kind)&&this.kind!==73)throw new Error('component has no selection');return this.owner ? this.owner.nodes.get(keyFor(native.getSelected(this.owner.handle,this[NODE]))) : this.selectedValue;}
@@ -1063,6 +1074,7 @@ class App {
       if([42,43].includes(node.kind))native.setTotal(this.handle,node[NODE],node.totalValue);
       if (numerics.has(node.kind)) native.setValue(this.handle,node[NODE],node.numericValue);
       if ((node[ATTACHMENT_SLOT] || node.kind===81 || disabledKinds.has(node.kind)) && (node.kind!==20 || node.disabledValue)) native.setDisabled(this.handle,node[NODE],node.disabledValue ? 1 : 0);
+      if(node.notificationAutoHideValue !== undefined) native.setNotificationAutoHide(this.handle,node[NODE],node.notificationAutoHideValue);
       if(node.kind===15 || (node.kind===20 && node.openSet))native.setOpen(this.handle,node[NODE],node.openValue?1:0);
       if(detailKinds.has(node.kind))native.setDetail(this.handle,node[NODE],node.detailValue);
       if(node.kind===52)native.setAttachmentStatus(this.handle,node[NODE],node.attachmentValue);
@@ -1348,6 +1360,10 @@ class App {
   supports_carousel_slots() {
     this._alive();
     return typeof native.carouselSlots === 'function' && typeof native.carouselSlot === 'function' && native.carouselSlots(this.handle);
+  }
+  supports_notification_auto_hide() {
+    this._alive();
+    return typeof native.notificationAutoHide === 'function' && typeof native.setNotificationAutoHide === 'function' && native.notificationAutoHide(this.handle);
   }
   supports_notification_action() {
     this._alive();

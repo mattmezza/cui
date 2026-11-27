@@ -616,9 +616,8 @@ blocks pointer actions outside the subtree; closing restores outside interaction
 Set a card's title and detail before opening it. Body activation emits Click and
 starts dismissal. Close emits only the Close event after the exit animation.
 `is_open()` becomes false as soon as dismissal starts. To reopen the same node,
-wait for its Close event. The bridge currently exposes in-app delivery and
-manual dismissal. Immediate C also offers timed dismissal, custom rendering
-and hooks for host-managed OS delivery.
+wait for its Close event. The bridge supports in-app delivery. The immediate C
+manager also accepts custom rendering and hooks for host-managed OS delivery.
 
 Enable wrapping and a separate Close control before hover for the app's shared
 stack. The option applies from the next step, including cards that are already
@@ -655,10 +654,31 @@ path for each action's side effect. Python, JavaScript, TypeScript and Go attach
 the action before mounting. Older providers can mount the same card without an
 action. Probe first when your app supports more than one provider version.
 
+Retained cards are persistent by default. Enable auto-hide before opening a
+card to close it after five seconds in the present phase. Hover and keyboard
+focus inside the notification stack pause its timers. Changing the setting
+while a card is visible applies on its next opening. Expiry emits one Close
+after exit. Body Click remains reserved for an actual activation. A card with
+a Button action can opt into this same timer.
+
+| Binding | Probe | Configure the next opening |
+| --- | --- | --- |
+| C | Look up `cui_bridge_notification_set_auto_hide_v1` with a shared provider | `cui_bridge_notification_set_auto_hide_v1(app, notice, 1)` |
+| Python | `app.supports_notification_auto_hide()` | `notice.auto_hide(True)` |
+| JavaScript and TypeScript | `app.supports_notification_auto_hide()` | `notice.auto_hide(true)` |
+| Go | `supported, err := app.SupportsNotificationAutoHide()` | `notice.AutoHide(true)` |
+| Rust | `app.supports_notification_auto_hide()` | `app.notification_auto_hide(notice, true)?` |
+
+Older providers can still mount plain persistent cards. For SDL `run()`, the
+runner keeps advancing a stack while a notification wake is pending. For a
+manually stepped app, supply elapsed time and continue stepping through exit.
+The wrapper uses the existing event queue for both paths.
+
 The workspace example disables the trigger until the card has closed, and the
 Review action updates the workspace status while the card stays open. With a
 built bridge, run it from the repository root. Omit `--font` to exercise the
-same interactions headlessly. [Workspace example](../bindings/bridge/examples/notification_workspace.py)
+same interactions headlessly. Add `--auto-hide` for a timed status card that
+re-enables the trigger when it expires. [Workspace example](../bindings/bridge/examples/notification_workspace.py)
 
 ```sh
 PYTHONPATH=bindings/python CUI_BRIDGE_LIBRARY="$PWD/build/libcui_bridge.so" \

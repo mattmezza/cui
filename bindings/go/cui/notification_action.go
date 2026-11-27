@@ -34,3 +34,5 @@ func (a *App) validateNotificationAction(n, parent *Node) error {
 	n.notificationAction = parent != nil && parent.kind == 62
 	return nil
 }
+
+var ErrNotificationAutoHideUnavailable = errors.New("Notification auto-hide requires a newer CUI bridge")

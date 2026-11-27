@@ -54,10 +54,12 @@ jobs:
         run: |
           cmake -S . -B "$RUNNER_TEMP/cui-run-native" -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DCUI_BUILD_NATIVE=ON -DCUI_REQUIRE_NATIVE=ON \
-            -DCUI_BUILD_BRIDGE=ON -DCUI_SANITIZE=OFF \
+            -DCUI_BUILD_BRIDGE=ON -DCUI_BRIDGE_NATIVE_TESTS=ON -DCUI_SANITIZE=OFF \
             -DCMAKE_BUILD_RPATH="$RUNNER_TEMP/cui-run-deps/lib" \
             -DCUI_TEST_FONT="$PWD/third_party/inter/Inter-Regular.otf"
-          cmake --build "$RUNNER_TEMP/cui-run-native" --target cui_bridge --parallel 4
+          cmake --build "$RUNNER_TEMP/cui-run-native" --target cui_bridge test_bridge_notification_idle_sdl --parallel 4
+      - name: Verify Notification expiry in an idle native loop
+        run: python scripts/test_local.py --build-dir "$RUNNER_TEMP/cui-run-native" -R '^bridge_notification_idle_sdl$'
       - name: Validate all ten static and dynamic callback cases in private Xvfb
         # This script stages modules outside the checkout, builds offline, and
         # invokes scripts/test_local.py itself. Never provide a desktop DISPLAY.

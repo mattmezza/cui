@@ -16,6 +16,8 @@ def tap(app, node):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--font", help="TTF or OTF font for the interactive SDL window")
+    parser.add_argument("--auto-hide", action="store_true",
+                        help="Show a timed status card in place of the Review action")
     args = parser.parse_args()
     status = label("Workspace is up to date")
     show = button("show-update").primary().label("Show workspace update")
@@ -51,7 +53,11 @@ def main():
     with App(**options) as app:
         if app.supports_responsive_notifications():
             app.set_responsive_notifications(True)
-        has_action = app.supports_notification_action()
+        if args.auto_hide:
+            if not app.supports_notification_auto_hide():
+                parser.error("--auto-hide requires a provider with Notification auto-hide")
+            notice.auto_hide(True)
+        has_action = not args.auto_hide and app.supports_notification_action()
         if has_action:
             notice.action(review)
         app.mount(column("workspace").gap(12).children(status, show, notice))
@@ -66,8 +72,14 @@ def main():
             app.step()
             tap(app, review)
             assert notice.is_open() and reviews == 1
-        notice.open(False)
-        app.step(.4)
+        if args.auto_hide:
+            app.queue_pointer("move", 0, 0)
+            app.step(.4)
+            for _ in range(6):
+                app.step(1)
+        else:
+            notice.open(False)
+            app.step(.4)
         app.dispatch()
         assert not notice.is_open() and dismissals == 1
 

@@ -73,6 +73,9 @@ add_test(NAME node_sidebar_workspace COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME node_notifications_v1 COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/test/notifications-v1.test.cjs)
+add_test(NAME node_notification_auto_hide COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_EXPECT_NOTIFICATION_AUTO_HIDE=1
+ ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/notification-auto-hide.test.cjs)
 add_test(NAME node_notification_action COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_EXPECT_NOTIFICATION_ACTION=1
  ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/notification-action.test.cjs)
@@ -194,6 +197,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 find_program(CUI_NODE_TSC_EXECUTABLE tsc)
 if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_notification_auto_hide_types COMMAND ${CUI_NODE_TSC_EXECUTABLE}
+  --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --noEmit
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/notification-auto-hide.types.ts)
  add_test(NAME node_notification_action_types COMMAND ${CUI_NODE_TSC_EXECUTABLE}
   --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --noEmit
   ${CMAKE_CURRENT_SOURCE_DIR}/test/notification-action.types.ts)

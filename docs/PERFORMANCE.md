@@ -139,8 +139,14 @@ cmake --build build --target cui_bench_hover
 Portable CI runs at most two CTest processes at once and sets
 `CMAKE_BUILD_PARALLEL_LEVEL=2` for nested consumer builds. Each test uses its own
 process and temporary consumer directories; reference fixtures remain read-only.
-Native CI and local test scheduling are unchanged. On Linux, continue using
-`python scripts/test_local.py --build-dir build`, which isolates the display.
+On Linux, use `python scripts/test_local.py --build-dir build` to isolate the
+display for local tests.
+
+The alpha.12 portable Ubuntu Release job took 1,026 seconds, of which 933 were
+compilation and 83 were CTest. The next candidate uses four workers for this
+job's primary compile on the four-core public Ubuntu runner. The other portable
+builds use two workers. Use the hosted compile and CTest step durations for the
+comparison. Candidate timing is pending. [Alpha.12 job](https://github.com/mattmezza/cui/actions/runs/45905181988/job/140200121683) · [Runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)
 
 The baseline Windows Debug job in [run 41249695765](https://github.com/mattmezza/cui/actions/runs/41249695765)
 spent 165.88 seconds on `agent_skill_contract` and 98.43 seconds on

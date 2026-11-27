@@ -100,6 +100,7 @@ class WorkflowTests(unittest.TestCase):
                               'test_bridge_part_shadows', 'test_bridge_avatar_style'),
             'go-rust-builders': ('test_bridge_window_visibility', 'test_bridge_stepper_visual',
                                  'test_bridge_shadows', 'test_bridge_skeleton', 'test_bridge_badge',
+                                 'test_bridge_kbd',
                                  'test_bridge_icon_presentation', 'test_bridge_data_table_capacity',
                                  'test_bridge_data_table_capacity_allocations'),
         }

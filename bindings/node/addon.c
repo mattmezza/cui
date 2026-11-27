@@ -281,9 +281,10 @@ static napi_value notification_auto_hide(napi_env env, napi_callback_info info) 
     napi_value v[1], result;
     js_app *app;
     void (*symbol)(void) = NULL;
-    if (!args(env, info, 1, v) || !app_arg(env, v[0], &app)) return NULL;
-    bool supported = optional_bridge_symbol(&symbol, sizeof symbol,
-                                            "cui_bridge_notification_set_auto_hide_v1");
+    if (!args(env, info, 1, v) || !app_arg(env, v[0], &app))
+        return NULL;
+    bool supported =
+        optional_bridge_symbol(&symbol, sizeof symbol, "cui_bridge_notification_set_auto_hide_v1");
     return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
 }
 static napi_value set_notification_auto_hide(napi_env env, napi_callback_info info) {
@@ -292,8 +293,8 @@ static napi_value set_notification_auto_hide(napi_env env, napi_callback_info in
     js_node *node;
     bool enabled;
     cui_bridge_status (*set)(cui_bridge_app *, cui_bridge_node, uint32_t) = NULL;
-    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) ||
-        !node_arg(env, v[1], app, &node)) return NULL;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
+        return NULL;
     if (napi_get_value_bool(env, v[2], &enabled) != napi_ok)
         return fail(env, "auto_hide requires boolean");
     if (!optional_bridge_symbol(&set, sizeof set, "cui_bridge_notification_set_auto_hide_v1"))
@@ -321,13 +322,20 @@ static napi_value notification_action(napi_env env, napi_callback_info info) {
         return NULL;
     if (!optional_bridge_symbol(&create, sizeof create, "cui_bridge_notification_action_create_v1"))
         return fail(env, "Notification action unavailable");
-    if (!string_arg(env, v[2], &key)) return NULL;
+    if (!string_arg(env, v[2], &key))
+        return NULL;
     node = calloc(1, sizeof(*node));
-    if (!node) { free(key); return fail(env, "allocation failed"); }
+    if (!node) {
+        free(key);
+        return fail(env, "allocation failed");
+    }
     node->owner = app;
     cui_bridge_status code = create(app->bridge, parent->node, key, &node->node);
     free(key);
-    if (code != CUI_BRIDGE_OK) { free(node); return status(env, code); }
+    if (code != CUI_BRIDGE_OK) {
+        free(node);
+        return status(env, code);
+    }
     return expose_node(env, v[0], node);
 }
 static napi_value attachment_slots(napi_env env, napi_callback_info info) {

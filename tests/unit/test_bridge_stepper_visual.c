@@ -342,7 +342,8 @@ int main(void) {
     assert(cui_bridge_node_remove(a, steps) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_stepper_fill(a, steps, 1, 0, 200, 200) == CUI_BRIDGE_STALE_HANDLE);
     assert(cui_bridge_set_stepper_wrapped_fill_v1(a, steps, 0, 0, 0, 0) == CUI_BRIDGE_STALE_HANDLE);
-    assert(cui_bridge_set_stepper_centered_fill_v1(a, steps, 0, 0, 0, 0) == CUI_BRIDGE_STALE_HANDLE);
+    assert(cui_bridge_set_stepper_centered_fill_v1(a, steps, 0, 0, 0, 0) ==
+           CUI_BRIDGE_STALE_HANDLE);
     cui_bridge_destroy(a);
     return 0;
 }

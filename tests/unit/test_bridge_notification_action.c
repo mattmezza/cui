@@ -35,8 +35,8 @@ static cui_id id(cui_bridge_app *app, cui_bridge_node node) {
 }
 
 static cui_id part(cui_bridge_app *app, cui_bridge_node note, cui_notification_part kind) {
-    return cui_notification_part_id(UINT64_C(0x4e4f544946594255), (cui_notification_id){1, id(app, note)},
-                                    kind);
+    return cui_notification_part_id(UINT64_C(0x4e4f544946594255),
+                                    (cui_notification_id){1, id(app, note)}, kind);
 }
 
 static void tap(cui_bridge_app *app, cui_id target, cui_pointer_type type) {
@@ -58,12 +58,13 @@ static bool open(cui_bridge_app *app, cui_bridge_node note) {
     return value != 0;
 }
 
-static void expect_event_at(cui_bridge_app *app, cui_bridge_node node,
-                            cui_bridge_event_type type, int line) {
+static void expect_event_at(cui_bridge_app *app, cui_bridge_node node, cui_bridge_event_type type,
+                            int line) {
     cui_bridge_event_ex event;
     char payload[1];
     uint32_t required;
-    cui_bridge_status status = cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required);
+    cui_bridge_status status =
+        cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required);
     if (status != CUI_BRIDGE_OK)
         fprintf(stderr, "line %d: expected bridge event %d for slot %u, status %d\n", line, type,
                 node.slot, status);
@@ -78,7 +79,8 @@ static void expect_empty(cui_bridge_app *app) {
     cui_bridge_event_ex event;
     char payload[1];
     uint32_t required;
-    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_EMPTY);
 }
 
 static void ownership(void) {
@@ -223,8 +225,8 @@ static void auto_hide(void) {
     cui_rect card = entry->bounds;
     cui_focus(app->ui, 0);
     assert(cui_queue_event(app->ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
-                                              .x = card.x + card.w / 2,
-                                              .y = card.y + card.h / 2}));
+                                                .x = card.x + card.w / 2,
+                                                .y = card.y + card.h / 2}));
     assert(cui_bridge_step(app, 1) == CUI_BRIDGE_OK);
     assert(entry->remaining == 4);
     assert(cui_queue_event(app->ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 0, .y = 0}));

@@ -1011,8 +1011,8 @@ bool cui_marker_styled(cui_context *, cui_id, const cui_theme *, cui_marker_stat
 /* Internal retained action slot. action_user marks cards with an attached
  * Button. Its width and inherited opacity are established by the renderer. */
 typedef void (*cui_notification_retained_action_fn)(void *user, float width);
-bool cui_notifications_retained(cui_context *, cui_id, const cui_theme *,
-                                cui_notification_state *, cui_rect, double, bool responsive,
+bool cui_notifications_retained(cui_context *, cui_id, const cui_theme *, cui_notification_state *,
+                                cui_rect, double, bool responsive,
                                 cui_notification_retained_action_fn, cui_notification_advance *);
 #endif
 
@@ -1531,13 +1531,9 @@ static void cui_status_notification_legacy_body(cui_context *ui, cui_id card, co
     cui_status_spacer(ui, cui_status_child_id(card, 312), 2);
 }
 
-static cui_notification_advance cui_status_notifications_render(cui_context *ui, cui_id id,
-                                                                const cui_theme *t,
-                                                                cui_notification_state *s,
-                                                                cui_rect viewport, double now,
-                                                                bool responsive,
-                                                                cui_notification_retained_action_fn action,
-                                                                bool *submitted) {
+static cui_notification_advance cui_status_notifications_render(
+    cui_context *ui, cui_id id, const cui_theme *t, cui_notification_state *s, cui_rect viewport,
+    double now, bool responsive, cui_notification_retained_action_fn action, bool *submitted) {
     cui_notification_advance result = {0};
     if (!ui || !t || !s || !isfinite(now) || now < 0 || !isfinite(viewport.x) ||
         !isfinite(viewport.y) || !isfinite(viewport.w) || viewport.w <= 0 ||
@@ -1763,7 +1759,7 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
             /* The top card is independently dismissible before hover, including
              * for a passive alert with no other keyboard or touch target. */
             bool show_close = responsive_card ? !hidden && (geometry.rank == 0 || expanded[anchor])
-                                         : cui_hovered(ui, card) || expanded[anchor];
+                                              : cui_hovered(ui, card) || expanded[anchor];
             if (show_close) {
                 cui_rect close_bounds = {card_x + card_width - 24, card_y + 4, 20, 20};
                 float button_height = 0;
@@ -1862,8 +1858,8 @@ bool cui_notifications_retained(cui_context *ui, cui_id id, const cui_theme *the
         }
     }
     bool submitted = true;
-    cui_notification_advance next = cui_status_notifications_render(ui, id, theme, state, viewport,
-                                                                    now, responsive, action, &submitted);
+    cui_notification_advance next = cui_status_notifications_render(
+        ui, id, theme, state, viewport, now, responsive, action, &submitted);
     if (!submitted)
         return false;
     *out = next;

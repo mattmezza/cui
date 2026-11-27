@@ -106,7 +106,7 @@ typedef struct {
 } cui_stepper_connector_paint;
 
 static bool cui_stepper_connector_prepaint(const cui_prepaint_info *info, const void *data,
-                                          cui_prepaint_writer *writer) {
+                                           cui_prepaint_writer *writer) {
     const cui_stepper_connector_paint *p = data;
     cui_rect previous = {0};
     bool have_previous = false;
@@ -123,8 +123,8 @@ static bool cui_stepper_connector_prepaint(const cui_prepaint_info *info, const 
             if (p->vertical) {
                 edge = previous.y + previous.h + p->gap;
                 next = current.y - p->gap;
-                connector = (cui_rect){previous.x + (previous.w - p->thickness) / 2,
-                                       edge, p->thickness, next - edge};
+                connector = (cui_rect){previous.x + (previous.w - p->thickness) / 2, edge,
+                                       p->thickness, next - edge};
             } else {
                 edge = previous.x + previous.w + p->gap;
                 next = current.x - p->gap;
@@ -132,12 +132,12 @@ static bool cui_stepper_connector_prepaint(const cui_prepaint_info *info, const 
                                        next - edge, p->thickness};
             }
             if (next > edge &&
-                !cui_prepaint_emit(writer,
-                                   &(cui_draw_command){.type = CUI_DRAW_RECT,
-                                                       .bounds = connector,
-                                                       .color = i <= p->selected ? p->passed
-                                                                                : p->pending},
-                                   false))
+                !cui_prepaint_emit(
+                    writer,
+                    &(cui_draw_command){.type = CUI_DRAW_RECT,
+                                        .bounds = connector,
+                                        .color = i <= p->selected ? p->passed : p->pending},
+                    false))
                 return false;
         }
         previous = current;
@@ -179,8 +179,8 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
             return (cui_stepper_navigation_result){0};
     bool centered = p.layout == CUI_STEPPER_LAYOUT_CENTERED_FILL;
     bool wrapped = centered || p.layout == CUI_STEPPER_LAYOUT_WRAPPED_FILL;
-    cui_text_align text_align = centered && !o.vertical ? CUI_TEXT_ALIGN_CENTER
-                                                        : CUI_TEXT_ALIGN_LEFT;
+    cui_text_align text_align =
+        centered && !o.vertical ? CUI_TEXT_ALIGN_CENTER : CUI_TEXT_ALIGN_LEFT;
     if (wrapped) {
         if ((!steps && count) || !isfinite(t->font_size) || t->font_size <= 0)
             return (cui_stepper_navigation_result){0};
@@ -231,11 +231,11 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
                                              .passed = t->primary,
                                              .pending = t->border,
                                              .vertical = o.vertical};
-        (void)cui_set_prepaint(ui, (cui_prepaint_options){
-                                     .callback = cui_stepper_connector_prepaint,
-                                     .payload = &paint,
-                                     .payload_bytes = sizeof paint,
-                                     .command_budget = count + 1});
+        (void)cui_set_prepaint(ui,
+                               (cui_prepaint_options){.callback = cui_stepper_connector_prepaint,
+                                                      .payload = &paint,
+                                                      .payload_bytes = sizeof paint,
+                                                      .command_budget = count + 1});
     }
     for (size_t i = 0; i < count; ++i) {
         bool checked = i <= selected;
@@ -278,15 +278,14 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
                                     .grow_height = o.vertical},
                                 i < selected ? t->primary : t->border, (cui_corner_radii){0});
         }
-        cui_begin_box(ui, trigger,
-                      (cui_box){.width = wrapped ? -1 : 0,
-                                .height = centered && o.vertical && p.height > 0 ? -1 : 0,
-                                .align_x = centered && !o.vertical ? CUI_ALIGN_CENTER
-                                                                  : CUI_ALIGN_START,
-                                .align_y = centered && o.vertical ? CUI_ALIGN_CENTER
-                                                                 : CUI_ALIGN_START,
-                                .row = o.vertical,
-                                .gap = o.vertical ? gap * 2 : gap});
+        cui_begin_box(
+            ui, trigger,
+            (cui_box){.width = wrapped ? -1 : 0,
+                      .height = centered && o.vertical && p.height > 0 ? -1 : 0,
+                      .align_x = centered && !o.vertical ? CUI_ALIGN_CENTER : CUI_ALIGN_START,
+                      .align_y = centered && o.vertical ? CUI_ALIGN_CENTER : CUI_ALIGN_START,
+                      .row = o.vertical,
+                      .gap = o.vertical ? gap * 2 : gap});
         float radius = t->radius == 0 ? 0 : side / 2;
         cui_begin_box(ui, cui_numeric_part_id(id, 1000 + (unsigned)i),
                       (cui_box){.width = wrapped && !o.vertical ? -1 : side,
@@ -327,11 +326,14 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
         cui_end_box(ui);
         cui_begin_box(ui, 0, (cui_box){.width = wrapped ? -1 : 0, .gap = gap});
         cui_stepper_present_text(ui, steps[i].title, font,
-                                 o.disabled || steps[i].disabled ? t->muted : t->text, wrapped, text_align);
+                                 o.disabled || steps[i].disabled ? t->muted : t->text, wrapped,
+                                 text_align);
         if (steps[i].description.length)
-            cui_stepper_present_text(ui, steps[i].description, font * .8f, t->muted, wrapped, text_align);
+            cui_stepper_present_text(ui, steps[i].description, font * .8f, t->muted, wrapped,
+                                     text_align);
         if (steps[i].status == CUI_STEP_ERROR)
-            cui_stepper_present_text(ui, cui_string("Error"), font * .8f, t->danger, wrapped, text_align);
+            cui_stepper_present_text(ui, cui_string("Error"), font * .8f, t->danger, wrapped,
+                                     text_align);
         cui_end_box(ui);
         cui_end_box(ui);
         if (fill)

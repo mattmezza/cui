@@ -670,7 +670,8 @@ static void centered_geometry(void) {
     wrapped_frame(&f, 144);
     assert(f.calls == 2 && f.selected == 1);
 
-    assert(cui_queue_accessibility_action(f.ui, cui_numeric_part_id(10, 1), CUI_ACCESSIBILITY_ACTIVATE));
+    assert(cui_queue_accessibility_action(f.ui, cui_numeric_part_id(10, 1),
+                                          CUI_ACCESSIBILITY_ACTIVATE));
     wrapped_frame(&f, 144);
     assert(f.calls == 3 && f.selected == 0);
     cui_destroy(f.ui);

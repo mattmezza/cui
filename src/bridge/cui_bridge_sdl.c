@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_sdl3.h"
 #include "../../backends/sdl3/cui_sdl3_timed_frames_internal.h"
+#include "cui/cui_sdl3.h"
 #include "cui_bridge_internal.h"
 #include <stdlib.h>
 #include <string.h>

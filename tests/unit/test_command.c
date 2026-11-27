@@ -6,6 +6,8 @@
 #endif
 #include <assert.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 static unsigned order[32], order_count;
 static cui_command_index selected_index;
@@ -74,7 +76,9 @@ static void test_unicode_filter(void) {
         {u8"\u0130\u03a3", u8"i\u0307\u03c2", true},
         {u8"Stra\u00dfe", "STRASSE", false},
         {u8"caf\u00e9", u8"cafe\u0301", false},
-        {"label", u8"\t\u202f\xc2\x85\n", true},
+        /* Narrow no-break space and next line. Keep the UTF-8 bytes literal:
+           MSVC can re-encode numeric escapes inside a u8 string. */
+        {"label", "\t\xe2\x80\xaf\xc2\x85\n", true},
         {"label", u8"\u200blabel", false},
         {"\xf0\x9f", "\x9f", true},
         {"\xc3\xa9", "\xa9", false},
@@ -82,7 +86,11 @@ static void test_unicode_filter(void) {
     };
     for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
         cui_command_item item = {.label = cui_string(cases[i].label)};
-        assert(cui_command_matches(&item, cui_string(cases[i].query)) == cases[i].matches);
+        if (cui_command_matches(&item, cui_string(cases[i].query)) != cases[i].matches) {
+            fprintf(stderr, "Command Unicode case %zu: expected %s\n", i,
+                    cases[i].matches ? "a match" : "no match");
+            exit(EXIT_FAILURE);
+        }
     }
     const char bytes[] = {'X', '\0', 'Y'};
     cui_command_item binary = {.label = (cui_str){bytes, sizeof bytes}};
@@ -97,7 +105,7 @@ static void test_unicode_filter(void) {
     };
     cui_command_row rows[2];
     cui_command_state state;
-    cui_command_index index;
+    cui_command_index index = {0};
     assert(cui_command_init(&state, rows, 2, NULL));
     assert(cui_command_rebuild(&state, entries, 2, cui_string(u8"\u3000pr\u00e9f\u00e9\u00a0"),
                                true, cui_command_default()));
@@ -458,7 +466,7 @@ static void test_grow_panel_width(void) {
 static float measure_width(float width, float font, void *user) {
     (void)font;
     *(float *)user = width;
-    return width < 300 ? 60 : 32;
+    return width < 300 ? 60.0f : 32.0f;
 }
 
 static bool custom_header_prepaint(const cui_prepaint_info *info, const void *payload,
@@ -516,7 +524,7 @@ static void test_grow_custom_measure(void) {
 static float measure_short_row(float width, float font, void *user) {
     (void)font;
     *(float *)user = width;
-    return width >= 225 ? 5 : 7;
+    return width >= 225 ? 5.0f : 7.0f;
 }
 
 static void test_short_custom_row_matches_measurement(void) {
@@ -653,7 +661,7 @@ static void test_custom_height_with_later_sibling(bool short_row) {
         (void)cui_end_frame(ui);
         assert(cui_last_error(ui) == CUI_OK);
         cui_rect row = cui_bounds(ui, cui_command_row_id(42, (cui_command_index){0, 0}));
-        float expected_height = short_row ? (frame ? 7 : 5) : (frame ? 60 : 32);
+        float expected_height = short_row ? (frame ? 7.0f : 5.0f) : (frame ? 60.0f : 32.0f);
         assert(row.w == 222 && row.h == expected_height);
         assert(cui_needs_redraw(ui) == !frame);
         if (frame)

@@ -17,7 +17,7 @@ class SDLV1SourceTests(unittest.TestCase):
         # session owns the composition. The original members stay in order.
         expected = original.replace('    cui_id ime_focus;\n',
                                     '    bool ime_uses_input_state;\n    cui_id ime_focus;\n', 1)
-        extension_fields = 'bool v2_busy, v2_faulted; bool wheel_shift;'
+        extension_fields = 'bool v2_busy, v2_faulted; bool wheel_shift; bool timed_frame;'
         self.assertEqual(fields(current), fields(expected) + extension_fields.split())
         self.assertEqual(current.count('cui_sdl3 *s = calloc(1, sizeof(*s));'), 1)
         self.assertEqual((ROOT / 'backends/sdl3/cui_sdl3_mesh.h').read_bytes(),

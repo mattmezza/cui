@@ -43,6 +43,8 @@ def main():
             for family in FAMILIES:
                 page.goto(f'http://127.0.0.1:{server.server_port}/#{family}')
                 page.wait_for_function('(s)=>window.cuiGallery?.renderedComponent===s', arg=family)
+                if family == 'Badge':
+                    choose('#badge-layout', '1')
                 assert page.locator('#design-size').is_visible(), family
                 assert page.locator('#design-size option').count() == 14
                 legacy = {'DropdownButton':'dropdown-size','Badge':'control-size','Tag':'control-size',

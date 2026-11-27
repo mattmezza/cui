@@ -150,11 +150,12 @@ CTest keep two workers. [Runner specifications](https://docs.github.com/en/actio
 | --- | ---: | ---: | ---: | ---: |
 | [Alpha.12 baseline](https://github.com/mattmezza/cui/actions/runs/45905181988/job/140200121683) | 2 | 933 s | 83 s | 1,026 s |
 | [Alpha.13 precursor](https://github.com/mattmezza/cui/actions/runs/45915851860/job/140234881707) | 4 | 770 s | 94 s | 875 s |
+| [Alpha.13 release](https://github.com/mattmezza/cui/actions/runs/45919514206/job/140246631179) | 4 | 430 s | 53 s | 490 s |
 
-The observed compile was 163 seconds shorter (17.5%) and the job was 151 seconds
-shorter (14.7%). CTest took 11 seconds longer with the same worker limit. The two
-runs used different revisions and hosted runners, so the difference includes
-source changes and runner variation.
+The four-worker jobs finished 151 and 536 seconds ahead of the two-worker
+baseline. Their CTest times differed by 41 seconds with the same worker limit.
+The jobs used different source revisions and hosted runners. The timings describe
+observed wall time and leave the isolated effect of worker count undetermined.
 
 The baseline Windows Debug job in [run 41249695765](https://github.com/mattmezza/cui/actions/runs/41249695765)
 spent 165.88 seconds on `agent_skill_contract` and 98.43 seconds on

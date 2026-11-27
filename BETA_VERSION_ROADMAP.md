@@ -11,11 +11,11 @@ use the checklists below to track acceptance and delivery.
 
 | Track | Current status |
 | --- | --- |
-| Public release | **v0.1.0-alpha.12**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.12) |
+| Public release | **v0.1.0-alpha.13**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.13) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
-| Public website | Interactive WASM gallery and docs at alpha.12. The Pages deployment from `b36abbd8` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45905182265) |
-| Latest integrated work | Alpha.12 ships retained Carousel on both axes with wrapping, content sizing, custom controls and shared navigation events. The alpha.13 candidate adds typed retained Kbd, Command selection reflow and Unicode Command search. |
-| Packages | Alpha.12 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
+| Public website | Interactive WASM gallery and docs at alpha.13. The Pages deployment from `91c4787e` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45919514230) |
+| Latest integrated work | Alpha.13 ships typed retained Kbd, shared Kbd styling, Unicode Command search and responsive custom Command rows. |
+| Packages | Alpha.13 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
 feature test does not establish complete component parity.
@@ -28,6 +28,11 @@ feature test does not establish complete component parity.
 - **Released / deployed:** verified published artifacts, tracked separately from source.
 
 ## Release wrap-up
+
+Alpha.13 ships typed Kbd in retained C and five language bindings. Command
+searches Unicode labels and keywords and preserves visible selection during
+responsive row reflow. The gallery and release serve the same native starter.
+[Release evidence](docs/validation/alpha13-release.json)
 
 Alpha.12 ships content-sized Carousel slides on both axes, retained arrows
 and markers, looping and application-owned navigation. Installed
@@ -85,7 +90,7 @@ packages match the validated source. [Release evidence](docs/validation/alpha6-r
 | Native starter | Working source switches from a pinned Sidebar to a compact Sheet below MD. Private X11 checks verify intermediate rendering and focused page input across six widths. Headless checks cover navigation focus handoff, pinned account controls, clipped links, held mouse/touch and unsaved edits. Short Settings pages scroll by wheel, touch and form focus. Projects has a resizable list/detail pair and bounded tabs, verified with 48 private-X11 presentations across six widths and headless interaction tests. The extracted alpha.5 starter passes installed checks. Physical drag and other hosts remain open. See the [starter guide](docs/NATIVE_APP_STARTER.md) and [Linux evidence](docs/LINUX_LIVE_RESIZE.md). |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix remains open. Alpha.4 contains the typed model and foreign bridge subsets. The subsequent opt-in Linux C adapter passes native AT-SPI Set Value and headless numeric mailbox checks. Foreign host opt-in, other OS adapters and physical screen-reader acceptance remain open. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; released in alpha.4. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), SDL integration is now covered by focused checks; the other three adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
-| Validation | Alpha.11 passed hosted CI, native binding callbacks, all three browser shards and all six installed checks. [Release evidence](docs/validation/alpha11-release.json) |
+| Validation | Alpha.13 passed hosted CI, native callbacks, all three browser shards and installed consumers. [Release evidence](docs/validation/alpha13-release.json) |
 
 **Resource rule:** reuse existing build directories, serialize heavy builds, and keep automated windows off the desktop. Remove only confirmed disposable artifacts; preserve source and independently landed work.
 
@@ -122,7 +127,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 | [ ] | Package-manager delivery | Finish PyPI/npm/crates.io ownership/authentication/publication gates and clean installation checks; maintain verified Go module delivery and native dependency guidance. |
 | [ ] | Human and agent docs | Keep build/compiler/linker prerequisites, quickstarts, state/events, immediate/retained distinctions, language examples and professional app recipes reproducible. Update metadata and generated skill together; keep discovery concise. |
 | [ ] | Website and media | Keep gallery behavior, system/theme selection, search, copyable code, navigation scroll preservation, docs, version display, README media and OG coverage aligned with shipped APIs. Rendered docs and search summaries use CUI terminology with descriptive provenance links. |
-| [ ] | CI, performance and resources | Eleven offline Chromium probes now fetch their local WASM as binary. The same-artifact Popover browser phase fell from 70.9 s to 2.1 s locally with all eight cases. Timestamp-preserving generators are integrated (`3088338a`) and verified across 1,170 files. Rust’s embedded CMake build honors Cargo NUM_JOBS with a one-job fallback. Portable hosted CI allows two test processes and bounded nested builds. The four-worker Ubuntu Release job passed. It compiled in 770 s versus 933 s on alpha.12, and its total fell from 1,026 s to 875 s. The hosted comparison spans two source revisions. Alpha.7 recorded zero extra push runs across both release tags after the branch-only filter. Alpha.6 had six duplicate runs across those two tags. Installed-package CI exercises both Go variants and runs the shared Rust crate once. [Measurements](docs/PERFORMANCE.md#hosted-check-scheduling) |
+| [ ] | CI, performance and resources | Eleven offline Chromium probes now fetch their local WASM as binary. The same-artifact Popover browser phase fell from 70.9 s to 2.1 s locally with all eight cases. Timestamp-preserving generators are integrated (`3088338a`) and verified across 1,170 files. Rust’s embedded CMake build honors Cargo NUM_JOBS with a one-job fallback. Portable hosted CI allows two test processes and bounded nested builds. The four-worker Ubuntu Release jobs passed in 875 s and 490 s. The two-worker alpha.12 baseline took 1,026 s. These measurements span different source revisions and runners. Alpha.7 recorded zero extra push runs across both release tags after the branch-only filter. Alpha.6 had six duplicate runs across those two tags. Installed-package CI exercises both Go variants and runs the shared Rust crate once. [Measurements](docs/PERFORMANCE.md#hosted-check-scheduling) |
 
 ### Next component slices
 
@@ -225,7 +230,7 @@ Historical source evidence and remaining acceptance:
 | Dialog composition | `ef893a34` idle fix; focused native checks and full browser gate on artifact `f728908e` pass | Broader lifecycle. Alpha.5 deploys the focused behavior and nested-touch checks pass. |
 | Localized TimeField | Integrated `49267cc4`; native/source/ABI checks and keyboard gallery gates pass. Working source covers ordered IME and formatted semantic values. Chromium AX and Linux AT-SPI verify the current time, discrete values and segment focus. Released language artifacts pass headless examples. | Physical IME, assistive-technology editing and screen-reader qualification, and interactive native binding acceptance. |
 
-Receipts travel with their source changes. Use the alpha.12 receipt above for
+Receipts travel with their source changes. Use the alpha.13 receipt above for
 exact-source acceptance and delivery.
 
 Detailed validation receipts live in [docs/validation](docs/validation).

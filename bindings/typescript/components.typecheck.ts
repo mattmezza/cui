@@ -210,3 +210,9 @@ const stepperWrappedFillSupported: boolean = app.supports_stepper_wrapped_fill()
 visualStepper().stepper_wrapped_fill(false, 'huge');
 // @ts-expect-error dimensions are numeric
 visualStepper().stepper_wrapped_fill(false, 'md', '300');
+visualStepper().stepper_centered_fill().stepper_centered_fill(true, 'xs', 300, 120).stepper_fill().stepper_visual();
+const stepperCenteredFillSupported: boolean = app.supports_stepper_centered_fill();
+// @ts-expect-error invalid density
+visualStepper().stepper_centered_fill(false, 'huge');
+// @ts-expect-error dimensions are numeric
+visualStepper().stepper_centered_fill(false, 'md', '300');

@@ -283,6 +283,42 @@ def main():
                 change('stepper-axis', 1)
                 first, middle = [page.evaluate(TARGET, n) for n in ('Details', 'Review')]
                 assert first['x'] == middle['x'] and first['y'] + first['h'] <= middle['y']
+                def centered_geometry(vertical):
+                    cs = commands()
+                    along, size = ('y', 'h') if vertical else ('x', 'w')
+                    across, stroke = ('x', 'w') if vertical else ('y', 'h')
+                    indicators = sorted(
+                        (c for c in cs if c['type'] == 0 and c['radius'] == 12),
+                        key=lambda c: c[along])
+                    connectors = sorted(
+                        (c for c in cs if c['type'] == 0 and c[stroke] == 2),
+                        key=lambda c: c[along])
+                    assert len(indicators) == 3 and len(connectors) == 2
+                    for first, line, following in zip(indicators, connectors, indicators[1:]):
+                        assert abs(line[along] - first[along] - first[size] - 4) < .1
+                        assert abs(following[along] - line[along] - line[size] - 4) < .1
+                        assert abs(line[across] + line[stroke]/2 -
+                                   first[across] - first[stroke]/2) < .1
+                        assert sample(line) == line['color']
+                    for name, marker in zip(('Details', 'Review', 'Finish'), indicators):
+                        label = next(c for c in cs if c['type'] == 2 and c['text'] == name)
+                        trigger = page.evaluate(TARGET, name)
+                        if vertical:
+                            assert abs(marker['y']+marker['h']/2-trigger['y']-trigger['h']/2) < .1
+                        else:
+                            assert abs(label['x']+label['w']/2-marker['x']-marker['w']/2) < .1
+
+                change('stepper-mode', 4)
+                centered_geometry(True)
+                snippets.append(page.locator('#snippet').inner_text())
+                assert 'CUI_STEPPER_LAYOUT_CENTERED_FILL' in snippets[-1]
+                change('stepper-axis', 0)
+                centered_geometry(False)
+                snippets.append(page.locator('#snippet').inner_text())
+                click('Finish')
+                painted('Step 3 of 3')
+                click('Review')
+                painted('Step 2 of 3')
                 # Leave every route-owned choice nondefault before SPA navigation.
                 change('stepper-mode', 1)
                 change('stepper-axis', 0)
@@ -310,7 +346,7 @@ def main():
                 subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
                                 '-I'+str(args.source_root.resolve()/'include'), '-c', str(source),
                                 '-o', str(source.with_suffix('.o'))], check=True)
-        print('PASS: desktop DPR1/2 + touch390 DPR2 WASM Fill and wrapped reflow, hover/capture pixels, validation, keyboard and touch, legacy layouts, route reset and compiled snippets')
+        print('PASS: desktop DPR1/2 + touch390 DPR2 WASM Fill, wrapping, centered connectors, hover/capture pixels, validation, keyboard and touch, legacy layouts, route reset and compiled snippets')
     finally:
         server.shutdown()
         server.server_close()

@@ -2140,7 +2140,13 @@ static const cui_pagination_labels pagination_labels_fr = {
 };
 static bool stepper_details_confirmed, stepper_validation_failed;
 static unsigned stepper_request_count;
-enum { STEPPER_BUTTONS, STEPPER_FIXED_CONNECTORS, STEPPER_FILL, STEPPER_WRAPPED_FILL };
+enum {
+    STEPPER_BUTTONS,
+    STEPPER_FIXED_CONNECTORS,
+    STEPPER_FILL,
+    STEPPER_WRAPPED_FILL,
+    STEPPER_CENTERED_FILL
+};
 enum { STEPPER_HORIZONTAL, STEPPER_VERTICAL, STEPPER_AUTO };
 static int stepper_mode = STEPPER_FILL, stepper_axis = STEPPER_AUTO;
 static bool stepper_icons;
@@ -2148,7 +2154,7 @@ static cui_stepper_density stepper_density;
 static cui_design_size stepper_design_size;
 static unsigned char stepper_icon_pixels[3][8 * 8 * 4];
 void gallery_stepper_options(int mode, int axis, int density, int icons, int size) {
-    stepper_mode = mode >= STEPPER_BUTTONS && mode <= STEPPER_WRAPPED_FILL ? mode : STEPPER_FILL;
+    stepper_mode = mode >= STEPPER_BUTTONS && mode <= STEPPER_CENTERED_FILL ? mode : STEPPER_FILL;
     stepper_axis = axis >= STEPPER_HORIZONTAL && axis <= STEPPER_AUTO ? axis : STEPPER_AUTO;
     stepper_density = density >= CUI_STEPPER_DENSITY_MD && density <= CUI_STEPPER_DENSITY_LG
                           ? (cui_stepper_density)density
@@ -7166,10 +7172,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                   .icons = stepper_icons ? icons : NULL,
                                                   .icon_count = stepper_icons ? 3 : 0};
             if (stepper_mode >= STEPPER_FILL) {
-                bool wrapped = stepper_mode == STEPPER_WRAPPED_FILL;
+                cui_stepper_layout layout = CUI_STEPPER_LAYOUT_FILL;
+                if (stepper_mode == STEPPER_WRAPPED_FILL)
+                    layout = CUI_STEPPER_LAYOUT_WRAPPED_FILL;
+                else if (stepper_mode == STEPPER_CENTERED_FILL)
+                    layout = CUI_STEPPER_LAYOUT_CENTERED_FILL;
                 cui_stepper_presentation_options presentation = {
-                    .layout = wrapped ? CUI_STEPPER_LAYOUT_WRAPPED_FILL : CUI_STEPPER_LAYOUT_FILL,
-                    .height = vertical && !wrapped ? height * .6f : 0,
+                    .layout = layout,
+                    .height = vertical && layout == CUI_STEPPER_LAYOUT_FILL ? height * .6f : 0,
                     .custom_palette = true,
                     .palette = {
                         .normal = t.secondary,

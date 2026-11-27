@@ -2550,3 +2550,123 @@ func TestStepperWrappedFill(t *testing.T) {
 		}
 	}
 }
+
+func TestStepperCenteredFill(t *testing.T) {
+	for _, size := range []float32{-1, 4097, float32(math.NaN()), float32(math.Inf(1))} {
+		if Stepper("bad").StepperCenteredFill(false, StepperMD, size, 0).Err() == nil {
+			t.Fatal("invalid width accepted")
+		}
+		if Stepper("bad").StepperCenteredFill(false, StepperMD, 0, size).Err() == nil {
+			t.Fatal("invalid height accepted")
+		}
+	}
+	if Item("bad", "bad").StepperCenteredFill(false, StepperMD, 0, 0).Err() == nil {
+		t.Fatal("wrong kind accepted")
+	}
+	if Stepper("bad").StepperCenteredFill(false, StepperDensity(4), 0, 0).Err() == nil {
+		t.Fatal("invalid density accepted")
+	}
+
+	// Each presentation replaces the preceding mode before mount.
+	queued := Stepper("queued").StepperWrappedFill(false, StepperMD, 0, 0).StepperCenteredFill(false, StepperMD, 0, 0)
+	if !queued.stepperCenteredFill || queued.stepperWrappedFill || queued.stepperFill || queued.hasStepperVisual {
+		t.Fatal("centered mode did not replace wrapped mode")
+	}
+	queued.StepperWrappedFill(false, StepperMD, 0, 0)
+	if queued.stepperCenteredFill || !queued.stepperWrappedFill {
+		t.Fatal("wrapped mode did not replace centered mode")
+	}
+	queued.StepperCenteredFill(false, StepperMD, 0, 0).StepperFill(false, StepperMD, 0, 0)
+	if queued.stepperCenteredFill || !queued.stepperFill {
+		t.Fatal("ordinary fill did not replace centered mode")
+	}
+	queued.StepperCenteredFill(false, StepperMD, 0, 0).StepperVisual(true, false, StepperMD)
+	if queued.stepperCenteredFill || !queued.hasStepperVisual {
+		t.Fatal("visual mode did not replace centered mode")
+	}
+	a := app(t)
+	supported, err := a.SupportsStepperCenteredFill()
+	check(t, err)
+	if expected := os.Getenv("CUI_EXPECT_STEPPER_CENTERED"); expected != "" && supported != (expected == "1") {
+		t.Fatalf("unexpected Stepper Centered Fill availability: %v", supported)
+	}
+	first, second := Item("a", "A long step title that wraps across several lines"), Item("b", "Another long step title that wraps across several lines")
+	steps := Stepper("steps").StepperCenteredFill(false, StepperSM, 0, 0).DesignSize(LG).Children(first, second)
+	changes := 0
+	steps.OnChange(func(Event) { changes++ })
+	if !supported {
+		if err := a.Mount(Column("root").Children(steps)); err != ErrStepperCenteredFillUnavailable {
+			t.Fatalf("unavailable: %v", err)
+		}
+		if steps.app != nil {
+			t.Fatal("mount mutated before preflight")
+		}
+		oldFill, e := a.SupportsStepperFill()
+		check(t, e)
+		if oldFill {
+			steps.StepperFill(false, StepperSM, 0, 0)
+		} else {
+			steps.StepperVisual(true, false, StepperSM)
+		}
+	}
+	check(t, a.Mount(Column("root").Children(steps)))
+	check(t, a.Step(.016))
+	if supported {
+		if wrapped, e := a.SupportsStepperWrappedFill(); e != nil {
+			t.Fatal(e)
+		} else if wrapped {
+			check(t, steps.StepperWrappedFill(false, StepperSM, 0, 0).Err())
+			if steps.stepperCenteredFill {
+				t.Fatal("mounted wrapped mode retained centered mode")
+			}
+			check(t, steps.StepperCenteredFill(false, StepperSM, 0, 0).Err())
+			if steps.stepperWrappedFill {
+				t.Fatal("mounted centered mode retained wrapped mode")
+			}
+			check(t, a.Step(.016))
+		}
+		wide, e := a.Bounds(steps)
+		check(t, e)
+		check(t, steps.StepperCenteredFill(false, StepperMD, 160, 0).Err())
+		check(t, a.Step(.016))
+		narrow, e := a.Bounds(steps)
+		check(t, e)
+		check(t, steps.StepperCenteredFill(false, StepperMD, 600, 0).Err())
+		check(t, a.Step(.016))
+		broad, e := a.Bounds(steps)
+		check(t, e)
+		if narrow.Width != 160 || narrow.Height <= broad.Height || narrow.Height <= wide.Height {
+			t.Fatalf("centered rows did not grow at narrow width: %v %v", narrow, broad)
+		}
+		check(t, steps.StepperCenteredFill(false, StepperMD, 160, 0).Err())
+		check(t, steps.StepperVisual(true, false, StepperMD).Err())
+		check(t, a.Step(.016))
+		fixed, e := a.Bounds(steps)
+		check(t, e)
+		if fixed.Width <= narrow.Width {
+			t.Fatalf("fixed layout did not replace bounded fill: fixed %v and fill %v", fixed, narrow)
+		}
+		check(t, steps.StepperCenteredFill(true, StepperLG, 320, 240).Err())
+		check(t, a.Step(.016))
+		vertical, e := a.Bounds(steps)
+		check(t, e)
+		one, e := a.NumericPartBounds(steps, 1)
+		check(t, e)
+		two, e := a.NumericPartBounds(steps, 2)
+		check(t, e)
+		if vertical.Width != 320 || vertical.Height != 240 || two.Y <= one.Y {
+			t.Fatalf("explicit vertical fill geometry: %v %v %v", vertical, one, two)
+		}
+		clickRect(t, a, two)
+		if changes != 0 {
+			t.Fatal("CHANGE dispatched during step")
+		}
+		_, e = a.Dispatch()
+		check(t, e)
+		selected, e := a.Selected(steps)
+		check(t, e)
+		if changes != 1 || selected != second {
+			t.Fatalf("new Fill selection and event count: %v %d", selected, changes)
+		}
+	}
+}

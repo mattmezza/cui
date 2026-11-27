@@ -157,19 +157,24 @@ cover reflow on resize and larger type, actual connector and hover/press pixels,
 request rejection, keyboard and touch selection, the fixed-layout variants and
 route reset. The wrapped layout keeps all three steps reachable in a horizontal
 row on the touch viewport. The checks compile the displayed snippets with strict
-C11 warnings. Centered crossing connectors, arbitrary child content and native
-assistive-technology acceptance remain open.
+C11 warnings. Choose **Centered labels** to see the connectors cross lane
+boundaries between markers. The preview exercises both axes and includes copyable C.
+Arbitrary child content and native assistive-technology acceptance remain open.
 
 ## Foreign builder visual authoring
 
-Python, JavaScript, TypeScript, Go and Rust offer fixed connectors, Fill and
-Wrapped Fill. Retained C uses `cui_bridge_set_stepper_wrapped_fill_v1` for
-wrapping, with the same options as `cui_bridge_set_stepper_fill`. Probe each
+Python, JavaScript, TypeScript, Go and Rust offer fixed connectors, Fill,
+Wrapped Fill and Centered Fill. Retained C uses
+`cui_bridge_set_stepper_centered_fill_v1` for centered labels and
+`cui_bridge_set_stepper_wrapped_fill_v1` for leading-aligned labels. Both
+accept the same options as `cui_bridge_set_stepper_fill`. Probe each
 capability independently when deploying to earlier providers. In Python, for
 example, choose a layout before mounting the tree:
 
 ```python
-if app.supports_stepper_wrapped_fill():
+if app.supports_stepper_centered_fill():
+    steps.stepper_centered_fill(vertical=False, width=0)
+elif app.supports_stepper_wrapped_fill():
     steps.stepper_wrapped_fill(vertical=False, width=0)
 elif app.supports_stepper_fill():
     steps.stepper_fill(vertical=True)
@@ -218,9 +223,17 @@ their content, and pick the vertical orientation when the available width cannot
 comfortably hold every lane. The mode accepts valid UTF-8 and uses CUI's paragraph
 wrapping. Supply enough width for at least one grapheme in each text column.
 
+Use `CUI_STEPPER_LAYOUT_CENTERED_FILL` with the same sizing rules to center
+horizontal captions and markers within each lane. In a vertical Stepper, text
+wraps beside the marker and the marker centers vertically against its row.
+Connectors span the current marker edges across lane boundaries. Keep the height
+at zero for content-sized vertical rows or pass a height to distribute the rows
+over a region. Connectors leave a gap at each marker and disappear if no space
+remains between them. They draw beneath the markers and captions. Hit regions
+belong to the steps. Resizing updates the markers, wrap and connectors together.
+
 All shared XS..9XL design sizes remain available. Density selects indicator glyph
-and proportions. Centered crossing connectors and arbitrary child styling remain
-outside these layouts.
+and proportions. Arbitrary child styling remains open.
 
 Calling the new entry opts into secondary/secondary_hover/secondary_foreground
 unchecked indicators and theme-radius behavior (zero radius makes square

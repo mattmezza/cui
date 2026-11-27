@@ -153,6 +153,71 @@ class Extended(unittest.TestCase):
                 node.stepper_visual()
                 app.mount(c.column().children(c.stepper("validation").stepper_wrapped_fill().stepper_visual()))
 
+    def test_stepper_centered_fill(self):
+        from unittest.mock import patch
+        with c.App(width=800,height=800) as app:
+            expected = os.environ.get('CUI_EXPECT_STEPPER_CENTERED', '1') == '1'
+            self.assertEqual(app.supports_stepper_centered_fill(), expected)
+            self.assertTrue(app.supports_stepper_fill())
+            if not expected:
+                node=c.stepper('missing').stepper_centered_fill()
+                with self.assertRaisesRegex(RuntimeError,'cui_bridge_set_stepper_centered_fill_v1'):
+                    app.mount(c.column().children(node))
+                self.assertIsNone(node._app)
+                old=c.stepper('old').stepper_fill(width=300).children(c.item('old-item','Old step'))
+                app.mount(c.column().children(old))
+                app.step()
+                previous_fill=old._stepper_fill
+                with self.assertRaisesRegex(RuntimeError,'cui_bridge_set_stepper_centered_fill_v1'):
+                    old.stepper_centered_fill()
+                self.assertEqual(old._stepper_fill,previous_fill)
+                app.step()
+                self.assertAlmostEqual(app.bounds(old)[2],300,delta=1)
+                return
+            a,b=c.item('a','First step title with several words').detail('Description with enough text to wrap'),c.item('b','Second step title').detail('Second description')
+            node=c.stepper('fill').stepper_visual().stepper_centered_fill(width=360,height=64).children(a,b)
+            node.select(a)
+            events=[];node.on_change(events.append)
+            app.mount(c.column().children(node));app.step()
+            self.assertIs(node.selected(),a)
+            self.assertAlmostEqual(app.bounds(node)[2],360,delta=1)
+            self.press_rect(app,app.numeric_part_bounds(node,2));app.dispatch()
+            self.assertIs(node.selected(),b);self.assertEqual(len(events),1)
+            self.press_rect(app,app.numeric_part_bounds(node,2));app.dispatch()
+            self.assertEqual(len(events),1)
+            for density in ('md','xs','sm','lg'):
+                node.stepper_centered_fill(True,density,240,240);app.step()
+                self.assertGreater(app.numeric_part_bounds(node,2)[1],app.numeric_part_bounds(node,1)[1])
+            node.stepper_wrapped_fill();app.step()
+            self.assertIsNone(node._stepper_centered_fill)
+            node.stepper_centered_fill();app.step()
+            self.assertIsNone(node._stepper_wrapped_fill)
+            node.stepper_fill();app.step()
+            self.assertIsNone(node._stepper_centered_fill)
+            self.assertIs(node.selected(),b)
+            node.stepper_centered_fill();app.step()
+            node.stepper_visual(True,False);app.step()
+            self.assertIsNone(node._stepper_centered_fill)
+            node.stepper_fill(width=300)
+            previous_fill=node._stepper_fill
+            with patch.object(app._api,'set_stepper_centered_fill_v1',None):
+                with self.assertRaisesRegex(RuntimeError,'cui_bridge_set_stepper_centered_fill_v1'):
+                    node.stepper_centered_fill()
+            self.assertIsNone(node._stepper_centered_fill)
+            self.assertEqual(node._stepper_fill,previous_fill)
+            self.assertIs(node.selected(),b)
+        for value in (-1,4097,float('nan'),float('inf'),True,'1'):
+            with self.assertRaises(ValueError):c.stepper("validation").stepper_centered_fill(width=value)
+        with c.App() as app:
+            node=c.stepper('missing').stepper_centered_fill().children(c.item('a','A'))
+            with patch.object(app._api,'set_stepper_centered_fill_v1',None):
+                self.assertFalse(app.supports_stepper_centered_fill())
+                with self.assertRaisesRegex(RuntimeError,'cui_bridge_set_stepper_centered_fill_v1'):
+                    app.mount(c.column().children(node))
+                self.assertIsNone(node._app)
+                node.stepper_visual()
+                app.mount(c.column().children(c.stepper("validation").stepper_centered_fill().stepper_visual()))
+
     def test_navigation(self):
         for name in ('list_view','menu','stepper'):
             with self.subTest(name=name),c.App(width=800,height=800) as app:

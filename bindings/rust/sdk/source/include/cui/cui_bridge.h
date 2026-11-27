@@ -1586,6 +1586,16 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_stepper_wrapped_fill_v1(cui_brid
                                                                         uint32_t vertical,
                                                                         uint32_t density,
                                                                         float width, float height);
+/* Optional centered Fill. Same arguments, UTF-8 wrapping, ownership and
+ * selection/event contract as wrapped Fill. Horizontal markers and captions
+ * share a lane center. Vertical markers center beside their captions.
+ * Connectors span adjacent marker edges at the current layout, with gaps.
+ * Success replaces the previous presentation; errors preserve it. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_stepper_centered_fill_v1(cui_bridge_app *,
+                                                                         cui_bridge_node,
+                                                                         uint32_t vertical,
+                                                                         uint32_t density,
+                                                                         float width, float height);
 /* Copies a tightly packed or padded RGBA8 image (at most 16 MiB).
  * Also accepts Item children of Stepper as optional tinted visual icons.
  * Item icon bytes remain owned through replacement/removal; other parents reject. */

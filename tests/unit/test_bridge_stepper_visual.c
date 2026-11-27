@@ -172,6 +172,36 @@ static void check_wrapped_fill(cui_bridge_app *a, cui_bridge_node root, cui_brid
     assert(cui_bridge_get_selected(a, steps, &selection) == CUI_BRIDGE_OK);
     assert(selection.slot == second.slot && drain(a) == 0);
 }
+static void check_centered_fill(cui_bridge_app *a, cui_bridge_node root, cui_bridge_node steps,
+                                cui_bridge_node first, cui_bridge_node second) {
+    assert(cui_bridge_set_stepper_centered_fill_v1(a, root, 0, 0, 180, 0) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_selected(a, steps, first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_stepper_centered_fill_v1(a, steps, 0, 0, 180, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_stepper_centered_fill_v1(a, steps, 1, 0, -1, 100) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    cui_draw_list draw = paint(a);
+    cui_id id = a->nodes[steps.slot].id;
+    cui_rect one = cui_bounds(a->ui, cui_numeric_part_id(id, 1000));
+    cui_rect two = cui_bounds(a->ui, cui_numeric_part_id(id, 1001));
+    assert(two.x - one.x == 90 && two.y == one.y);
+    bool found = false;
+    for (size_t i = 0; i < draw.count; i++) {
+        const cui_draw_command *cmd = &draw.commands[i];
+        if (cmd->type == CUI_DRAW_RECT && cmd->bounds.h == 2.25f &&
+            same_color(cmd->color, a->theme.border)) {
+            assert(!found && cmd->bounds.x > one.x + one.w &&
+                   cmd->bounds.x + cmd->bounds.w < two.x);
+            assert(cmd->bounds.y + cmd->bounds.h / 2 == one.y + one.h / 2);
+            found = true;
+        }
+    }
+    assert(found && drain(a) == 0);
+    click(a, steps, 2);
+    cui_bridge_node selection;
+    assert(cui_bridge_get_selected(a, steps, &selection) == CUI_BRIDGE_OK);
+    assert(selection.slot == second.slot && drain(a) == 1);
+}
 int main(void) {
     cui_bridge_options o = {.struct_size = sizeof o,
                             .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -296,6 +326,7 @@ int main(void) {
     assert(a->nodes[first.slot].image_frame.revision == 2);
     check_fill(a, root, steps, first, second);
     check_wrapped_fill(a, root, steps, first, second);
+    check_centered_fill(a, root, steps, first, second);
     assert(cui_bridge_set_stepper_visual(a, steps, 0, 1, 3) == CUI_BRIDGE_OK);
     cui_draw_list legacy = paint(a);
     for (size_t i = 0; i < legacy.count; i++)
@@ -311,6 +342,7 @@ int main(void) {
     assert(cui_bridge_node_remove(a, steps) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_stepper_fill(a, steps, 1, 0, 200, 200) == CUI_BRIDGE_STALE_HANDLE);
     assert(cui_bridge_set_stepper_wrapped_fill_v1(a, steps, 0, 0, 0, 0) == CUI_BRIDGE_STALE_HANDLE);
+    assert(cui_bridge_set_stepper_centered_fill_v1(a, steps, 0, 0, 0, 0) == CUI_BRIDGE_STALE_HANDLE);
     cui_bridge_destroy(a);
     return 0;
 }

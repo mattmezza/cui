@@ -313,6 +313,10 @@ class _API:
         if hasattr(lib, "cui_bridge_set_stepper_wrapped_fill_v1"):
             self.set_stepper_wrapped_fill_v1 = bind("set_stepper_wrapped_fill_v1", C.c_int, C.c_void_p, _Handle,
                                          C.c_uint32, C.c_uint32, C.c_float, C.c_float)
+        self.set_stepper_centered_fill_v1 = None
+        if hasattr(lib, "cui_bridge_set_stepper_centered_fill_v1"):
+            self.set_stepper_centered_fill_v1 = bind("set_stepper_centered_fill_v1", C.c_int, C.c_void_p, _Handle,
+                                         C.c_uint32, C.c_uint32, C.c_float, C.c_float)
         self.set_stepper_visual = bind("set_stepper_visual", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.c_uint32)
         self.set_design_size = bind("set_design_size", C.c_int, C.c_void_p, _Handle, C.c_int)
         self.set_avatar_identity = bind("set_avatar_identity", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.c_uint32)
@@ -586,6 +590,7 @@ class Widget:
         self._stepper_visual = None
         self._stepper_fill = None
         self._stepper_wrapped_fill = None
+        self._stepper_centered_fill = None
         self._avatar_identity = None
         self._avatar_placeholder = None
         self._part_shadow_styles = {}
@@ -1331,6 +1336,7 @@ class Widget:
         self._stepper_visual = value
         self._stepper_fill = None
         self._stepper_wrapped_fill = None
+        self._stepper_centered_fill = None
         return self
 
     def stepper_fill(self, vertical: bool = False, density: str = "md",
@@ -1347,6 +1353,7 @@ class Widget:
         value = (int(vertical), densities[density], width, height)
         self._change("set_stepper_fill", *value)
         self._stepper_wrapped_fill = None
+        self._stepper_centered_fill = None
         self._stepper_fill = value
         self._stepper_visual = None
         return self
@@ -1367,7 +1374,30 @@ class Widget:
             self._app._require_stepper_wrapped_fill()
         value = (int(vertical), densities[density], width, height)
         self._change("set_stepper_wrapped_fill_v1", *value)
+        self._stepper_centered_fill = None
         self._stepper_wrapped_fill = value
+        self._stepper_fill = None
+        self._stepper_visual = None
+        return self
+
+    def stepper_centered_fill(self, vertical: bool = False, density: str = "md",
+                              width: float = 0, height: float = 0) -> "Widget":
+        """Center horizontal labels and vertically center markers beside vertical labels.
+
+        Zero width grows and zero height uses intrinsic height.
+        """
+        densities = {"md": 0, "xs": 1, "sm": 2, "lg": 3}
+        if (self.kind != "stepper" or type(vertical) is not bool or
+                not isinstance(density, str) or density not in densities or
+                any(type(x) not in (int, float) or not 0 <= x <= 4096
+                    for x in (width, height))):
+            raise ValueError("stepper_centered_fill requires Stepper, bool, md/xs/sm/lg and finite dimensions in [0,4096]")
+        if self._app is not None:
+            self._app._require_stepper_centered_fill()
+        value = (int(vertical), densities[density], width, height)
+        self._change("set_stepper_centered_fill_v1", *value)
+        self._stepper_wrapped_fill = None
+        self._stepper_centered_fill = value
         self._stepper_fill = None
         self._stepper_visual = None
         return self
@@ -2389,6 +2419,15 @@ class App:
         if not self.supports_stepper_wrapped_fill():
             raise RuntimeError("Stepper wrapped Fill requires cui_bridge_set_stepper_wrapped_fill_v1")
 
+    def supports_stepper_centered_fill(self) -> bool:
+        """Report whether the provider offers retained Stepper centered Fill."""
+        self._ensure_open()
+        return self._api.set_stepper_centered_fill_v1 is not None
+
+    def _require_stepper_centered_fill(self) -> None:
+        if not self.supports_stepper_centered_fill():
+            raise RuntimeError("Stepper centered Fill requires cui_bridge_set_stepper_centered_fill_v1")
+
     def supports_radio_tab_index(self) -> bool:
         """Report whether the loaded bridge offers signed Radio and RadioGroup Tab order."""
         self._ensure_open()
@@ -2534,6 +2573,8 @@ class App:
                 raise RuntimeError("Typed Kbd requires cui_bridge_set_kbd_stroke_v1")
             if node._stepper_wrapped_fill is not None:
                 self._require_stepper_wrapped_fill()
+            if node._stepper_centered_fill is not None:
+                self._require_stepper_centered_fill()
             if node._stepper_fill is not None:
                 self._require_stepper_fill()
             if node._virtual_list_axis == "horizontal" and not self.supports_virtual_list_axis():
@@ -2730,6 +2771,8 @@ class App:
                     node._change("set_detail", _utf8(node._detail))
                 if node._stepper_wrapped_fill is not None:
                     node._change("set_stepper_wrapped_fill_v1", *node._stepper_wrapped_fill)
+                if node._stepper_centered_fill is not None:
+                    node._change("set_stepper_centered_fill_v1", *node._stepper_centered_fill)
                 if node._stepper_fill is not None:
                     node._change("set_stepper_fill", *node._stepper_fill)
                 if node._stepper_visual is not None:

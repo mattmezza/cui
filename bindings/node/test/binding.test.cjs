@@ -80,6 +80,54 @@ async function main() {
   missingApp.mount(column().children(stepper().stepper_wrapped_fill().stepper_visual()));missingApp.dispose();
   }
   }
+  {
+  const fillApp=new App({backend:'headless',width:800,height:800});
+  const expectedCentered=process.env.CUI_EXPECT_STEPPER_CENTERED!=='0';
+  assert.equal(fillApp.supports_stepper_centered_fill(),expectedCentered);
+  assert.equal(fillApp.supports_stepper_fill(),true);
+  if(!expectedCentered){
+    const unavailable=stepper().stepper_centered_fill();
+    assert.throws(()=>fillApp.mount(column().children(unavailable)),/cui_bridge_set_stepper_centered_fill_v1/);
+    assert(!unavailable.owner);
+    const old=stepper().stepper_fill(false,'md',300).children(item('old-item','Old step'));
+    fillApp.mount(column().children(old));fillApp.step();
+    const previousFill=old.stepperFillValue;
+    assert.throws(()=>old.stepper_centered_fill(),/cui_bridge_set_stepper_centered_fill_v1/);
+    assert.deepEqual(old.stepperFillValue,previousFill);
+    fillApp.step();assert(Math.abs(old.bounds().width-300)<1);fillApp.dispose();
+  } else {
+  const fa=item('fa','First step title with several words').detail('Description with enough text to wrap'),fb=item('fb','Second step title').detail('Second description');
+  const fill=stepper('fill').stepper_visual().stepper_centered_fill(false,'md',360,64).children(fa,fb);
+  fill.select(fa);
+  const fillEvents=[];fill.on_change(e=>fillEvents.push(e));
+  fillApp.mount(column().children(fill));fillApp.step();
+  assert.equal(fill.selected(),fa);
+  assert(Math.abs(fill.bounds().width-360)<1);
+  part=fill.numeric_part_bounds(2);
+  for(let i=0;i<2;i++){fillApp.pointer('down',part.x+part.width/2,part.y+part.height/2).pointer('up',part.x+part.width/2,part.y+part.height/2);fillApp.step();}
+  assert.equal(fill.selected(),fb);assert.equal(fillEvents.length,1);
+  for(const density of ['md','xs','sm','lg']){fill.stepper_centered_fill(true,density,240,240);fillApp.step();assert(fill.numeric_part_bounds(2).y>fill.numeric_part_bounds(1).y);}
+  fill.stepper_wrapped_fill();fillApp.step();assert.equal(fill.stepperCenteredFillValue,null);
+  fill.stepper_centered_fill();fillApp.step();assert.equal(fill.stepperWrappedFillValue,null);
+  fill.stepper_fill();fillApp.step();assert.equal(fill.stepperCenteredFillValue,null);assert.equal(fill.selected(),fb);
+  fill.stepper_centered_fill();fillApp.step();
+  fill.stepper_visual();fillApp.step();assert.equal(fill.stepperCenteredFillValue,null);
+  fill.stepper_fill(false,'md',300);
+  const previousFill=fill.stepperFillValue;
+  const supportsFill=fillApp.supports_stepper_centered_fill;
+  fillApp.supports_stepper_centered_fill=()=>false;
+  assert.throws(()=>fill.stepper_centered_fill(),/cui_bridge_set_stepper_centered_fill_v1/);
+  assert.equal(fill.stepperCenteredFillValue,null);
+  assert.deepEqual(fill.stepperFillValue,previousFill);assert.equal(fill.selected(),fb);
+  fillApp.supports_stepper_centered_fill=supportsFill;fillApp.dispose();
+  for(const value of [-1,4097,NaN,Infinity,true,'1'])assert.throws(()=>stepper().stepper_centered_fill(false,'md',value));
+  const missingApp=new App({backend:'headless'});missingApp.supports_stepper_centered_fill=()=>false;
+  const missing=stepper().stepper_centered_fill();
+  assert.throws(()=>missingApp.mount(column().children(missing)),/cui_bridge_set_stepper_centered_fill_v1/);
+  assert(!missing.owner);
+  missingApp.mount(column().children(stepper().stepper_centered_fill().stepper_visual()));missingApp.dispose();
+  }
+  }
   const avatarApp = new App({width:600,height:400});
   const person = avatar('person','Ada Lovelace').design_size('md').identity_colors(true,4);
   const anonymous = avatar('anonymous').anonymous_icon(true,'user');

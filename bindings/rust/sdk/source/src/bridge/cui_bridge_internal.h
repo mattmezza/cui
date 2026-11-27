@@ -47,7 +47,8 @@ typedef enum {
     BRIDGE_STEPPER_BUTTONS,
     BRIDGE_STEPPER_FIXED,
     BRIDGE_STEPPER_FILL,
-    BRIDGE_STEPPER_WRAPPED_FILL
+    BRIDGE_STEPPER_WRAPPED_FILL,
+    BRIDGE_STEPPER_CENTERED_FILL
 } bridge_stepper_layout;
 typedef struct {
     uint32_t generation;

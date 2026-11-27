@@ -74,11 +74,13 @@ No output is clipped or filtered by safety keywords.
 Use `cui_stepper_present` for fill connectors. Choose direction from container
 width with `cui_responsive_query`. Choose `CUI_STEPPER_LAYOUT_WRAPPED_FILL` to
 wrap UTF-8 labels and descriptions in equal horizontal lanes or beside each
-vertical indicator. Pass width 0 to grow and height 0 for natural height.
-Keep accepted requests in owner state and resubmit on the next frame. Retained
-builders queue CHANGE. Probe `supports_stepper_wrapped_fill`
-(`SupportsStepperWrappedFill` in Go) separately from `supports_stepper_fill`
-before selecting a layout. See `docs/STEPPER_NAVIGATION.md` and
+vertical indicator. `CUI_STEPPER_LAYOUT_CENTERED_FILL` centers horizontal
+captions and connects adjacent marker edges on both axes. Pass width 0 to
+grow and height 0 for natural height. Keep accepted requests in owner state
+and resubmit on the next frame. Retained builders queue CHANGE. Probe
+`supports_stepper_centered_fill` (`SupportsStepperCenteredFill` in Go),
+`supports_stepper_wrapped_fill` or `supports_stepper_fill` before selecting
+the corresponding layout. See `docs/STEPPER_NAVIGATION.md` and
 `docs/BINDING_BUILDERS.md`.
 
 Use `cui_accordion_present` or `cui_collapsible_present` for immediate C.

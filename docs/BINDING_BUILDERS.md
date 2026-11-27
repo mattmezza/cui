@@ -900,6 +900,18 @@ through the optional `cui_bridge_set_stepper_wrapped_fill_v1` symbol.
 | Go | `app.SupportsStepperWrappedFill()` returns `(bool, error)` | `steps.StepperWrappedFill(false, cui.StepperMD, 0, 0)` |
 | Rust | `app.supports_stepper_wrapped_fill()` | `app.stepper_wrapped_fill(steps, false, StepperDensity::Md, 0., 0.)?` or the fluent builder method |
 
+Choose Centered Fill when horizontal markers and labels should share a center
+line or vertical markers should center beside their labels. Connectors connect
+the actual marker edges with gaps. Use the same four parameters and keep
+height at zero for content-sized rows. The provider exports
+`cui_bridge_set_stepper_centered_fill_v1` independently of the wrapping setter.
+
+| Language | Capability probe | Apply centered fill |
+| --- | --- | --- |
+| Python, JavaScript, TypeScript | `app.supports_stepper_centered_fill()` | `steps.stepper_centered_fill()` |
+| Go | `app.SupportsStepperCenteredFill()` returns `(bool, error)` | `steps.StepperCenteredFill(false, cui.StepperMD, 0, 0)` |
+| Rust | `app.supports_stepper_centered_fill()` | `app.stepper_centered_fill(steps, false, StepperDensity::Md, 0., 0.)?` or the fluent builder method |
+
 Switching between the layout setters preserves the selected Item. User
 selection still produces a queued CHANGE. See the capability fallback in
 [Stepper navigation](STEPPER_NAVIGATION.md#foreign-builder-visual-authoring).

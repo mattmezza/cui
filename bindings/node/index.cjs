@@ -100,6 +100,7 @@ function requestsRadioMotion(node) {
   return node.radioMotionValue || node.childrenValue.some(requestsRadioMotion);
 }
 const stepperWrappedFillUnavailable = 'Stepper wrapped Fill requires cui_bridge_set_stepper_wrapped_fill_v1';
+const stepperCenteredFillUnavailable = 'Stepper centered Fill requires cui_bridge_set_stepper_centered_fill_v1';
 const stepperFillUnavailable = 'Stepper Fill requires cui_bridge_set_stepper_fill';
 function preflightNodeOptions(app, node, insideDecoration = false, insideAttachmentSlot = false) {
   if (node.kbdStyleValue && !app.supportsKbdStyle()) throw new Error('Kbd style requires cui_bridge_set_kbd_style_v1');
@@ -118,6 +119,7 @@ function preflightNodeOptions(app, node, insideDecoration = false, insideAttachm
     if (!app.supports_carousel_basis()) throw new Error('Carousel basis unavailable');
   }
   if (node.stepperWrappedFillValue && !app.supports_stepper_wrapped_fill()) throw new Error(stepperWrappedFillUnavailable);
+  if (node.stepperCenteredFillValue && !app.supports_stepper_centered_fill()) throw new Error(stepperCenteredFillUnavailable);
   if (node.stepperFillValue && !app.supports_stepper_fill()) throw new Error(stepperFillUnavailable);
   if (insideDecoration && !radioContentKinds.has(node.kind))
     throw new TypeError('RadioGroup Item decoration requires passive children');
@@ -585,7 +587,7 @@ class Node {
     if(this.kind!==44 || typeof enabled!=='boolean' || typeof vertical!=='boolean' || !Object.hasOwn(densities,density))throw new TypeError('stepper_visual requires Stepper, bools and md/xs/sm/lg density');
     const value=[+enabled,+vertical,densities[density]];
     if(this.owner)native.setStepperVisual(this.owner.handle,this[NODE],...value);
-    this.stepperVisualValue=value;this.stepperWrappedFillValue=null;this.stepperFillValue=null;return this;
+    this.stepperVisualValue=value;this.stepperWrappedFillValue=null;this.stepperCenteredFillValue=null;this.stepperFillValue=null;return this;
   }
   stepper_fill(vertical=false,density='md',width=0,height=0) {
     const densities={md:0,xs:1,sm:2,lg:3};
@@ -597,7 +599,7 @@ class Node {
       if(!this.owner.supports_stepper_fill())throw new Error(stepperFillUnavailable);
       native.setStepperFill(this.owner.handle,this[NODE],...value);
     }
-    this.stepperWrappedFillValue=null;this.stepperFillValue=value;this.stepperVisualValue=null;return this;
+    this.stepperWrappedFillValue=null;this.stepperCenteredFillValue=null;this.stepperFillValue=value;this.stepperVisualValue=null;return this;
   }
   stepper_wrapped_fill(vertical=false,density='md',width=0,height=0) {
     const densities={md:0,xs:1,sm:2,lg:3};
@@ -609,7 +611,19 @@ class Node {
       if(!this.owner.supports_stepper_wrapped_fill())throw new Error(stepperWrappedFillUnavailable);
       native.setStepperWrappedFill(this.owner.handle,this[NODE],...value);
     }
-    this.stepperWrappedFillValue=value;this.stepperFillValue=null;this.stepperVisualValue=null;return this;
+    this.stepperCenteredFillValue=null;this.stepperWrappedFillValue=value;this.stepperFillValue=null;this.stepperVisualValue=null;return this;
+  }
+  stepper_centered_fill(vertical=false,density='md',width=0,height=0) {
+    const densities={md:0,xs:1,sm:2,lg:3};
+    if(this.kind!==44 || typeof vertical!=='boolean' || typeof density!=='string' || !Object.hasOwn(densities,density) ||
+       ![width,height].every(x=>Number.isFinite(x)&&x>=0&&x<=4096))
+      throw new TypeError('stepper_centered_fill requires Stepper, bool, md/xs/sm/lg and finite dimensions in [0,4096]');
+    const value=[+vertical,densities[density],width,height];
+    if(this.owner){
+      if(!this.owner.supports_stepper_centered_fill())throw new Error(stepperCenteredFillUnavailable);
+      native.setStepperCenteredFill(this.owner.handle,this[NODE],...value);
+    }
+    this.stepperWrappedFillValue=null;this.stepperCenteredFillValue=value;this.stepperFillValue=null;this.stepperVisualValue=null;return this;
   }
   image_rgba(pixels,width,height,stride=width*4) {
     if(![53,20].includes(this.kind) || !(pixels instanceof Uint8Array) || ![width,height].every(x=>Number.isInteger(x)&&x>0&&x<=2048) ||
@@ -1104,6 +1118,7 @@ class App {
       if(node.visualValue)native.setVisualSize(this.handle,node[NODE],...node.visualValue);
       if(node.statusValue!==null)native.setStepStatus(this.handle,node[NODE],node.statusValue);
       if(node.stepperWrappedFillValue)native.setStepperWrappedFill(this.handle,node[NODE],...node.stepperWrappedFillValue);
+      if(node.stepperCenteredFillValue)native.setStepperCenteredFill(this.handle,node[NODE],...node.stepperCenteredFillValue);
       if(node.stepperFillValue)native.setStepperFill(this.handle,node[NODE],...node.stepperFillValue);
       if(node.stepperVisualValue)native.setStepperVisual(this.handle,node[NODE],...node.stepperVisualValue);
       if(node.designSizeValue!==undefined)native.setDesignSize(this.handle,node[NODE],node.designSizeValue);
@@ -1288,6 +1303,10 @@ class App {
   supports_stepper_wrapped_fill() {
     this._alive();
     return typeof native.supportsStepperWrappedFill==='function' && typeof native.setStepperWrappedFill==='function' && native.supportsStepperWrappedFill();
+  }
+  supports_stepper_centered_fill() {
+    this._alive();
+    return typeof native.supportsStepperCenteredFill==='function' && typeof native.setStepperCenteredFill==='function' && native.supportsStepperCenteredFill();
   }
   supports_carousel_axis() {
     this._alive();

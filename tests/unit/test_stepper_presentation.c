@@ -583,7 +583,100 @@ static void wrapped_geometry_and_requests(void) {
     assert(!semantics && f.calls == 2);
     cui_destroy(f.ui);
 }
+static bool near(float a, float b) {
+    return fabsf(a - b) < .1f;
+}
+static size_t centered_connectors(fixture *f, cui_draw_list draw, size_t selected) {
+    size_t count = 0;
+    for (size_t i = 0; i < draw.count; ++i) {
+        const cui_draw_command *cmd = &draw.commands[i];
+        cui_rect line = cmd->bounds;
+        if (cmd->type != CUI_DRAW_RECT || cmd->radius ||
+            (f->visual.vertical ? line.w : line.h) != 2)
+            continue;
+        assert(count < 2);
+        cui_rect a = cui_bounds(f->ui, cui_numeric_part_id(10, 1000 + (unsigned)count));
+        cui_rect b = cui_bounds(f->ui, cui_numeric_part_id(10, 1001 + (unsigned)count));
+        assert(same(cmd->color, count < selected ? f->theme.primary : f->theme.border));
+        if (f->visual.vertical) {
+            assert(near(line.x + line.w / 2, a.x + a.w / 2));
+            assert(near(line.x + line.w / 2, b.x + b.w / 2));
+            assert(near(line.y, a.y + a.h + 4));
+            assert(near(line.y + line.h, b.y - 4));
+        } else {
+            assert(near(line.y + line.h / 2, a.y + a.h / 2));
+            assert(near(line.y + line.h / 2, b.y + b.h / 2));
+            assert(near(line.x, a.x + a.w + 4));
+            assert(near(line.x + line.w, b.x - 4));
+            cui_rect lane = cui_bounds(f->ui, cui_numeric_part_id(10, 2000 + (unsigned)count));
+            assert(line.x < lane.x + lane.w && line.x + line.w > lane.x + lane.w);
+        }
+        ++count;
+    }
+    return count;
+}
+static void centered_geometry(void) {
+    fixture f = create();
+    f.presentation.layout = CUI_STEPPER_LAYOUT_CENTERED_FILL;
+    f.selected = 1;
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        cui_draw_list draw = wrapped_frame(&f, pass ? 208 : 720);
+        cui_rect first = cui_bounds(f.ui, cui_numeric_part_id(10, 2000));
+        assert((wrapped_title_lines(draw, first) > 1) == (pass == 1));
+        assert(centered_connectors(&f, draw, 1) == 2);
+        for (unsigned i = 0; i < 3; ++i) {
+            cui_rect lane = cui_bounds(f.ui, cui_numeric_part_id(10, 2000 + i));
+            cui_rect indicator_bounds = cui_bounds(f.ui, cui_numeric_part_id(10, 1000 + i));
+            assert(near(lane.x + lane.w / 2, indicator_bounds.x + indicator_bounds.w / 2));
+        }
+        cui_str title = wrapped_steps[0].title;
+        for (size_t i = 0; i < draw.count; ++i) {
+            const cui_draw_command *cmd = &draw.commands[i];
+            if (cmd->type == CUI_DRAW_TEXT && cmd->text_source.paragraph.length == title.length &&
+                !memcmp(cmd->text_source.paragraph.data, title.data, title.length))
+                assert(near(cmd->bounds.x + cmd->bounds.w / 2, first.x + first.w / 2));
+        }
+    }
+
+    size_t semantics;
+    (void)cui_semantics(f.ui, &semantics);
+    assert(semantics == 4);
+    cui_rect last = cui_bounds(f.ui, cui_numeric_part_id(10, 1002));
+    pointer(&f, CUI_EVENT_POINTER_DOWN, last.x + last.w / 2, last.y + last.h / 2);
+    pointer(&f, CUI_EVENT_POINTER_UP, last.x + last.w / 2, last.y + last.h / 2);
+    cui_draw_list draw = wrapped_frame(&f, 208);
+    assert(f.calls == 1 && f.selected == 2);
+    assert(centered_connectors(&f, draw, 1) == 2);
+    draw = wrapped_frame(&f, 208);
+    assert(centered_connectors(&f, draw, 2) == 2);
+
+    draw = frame(&f, 33);
+    assert(centered_connectors(&f, draw, 2) == 0);
+    f.visual.vertical = true;
+    for (unsigned pass = 0; pass < 3; ++pass) {
+        f.presentation.height = pass == 2 ? 399 : 0;
+        draw = wrapped_frame(&f, pass ? 144 : 415);
+        cui_rect lane = cui_bounds(f.ui, cui_numeric_part_id(10, 2000));
+        assert((wrapped_title_lines(draw, lane) > 1) == (pass > 0));
+        assert(centered_connectors(&f, draw, 2) == 2);
+        for (unsigned i = 0; i < 3; ++i) {
+            cui_rect trigger = cui_bounds(f.ui, cui_numeric_part_id(10, i + 1));
+            cui_rect marker = cui_bounds(f.ui, cui_numeric_part_id(10, 1000 + i));
+            assert(near(marker.y + marker.h / 2, trigger.y + trigger.h / 2));
+        }
+    }
+    cui_focus(f.ui, cui_numeric_part_id(10, 2));
+    assert(cui_queue_event(f.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    wrapped_frame(&f, 144);
+    assert(f.calls == 2 && f.selected == 1);
+
+    assert(cui_queue_accessibility_action(f.ui, cui_numeric_part_id(10, 1), CUI_ACCESSIBILITY_ACTIVATE));
+    wrapped_frame(&f, 144);
+    assert(f.calls == 3 && f.selected == 0);
+    cui_destroy(f.ui);
+}
 int main(void) {
+    centered_geometry();
     wrapped_geometry_and_requests();
     unequal_height_alignment();
     multiple_requests();

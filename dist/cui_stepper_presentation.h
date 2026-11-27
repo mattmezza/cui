@@ -9,7 +9,8 @@ extern "C" {
 typedef enum {
     CUI_STEPPER_LAYOUT_CONTENT = 0,
     CUI_STEPPER_LAYOUT_FILL,
-    CUI_STEPPER_LAYOUT_WRAPPED_FILL
+    CUI_STEPPER_LAYOUT_WRAPPED_FILL,
+    CUI_STEPPER_LAYOUT_CENTERED_FILL
 } cui_stepper_layout;
 typedef struct {
     cui_color normal, hover, pressed, foreground;
@@ -27,6 +28,10 @@ typedef struct {
  * the same extent rules. It gives horizontal steps equal lanes, makes vertical
  * labels use the width beside their indicator, and wraps valid UTF-8 labels
  * and descriptions at the current lane width. Use height0 to fit wrapped rows.
+ * CENTERED_FILL uses the same wrapping and extent rules. It centers horizontal
+ * markers and text in equal lanes and centers vertical markers beside the text.
+ * Decorative connectors cross lane boundaries between actual marker edges,
+ * with gaps. They collapse at narrow widths and have no input targets.
  * Invalid options fail before Base registration/reduction; one Base reducer is used.
  * Result.valid is argument preflight, not layout/resource-capacity proof.
  * Unchecked normal/hover/foreground use theme.secondary/secondary_hover/
@@ -40,7 +45,7 @@ typedef struct {
  * drag/keyboard equivalence is not claimed. Decoration adds no input targets.
  * Request timing/captured selection and all bitmap lifetimes match visual API:
  * configuration borrowed through return, bitmap bytes through render completion.
- * No centered geometry, arbitrary children, exact typography or bindings claim. */
+ * Arbitrary children and exact source typography are outside this API. */
 cui_stepper_navigation_result cui_stepper_present(cui_context *, cui_id, const cui_theme *,
                                                   const cui_step *, size_t count, size_t selected,
                                                   cui_stepper_visual_options,
@@ -60,6 +65,14 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *, cui_id, const c
 #include "cui_stepper_navigation.h"
 /* src/components/cui_stepper_presentation.c */
 /* SPDX-License-Identifier: MIT */
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PREPAINT_BOUNDS_INTERNAL_H
+#define CUI_PREPAINT_BOUNDS_INTERNAL_H
+
+/* Current, unclipped named box bounds within the paint owner's layer. */
+bool cui_core_prepaint_bounds(cui_prepaint_writer *, cui_id, cui_rect *);
+#endif
 
 #include <math.h>
 #include <stdio.h>
@@ -85,12 +98,60 @@ static bool cui_stepper_indicator_prepaint(const cui_prepaint_info *info, const 
     return cui_prepaint_emit(writer, &c, false);
 }
 
+typedef struct {
+    size_t count, selected;
+    float gap, thickness;
+    cui_color passed, pending;
+    bool vertical;
+} cui_stepper_connector_paint;
+
+static bool cui_stepper_connector_prepaint(const cui_prepaint_info *info, const void *data,
+                                          cui_prepaint_writer *writer) {
+    const cui_stepper_connector_paint *p = data;
+    cui_rect previous = {0};
+    bool have_previous = false;
+    for (size_t i = 0; i < p->count; ++i) {
+        cui_rect current;
+        if (!cui_core_prepaint_bounds(writer, cui_numeric_part_id(info->owner, 1000 + (unsigned)i),
+                                      &current)) {
+            have_previous = false;
+            continue;
+        }
+        if (have_previous) {
+            cui_rect connector;
+            float edge, next;
+            if (p->vertical) {
+                edge = previous.y + previous.h + p->gap;
+                next = current.y - p->gap;
+                connector = (cui_rect){previous.x + (previous.w - p->thickness) / 2,
+                                       edge, p->thickness, next - edge};
+            } else {
+                edge = previous.x + previous.w + p->gap;
+                next = current.x - p->gap;
+                connector = (cui_rect){edge, previous.y + (previous.h - p->thickness) / 2,
+                                       next - edge, p->thickness};
+            }
+            if (next > edge &&
+                !cui_prepaint_emit(writer,
+                                   &(cui_draw_command){.type = CUI_DRAW_RECT,
+                                                       .bounds = connector,
+                                                       .color = i <= p->selected ? p->passed
+                                                                                : p->pending},
+                                   false))
+                return false;
+        }
+        previous = current;
+        have_previous = true;
+    }
+    return true;
+}
+
 static void cui_stepper_present_text(cui_context *ui, cui_str text, float font, cui_color color,
-                                     bool wrapped) {
+                                     bool wrapped, cui_text_align align) {
     if (wrapped) {
         if (text.length)
             (void)cui_text_paragraph_colored_aligned(ui, text, font, color, 0, (cui_text_style){0},
-                                                     true, NULL, 0, CUI_TEXT_ALIGN_LEFT);
+                                                     true, NULL, 0, align);
     } else {
         cui_text(ui, text, font, color);
     }
@@ -101,7 +162,7 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
                                                   size_t selected, cui_stepper_visual_options o,
                                                   cui_stepper_presentation_options p,
                                                   cui_stepper_navigation_handler handler) {
-    if (p.layout < CUI_STEPPER_LAYOUT_CONTENT || p.layout > CUI_STEPPER_LAYOUT_WRAPPED_FILL ||
+    if (p.layout < CUI_STEPPER_LAYOUT_CONTENT || p.layout > CUI_STEPPER_LAYOUT_CENTERED_FILL ||
         !isfinite(p.width) || !isfinite(p.height) || p.width < 0 || p.height < 0 ||
         (p.layout == CUI_STEPPER_LAYOUT_CONTENT && (p.width != 0 || p.height != 0)))
         return (cui_stepper_navigation_result){0};
@@ -116,7 +177,10 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
     for (size_t i = 0; o.icons && i < count; ++i)
         if (o.icons[i].present && !cui_bitmap_valid(o.icons[i].bitmap))
             return (cui_stepper_navigation_result){0};
-    bool wrapped = p.layout == CUI_STEPPER_LAYOUT_WRAPPED_FILL;
+    bool centered = p.layout == CUI_STEPPER_LAYOUT_CENTERED_FILL;
+    bool wrapped = centered || p.layout == CUI_STEPPER_LAYOUT_WRAPPED_FILL;
+    cui_text_align text_align = centered && !o.vertical ? CUI_TEXT_ALIGN_CENTER
+                                                        : CUI_TEXT_ALIGN_LEFT;
     if (wrapped) {
         if ((!steps && count) || !isfinite(t->font_size) || t->font_size <= 0)
             return (cui_stepper_navigation_result){0};
@@ -159,6 +223,20 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
                   .width = fill ? (p.width > 0 ? p.width : -1) : 0,
                   .height = fill ? p.height : 0,
                   .align_y = fill && !wrapped && !o.vertical ? CUI_ALIGN_CENTER : CUI_ALIGN_START});
+    if (centered && count > 1) {
+        cui_stepper_connector_paint paint = {.count = count,
+                                             .selected = selected,
+                                             .gap = 4 * scale,
+                                             .thickness = thickness,
+                                             .passed = t->primary,
+                                             .pending = t->border,
+                                             .vertical = o.vertical};
+        (void)cui_set_prepaint(ui, (cui_prepaint_options){
+                                     .callback = cui_stepper_connector_prepaint,
+                                     .payload = &paint,
+                                     .payload_bytes = sizeof paint,
+                                     .command_budget = count + 1});
+    }
     for (size_t i = 0; i < count; ++i) {
         bool checked = i <= selected;
         cui_color foreground = checked ? t->on_primary : colors.foreground;
@@ -172,7 +250,16 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
                     lane.width = 1.0f / (float)count;
                     lane.width_percent = true;
                     lane.custom_padding = true;
-                    lane.padding_edges.right = has_next ? gap : 0;
+                    if (centered && count > 1) {
+                        lane.padding_edges.left = gap / 2;
+                        lane.padding_edges.right = gap / 2;
+                    } else
+                        lane.padding_edges.right = has_next ? gap : 0;
+                } else if (centered && count > 1) {
+                    lane.height = p.height > 0 ? -1 : 0;
+                    lane.custom_padding = true;
+                    lane.padding_edges.top = 8 * scale;
+                    lane.padding_edges.bottom = 8 * scale;
                 } else if (has_next) {
                     lane.custom_padding = true;
                     lane.padding_edges.bottom = 16 * scale;
@@ -180,7 +267,7 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
             }
             cui_begin_box(ui, cui_numeric_part_id(id, 2000 + (unsigned)i), lane);
         }
-        if (fill && has_next) {
+        if (fill && !centered && has_next) {
             cui_set_underlay_ex(ui,
                                 (cui_underlay_layout){
                                     .bounds = o.vertical ? (cui_rect){side / 2, side + 4 * scale,
@@ -193,6 +280,11 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
         }
         cui_begin_box(ui, trigger,
                       (cui_box){.width = wrapped ? -1 : 0,
+                                .height = centered && o.vertical && p.height > 0 ? -1 : 0,
+                                .align_x = centered && !o.vertical ? CUI_ALIGN_CENTER
+                                                                  : CUI_ALIGN_START,
+                                .align_y = centered && o.vertical ? CUI_ALIGN_CENTER
+                                                                 : CUI_ALIGN_START,
                                 .row = o.vertical,
                                 .gap = o.vertical ? gap * 2 : gap});
         float radius = t->radius == 0 ? 0 : side / 2;
@@ -235,11 +327,11 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
         cui_end_box(ui);
         cui_begin_box(ui, 0, (cui_box){.width = wrapped ? -1 : 0, .gap = gap});
         cui_stepper_present_text(ui, steps[i].title, font,
-                                 o.disabled || steps[i].disabled ? t->muted : t->text, wrapped);
+                                 o.disabled || steps[i].disabled ? t->muted : t->text, wrapped, text_align);
         if (steps[i].description.length)
-            cui_stepper_present_text(ui, steps[i].description, font * .8f, t->muted, wrapped);
+            cui_stepper_present_text(ui, steps[i].description, font * .8f, t->muted, wrapped, text_align);
         if (steps[i].status == CUI_STEP_ERROR)
-            cui_stepper_present_text(ui, cui_string("Error"), font * .8f, t->danger, wrapped);
+            cui_stepper_present_text(ui, cui_string("Error"), font * .8f, t->danger, wrapped, text_align);
         cui_end_box(ui);
         cui_end_box(ui);
         if (fill)

@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 export function stepperUsage(mode = 2, orientation = 2, density = 0, icons = 0, size = 0, disabled = false) {
  const visual = mode !== 0;
- const wrapped = mode === 3;
+ const wrapped = mode === 3 || mode === 4;
+ const layout = mode === 4 ? 'CENTERED_FILL' : wrapped ? 'WRAPPED_FILL' : 'FILL';
  const fill = mode === 2 || wrapped;
  const automatic = orientation === 2;
  const sizeToken = ['INHERIT','XS','SM','BASE','MD','LG','XL','2XL','3XL','4XL','5XL','6XL','7XL','8XL','9XL'][size];
@@ -53,7 +54,7 @@ ${visual?`    const cui_stepper_visual_options options = {
     };
 ${fill?`    /* ${wrapped?'The containing box supplies the width; rows fit their wrapped labels.':'Give the containing box a width. A positive vertical extent spaces the steps.'} */
     const cui_stepper_presentation_options presentation = {
-        .layout = CUI_STEPPER_LAYOUT_${wrapped?'WRAPPED_FILL':'FILL'},
+        .layout = CUI_STEPPER_LAYOUT_${layout},
 ${wrapped?'':'        .height = vertical ? vertical_extent : 0,\n'}        .custom_palette = true,
         .palette = {
             .normal = theme->secondary,

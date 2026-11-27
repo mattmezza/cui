@@ -177,3 +177,91 @@ impl<'a> Builder<'a> {
         Ok(self)
     }
 }
+
+#[cfg(cui_bridge_static)]
+fn centered_setter() -> Option<Set> {
+    extern "C" {
+        fn cui_bridge_set_stepper_centered_fill_v1(
+            a: *mut c_void,
+            n: RawNode,
+            vertical: u32,
+            density: u32,
+            width: f32,
+            height: f32,
+        ) -> u32;
+    }
+    Some(cui_bridge_set_stepper_centered_fill_v1)
+}
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn centered_setter() -> Option<Set> {
+    unsafe {
+        let symbol =
+            super::notification_symbol_v1(b"cui_bridge_set_stepper_centered_fill_v1\0".as_ptr().cast());
+        if symbol.is_null() {
+            None
+        } else {
+            Some(std::mem::transmute::<*mut c_void, Set>(symbol))
+        }
+    }
+}
+#[cfg(all(not(cui_bridge_static), not(any(unix, windows))))]
+fn centered_setter() -> Option<Set> {
+    None
+}
+
+impl App {
+    /// Independently probes centered Fill without affecting ordinary Fill.
+    pub fn supports_stepper_centered_fill(&self) -> bool {
+        centered_setter().is_some()
+    }
+    /// Centers horizontal labels and vertically centers markers beside vertical labels.
+    /// Zero width grows with the parent; zero height fits centered rows.
+    /// A subsequent `stepper_visual` call restores ordinary presentation.
+    /// Returns `Error::STEPPER_CENTERED_FILL_UNAVAILABLE` on older providers.
+    pub fn stepper_centered_fill(
+        &mut self,
+        node: Node,
+        vertical: bool,
+        density: StepperDensity,
+        width: f32,
+        height: f32,
+    ) -> Result<&mut Self> {
+        let node = self.valid(node)?;
+        if !width.is_finite()
+            || !height.is_finite()
+            || !(0. ..=4096.).contains(&width)
+            || !(0. ..=4096.).contains(&height)
+        {
+            return Err(Error(3));
+        }
+        let set = centered_setter().ok_or(Error::STEPPER_CENTERED_FILL_UNAVAILABLE)?;
+        check(unsafe {
+            set(
+                self.raw,
+                node,
+                vertical as u32,
+                density as u32,
+                width,
+                height,
+            )
+        })?;
+        Ok(self)
+    }
+}
+impl Error {
+    /// Selected bridge provider does not export centered filled Stepper presentation.
+    pub const STEPPER_CENTERED_FILL_UNAVAILABLE: Self = Self(0x535443);
+}
+impl<'a> Builder<'a> {
+    pub fn stepper_centered_fill(
+        self,
+        vertical: bool,
+        density: StepperDensity,
+        width: f32,
+        height: f32,
+    ) -> Result<Self> {
+        self.app
+            .stepper_centered_fill(self.node, vertical, density, width, height)?;
+        Ok(self)
+    }
+}

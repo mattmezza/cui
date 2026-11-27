@@ -10,7 +10,9 @@ fn main() -> Result<()> {
     app.image_rgba(first, &[255, 255, 255, 255], 1, 1, 4)?;
     app.stepper_visual(steps, true, false, StepperDensity::Sm)?
         .design_size(steps, DesignSize::Lg)?;
-    if app.supports_stepper_wrapped_fill() {
+    if app.supports_stepper_centered_fill() {
+        app.stepper_centered_fill(steps, false, StepperDensity::Sm, 360., 0.)?;
+    } else if app.supports_stepper_wrapped_fill() {
         app.stepper_wrapped_fill(steps, false, StepperDensity::Sm, 360., 0.)?;
     } else if app.supports_stepper_fill() {
         app.stepper_fill(steps, false, StepperDensity::Sm, 0., 0.)?;

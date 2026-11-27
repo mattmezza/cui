@@ -46,6 +46,8 @@ export class App {
   /** Whether this app's native bridge offers retained Stepper Fill. */
   supports_stepper_fill(): boolean;
   supports_stepper_wrapped_fill(): boolean;
+  /** Whether this app's native bridge offers retained Stepper Centered Fill. */
+  supports_stepper_centered_fill(): boolean;
   /** Whether this app's native bridge supports fractional Carousel slides. */
   supports_carousel_axis(): boolean;
   supports_carousel_looping(): boolean;
@@ -211,6 +213,8 @@ export interface Stepper extends Group, DesignSized {
   stepper_fill(vertical?: boolean, density?: "md" | "xs" | "sm" | "lg", width?: number, height?: number): this;
   /** Wrap Title/description in equal horizontal lanes or beside vertical indicators; zero width grows, zero height is intrinsic. */
   stepper_wrapped_fill(vertical?: boolean, density?: "md" | "xs" | "sm" | "lg", width?: number, height?: number): this;
+  /** Center Title/description beneath horizontal indicators or beside vertical indicators; zero width grows, zero height is intrinsic. */
+  stepper_centered_fill(vertical?: boolean, density?: "md" | "xs" | "sm" | "lg", width?: number, height?: number): this;
   stepper_visual(enabled?: boolean, vertical?: boolean, density?: "md" | "xs" | "sm" | "lg"): this;
   numeric_part_bounds(part: number): Bounds;
 }

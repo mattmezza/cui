@@ -1520,6 +1520,14 @@ const void *cui_core_ordered_retained(const cui_context *, cui_id owner, cui_id 
 #endif
 
 /* SPDX-License-Identifier: MIT */
+#ifndef CUI_PREPAINT_BOUNDS_INTERNAL_H
+#define CUI_PREPAINT_BOUNDS_INTERNAL_H
+
+/* Current, unclipped named box bounds within the paint owner's layer. */
+bool cui_core_prepaint_bounds(cui_prepaint_writer *, cui_id, cui_rect *);
+#endif
+
+/* SPDX-License-Identifier: MIT */
 #ifndef CUI_SCROLL_FOCUS_INTERNAL_H
 #define CUI_SCROLL_FOCUS_INTERNAL_H
 
@@ -12855,6 +12863,23 @@ static bool cui_core_writer(cui_prepaint_writer *writer) {
     return writer && writer->ui && writer->ui->prepainting &&
            writer->ui->prepaint_writer == writer &&
            writer->registration < writer->ui->prepaint_count;
+}
+bool cui_core_prepaint_bounds(cui_prepaint_writer *writer, cui_id id, cui_rect *out) {
+    if (!cui_core_writer(writer) || !id || !out)
+        return false;
+    cui_context *ui = writer->ui;
+    Clay_LayoutElementHashMapItem *item = Clay__GetHashMapItem(cui_core_folded(id));
+    if (item == &Clay_LayoutElementHashMapItem_DEFAULT || !item->layoutElement)
+        return false;
+    cui_core_box_node *node = item->layoutElement->config.userData;
+    if (!node || (void *)node == ui || node->id != id ||
+        node->layer != ui->nodes[ui->prepaints[writer->registration].node].layer)
+        return false;
+    const cui_core_geometry *geometry = &ui->geometry[node - ui->nodes];
+    if (!geometry->found)
+        return false;
+    *out = geometry->bounds;
+    return true;
 }
 static bool cui_core_prepaint_rect(cui_rect r) {
     return isfinite(r.x) && isfinite(r.y) && isfinite(r.w) && isfinite(r.h) && r.w >= 0 &&

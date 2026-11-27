@@ -8,7 +8,8 @@ extern "C" {
 typedef enum {
     CUI_STEPPER_LAYOUT_CONTENT = 0,
     CUI_STEPPER_LAYOUT_FILL,
-    CUI_STEPPER_LAYOUT_WRAPPED_FILL
+    CUI_STEPPER_LAYOUT_WRAPPED_FILL,
+    CUI_STEPPER_LAYOUT_CENTERED_FILL
 } cui_stepper_layout;
 typedef struct {
     cui_color normal, hover, pressed, foreground;
@@ -26,6 +27,10 @@ typedef struct {
  * the same extent rules. It gives horizontal steps equal lanes, makes vertical
  * labels use the width beside their indicator, and wraps valid UTF-8 labels
  * and descriptions at the current lane width. Use height0 to fit wrapped rows.
+ * CENTERED_FILL uses the same wrapping and extent rules. It centers horizontal
+ * markers and text in equal lanes and centers vertical markers beside the text.
+ * Decorative connectors cross lane boundaries between actual marker edges,
+ * with gaps. They collapse at narrow widths and have no input targets.
  * Invalid options fail before Base registration/reduction; one Base reducer is used.
  * Result.valid is argument preflight, not layout/resource-capacity proof.
  * Unchecked normal/hover/foreground use theme.secondary/secondary_hover/
@@ -39,7 +44,7 @@ typedef struct {
  * drag/keyboard equivalence is not claimed. Decoration adds no input targets.
  * Request timing/captured selection and all bitmap lifetimes match visual API:
  * configuration borrowed through return, bitmap bytes through render completion.
- * No centered geometry, arbitrary children, exact typography or bindings claim. */
+ * Arbitrary children and exact source typography are outside this API. */
 cui_stepper_navigation_result cui_stepper_present(cui_context *, cui_id, const cui_theme *,
                                                   const cui_step *, size_t count, size_t selected,
                                                   cui_stepper_visual_options,

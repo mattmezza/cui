@@ -3794,6 +3794,13 @@ cui_bridge_status cui_bridge_set_stepper_wrapped_fill_v1(cui_bridge_app *app,
     return bridge_set_stepper_fill(app, handle, vertical, density, width, height,
                                    BRIDGE_STEPPER_WRAPPED_FILL);
 }
+cui_bridge_status cui_bridge_set_stepper_centered_fill_v1(cui_bridge_app *app,
+                                                          cui_bridge_node handle, uint32_t vertical,
+                                                          uint32_t density, float width,
+                                                          float height) {
+    return bridge_set_stepper_fill(app, handle, vertical, density, width, height,
+                                   BRIDGE_STEPPER_CENTERED_FILL);
+}
 static cui_bridge_status bridge_copy_image_rgba(cui_bridge_node_record *node, const uint8_t *pixels,
                                                 uint32_t width, uint32_t height, uint32_t stride,
                                                 uint32_t byte_count) {
@@ -4906,10 +4913,13 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                 cui_stepper_navigation_handler handler = {bridge_stepper_requested, &request};
                 cui_stepper_navigation_result result;
                 if (node->stepper_layout >= BRIDGE_STEPPER_FILL) {
+                    cui_stepper_layout layout = CUI_STEPPER_LAYOUT_FILL;
+                    if (node->stepper_layout == BRIDGE_STEPPER_WRAPPED_FILL)
+                        layout = CUI_STEPPER_LAYOUT_WRAPPED_FILL;
+                    else if (node->stepper_layout == BRIDGE_STEPPER_CENTERED_FILL)
+                        layout = CUI_STEPPER_LAYOUT_CENTERED_FILL;
                     cui_stepper_presentation_options presentation = {
-                        .layout = node->stepper_layout == BRIDGE_STEPPER_WRAPPED_FILL
-                                      ? CUI_STEPPER_LAYOUT_WRAPPED_FILL
-                                      : CUI_STEPPER_LAYOUT_FILL,
+                        .layout = layout,
                         .width = node->visual_width,
                         .height = node->visual_height};
                     result = cui_stepper_present(app->ui, node->id, &app->theme, scratch->steps,

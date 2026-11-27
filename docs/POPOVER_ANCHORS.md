@@ -256,11 +256,46 @@ admitted. Arrow paint requires a compatible renderer.
 Placement uses the trigger's most recently completed layout. Showing or
 moving an anchor can require a follow-up frame. A hidden anchor can temporarily
 leave the panel logically open with no rendered bounds. The application can
-still close it explicitly. Retained options omit routed secondary-click
-opening, arbitrary part-styling refinements and transitions.
+still close it explicitly. Arbitrary part styling and transitions remain open.
 
-The following examples drive an account menu with a real trigger click and
-Escape. From a repo checkout with a current bridge, run:
+### Right-click in retained builders
+
+Enable the secondary trigger on an anchored Popover. The anchor must have
+an enabled interactive semantic in the current tree and match the routed
+secondary down from the last completed layout. Hidden triggers and triggers
+behind a modal are ignored. The allowed press toggles once per step. If two
+eligible Popovers share an anchor, the first in retained node-slot order handles
+it. Use one automatic Popover per trigger for predictable results.
+
+The bridge checks the complete tree, so the anchor can appear before or after
+the Popover. An accepted press schedules a redraw. On opening, the logical
+open flag becomes true at the end of that step and the next step paints the
+panel. A closing press requests the usual deferred close; the next step
+queues one `CLOSE` with the closed result and restores trigger focus. A close
+already being processed takes precedence. The automatic trigger does not
+queue a Button click. Keep the normal trigger callback for primary input,
+keyboard, accessibility activation and tap. Host context-menu policy is separate.
+Touch long press is outside this API.
+
+| Consumer | Option | Capability probe | Synthetic input |
+| --- | --- | --- | --- |
+| C bridge | `CUI_BRIDGE_POPOVER_SECONDARY_TRIGGER_V1` in the copied flags | `cui_bridge_queue_pointer_button_v1` present | `cui_bridge_queue_pointer_button_v1(app, phase, CUI_BRIDGE_POINTER_SECONDARY, x, y)` |
+| Python | `secondary_trigger=True` | `app.supports_popover_secondary_trigger()` | `app.queue_pointer(phase, x, y, button="secondary")` |
+| JavaScript / TypeScript | `secondary_trigger: true` | `app.supports_popover_secondary_trigger()` | `app.pointer(phase, x, y, 'secondary')` |
+| Go | `SecondaryTrigger: true` | `app.SupportsPopoverSecondaryTrigger()` | `app.QueuePointerButton(phase, cui.PointerSecondary, x, y)` |
+| Rust | `secondary_trigger: true` | `app.supports_popover_secondary_trigger()` | `app.pointer_button(phase, PointerButton::Secondary, x, y)` |
+
+SDL already maps the right mouse button to secondary input. The private
+Linux Xvfb test injects SDL right-button events into an initially hidden
+software-rendered window. For synthetic tests using the bridge entry point,
+send down and up at the trigger center, then run the input step and one
+more step for presentation. The legacy pointer methods still send primary
+input. Older providers can still use the account callback; probe before
+enabling the secondary option.
+
+The following account menu examples exercise right-click when supported and
+primary activation on older providers. Both paths close with Escape. From a
+repo checkout with a current bridge, run:
 
 ```sh
 CUI_BRIDGE_LIBRARY="$PWD/build/libcui_bridge.so" PYTHONPATH=bindings/python python bindings/python/examples/account_menu.py

@@ -5,6 +5,7 @@ export interface Bounds { x: number; y: number; width: number; height: number }
 export type Key = 'tab' | 'enter' | 'space' | 'escape' | 'left' | 'right' | 'up' | 'down';
 export type KeyPhase = 'down' | 'up';
 export type PointerPhase = 'move' | 'down' | 'up';
+export type PointerButton = 'primary' | 'secondary' | 'middle';
 export interface ClickEvent<T extends Node = Button> { node: T; frame: number }
 export interface Node { key(value: string): this; bounds(): Bounds; remove(): this }
 export interface Container extends Node { children(...items: (Node | Node[])[]): this; gap(value: number): this; gap_px(value: number): this; gap_units(value: number): this }
@@ -66,7 +67,9 @@ export class App {
   supports_radio_item_content(): boolean;
   /** Whether this app's native bridge can attach hints to retained radio options. */
   supports_radio_tooltip(): boolean;
-  pointer(phase: PointerPhase, x: number, y: number): this;
+  pointer(phase: 'move', x: number, y: number, button?: 'primary'): this;
+  pointer(phase: 'down' | 'up', x: number, y: number, button?: PointerButton): this;
+  pointer(phase: PointerPhase, x: number, y: number, button?: 'primary'): this;
   key(phase: KeyPhase, key: Key, modifiers?: number, repeat?: boolean): this;
   text_input(text: string): this;
   step(dt?: number): number;
@@ -176,7 +179,7 @@ export interface PopoverOptions {
   anchor?: 0|1|2|3|4|5|6|7;
   width?: number; height?: number; margin?: number; offset?: number; reference_rem?: number;
   arrow?: boolean; hide_close?: boolean; keep_pointer_focus?: boolean; focus_content?: boolean;
-  no_escape_dismiss?: boolean; no_outside_dismiss?: boolean;
+  no_escape_dismiss?: boolean; no_outside_dismiss?: boolean; secondary_trigger?: boolean;
 }
 export interface Popover extends Surface, Composite {anchor(node: Node): this; popover_options(options: PopoverOptions|null): this}
 export interface HoverSurface extends Label {on_change(callback: (event: ChangeEvent) => void): this; anchor(node: Node): this; is_open(): boolean; disabled(value?: boolean): this}
@@ -611,6 +614,7 @@ export interface App {
   supports_rating_options(): boolean;
   supports_dialog_composition(): boolean;
   supports_popover_options(): boolean;
+  supports_popover_secondary_trigger(): boolean;
   supports_pagination_options(): boolean;
 }
 

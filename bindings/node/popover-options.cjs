@@ -2,12 +2,13 @@
 'use strict';
 
 const CONFIG = Symbol('Popover options');
+const secondaryTrigger = 1 << 7;
 const booleanOptions = [
   'arrow', 'hide_close', 'keep_pointer_focus', 'focus_content',
   'no_escape_dismiss', 'no_outside_dismiss',
 ];
 const numberOptions = ['width', 'height', 'margin', 'offset', 'reference_rem'];
-const allowedOptions = new Set(['anchor', ...booleanOptions, ...numberOptions]);
+const allowedOptions = new Set(['anchor', 'secondary_trigger', ...booleanOptions, ...numberOptions]);
 
 module.exports = function (native, Node, handle) {
   function supports(app) {
@@ -15,12 +16,21 @@ module.exports = function (native, Node, handle) {
     return typeof native.popoverOptions === 'function' && native.popoverOptions(app.handle, 0);
   }
 
-  function requireSupport(app) {
+  function supportsSecondaryTrigger(app) {
+    app._alive();
+    return typeof native.pointerButton === 'function' && supports(app)
+      && native.popoverOptions(app.handle, 3);
+  }
+
+  function requireSupport(app, config) {
     if (!supports(app)) throw new Error('Popover options require a compatible bridge');
+    if (config && (config[1] & secondaryTrigger) && !supportsSecondaryTrigger(app)) {
+      throw new Error('Popover secondary_trigger requires a compatible bridge');
+    }
   }
 
   function apply(app, node, config) {
-    requireSupport(app);
+    requireSupport(app, config);
     if (config === null) {
       native.popoverOptions(app.handle, 2, node[handle]);
     } else {
@@ -48,6 +58,9 @@ module.exports = function (native, Node, handle) {
         if (typeof value !== 'boolean') throw new TypeError(`${name} must be boolean`);
         if (value) flags |= 1 << bit;
       }
+      const { secondary_trigger = false } = options;
+      if (typeof secondary_trigger !== 'boolean') throw new TypeError('secondary_trigger must be boolean');
+      if (secondary_trigger) flags |= secondaryTrigger;
       const dimensions = numberOptions.map(name => {
         const value = options[name] === undefined ? 0 : options[name];
         const lower = name === 'offset' ? -4096 : 0;
@@ -65,7 +78,7 @@ module.exports = function (native, Node, handle) {
   };
 
   function preflight(app, node) {
-    if (node[CONFIG]) requireSupport(app);
+    if (node[CONFIG]) requireSupport(app, node[CONFIG]);
     for (const child of node.childrenValue) preflight(app, child);
   }
 
@@ -73,5 +86,5 @@ module.exports = function (native, Node, handle) {
     if (node[CONFIG]) apply(app, node, node[CONFIG]);
   }
 
-  return { supports, preflight, mount };
+  return { supports, supportsSecondaryTrigger, preflight, mount };
 };

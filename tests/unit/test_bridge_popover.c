@@ -260,8 +260,120 @@ static void test_hidden_anchor(void) {
     cui_bridge_destroy(app);
 }
 
+static void queue_button_at(cui_bridge_app *app, cui_bridge_rect rect,
+                            cui_bridge_pointer_button button) {
+    float x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+    assert(cui_bridge_queue_pointer_button_v1(app, CUI_BRIDGE_POINTER_DOWN, button, x, y) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer_button_v1(app, CUI_BRIDGE_POINTER_UP, button, x, y) ==
+           CUI_BRIDGE_OK);
+}
+
+static void test_secondary_trigger(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .width = 640,
+                                  .height = 480};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = make_node(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root");
+    cui_bridge_node popup = make_node(app, root, CUI_BRIDGE_POPOVER, "Account actions");
+    cui_bridge_node profile = make_node(app, popup, CUI_BRIDGE_BUTTON, "Profile");
+    cui_bridge_node collapse = make_node(app, root, CUI_BRIDGE_COLLAPSIBLE, "Workspace");
+    cui_bridge_node trigger = make_node(app, collapse, CUI_BRIDGE_BUTTON, "Account");
+    cui_bridge_node another = make_node(app, root, CUI_BRIDGE_POPOVER, "Other account actions");
+    cui_bridge_node blocker = make_node(app, root, CUI_BRIDGE_DIALOG, "Modal");
+    cui_bridge_popover_config_v1 config = {
+        .width = 180,
+        .height = 135,
+        .flags = CUI_BRIDGE_POPOVER_FOCUS_CONTENT_V1,
+    };
+    assert(cui_bridge_set_anchor(app, popup, trigger) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_anchor(app, another, trigger) == CUI_BRIDGE_OK);
+    assert(cui_bridge_popover_configure_v1(app, popup, sizeof config, &config) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_open(app, collapse, 1) == CUI_BRIDGE_OK);
+    step(app);
+    cui_bridge_rect target = bounds(app, trigger);
+    queue_button_at(app, target, CUI_BRIDGE_POINTER_SECONDARY);
+    step(app);
+    assert(!is_open(app, popup));
+    assert(!take_event(app, trigger, CUI_BRIDGE_EVENT_CLICK, 0));
+
+    config.flags |= CUI_BRIDGE_POPOVER_SECONDARY_TRIGGER_V1;
+    assert(cui_bridge_popover_configure_v1(app, popup, sizeof config, &config) == CUI_BRIDGE_OK);
+    assert(cui_bridge_popover_configure_v1(app, another, sizeof config, &config) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer_button_v1(app, CUI_BRIDGE_POINTER_DOWN,
+                                              (cui_bridge_pointer_button)3, 8,
+                                              8) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_queue_pointer_button_v1(app, CUI_BRIDGE_POINTER_MOVE,
+                                              CUI_BRIDGE_POINTER_SECONDARY, 8,
+                                              8) == CUI_BRIDGE_INVALID_ARGUMENT);
+    queue_button_at(app, target, CUI_BRIDGE_POINTER_MIDDLE);
+    step(app);
+    assert(!is_open(app, popup));
+    click(app, trigger);
+    assert(!is_open(app, popup) && take_event(app, trigger, CUI_BRIDGE_EVENT_CLICK, 0));
+    key(app, CUI_BRIDGE_KEY_ENTER);
+    assert(!is_open(app, popup) && take_event(app, trigger, CUI_BRIDGE_EVENT_CLICK, 0));
+
+    /* Disabling or omitting the current trigger rejects a press already
+     * routed to its last completed snapshot. */
+    queue_button_at(app, target, CUI_BRIDGE_POINTER_SECONDARY);
+    assert(cui_bridge_set_disabled(app, trigger, 1) == CUI_BRIDGE_OK);
+    step(app);
+    assert(!is_open(app, popup) && !is_open(app, another));
+    assert(cui_bridge_set_disabled(app, trigger, 0) == CUI_BRIDGE_OK);
+    step(app);
+    queue_button_at(app, target, CUI_BRIDGE_POINTER_SECONDARY);
+    assert(cui_bridge_set_open(app, collapse, 0) == CUI_BRIDGE_OK);
+    step(app);
+    assert(!is_open(app, popup) && !is_open(app, another));
+    assert(cui_bridge_set_open(app, collapse, 1) == CUI_BRIDGE_OK);
+    step(app);
+    target = bounds(app, trigger);
+
+    /* A modal opened since the last snapshot blocks the outside trigger
+     * even though it submits later than the trigger and both Popovers. */
+    queue_button_at(app, target, CUI_BRIDGE_POINTER_SECONDARY);
+    assert(cui_bridge_set_open(app, blocker, 1) == CUI_BRIDGE_OK);
+    step(app);
+    assert(!is_open(app, popup) && !is_open(app, another));
+    assert(cui_bridge_set_open(app, blocker, 0) == CUI_BRIDGE_OK);
+    step(app);
+    assert(take_event(app, blocker, CUI_BRIDGE_EVENT_CLOSE, CUI_SURFACE_CLOSED));
+
+    queue_button_at(app, target, CUI_BRIDGE_POINTER_SECONDARY);
+    queue_button_at(app, target, CUI_BRIDGE_POINTER_SECONDARY);
+    step(app);
+    assert(is_open(app, popup) && !is_open(app, another));
+    assert(cui_needs_redraw(app->ui));
+    cui_bridge_rect unavailable;
+    assert(cui_bridge_node_bounds(app, popup, &unavailable) == CUI_BRIDGE_INVALID_STATE);
+    assert(!take_event(app, trigger, CUI_BRIDGE_EVENT_CLICK, 0));
+    step(app);
+    assert(bounds(app, popup).width == config.width);
+    expect_link(app, trigger, app->nodes[popup.slot].surface_state.overlay.id);
+    assert(cui_focused(app->ui) == app->nodes[profile.slot].id);
+
+    target = bounds(app, trigger);
+    queue_button_at(app, target, CUI_BRIDGE_POINTER_SECONDARY);
+    queue_button_at(app, target, CUI_BRIDGE_POINTER_SECONDARY);
+    step(app);
+    assert(is_open(app, popup) && !take_event(app, popup, CUI_BRIDGE_EVENT_CLOSE, 0));
+    step(app);
+    assert(!is_open(app, popup) && !is_open(app, another));
+    assert(take_event(app, popup, CUI_BRIDGE_EVENT_CLOSE, CUI_SURFACE_CLOSED));
+    assert(cui_focused(app->ui) == app->nodes[trigger.slot].id);
+    expect_link(app, trigger, 0);
+    step(app);
+    assert(!take_event(app, popup, CUI_BRIDGE_EVENT_CLOSE, 0));
+    cui_bridge_destroy(app);
+}
+
 int main(void) {
     test_options();
+    test_secondary_trigger();
     test_hidden_anchor();
     test_remove_open_popover();
     return 0;

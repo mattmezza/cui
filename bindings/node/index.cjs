@@ -1161,11 +1161,22 @@ class App {
     if (node === this.root) this.root = null;
     if (node.parent) node.parent.childrenValue = node.parent.childrenValue.filter(child => child !== node);
   }
-  pointer(phase, x, y) {
+  pointer(phase, x, y, button = 'primary') {
     this._alive();
     const phases = {move: 0, down: 1, up: 2};
+    const buttons = {primary: 0, secondary: 1, middle: 2};
     if (!Object.hasOwn(phases, phase)) throw new TypeError('phase must be move, down, or up');
-    native.pointer(this.handle, phases[phase], x, y); return this;
+    if (!Object.hasOwn(buttons, button) || (phase === 'move' && button !== 'primary')) {
+      throw new TypeError('use a primary, secondary or middle button for down/up');
+    }
+    if (button === 'primary') native.pointer(this.handle, phases[phase], x, y);
+    else {
+      if (typeof native.pointerButton !== 'function') {
+        throw new Error('Non-primary pointer input requires a compatible bridge');
+      }
+      native.pointerButton(this.handle, phases[phase], buttons[button], x, y);
+    }
+    return this;
   }
   scroll(x,y,dx,dy) {this._alive();native.scroll(this.handle,x,y,dx,dy);return this;}
   text_input(text) { this._alive(); native.textInput(this.handle,text); return this; }
@@ -1408,6 +1419,7 @@ class App {
   supports_rating_options() { return ratingOptions.supports(this); }
   supports_dialog_composition() { return dialogs.supports(this); }
   supports_popover_options() { return popoverOptions.supports(this); }
+  supports_popover_secondary_trigger() { return popoverOptions.supportsSecondaryTrigger(this); }
   supports_pagination_options() { return paginationOptions.supports(this); }
   supports_spinner_icon_resource() { return spinners.supportsResource(this); }
   supports_spinner_presentation() { return spinners.supports(this); }

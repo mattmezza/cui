@@ -5,7 +5,19 @@ import (
 	"math"
 )
 
-var ErrPopoverOptionsUnavailable = errors.New("Popover options unavailable")
+var (
+	ErrPopoverOptionsUnavailable          = errors.New("Popover options unavailable")
+	ErrPopoverSecondaryTriggerUnavailable = errors.New("Popover secondary trigger unavailable")
+	ErrPointerButtonUnavailable           = errors.New("non-primary pointer input unavailable")
+)
+
+type PointerButton uint32
+
+const (
+	PointerPrimary PointerButton = iota
+	PointerSecondary
+	PointerMiddle
+)
 
 type PopoverAnchor uint32
 
@@ -27,6 +39,7 @@ type PopoverOptions struct {
 	Width, Height, Margin, Offset, ReferenceRem      float32
 	Arrow, HideClose, KeepPointerFocus, FocusContent bool
 	NoEscapeDismiss, NoOutsideDismiss, CustomOffset  bool
+	SecondaryTrigger                                 bool // Toggle on a routed right-click.
 }
 
 func (o PopoverOptions) validate() error {

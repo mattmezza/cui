@@ -2,7 +2,7 @@
 mod dialog;
 pub use dialog::{DialogAction, DialogOptions, DialogSlot};
 mod popover_options;
-pub use popover_options::{PopoverAnchor, PopoverOptions};
+pub use popover_options::{PointerButton, PopoverAnchor, PopoverOptions};
 mod attachment;
 mod notification_action;
 mod notification_auto_hide;

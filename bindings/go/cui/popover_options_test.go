@@ -78,3 +78,47 @@ func TestPopoverOptionsProviderAndEscape(t *testing.T) {
 	popup.PopoverOptions(nil)
 	check(t, popup.Err())
 }
+
+func TestPopoverSecondaryTrigger(t *testing.T) {
+	a := app(t)
+	secondary, err := a.SupportsPopoverSecondaryTrigger()
+	check(t, err)
+	expected := os.Getenv("CUI_POPOVER_UNSUPPORTED") != "1" &&
+		os.Getenv("CUI_POPOVER_SECONDARY_UNSUPPORTED") != "1"
+	if secondary != expected {
+		t.Fatalf("secondary support = %v, want %v", secondary, expected)
+	}
+	clicks, closed := 0, 0
+	trigger := Button("trigger").OnClick(func(Event) { clicks++ })
+	menu := Popover("menu", "Account", "").Anchor(trigger).OnClose(func(Event) { closed++ })
+	check(t, a.Mount(Column("root").Children(menu, trigger)))
+	menu.PopoverOptions(&PopoverOptions{SecondaryTrigger: true})
+	if !secondary {
+		err := menu.Err()
+		if !errors.Is(err, ErrPopoverSecondaryTriggerUnavailable) && !errors.Is(err, ErrPopoverOptionsUnavailable) {
+			t.Fatalf("unsupported options: %v", err)
+		}
+		return
+	}
+	check(t, menu.Err())
+	check(t, a.Step(.016))
+	b, err := a.Bounds(trigger)
+	check(t, err)
+	for _, open := range []bool{true, false} {
+		for _, phase := range []PointerPhase{PointerDown, PointerUp} {
+			check(t, a.QueuePointerButton(phase, PointerSecondary, b.X+b.Width/2, b.Y+b.Height/2))
+		}
+		check(t, a.Step(.016))
+		check(t, a.Step(.016))
+		_, err = a.Dispatch()
+		check(t, err)
+		actual, err := a.Open(menu)
+		check(t, err)
+		if actual != open {
+			t.Fatalf("open = %v, want %v", actual, open)
+		}
+	}
+	if clicks != 0 || closed != 1 {
+		t.Fatalf("clicks = %d, closes = %d", clicks, closed)
+	}
+}

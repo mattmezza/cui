@@ -2870,12 +2870,21 @@ class App:
         self._ensure_open()
         self._api.check(self._api.step(self._ptr, dt))
 
-    def queue_pointer(self, phase: str, x: float, y: float) -> None:
+    def queue_pointer(self, phase: str, x: float, y: float, *, button: str = "primary") -> None:
         self._ensure_open()
         phases = {"move": 0, "down": 1, "up": 2}
+        buttons = {"primary": 0, "secondary": 1, "middle": 2}
         if phase not in phases:
             raise ValueError("phase must be move/down/up")
-        self._api.check(self._api.queue_pointer(self._ptr, phases[phase], x, y))
+        if button not in buttons or (phase == "move" and button != "primary"):
+            raise ValueError("use a primary, secondary or middle button for down/up")
+        if button == "primary":
+            self._api.check(self._api.queue_pointer(self._ptr, phases[phase], x, y))
+        else:
+            queue = self._api.queue_pointer_button
+            if queue is None:
+                raise RuntimeError("Non-primary pointer input requires a compatible bridge")
+            self._api.check(queue(self._ptr, phases[phase], buttons[button], x, y))
 
     def queue_key(self, phase: str, key: str, modifiers: int = 0, repeat: bool = False) -> None:
         self._ensure_open()
@@ -3302,6 +3311,10 @@ class App:
     def supports_popover_options(self) -> bool:
         from .popover_options import supported
         return supported(self)
+
+    def supports_popover_secondary_trigger(self) -> bool:
+        from .popover_options import supports_secondary_trigger
+        return supports_secondary_trigger(self)
 
     def supports_pagination_options(self) -> bool:
         from .pagination_options import supported

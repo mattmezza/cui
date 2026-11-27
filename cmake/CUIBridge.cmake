@@ -798,6 +798,14 @@ if(TARGET cui_sdl3 AND CUI_BRIDGE_NATIVE_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "L
   CUI_TEST_FONT=${CUI_TEST_FONT} SDL_RENDER_DRIVER=software
   $<TARGET_FILE:test_bridge_notification_idle_sdl>)
  set_tests_properties(bridge_notification_idle_sdl PROPERTIES TIMEOUT 15)
+ add_executable(test_bridge_popover_secondary_sdl
+  ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_popover_secondary_sdl.c)
+ target_link_libraries(test_bridge_popover_secondary_sdl PRIVATE cui_bridge cui_sdl3_dependency)
+ cui_warnings(test_bridge_popover_secondary_sdl)
+ add_test(NAME bridge_popover_secondary_sdl COMMAND ${CMAKE_COMMAND} -E env
+  CUI_TEST_FONT=${CUI_TEST_FONT} SDL_RENDER_DRIVER=software
+  $<TARGET_FILE:test_bridge_popover_secondary_sdl>)
+ set_tests_properties(bridge_popover_secondary_sdl PROPERTIES TIMEOUT 15)
 endif()
 if(TARGET cui_sdl3)
  add_executable(test_bridge_components_sdl ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_components_sdl.c)

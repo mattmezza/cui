@@ -159,9 +159,10 @@ then call `cui_popover_link_trigger` with the current begin result after the pan
 Use `cui_popover_begin_with_outside_focus` and
 `CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER` to keep a nonmodal outside click's focus.
 For right-click, call `cui_popover_take_secondary_press` after submitting the trigger.
-Retained builders have optional placement and focus via `popover_options`
-(`PopoverOptions` in Go). Check provider support and wire opening to your
-trigger's callback. The same guide links runnable account menus.
+Retained builders offer placement and focus via `popover_options`
+(`PopoverOptions` in Go) and optional `secondary_trigger` (`SecondaryTrigger` in Go).
+Probe provider support. Wire ordinary activation to your trigger's callback.
+See the retained right-click section in the same guide for runnable account menus.
 
 `read PATH` still prints the exact full document; `info` lists paths and hashes.
 For broad Markdown guides use `read PATH --headings`, then

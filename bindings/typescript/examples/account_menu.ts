@@ -7,9 +7,10 @@ try {
   const trigger = button('account').label('Account');
   const close = button('close').label('Close account menu');
   const menu = popover('account-menu').anchor(trigger).children(close);
+  const rightClick = app.supports_popover_secondary_trigger();
   if (app.supports_popover_options()) {
     const options: PopoverOptions = {
-      anchor: 0, width: 220, height: 96, margin: 8, hide_close: true, focus_content: true,
+      anchor: 0, width: 220, height: 96, margin: 8, hide_close: true, focus_content: true, secondary_trigger: rightClick,
     };
     menu.popover_options(options);
   }
@@ -18,8 +19,9 @@ try {
   app.mount(column().children(trigger, menu)).step();
 
   const { x, y, width, height } = trigger.bounds();
-  app.pointer('down', x + width / 2, y + height / 2)
-    .pointer('up', x + width / 2, y + height / 2).step();
+  const mouseButton = rightClick ? 'secondary' : 'primary';
+  app.pointer('down', x + width / 2, y + height / 2, mouseButton)
+    .pointer('up', x + width / 2, y + height / 2, mouseButton).step();
   app.step();
   if (!menu.is_open()) throw new Error('The Account button should open the menu');
 

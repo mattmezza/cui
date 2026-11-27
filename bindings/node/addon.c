@@ -1024,6 +1024,22 @@ static napi_value pointer(napi_env env, napi_callback_info info) {
     }
     return undefined(env);
 }
+static napi_value pointer_button(napi_env env, napi_callback_info info) {
+    napi_value v[5];
+    js_app *app;
+    uint32_t phase, button;
+    double x, y;
+    if (!args(env, info, 5, v) || !app_arg(env, v[0], &app) || !uint_arg(env, v[1], &phase) ||
+        !uint_arg(env, v[2], &button) || !number_arg(env, v[3], &x) || !number_arg(env, v[4], &y))
+        return NULL;
+    cui_bridge_status (*queue)(cui_bridge_app *, cui_bridge_pointer_phase,
+                               cui_bridge_pointer_button, float, float) = NULL;
+    if (!optional_bridge_symbol(&queue, sizeof queue, "cui_bridge_queue_pointer_button_v1"))
+        return fail(env, "Non-primary pointer input requires a compatible bridge");
+    return status(env, queue(app->bridge, (cui_bridge_pointer_phase)phase,
+                             (cui_bridge_pointer_button)button, (float)x, (float)y));
+}
+
 static napi_value key_input(napi_env env, napi_callback_info info) {
     napi_value v[5];
     js_app *app;
@@ -3242,6 +3258,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setCustomRounding", set_round, 0);
     EXPORT("setHoverRgba", set_hover, 0);
     EXPORT("pointer", pointer, 0);
+    EXPORT("pointerButton", pointer_button, 0);
     EXPORT("key", key_input, 0);
     EXPORT("step", step, 0);
     EXPORT("poll", poll, 0);

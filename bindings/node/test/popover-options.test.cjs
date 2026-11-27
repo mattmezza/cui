@@ -28,3 +28,37 @@ test('Popover placement, Button callback opening, content focus and Escape',()=>
     p.popover_options(null);
   }finally{app.dispose();}
 });
+
+test('Secondary presses toggle a Popover without replaying Button clicks', () => {
+  const app = new App();
+  try {
+    let clicks = 0;
+    let closed = 0;
+    const trigger = button('Account').on_click(() => clicks++);
+    const menu = popover('menu').anchor(trigger).on_close(() => closed++)
+      .popover_options({ secondary_trigger: true });
+    const root = column().children(menu, trigger);
+    const expected = process.env.CUI_POPOVER_UNSUPPORTED !== '1'
+      && process.env.CUI_POPOVER_SECONDARY_UNSUPPORTED !== '1';
+    assert.equal(app.supports_popover_secondary_trigger(), expected);
+    if (!expected) {
+      assert.throws(() => app.mount(root), /compatible bridge/);
+      menu.popover_options(null);
+      app.mount(root).step();
+      return;
+    }
+    app.mount(root).step();
+    const { x, y, width, height } = trigger.bounds();
+    for (const open of [true, false]) {
+      app.pointer('down', x + width / 2, y + height / 2, 'secondary')
+        .pointer('up', x + width / 2, y + height / 2, 'secondary');
+      app.step();
+      app.step();
+      assert.equal(menu.is_open(), open);
+    }
+    assert.equal(clicks, 0);
+    assert.equal(closed, 1);
+  } finally {
+    app.dispose();
+  }
+});

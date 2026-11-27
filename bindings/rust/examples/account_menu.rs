@@ -10,6 +10,7 @@ fn main() {
     a.anchor(menu, trigger).unwrap();
     let close = a.child(menu, Kind::Button, "close").unwrap();
     a.text(close, "Close").unwrap();
+    let right_click = a.supports_popover_secondary_trigger();
     let options = PopoverOptions {
         anchor: PopoverAnchor::TopRight,
         width: 180.,
@@ -17,6 +18,7 @@ fn main() {
         margin: 8.,
         hide_close: true,
         focus_content: true,
+        secondary_trigger: right_click,
         ..Default::default()
     };
     if a.supports_popover_options() {
@@ -30,10 +32,15 @@ fn main() {
     a.on_click(trigger, move || o.set(true)).unwrap();
     a.step(0.016).unwrap();
     let b = a.bounds(trigger).unwrap();
-    a.pointer(Phase::Down, b.x + b.width / 2., b.y + b.height / 2.)
-        .unwrap();
-    a.pointer(Phase::Up, b.x + b.width / 2., b.y + b.height / 2.)
-        .unwrap();
+    let button = if right_click {
+        PointerButton::Secondary
+    } else {
+        PointerButton::Primary
+    };
+    for phase in [Phase::Down, Phase::Up] {
+        a.pointer_button(phase, button, b.x + b.width / 2., b.y + b.height / 2.)
+            .unwrap();
+    }
     a.step(0.016).unwrap();
     a.dispatch().unwrap();
     if opening.replace(false) {

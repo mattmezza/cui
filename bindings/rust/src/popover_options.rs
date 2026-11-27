@@ -29,6 +29,49 @@ pub struct PopoverOptions {
     pub no_escape_dismiss: bool,
     pub no_outside_dismiss: bool,
     pub custom_offset: bool,
+    /// Toggle on a routed right-click over the enabled anchor.
+    pub secondary_trigger: bool,
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PointerButton {
+    Primary,
+    Secondary,
+    Middle,
+}
+
+type QueuePointerButton = unsafe extern "C" fn(*mut c_void, u32, u32, f32, f32) -> u32;
+fn queue_pointer_button() -> Option<QueuePointerButton> {
+    #[cfg(cui_bridge_static)]
+    {
+        extern "C" {
+            fn cui_bridge_queue_pointer_button_v1(
+                app: *mut c_void,
+                phase: u32,
+                button: u32,
+                x: f32,
+                y: f32,
+            ) -> u32;
+        }
+        Some(cui_bridge_queue_pointer_button_v1)
+    }
+    #[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+    unsafe {
+        let symbol =
+            notification_symbol_v1(b"cui_bridge_queue_pointer_button_v1\0".as_ptr().cast());
+        if symbol.is_null() {
+            None
+        } else {
+            Some(std::mem::transmute::<*mut c_void, QueuePointerButton>(
+                symbol,
+            ))
+        }
+    }
+    #[cfg(all(not(cui_bridge_static), not(any(unix, windows))))]
+    {
+        None
+    }
 }
 #[repr(C)]
 struct Raw {
@@ -91,6 +134,7 @@ impl PopoverOptions {
             self.no_escape_dismiss,
             self.no_outside_dismiss,
             self.custom_offset,
+            self.secondary_trigger,
         ]
         .iter()
         .enumerate()
@@ -115,6 +159,25 @@ impl App {
     pub fn supports_popover_options(&self) -> bool {
         function().is_some()
     }
+    pub fn supports_popover_secondary_trigger(&self) -> bool {
+        function().is_some() && queue_pointer_button().is_some()
+    }
+
+    /// Queues a mouse button. Use Primary for movement and older providers.
+    pub fn pointer_button(
+        &mut self,
+        phase: Phase,
+        button: PointerButton,
+        x: f32,
+        y: f32,
+    ) -> Result<()> {
+        if button == PointerButton::Primary {
+            return self.pointer(phase, x, y);
+        }
+        let queue = queue_pointer_button().ok_or(Error(8))?;
+        check(unsafe { queue(self.raw, phase as u32, button as u32, x, y) })
+    }
+
     /// None restores legacy presentation. An unavailable provider returns Error(8).
     pub fn popover_options(
         &mut self,
@@ -122,6 +185,11 @@ impl App {
         options: Option<PopoverOptions>,
     ) -> Result<&mut Self> {
         let n = self.valid(n)?;
+        if options.is_some_and(|o| o.secondary_trigger)
+            && !self.supports_popover_secondary_trigger()
+        {
+            return Err(Error(8));
+        }
         let raw = options.map(PopoverOptions::raw).transpose()?;
         let f = function().ok_or(Error(8))?;
         check(unsafe {

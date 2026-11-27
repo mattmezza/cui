@@ -455,19 +455,32 @@ static cui_bridge_status go_stepper_centered_fill(cui_bridge_app *a, cui_bridge_
 
 #if defined(CUI_GO_STATIC)
 #pragma weak cui_bridge_popover_configure_v1
+#pragma weak cui_bridge_queue_pointer_button_v1
 #endif
 static cui_bridge_status (*popover_configure)(cui_bridge_app *, cui_bridge_node, uint32_t,
                                               const cui_bridge_popover_config_v1 *);
+static cui_bridge_status (*pointer_button)(cui_bridge_app *, cui_bridge_pointer_phase,
+                                           cui_bridge_pointer_button, float, float);
 static void go_popover_initialize(void) {
  if (bridge_lib) {
   go_load_optional_symbol(&popover_configure, sizeof popover_configure,
                           "cui_bridge_popover_configure_v1");
+  go_load_optional_symbol(&pointer_button, sizeof pointer_button,
+                          "cui_bridge_queue_pointer_button_v1");
  }
 #if defined(CUI_GO_STATIC)
- else { popover_configure = cui_bridge_popover_configure_v1; }
+ else {
+  popover_configure = cui_bridge_popover_configure_v1;
+  pointer_button = cui_bridge_queue_pointer_button_v1;
+ }
 #endif
 }
 static int go_popover_supported(void) { return popover_configure != NULL; }
+static int go_pointer_button_supported(void) { return pointer_button != NULL; }
+static cui_bridge_status go_queue_pointer_button(cui_bridge_app *app, cui_bridge_pointer_phase p,
+                                                 cui_bridge_pointer_button button, float x, float y) {
+ return pointer_button ? pointer_button(app, p, button, x, y) : CUI_BRIDGE_INVALID_STATE;
+}
 static cui_bridge_status go_popover_configure(cui_bridge_app *app, cui_bridge_node node,
                                               const cui_bridge_popover_config_v1 *config) {
  return popover_configure
@@ -3204,6 +3217,27 @@ func (a *App) QueuePointer(p PointerPhase, x, y float32) error {
 	}
 	return result(C.go_queue_pointer(a.ptr, C.cui_bridge_pointer_phase(p), C.float(x), C.float(y)))
 }
+
+// QueuePointerButton queues a primary, secondary or middle mouse button. Only
+// PointerPrimary is valid for movement. Primary works with legacy providers.
+func (a *App) QueuePointerButton(p PointerPhase, button PointerButton, x, y float32) error {
+	if button == PointerPrimary {
+		return a.QueuePointer(p, x, y)
+	}
+	if err := a.check(); err != nil {
+		return err
+	}
+	if p < PointerDown || p > PointerUp || button < PointerSecondary || button > PointerMiddle ||
+		!finite(x) || !finite(y) {
+		return errors.New("invalid pointer button")
+	}
+	if C.go_pointer_button_supported() == 0 {
+		return ErrPointerButtonUnavailable
+	}
+	return result(C.go_queue_pointer_button(a.ptr, C.cui_bridge_pointer_phase(p),
+		C.cui_bridge_pointer_button(button), C.float(x), C.float(y)))
+}
+
 func (a *App) QueueKey(p KeyPhase, k Key, mods uint32, repeat bool) error {
 	if err := a.check(); err != nil {
 		return err
@@ -7252,6 +7286,15 @@ func (a *App) SupportsPopoverOptions() (bool, error) {
 	}
 	return C.go_popover_supported() != 0, nil
 }
+
+// SupportsPopoverSecondaryTrigger reports support for opt-in right-click.
+func (a *App) SupportsPopoverSecondaryTrigger() (bool, error) {
+	if e := a.check(); e != nil {
+		return false, e
+	}
+	return C.go_popover_supported() != 0 && C.go_pointer_button_supported() != 0, nil
+}
+
 func (n *Node) configurePopover(o *PopoverOptions) error {
 	if e := n.app.check(); e != nil {
 		return e
@@ -7263,13 +7306,16 @@ func (n *Node) configurePopover(o *PopoverOptions) error {
 	if o == nil {
 		return result(C.go_popover_configure(n.app.ptr, n.handle, nil))
 	}
+	if o.SecondaryTrigger && C.go_pointer_button_supported() == 0 {
+		return ErrPopoverSecondaryTriggerUnavailable
+	}
 	c.anchor = C.uint32_t(o.Anchor)
 	c.width = C.float(o.Width)
 	c.height = C.float(o.Height)
 	c.margin = C.float(o.Margin)
 	c.reference_rem = C.float(o.ReferenceRem)
 	flags := uint32(0)
-	for i, b := range []bool{o.Arrow, o.HideClose, o.KeepPointerFocus, o.FocusContent, o.NoEscapeDismiss, o.NoOutsideDismiss, o.CustomOffset} {
+	for i, b := range []bool{o.Arrow, o.HideClose, o.KeepPointerFocus, o.FocusContent, o.NoEscapeDismiss, o.NoOutsideDismiss, o.CustomOffset, o.SecondaryTrigger} {
 		if b {
 			flags |= 1 << i
 		}

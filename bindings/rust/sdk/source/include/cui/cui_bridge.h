@@ -827,6 +827,11 @@ typedef enum {
     CUI_BRIDGE_POINTER_DOWN,
     CUI_BRIDGE_POINTER_UP
 } cui_bridge_pointer_phase;
+typedef enum {
+    CUI_BRIDGE_POINTER_PRIMARY = 0,
+    CUI_BRIDGE_POINTER_SECONDARY,
+    CUI_BRIDGE_POINTER_MIDDLE
+} cui_bridge_pointer_button;
 typedef enum { CUI_BRIDGE_KEY_DOWN = 0, CUI_BRIDGE_KEY_UP = 1 } cui_bridge_key_phase;
 typedef enum {
     CUI_BRIDGE_KEY_TAB = 1,
@@ -1464,7 +1469,8 @@ enum {
     CUI_BRIDGE_POPOVER_FOCUS_CONTENT_V1 = 1u << 3,
     CUI_BRIDGE_POPOVER_NO_ESCAPE_DISMISS_V1 = 1u << 4,
     CUI_BRIDGE_POPOVER_NO_OUTSIDE_DISMISS_V1 = 1u << 5,
-    CUI_BRIDGE_POPOVER_CUSTOM_OFFSET_V1 = 1u << 6
+    CUI_BRIDGE_POPOVER_CUSTOM_OFFSET_V1 = 1u << 6,
+    CUI_BRIDGE_POPOVER_SECONDARY_TRIGGER_V1 = 1u << 7
 };
 typedef struct {
     uint32_t anchor, flags;
@@ -1486,6 +1492,12 @@ typedef struct {
  * contract. Removing the node discards the panel and restores the trigger
  * if its body owned focus. Removal does not queue CLOSE. An admitted panel
  * links its trigger in the current semantics.
+ * SECONDARY_TRIGGER toggles on a routed secondary press over the enabled
+ * anchor. At most one toggle per anchor per step; the first eligible Popover
+ * in retained node-slot order claims a shared trigger. The next frame presents
+ * the open panel or queues the usual CLOSE (closed) result. Primary, touch,
+ * keyboard and accessibility activation are still handled by the application.
+ * The option is available with cui_bridge_queue_pointer_button_v1.
  * The bounds query returns its painted panel and fails while it is omitted. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_popover_configure_v1(
     cui_bridge_app *, cui_bridge_node, uint32_t config_size, const cui_bridge_popover_config_v1 *);
@@ -1765,6 +1777,12 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_hover_rgba(cui_bridge_app
 CUI_BRIDGE_API cui_bridge_status cui_bridge_queue_pointer(cui_bridge_app *app,
                                                           cui_bridge_pointer_phase phase, float x,
                                                           float y);
+/* Explicit mouse button for a down/up. Use PRIMARY for movement. The legacy
+ * pointer entry point is equivalent to always passing PRIMARY. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_queue_pointer_button_v1(cui_bridge_app *,
+                                                                    cui_bridge_pointer_phase,
+                                                                    cui_bridge_pointer_button,
+                                                                    float x, float y);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_queue_key(cui_bridge_app *app,
                                                       cui_bridge_key_phase phase,
                                                       cui_bridge_key key, uint32_t modifiers,

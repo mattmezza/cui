@@ -14,7 +14,7 @@ class PopoverTests(unittest.TestCase):
         for config in (
             {"anchor": 8}, {"anchor": True}, {"width": float("nan")},
             {"width": 10**400}, {"height": 4097}, {"margin": -1},
-            {"offset": 4097}, {"reference_rem": 257}, {"arrow": 1}, {"bogus": True},
+            {"offset": 4097}, {"reference_rem": 257}, {"arrow": 1}, {"secondary_trigger": 1}, {"bogus": True},
         ):
             with self.subTest(config=config), self.assertRaises((ValueError, TypeError)):
                 popover("p").popover_options(config)
@@ -39,6 +39,35 @@ class PopoverTests(unittest.TestCase):
                 panel.open(False)
                 app.step()
                 self.assertFalse(panel.is_open())
+
+    def test_secondary_trigger(self):
+        with App() as app:
+            trigger = button("trigger")
+            clicks, closes = [], []
+            trigger.on_click(clicks.append)
+            panel = popover("menu").anchor(trigger).on_close(closes.append)
+            panel.popover_options(secondary_trigger=True)
+            root = column().children(panel, trigger)
+            expected = not (os.environ.get("CUI_POPOVER_UNSUPPORTED") == "1" or
+                            os.environ.get("CUI_POPOVER_SECONDARY_UNSUPPORTED") == "1")
+            self.assertEqual(app.supports_popover_secondary_trigger(), expected)
+            if not expected:
+                with self.assertRaisesRegex(RuntimeError, "compatible bridge"):
+                    app.mount(root)
+                panel.popover_options(None)
+                app.mount(root).step()
+                return
+            app.mount(root).step()
+            x, y, w, h = app.bounds(trigger)
+            for open_after in (True, False):
+                for phase in ("down", "up"):
+                    app.queue_pointer(phase, x + w / 2, y + h / 2, button="secondary")
+                app.step()
+                app.step()
+                app.dispatch()
+                self.assertEqual(panel.is_open(), open_after)
+            self.assertEqual(clicks, [])
+            self.assertEqual(len(closes), 1)
 
     def test_placement_focus_escape(self):
         with App(width=640, height=480) as app:

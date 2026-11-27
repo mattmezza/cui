@@ -44,6 +44,7 @@ typedef struct bridge_disclosure_headings bridge_disclosure_headings;
 typedef struct bridge_disclosure_titles bridge_disclosure_titles;
 typedef struct bridge_kbd_owned bridge_kbd_owned;
 typedef struct bridge_dialog_owned bridge_dialog_owned;
+typedef struct bridge_popover_owned bridge_popover_owned;
 typedef enum {
     BRIDGE_STEPPER_BUTTONS,
     BRIDGE_STEPPER_FIXED,
@@ -100,7 +101,7 @@ typedef struct {
     bridge_dialog_owned *dialog;
     uint8_t dialog_slot_role, dialog_action;
     cui_bridge_node anchor;
-    cui_bridge_popover_config_v1 *popover_config;
+    bridge_popover_owned *popover;
     cui_rect tracked_popover_anchor;
     uint64_t popover_measure_frame, popover_bounds_frame, popover_link_frame;
     uint32_t popover_link_slot;

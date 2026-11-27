@@ -9,7 +9,13 @@ static napi_value popover_options(napi_env env, napi_callback_info info) {
                                    const cui_bridge_popover_config_v1 *) = NULL;
     bool supported =
         optional_bridge_symbol(&configure, sizeof configure, "cui_bridge_popover_configure_v1");
-    if (op == 0) {
+    if (op == 0 || op == 3) {
+        if (supported && op == 3) {
+            cui_bridge_status (*queue)(cui_bridge_app *, cui_bridge_pointer_phase,
+                                       cui_bridge_pointer_button, float, float) = NULL;
+            supported =
+                optional_bridge_symbol(&queue, sizeof queue, "cui_bridge_queue_pointer_button_v1");
+        }
         napi_value result;
         return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
     }
@@ -34,7 +40,7 @@ static napi_value popover_options(napi_env env, napi_callback_info info) {
                 return fail(env, "Popover option out of range");
             *fields[i] = (float)value;
         }
-        if (config.anchor > CUI_BRIDGE_POPOVER_RIGHT_CENTER_V1 || config.flags > 127 ||
+        if (config.anchor > CUI_BRIDGE_POPOVER_RIGHT_CENTER_V1 || config.flags > 255 ||
             (!(config.flags & CUI_BRIDGE_POPOVER_CUSTOM_OFFSET_V1) && config.offset != 0))
             return fail(env, "invalid Popover options");
     }

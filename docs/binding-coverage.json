@@ -823,7 +823,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust builders expose the optional retained placement, arrow, dismissal and focus record. Retained authoring omits the immediate geometry helpers, direct semantic-link control, routed secondary-click opening, transitions and arbitrary part styling. Source SDKs include the immediate C API."
+        "Python, JavaScript, TypeScript, Go and Rust builders expose the optional retained placement, arrow, dismissal and focus record. They also support an opt-in routed secondary-click toggle and synthetic mouse-button input when the provider publishes the new symbol. Retained authoring omits the immediate geometry helpers, direct semantic-link control, transitions and arbitrary part styling. Source SDKs include the immediate C API."
       ]
     },
     {

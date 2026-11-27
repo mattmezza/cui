@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.13**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.13) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
 | Public website | Interactive WASM gallery and docs at alpha.13. The Pages deployment from `91c4787e` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45919514230) |
-| Working integration | Retained rotating Spinner and shared SVG artwork across the language builders, a custom SVG gallery demo, and Skeleton loading recipes and solid palette import. |
+| Working integration | Retained rotating Spinner with shared SVG artwork, Skeleton loading recipes and solid palette import, and a Badge inbox recipe with interactive photo avatars. |
 | Packages | Alpha.13 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -140,7 +140,7 @@ Check reported regressions against the current gallery as each slice lands.
 
 | Order | Component | Next outcome |
 | --- | --- | --- |
-| 1 | Icon / Badge / Skeleton | Alpha.5 ships the SVG and Badge builders and responsive Skeleton example. Keep targeting custom artwork, interactive Badge children and loading-to-content transitions in compatibility checks. |
+| 1 | Icon / Badge / Skeleton | Alpha.5 ships the SVG and Badge builders. Working source adds a copyable Badge inbox with real photos, nested passive markers, and mouse, keyboard and touch coverage in Chromium. Native count tests cover zero, custom caps, `SIZE_MAX` and same-ID variant changes. Inherited styles and physical-device checks remain open. [Badge guide](docs/BADGE.md) |
 | 1 | Spinner | Working source adds retained rotation and shared SVG artwork in C, Python, JS/TS, Go and Rust. The gallery demonstrates custom SVG with copyable C. Software and WASM checks cover rotation, raster lifetime and provider fallback. Inherited Icon styling and hardware acceptance remain open. [Spinner guide](docs/SPINNER.md) |
 | 2 | VideoPlayer / Video | The C player and WASM gallery have capability-gated mute and volume, with Chromium proof for keyboard and touch, decoded audio and player-only fullscreen. The optional native FFV1/PCM example applies gain after rendering and passes all 22 private-display/SDL dummy audio checks. Alpha.5 deploys the player. Physical audio and broader codecs remain open. [Player guide](docs/VIDEO_PLAYER.md) · [native sound example](examples/video_player_audio/README.md) |
 | 3 | DataTable | Live updates preserve row position and selection. Private-X11 and headless Chromium cover scrolling, paging and keyboard continuation. C and all five language bindings support opt-in 10,000-row snapshots within a 32 MiB native app budget and runnable 40-row inboxes. Ordinary setters accept 32 rows. Alpha.5 ships the copied snapshots and inbox examples. Remote adapters remain open. [Capacity guide](docs/BRIDGE_COMPONENTS.md#retain-more-than-32-datatable-rows-in-c) |

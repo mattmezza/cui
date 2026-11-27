@@ -1460,6 +1460,7 @@ def main():
             page.screenshot(path='/tmp/cui-web-editor.png')
             page.evaluate('location.hash="Badge"')
             page.wait_for_function('cuiGallery.renderedComponent==="Badge"')
+            control_change('badge-layout', '1')
             wait_semantic('7', 19)
             wait_semantic('99+', 19)
             wait_semantic('Notification', 19)

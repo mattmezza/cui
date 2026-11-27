@@ -54,10 +54,40 @@ The older `cui_badge` draws a standalone text pill. Use it for tags such as
 
 Headless tests cover first-frame layout, all sizes/variants, overflow text,
 custom colors, icon draw commands, nonfocusable status semantics, zero-count
-content preservation and invalid-input callback isolation. Arbitrary child
+content preservation and invalid-input callback isolation. Count tests include
+custom maxima, decimal boundaries and `SIZE_MAX`, as well as changing variant
+with the same ID. Arbitrary child
 styles remain ordinary Core composition; there is no global text-style scope.
 
-## Configured artwork route (focused C validation, unreleased)
+## Build an inbox with Badge
+
+The gallery opens a **Support inbox** with two notification controls and
+three interactive photo avatars. Alex has a nested unread count and verified
+icon. Opening Alex clears the count while the verification marker stays in
+place. Jamie and Robin show the same dot geometry with different status
+colors and accessible names. **Compare variants** shows the marker sizes and
+configured SVG on simple buttons.
+
+Copy the [inbox recipe](../examples/badge_recipes/inbox.h) into your C11 app.
+Initialize persistent app state by calling `badge_inbox_defaults()` once.
+Then draw it between `cui_begin_frame` and `cui_end_frame`.
+
+```c
+#include "inbox.h"
+
+void draw_inbox_panel(cui_context *ui, const cui_theme *theme,
+                      badge_inbox_state *inbox, float available_width) {
+    badge_inbox_draw(ui, "support-inbox", theme, inbox, NULL, available_width, false);
+}
+```
+
+Pass three photo and cache pairs to use pictures with `cui_avatar_ex`. Each
+cache and its source pixels must stay valid through draw-list consumption.
+When an activation changes a count, the recipe requests one follow-up frame
+to paint the new value. Supplement a capped count with an accessible name if
+users need the exact number.
+
+## Configure Badge artwork
 
 `cui_badge_with_icon` is an additive C route for ICON markers. Its
 `cui_badge_icon_content` borrows an initialized `cui_icon_state` and full
@@ -90,14 +120,14 @@ cui_badge_result result = cui_badge_with_icon(
 /* Handle result.icon_error separately from Core frame completion. */
 ```
 
-The first focused worker C11 strict compile and private-Xvfb test passed. It
-compared software pixels with an independent ordinary Icon tree and checked
-frozen old-route scenes and retained old-mask rendering. Descriptor sizes were
-measured as 136 bytes native/104 WASM32; WASM was a header probe only. The root
-configured build and expanded headless fixture also pass: nested interactive
-children, narrow/wide resize, omission/reappearance and resource-error recovery.
-The retained C bridge also composes Badge nodes around ordinary retained
-children with copied descriptors, shared SVG handles and frame results. Python
-also exposes this route. JavaScript, TypeScript, Go and Rust currently offer the
-standalone text pill. [Retained C guide](BRIDGE_BADGE.md),
-[Python guide](PYTHON_ICON_BADGE.md) · [Node and TypeScript guide](NODE_ICON_BADGE.md).
+The software tests compare configured artwork with a standalone Icon under
+the same style. They cover old-mask lifetime, nested interactive children,
+narrow and wide resize, omission and resource-error recovery. The browser
+tests exercise real photo pixels, passive markers, mouse, keyboard and touch
+interaction. Native GPU and physical-device acceptance remain open.
+
+Retained C, Python, JavaScript, TypeScript, Go and Rust can compose a
+configured Badge around retained child controls with copied options and
+shared Icon resources. [Retained C guide](BRIDGE_BADGE.md) ·
+[Python](PYTHON_ICON_BADGE.md) · [JS/TS](NODE_ICON_BADGE.md) ·
+[Go](GO_ICON_BADGE.md) · [Rust](RUST_ICON_BADGE.md).

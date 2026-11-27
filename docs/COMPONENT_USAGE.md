@@ -181,7 +181,7 @@ API: `cui_avatar`, `cui_avatar_ex`, `cui_avatar_stack`, `cui_avatar_image_init`,
 
 **Interaction:** Child controls return their own actions; corner indicators provide nonfocusable status semantics.
 
-**Usage:** Use cui_badge_ex for count/dot/named-icon composition; use cui_badge_with_icon with caller-owned Icon state/options for configured artwork. Handle icon_error independently from composition admission and Core frame success.
+**Usage:** Use cui_badge_ex for count, dot or named-icon composition around buttons or avatars. Nest Badge calls for independent corner indicators. Use cui_badge_with_icon with caller-owned Icon state/options for configured artwork and handle icon_error independently of the frame result.
 
 API: `cui_badge_defaults`, `cui_badge_ex`, `cui_badge_with_icon`, `cui_badge_icon_content`, `cui_badge_result`, `cui_badge`. Callback: `cui_button_content_fn`. [Public header](../include/cui/cui_components.h); [guide](BADGE.md), [guide](COMPONENTS.md).
 

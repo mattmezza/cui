@@ -43,6 +43,20 @@ for(const [key,label,choices,initial] of [
 $('control-size').after(sliderControls);
 function sliderValues(){return ['kind','axis','reverse','scale','accept'].map(k=>Number($('slider-'+k).value));}
 function resetSliderControls(){for(const [k,v] of Object.entries({kind:0,axis:0,reverse:0,scale:0,accept:1}))$('slider-'+k).value=String(v);}
+const badgeInboxExample='__CUI_BADGE_INBOX__';
+const badgeLayout=document.createElement('select');
+badgeLayout.id='badge-layout';
+badgeLayout.setAttribute('aria-label','Badge example');
+badgeLayout.add(new Option('Support inbox','0'));
+badgeLayout.add(new Option('Compare variants','1'));
+badgeLayout.hidden=true;
+$('control-size').after(badgeLayout);
+badgeLayout.addEventListener('change',()=>{syncBadgeControls();requestFrame();});
+function syncBadgeControls(){
+ const inbox=badgeLayout.value==='0';
+ $('design-size').hidden=inbox;
+ $('snippet').textContent=inbox?badgeInboxExample:snippets.Badge;
+}
 const skeletonControls=document.createElement('span');
 skeletonControls.hidden=true;
 function skeletonControl(id,label,choices){
@@ -583,7 +597,16 @@ cui_table_end(ui); /* Table */`,
  Popover:'options.anchor = cui_bounds(ui, trigger);\nif (cui_surface_begin(ui, &theme, &popover, title,\n    description, options)) {\n    draw_profile(ui);\n    cui_surface_end(ui);\n}',
  Tree:'cui_tree(ui, id, &theme, model, &state,\n    &selection, options);',
  Label:'cui_label_source(ui, &theme, (cui_label_options){\n    .primary = cui_string("Workspace"),\n    .secondary = cui_string("Ready to collaborate"), .has_secondary = true,\n    .highlight = cui_string("workspace"),\n    .semantic_id = cui_id_from(ui, "workspace-label")});',
- Badge:'// Define draw_inbox to compose your button, avatar or other content.\nvoid draw_inbox(cui_context *, void *);\ncui_badge_options badge = cui_badge_defaults();\nbadge.count = 125; // Displays 99+; zero hides the marker.\ncui_badge_ex(ui, id, &theme, badge, draw_inbox, user);',
+ Badge:`#include "cui/cui_components.h"
+
+/* Call during a frame; draw_content submits your button, avatar or other child. */
+bool draw_unread(cui_context *ui, cui_id id, const cui_theme *theme, size_t count,
+                 cui_design_size size, cui_button_content_fn draw_content, void *user) {
+    cui_badge_options badge = cui_badge_defaults();
+    badge.count = count;
+    badge.design_size = size;
+    return cui_badge_ex(ui, id, theme, badge, draw_content, user);
+}`,
  Progress:'cui_progress_options options = cui_progress_defaults();\noptions.motion = &motion; // retain zero-initialized state\noptions.now_seconds = now_seconds;\ncui_progress_ex(ui, id, &theme, progress / 100.0f, 300, options);',
  Alert:'cui_alert(ui, id, &theme, (cui_alert_options){\n    .kind = CUI_ALERT_INFO,\n    .title = cui_string("Heads up"),\n    .message = cui_string("Your changes were saved"),\n    .width = 360});',
  Bubble:'cui_begin_bubble(ui, id, &theme, CUI_BUBBLE_FILLED, 240);\ncui_label(ui, &theme, cui_string("Message"));\ncui_end_bubble(ui);',
@@ -1051,6 +1074,8 @@ function render(){
  const wideDisclosure=largeDisclosureHeadings&&canvasWrap.scrollWidth>canvasWrap.clientWidth;
  canvas.style.touchAction=wideTimeField||widePagination||wideDisclosure?'pan-x':'none';
  const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):timeField?Math.max(width<420?560:360,timeFieldHeight+240):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'?($('popover-mode').value==='1'?520:320):selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<268?240:width-48<488?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?($('virtual-axis').value==='2'?390:360):selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(width,designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value!=='0'?10*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ if(selected.name==='Badge'&&badgeLayout.value==='0')
+  height=width-48<220?430:340;
  if(selected.name==='Skeleton'&&skeletonLayout.value!=='0')
   height=Math.max(height,48+14*Number(skeletonRem.value));
  if(disclosure){
@@ -1136,6 +1161,7 @@ function render(){
  wasm.gallery_slider_options(...sliderValues());
  wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value),Number(controlShadowsEnabled()),Number($('radio-tab-order').checked),Number($('radio-styled-cards').checked),Number($('radio-mode').value),Number($('radio-accept').checked));
  wasm.gallery_avatar_options(Number($('avatar-source').value),Number($('avatar-palette').checked),Number($('avatar-hue').value),Number($('avatar-placeholder').value),Number($('avatar-rem').value));
+ if(selected.name==='Badge')wasm.gallery_badge_options(Number(badgeLayout.value));
  wasm.gallery_message_options(Number($('message-alignment').value),Number($('message-variant').value),Number($('message-inset').value),Number($('message-avatar').checked),Number($('message-scrollbar').checked));
  $('dropdown-shadow').disabled=$('dropdown-paint').value==='0'||$('dropdown-variant').value!=='11';
  wasm.gallery_dropdown_metadata_options(...['names','order','skip','toggle'].map(k=>Number($('dropdown-'+k).value)));
@@ -1598,6 +1624,8 @@ function selectComponent(){
  $('time-field-tab-mode').hidden=selected.name!=='TimeField';$('time-field-tab-mode').value='segments';
  for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control','text-paint'])$(id).hidden=selected.name!=='Theme';textPaintControl.value='0';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
  $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Pagination','Rating','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar','TimeField','Accordion','Collapsible','Carousel'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
+ badgeLayout.hidden=selected.name!=='Badge';badgeLayout.value='0';
+ if(!badgeLayout.hidden)syncBadgeControls();
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
  $('design-radius').value='-1';$('design-spacing').value='-1';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);

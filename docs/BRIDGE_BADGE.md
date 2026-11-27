@@ -5,9 +5,9 @@ It draws through the ordinary [C Badge component](BADGE.md) and places the
 indicator without moving the content. A count of zero hides the indicator.
 Children still produce their own events through the ordinary bridge queue.
 
-The optional V1 factory is available in working source. Python, JavaScript,
-TypeScript, Go and Rust can author the configured variant.
-The new C kind uses a dedicated factory to admit children.
+The optional V1 factory shipped in alpha.5. Python, JavaScript, TypeScript,
+Go and Rust can author the configured variant. The configured C kind uses
+a dedicated factory to admit children.
 [Python guide](PYTHON_ICON_BADGE.md) · [Node and TypeScript guide](NODE_ICON_BADGE.md) ·
 [Go guide](GO_ICON_BADGE.md) · [Rust guide](RUST_ICON_BADGE.md).
 

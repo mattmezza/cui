@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "../examples/badge_recipes/inbox.h"
 #include "../examples/composed_apps/app.h"
 #include "../examples/skeleton_recipes/scene.h"
 #include "../src/core/cui_ordered_input_internal.h"
@@ -2304,6 +2305,11 @@ static size_t gallery_editor_token(void *user, cui_str language, cui_str text, s
 }
 static size_t badge_count = 7;
 static bool badge_disabled;
+static bool badge_compare_variants;
+static badge_inbox_state badge_inbox_example;
+void gallery_badge_options(int layout) {
+    badge_compare_variants = layout == 1;
+}
 static void gallery_badge_content(cui_context *context, void *user) {
     const char *name = user;
     if (cui_button_ex(context, cui_id_from(context, name) ^ UINT64_C(0x7f3368229a10ce4b),
@@ -3280,6 +3286,7 @@ int gallery_init(void) {
     chart_state.hovered = SIZE_MAX;
     cui_icon_state_init(&icon_state);
     cui_icon_state_init(&badge_artwork);
+    badge_inbox_example = badge_inbox_defaults();
     if (!cui_icon_set_data(
             &badge_artwork,
             cui_string("<svg viewBox=\"0 0 16 16\"><path d=\"M2 2h5v5h7v7H2z\"/></svg>")))
@@ -5580,6 +5587,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     case 8: {
         badge_disabled = disabled != 0;
+        if (!badge_compare_variants) {
+            badge_inbox_photo photos[3];
+            for (unsigned i = 0; i < 3; i++)
+                photos[i] = (badge_inbox_photo){gallery_avatar_source(i), &avatar_images[i]};
+            badge_inbox_draw(ui, "badge-support-inbox", &t, &badge_inbox_example, photos, width - 48,
+                             badge_disabled);
+            break;
+        }
         cui_label(ui, &t, cui_string("Counts, overflow, dot and SVG icon badges on any content."));
         const char *names[] = {"Inbox", "Alerts", "Online", "Profile", "Quiet", "Custom icon"};
         for (unsigned i = 0; i < 6; i++) {

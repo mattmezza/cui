@@ -219,7 +219,7 @@
       ],
       "state_ownership": "Caller owns counts, options, child state and configured Icon state. Content is synchronous; Icon masks outlive rendering. Style/constraints are borrowed during submission.",
       "interaction": "Child controls return their own actions; corner indicators provide nonfocusable status semantics.",
-      "usage": "Use cui_badge_ex for count/dot/named-icon composition; use cui_badge_with_icon with caller-owned Icon state/options for configured artwork. Handle icon_error independently from composition admission and Core frame success.",
+      "usage": "Use cui_badge_ex for count, dot or named-icon composition around buttons or avatars. Nest Badge calls for independent corner indicators. Use cui_badge_with_icon with caller-owned Icon state/options for configured artwork and handle icon_error independently of the frame result.",
       "docs": [
         "docs/BADGE.md",
         "docs/BRIDGE_BADGE.md",
@@ -238,6 +238,9 @@
       "public_header": "include/cui/cui_components.h",
       "additional_public_headers": [
         "include/cui/cui_bridge.h"
+      ],
+      "examples": [
+        "examples/badge_recipes/inbox.h"
       ],
       "composition": "immediate frame submission"
     },

@@ -555,6 +555,11 @@ same-app Icon resource to a mounted rotating Spinner. The guide names the C,
 Python, JS/TS, Go and Rust accessors and their ownership rules. Use immediate C
 for custom callbacks.
 
+For Badge, read `docs/BADGE.md`. The copyable Support inbox recipe puts
+counts on icon buttons and nested status markers on photos. Keep counts and
+child actions in app state. Each badge uses a stable ID and leaves interaction
+to its child. Retained builders author configured Badge V1 around child nodes.
+
 For hidden native windows, read `docs/BINDING_BUILDERS.md` section `Native window
 visibility` and the chosen Go/Rust guide. C SDL3 uses
 `cui_sdl3_create_with_options` with `initially_hidden`; Python uses

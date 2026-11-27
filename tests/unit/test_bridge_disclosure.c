@@ -569,6 +569,11 @@ int main(void) {
     assert(!app->nodes[replacement.slot].disclosure_style);
     step(app);
     assert(row_color(app, replacement) != style.disabled_rgba);
+    strcpy(config.collapsed_icon, "plus");
+    assert(cui_bridge_disclosure_configure_v1(app, accordion, &config) == CUI_BRIDGE_OK);
+    style.cursor = CUI_BRIDGE_DISCLOSURE_CURSOR_CROSSHAIR;
+    assert(cui_bridge_disclosure_set_trigger_style_v1(app, replacement, &style) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_remove(app, accordion) == CUI_BRIDGE_OK);
     cui_bridge_destroy(app);
     test_heading_appearance();
     test_interaction_headings();

@@ -1296,6 +1296,12 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
             free(node->settings->defaults[i]);
         free(node->settings);
     }
+    node->disclosure_config = NULL;
+    node->disclosure_style = NULL;
+    node->disclosure_headings = NULL;
+    node->disclosure_titles = NULL;
+    node->disclosure_divider = NULL;
+    node->attachment_config = NULL;
     node->part_shadows = NULL;
     node->key = node->text = node->detail = NULL;
     node->kbd = NULL;

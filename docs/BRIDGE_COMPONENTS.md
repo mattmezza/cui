@@ -88,6 +88,10 @@ event layout, and functions are unchanged. New kinds are appended.
 | Dock | `cui_dock`, `cui_dock_view` | Retained native tab and split tree over Item panels and their child content; activate, split, query bounds, serialize and copied selected Item CHANGE | Up to 64 panels; panel topology freezes after first render; center workspace only, no host panel factories or close persistence |
 | Settings | `cui_settings` | Settings->Item pages->Item groups->Switch/Checkbox/Input/NumberInput fields; retained native navigation, copied filter query, native field interaction, selected page and field CHANGE snapshots, reset to first-render values | Up to 8 pages, 32 groups, 128 fields; topology and titles freeze after first render; field-level disabled only; no dropdown/custom fields, host persistence, or custom search callbacks |
 
+Removing retained Attachment or disclosure nodes releases their copied options
+and child options immediately. The application may shut down after removing
+those nodes.
+
 `cui_bridge_poll_event_ex` copies queued CHANGE snapshots, including editable
 text. A capacity failure preserves the event for retry. The legacy event poll
 returns CLICK events and skips CHANGE events.

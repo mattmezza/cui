@@ -252,6 +252,8 @@ int main(void) {
     step(app);
     cui_bridge_event event;
     assert(cui_bridge_poll_event(app, &event) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_set_text(app, card, filename) == CUI_BRIDGE_OK);
+    assert(cui_bridge_attachment_configure_v1(app, card, &config) == CUI_BRIDGE_OK);
     assert(cui_bridge_node_remove(app, card) == CUI_BRIDGE_OK);
     assert(cui_bridge_attachment_configure_v1(app, card, &config) == CUI_BRIDGE_STALE_HANDLE);
     assert(cui_bridge_attachment_set_preview_rgba_v1(app, card, NULL, 0, 0, 0, 0) ==

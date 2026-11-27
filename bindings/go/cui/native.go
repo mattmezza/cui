@@ -447,6 +447,22 @@ static cui_bridge_status go_set_radio_paint(cui_bridge_app *app, cui_bridge_node
  return radio_paint_set ? radio_paint_set(app, node, layer, paint) : CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
 
+static cui_bridge_status (*responsive_notifications_set)(cui_bridge_app *, uint32_t);
+static void go_responsive_notifications_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&responsive_notifications_set, sizeof responsive_notifications_set,
+                          "cui_bridge_set_responsive_notifications_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else { responsive_notifications_set = cui_bridge_set_responsive_notifications_v1; }
+#endif
+}
+static int go_responsive_notifications_supported(void) { return responsive_notifications_set != NULL; }
+static cui_bridge_status go_set_responsive_notifications(cui_bridge_app *app, uint32_t enabled) {
+ return responsive_notifications_set ? responsive_notifications_set(app, enabled)
+                                     : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+
 static cui_bridge_status (*radio_motion_set)(cui_bridge_app *, cui_bridge_node, uint32_t);
 
 static cui_bridge_status (*radio_content_set)(cui_bridge_app *, cui_bridge_node, uint32_t);
@@ -822,6 +838,7 @@ static int bridge_open(const char *path) {
  go_spinner_icon_initialize();
  go_pagination_initialize();
  go_rating_initialize();
+ go_responsive_notifications_initialize();
  go_radio_motion_initialize();
  go_radio_paint_initialize();
  go_radio_tab_index_initialize();
@@ -865,6 +882,7 @@ static int bridge_open(const char *path) {
  go_spinner_icon_initialize();
  go_pagination_initialize();
  go_rating_initialize();
+ go_responsive_notifications_initialize();
  go_radio_motion_initialize();
  go_radio_paint_initialize();
  go_radio_tab_index_initialize();
@@ -6715,4 +6733,28 @@ func (n *Node) SpinnerIconResource() (*IconResource, error) {
 		return nil, errors.New("unknown Spinner resource ownership")
 	}
 	return n.spinnerIconResource.alias(), nil
+}
+
+// ErrResponsiveNotificationsUnavailable indicates the provider lacks responsive notices.
+var ErrResponsiveNotificationsUnavailable = errors.New("responsive notifications are unavailable in this bridge")
+
+// SupportsResponsiveNotifications probes the optional retained notification layout.
+func (a *App) SupportsResponsiveNotifications() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_responsive_notifications_supported() != 0, nil
+}
+
+// SetResponsiveNotifications enables wrapping and independent Close for all retained
+// notifications in this app. It defaults off, is reversible, and must run outside Step.
+func (a *App) SetResponsiveNotifications(enabled bool) error {
+	supported, err := a.SupportsResponsiveNotifications()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrResponsiveNotificationsUnavailable
+	}
+	return result(C.go_set_responsive_notifications(a.ptr, C.uint32_t(btoi(enabled))))
 }

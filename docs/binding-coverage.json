@@ -328,7 +328,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The responsive presenter, Close before hover and stacked action layout are available in direct C submission and through opt-in immediate C Root mounting. Retained language builders keep the original presentation."
+        "The per-app responsive presenter is available through an optional bridge setter in Python, JavaScript, TypeScript, Go and Rust. Older providers keep legacy rendering. Action slots, stacked action layout, auto-hide and system delivery are immediate C only."
       ]
     },
     {

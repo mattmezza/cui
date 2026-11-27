@@ -1576,6 +1576,34 @@ static napi_value get_plot(napi_env env, napi_callback_info info) {
         return NULL;
     return result;
 }
+typedef cui_bridge_status (*responsive_notifications_fn)(cui_bridge_app *, uint32_t);
+static responsive_notifications_fn responsive_notifications_symbol(void) {
+    responsive_notifications_fn set = NULL;
+    (void)optional_bridge_symbol(&set, sizeof set, "cui_bridge_set_responsive_notifications_v1");
+    return set;
+}
+static napi_value supports_responsive_notifications(napi_env env, napi_callback_info info) {
+    (void)info;
+    napi_value result;
+    if (napi_get_boolean(env, responsive_notifications_symbol() != NULL, &result) != napi_ok)
+        return NULL;
+    return result;
+}
+static napi_value set_responsive_notifications(napi_env env, napi_callback_info info) {
+    napi_value v[2];
+    js_app *app;
+    bool enabled;
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app))
+        return NULL;
+    if (napi_get_value_bool(env, v[1], &enabled) != napi_ok)
+        return fail(env, "enabled must be boolean");
+    responsive_notifications_fn set = responsive_notifications_symbol();
+    if (!set)
+        return fail(env, "responsive notifications unavailable in this bridge");
+    cui_bridge_status code = set(app->bridge, enabled ? 1u : 0u);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 typedef cui_bridge_status (*stepper_fill_fn)(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t,
                                              float, float);
 static stepper_fill_fn stepper_fill_symbol(void) {
@@ -2966,6 +2994,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setVariant", set_num, 2);
     EXPORT("setSize", set_num, 3);
     EXPORT("setDesignSize", set_num, 14);
+    EXPORT("supportsResponsiveNotifications", supports_responsive_notifications, 0);
+    EXPORT("setResponsiveNotifications", set_responsive_notifications, 0);
     EXPORT("setStepperFill", set_stepper_fill, 0);
     EXPORT("supportsStepperFill", supports_stepper_fill, 0);
     EXPORT("setStepperVisual", set_stepper_visual, 0);

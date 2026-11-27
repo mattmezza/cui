@@ -1359,6 +1359,16 @@ cui_bridge_status cui_bridge_get_theme_preset(const cui_bridge_app *app, uint32_
     *out_index = app->theme_preset_index;
     return CUI_BRIDGE_OK;
 }
+cui_bridge_status cui_bridge_set_responsive_notifications_v1(cui_bridge_app *app,
+                                                             uint32_t enabled) {
+    cui_bridge_status status = bridge_ready(app);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (enabled > 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    app->responsive_notifications = enabled != 0;
+    return CUI_BRIDGE_OK;
+}
 cui_bridge_status cui_bridge_set_window_visible(cui_bridge_app *app, uint32_t visible) {
     cui_bridge_status status = bridge_ready(app);
     if (status != CUI_BRIDGE_OK)
@@ -6869,10 +6879,17 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
                   (cui_box){.width = -1, .height = -1, .background = app->theme.background});
     bridge_render_node(app, app->root);
     cui_end_box(app->ui);
-    if (app->notifications)
-        (void)cui_notifications(app->ui, UINT64_C(0x4e4f544946594255), &app->theme,
-                                app->notifications, (cui_rect){0, 0, app->width, app->height},
-                                app->now_seconds);
+    if (app->notifications) {
+        const cui_id scope = UINT64_C(0x4e4f544946594255);
+        cui_rect viewport = {0, 0, app->width, app->height};
+        if (app->responsive_notifications) {
+            cui_notification_advance advance;
+            (void)cui_notifications_responsive(app->ui, scope, &app->theme, app->notifications,
+                                               viewport, app->now_seconds, &advance);
+        } else
+            (void)cui_notifications(app->ui, scope, &app->theme, app->notifications, viewport,
+                                    app->now_seconds);
+    }
     cui_draw_list list = cui_end_frame(app->ui);
     status = cui_last_error(app->ui) == CUI_OK ? CUI_BRIDGE_OK : CUI_BRIDGE_CORE_ERROR;
     if (status == CUI_BRIDGE_OK && app->backend == CUI_BRIDGE_BACKEND_SDL)

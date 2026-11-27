@@ -18,6 +18,7 @@ pub use disclosure::{
 mod icon_resources;
 mod pagination_options;
 mod radio_motion;
+mod responsive_notifications;
 mod radio_paint;
 pub use radio_paint::{RadioPaint, RadioPaintLayer};
 mod shadows;

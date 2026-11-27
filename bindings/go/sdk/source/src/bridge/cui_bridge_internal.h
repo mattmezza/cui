@@ -191,6 +191,7 @@ struct cui_bridge_app {
     bool render_disabled;
     bool stepping, closed;
     bool running, run_dispatching, destroy_requested;
+    bool responsive_notifications;
     float width, height;
     double now_seconds;
     cui_notification_state *notifications;

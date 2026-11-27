@@ -1195,6 +1195,18 @@ class App {
     this._alive();
     return typeof native.supportsRadioPaint === 'function' && typeof native.setRadioPaint === 'function' && native.supportsRadioPaint();
   }
+  supports_responsive_notifications() {
+    this._alive();
+    return typeof native.supportsResponsiveNotifications === 'function' &&
+      typeof native.setResponsiveNotifications === 'function' && native.supportsResponsiveNotifications();
+  }
+  set_responsive_notifications(enabled) {
+    this._alive();
+    if (typeof enabled !== 'boolean') throw new TypeError('enabled must be boolean');
+    if (!this.supports_responsive_notifications()) throw new Error('responsive notifications unavailable in this bridge');
+    native.setResponsiveNotifications(this.handle, enabled);
+    return this;
+  }
   supports_stepper_fill() {
     this._alive();
     return typeof native.supportsStepperFill==='function' && typeof native.setStepperFill==='function' && native.supportsStepperFill();

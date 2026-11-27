@@ -628,6 +628,69 @@ static void test_notification(void) {
            CUI_BRIDGE_EMPTY);
     cui_bridge_destroy(app);
 }
+static void test_responsive_notifications(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_NONE,
+                                  .width = 220,
+                                  .height = 320};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_responsive_notifications_v1(NULL, 1) == CUI_BRIDGE_INVALID_ARGUMENT);
+    cui_bridge_node root = {0}, notice;
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_NOTIFICATION, "notice", &notice) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, notice, "Workspace report") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_detail_text(
+               app, notice,
+               "The weekly workspace report is ready. Make sure to review the "
+               "latest changes and tell your team before sharing it.") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_open(app, notice, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .4f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .3f) == CUI_BRIDGE_OK);
+    cui_bridge_rect legacy, responsive, restored;
+    assert(cui_bridge_node_bounds(app, notice, &legacy) == CUI_BRIDGE_OK);
+
+    assert(cui_bridge_set_responsive_notifications_v1(app, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_responsive_notifications_v1(app, 2) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_step(app, .3f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .3f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_bounds(app, notice, &responsive) == CUI_BRIDGE_OK);
+    assert(responsive.width == legacy.width && responsive.height > legacy.height);
+    assert(cui_bridge_set_responsive_notifications_v1(app, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .3f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .3f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_bounds(app, notice, &restored) == CUI_BRIDGE_OK);
+    assert(restored.width == legacy.width && restored.height == legacy.height);
+
+    assert(cui_bridge_set_responsive_notifications_v1(app, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .3f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .3f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_bounds(app, notice, &responsive) == CUI_BRIDGE_OK);
+    cui_bridge_event_ex event = {0};
+    char payload[8] = {0};
+    uint32_t needed = 0;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_EMPTY);
+    /* Close is already routed before the first pointer location enters the card. */
+    float x = responsive.x + responsive.width - 18, y = responsive.y + 18;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    uint32_t open;
+    assert(cui_bridge_get_open(app, notice, &open) == CUI_BRIDGE_OK && open == 0);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_step(app, .3f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.type == CUI_BRIDGE_EVENT_CLOSE && event.node.slot == notice.slot);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_EMPTY);
+    cui_bridge_destroy(app);
+}
 static void test_focus_trap(void) {
     cui_bridge_options o = {.struct_size = sizeof o,
                             .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -3049,6 +3112,7 @@ int main(void) {
     test_form();
     test_input_group();
     test_notification();
+    test_responsive_notifications();
     test_focus_trap();
     test_message_scroller();
     test_carousel();

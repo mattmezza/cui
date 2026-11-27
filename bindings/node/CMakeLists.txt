@@ -73,6 +73,9 @@ add_test(NAME node_sidebar_workspace COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME node_notifications_v1 COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/test/notifications-v1.test.cjs)
+add_test(NAME node_responsive_notifications COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_EXPECT_RESPONSIVE_NOTIFICATIONS=1
+ ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/responsive-notifications.test.cjs)
 
 # Synthetic protocol boundaries stay in a Linux test-only preload library.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -187,6 +190,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
  endif()
 endif()
 find_program(CUI_NODE_TSC_EXECUTABLE tsc)
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_responsive_notifications_types COMMAND ${CUI_NODE_TSC_EXECUTABLE}
+  --strict --target ES2020 --module commonjs --skipLibCheck --noEmit
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/responsive-notifications.types.ts)
+endif()
 if(CUI_NODE_TSC_EXECUTABLE)
  add_test(NAME node_slider_model_types_runtime COMMAND ${CMAKE_COMMAND} -E env
   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${Python3_EXECUTABLE}

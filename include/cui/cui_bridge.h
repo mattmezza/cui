@@ -996,6 +996,12 @@ cui_bridge_create_with_window_options(const cui_bridge_options *, const cui_brid
  * reports SDL's hidden flag, not occlusion/minimization or synchronous OS mapping. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_window_visible(cui_bridge_app *, uint32_t);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_get_window_visible(cui_bridge_app *, uint32_t *);
+/* Set between steps on the owning thread. Applies to the app's shared in-app
+ * notification stack from the next step, including already open cards. 1 selects
+ * wrapped cards with a dedicated Close target before hover; 0 restores the
+ * original presentation (default). Existing CLICK/CLOSE events are unchanged. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_responsive_notifications_v1(cui_bridge_app *,
+                                                                            uint32_t enabled);
 CUI_BRIDGE_API void cui_bridge_destroy(cui_bridge_app *app);
 /* Zero parent creates the single root. Keys are copied, unique among live nodes;
  * stale handles never alias a replacement node within an app. Handle provenance

@@ -805,6 +805,13 @@ add_test(NAME bridge_python_notifications_v1 COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_value_notifications COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_value_notifications_v1.py)
+add_test(NAME bridge_python_responsive_notifications COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ CUI_EXPECT_RESPONSIVE_NOTIFICATIONS=1
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_responsive_notifications.py)
+add_test(NAME bridge_python_notification_workspace COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/notification_workspace.py)
 
 add_executable(test_bridge_window_visibility ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_window_visibility.c)
 target_link_libraries(test_bridge_window_visibility PRIVATE cui_bridge)

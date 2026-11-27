@@ -38,6 +38,10 @@ export class App {
   set_window_visible(visible: boolean): this;
   window_visible(): boolean;
   mount(root: Row | Column | RootView): this;
+  /** Optional per-app responsive in-app stack; legacy behavior is the default. */
+  supports_responsive_notifications(): boolean;
+  /** Enables wrapping and independent Close controls. Call outside a step. */
+  set_responsive_notifications(enabled: boolean): this;
   /** Whether this app's native bridge offers retained Stepper Fill. */
   supports_stepper_fill(): boolean;
   /** Whether this app's native bridge supports fractional Carousel slides. */

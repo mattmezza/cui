@@ -284,6 +284,10 @@ class _API:
         self.set_text = bind("set_text", C.c_int, C.c_void_p, _Handle, C.c_char_p)
         self.set_gap = bind("set_gap", C.c_int, C.c_void_p, _Handle, C.c_float)
         self.set_variant = bind("set_button_variant", C.c_int, C.c_void_p, _Handle, C.c_int)
+        self.set_responsive_notifications = None
+        if hasattr(lib, "cui_bridge_set_responsive_notifications_v1"):
+            self.set_responsive_notifications = bind("set_responsive_notifications_v1", C.c_int,
+                                                     C.c_void_p, C.c_uint32)
         self.set_stepper_fill = None
         if hasattr(lib, "cui_bridge_set_stepper_fill"):
             self.set_stepper_fill = bind("set_stepper_fill", C.c_int, C.c_void_p, _Handle,
@@ -2251,6 +2255,21 @@ class App:
     def _require_radio_motion(self) -> None:
         if not self.supports_radio_motion():
             raise RuntimeError("Radio motion requires cui_bridge_radio_set_motion_v1")
+
+    def supports_responsive_notifications(self) -> bool:
+        """Report optional responsive in-app notification stack support."""
+        self._ensure_open()
+        return self._api.set_responsive_notifications is not None
+
+    def set_responsive_notifications(self, enabled: bool) -> "App":
+        """Enable wrapping and independent Close controls; default is legacy/off."""
+        self._ensure_open()
+        if type(enabled) is not bool:
+            raise TypeError("enabled must be bool")
+        if not self.supports_responsive_notifications():
+            raise RuntimeError("responsive notifications unavailable in this bridge")
+        self._api.check(self._api.set_responsive_notifications(self._ptr, int(enabled)))
+        return self
 
     def supports_stepper_fill(self) -> bool:
         """Report whether the provider offers retained Stepper Fill."""

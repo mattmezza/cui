@@ -608,13 +608,44 @@ Form accepts Item fields whose children are real controls; Item label/detail
 supply field metadata. Disabling Form or a field suppresses its child controls.
 InputGroup uses editable text and Item button addons; Item `step_status(0..3)`
 chooses the addon alignment and `on_click` receives addon presses.
-Notification is an in-app card. It uses title/detail, `open`, `is_open`, click and
-close callbacks. Cards share one stack; there is no OS notification delivery,
-autohide or action-button API in this bridge subset. The close callback arrives after the close animation completes;
-`is_open()` becomes false when dismissal starts. Set the title/detail before opening.
-
 FocusTrap accepts children and `open()`/`is_open()`. Its open modal focus scope
 blocks pointer actions outside the subtree; closing restores outside interaction.
+
+### Notification cards
+
+Set a card's title and detail before opening it. Body activation emits Click and
+starts dismissal. Close emits only the Close event after the exit animation.
+`is_open()` becomes false as soon as dismissal starts. To reopen the same node,
+wait for its Close event. The bridge currently exposes in-app delivery and
+manual dismissal. OS delivery, auto-hide and custom actions remain immediate C
+features.
+
+Enable wrapping and a separate Close control before hover for the app's shared
+stack. The option applies from the next step, including cards that are already
+open. Pass false to restore the default presentation. Check support first with
+an installed shared provider. Both presentations deliver the same queued events.
+
+| Binding | Probe | Enable |
+| --- | --- | --- |
+| C | Look up the optional setter when loading a shared provider | `cui_bridge_set_responsive_notifications_v1(app, 1)` |
+| Python | `app.supports_responsive_notifications()` | `app.set_responsive_notifications(True)` |
+| JavaScript and TypeScript | `app.supports_responsive_notifications()` | `app.set_responsive_notifications(true)` |
+| Go | `supported, err := app.SupportsResponsiveNotifications()` | `app.SetResponsiveNotifications(true)` |
+| Rust | `app.supports_responsive_notifications()` | `app.set_responsive_notifications(true)?` |
+
+The workspace example opens a real card through a button, disables the button
+until dismissal completes, and updates the workspace status in the Close
+handler. With a built bridge, run it from the repository root. Omit `--font`
+to exercise the same UI headlessly. [Workspace example](../bindings/bridge/examples/notification_workspace.py)
+
+```sh
+PYTHONPATH=bindings/python CUI_BRIDGE_LIBRARY="$PWD/build/libcui_bridge.so" \
+  python bindings/bridge/examples/notification_workspace.py --font /path/to/Inter-Regular.ttf
+```
+
+The window requires the SDL bridge. For compiler, dependency and linker setup,
+see the [native quickstart](NATIVE_APP_STARTER.md) and the bridge build commands
+at the start of this guide.
 
 ## Native fonts and fallback faces
 

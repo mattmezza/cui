@@ -142,11 +142,19 @@ process and temporary consumer directories; reference fixtures remain read-only.
 On Linux, use `python scripts/test_local.py --build-dir build` to isolate the
 display for local tests.
 
-The alpha.12 portable Ubuntu Release job took 1,026 seconds, of which 933 were
-compilation and 83 were CTest. The next candidate uses four workers for this
-job's primary compile on the four-core public Ubuntu runner. The other portable
-builds use two workers. Use the hosted compile and CTest step durations for the
-comparison. Candidate timing is pending. [Alpha.12 job](https://github.com/mattmezza/cui/actions/runs/45905181988/job/140200121683) · [Runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)
+The portable Ubuntu Release job uses four workers for its primary compile on
+GitHub's four-core public runner. The other portable builds, nested builds and
+CTest keep two workers. [Runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)
+
+| Successful Ubuntu Release job | Compile workers | Compile | CTest | Job total |
+| --- | ---: | ---: | ---: | ---: |
+| [Alpha.12 baseline](https://github.com/mattmezza/cui/actions/runs/45905181988/job/140200121683) | 2 | 933 s | 83 s | 1,026 s |
+| [Alpha.13 precursor](https://github.com/mattmezza/cui/actions/runs/45915851860/job/140234881707) | 4 | 770 s | 94 s | 875 s |
+
+The observed compile was 163 seconds shorter (17.5%) and the job was 151 seconds
+shorter (14.7%). CTest took 11 seconds longer with the same worker limit. The two
+runs used different revisions and hosted runners, so the difference includes
+source changes and runner variation.
 
 The baseline Windows Debug job in [run 41249695765](https://github.com/mattmezza/cui/actions/runs/41249695765)
 spent 165.88 seconds on `agent_skill_contract` and 98.43 seconds on

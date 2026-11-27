@@ -1,0 +1,156 @@
+{
+  "release": {
+    "isDraft": false,
+    "isPrerelease": true,
+    "publishedAt": "2026-11-27T10:41:02Z",
+    "url": "https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.16"
+  },
+  "source_revision": "1b7b3f36aa4df0a3332f51bfa2fc9b489e4a01ab",
+  "hosted_gates": {
+    "ci": {
+      "attempt": 1,
+      "conclusion": "success",
+      "headBranch": "main",
+      "headSha": "1b7b3f36aa4df0a3332f51bfa2fc9b489e4a01ab",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45981378173",
+      "jobs_passed": 16
+    },
+    "native_callbacks": {
+      "attempt": 1,
+      "conclusion": "success",
+      "headBranch": "main",
+      "headSha": "1b7b3f36aa4df0a3332f51bfa2fc9b489e4a01ab",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45981378271",
+      "jobs_passed": 1
+    },
+    "pages": {
+      "attempt": 1,
+      "conclusion": "success",
+      "headBranch": "main",
+      "headSha": "1b7b3f36aa4df0a3332f51bfa2fc9b489e4a01ab",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45981378441",
+      "jobs_passed": 5
+    }
+  },
+  "website": {
+    "verification": {
+      "source_revision": "1b7b3f36aa4df0a3332f51bfa2fc9b489e4a01ab",
+      "public_url": "https://matteo.merola.co/cui/",
+      "version": "0.1.0-alpha.16",
+      "native_starter": {
+        "bytes": 2194244,
+        "sha256": "b4c7cea62ac5a799b04217b37585fe297f9322a719301a662a812b6f7be10466"
+      },
+      "gallery_wasm_cache_key": "304eb90312f8e088"
+    },
+    "native_starter": {
+      "file": "cui-0.1.0-alpha.16-native-starter.tar.gz",
+      "bytes": 2194244,
+      "sha256": "b4c7cea62ac5a799b04217b37585fe297f9322a719301a662a812b6f7be10466"
+    }
+  },
+  "local_validation": {
+    "installed_checks": [
+      "native starter",
+      "static C",
+      "Python, JavaScript, TypeScript",
+      "Go and Rust"
+    ],
+    "clean_consumer_checks": "All five installed bindings probed Notification actions, auto-hide, Centered Fill Stepper, composed dialogs and secondary Popover activation. Each ran account_menu and dialog_composition.",
+    "text_checks": "Native wheel and npm bridge rendering compared with canonical text using primary and RTL fonts.",
+    "gallery": {
+      "source_revision": "1b7b3f36aa4df0a3332f51bfa2fc9b489e4a01ab",
+      "version": "0.1.0-alpha.16",
+      "starter": {
+        "bytes": 2194244,
+        "sha256": "b4c7cea62ac5a799b04217b37585fe297f9322a719301a662a812b6f7be10466"
+      },
+      "wasm": {
+        "bytes": 8644746,
+        "sha256": "7f6cae1bd8731622e53e65f322e43ee8697c2a1293c5802100c3724455410137"
+      },
+      "checks": [
+        "stepper_visual_gallery",
+        "popover_anchor_gallery",
+        "source_composition_gallery"
+      ]
+    }
+  },
+  "draft_asset_verification": {
+    "release_tag": "v0.1.0-alpha.16",
+    "source_revision": "1b7b3f36aa4df0a3332f51bfa2fc9b489e4a01ab",
+    "assets": {
+      "cui-0.1.0-alpha.16-native-starter.tar.gz": {
+        "bytes": 2194244,
+        "sha256": "b4c7cea62ac5a799b04217b37585fe297f9322a719301a662a812b6f7be10466"
+      },
+      "cui-native-0.1.0-alpha.16.tgz": {
+        "bytes": 13823317,
+        "sha256": "c29cc41af06dad1fb74d6360ada394d9b762fa01a31c8c8a30b61cdaf4581695"
+      },
+      "cui_bridge-0.1.0a16-py3-none-linux_x86_64.whl": {
+        "bytes": 16656333,
+        "sha256": "a87f68e7a5132cc3452022d2d8487f3ec628bbd160696c081117755b686426bf"
+      },
+      "SHA256SUMS": {
+        "bytes": 1001,
+        "sha256": "dfe2151dc2e25abd54bb96d766a64ad61e0ea35ec7cae8aaf674d703f3277cb0"
+      },
+      "cui-0.1.0-alpha.16-linux-x86_64-static.tar.gz": {
+        "bytes": 2438616,
+        "sha256": "3bb94725de9d9c08a34b950534152985437515e1ce3653abf722040bc2358f3e"
+      },
+      "cui-builders-0.1.0-alpha.16.crate": {
+        "bytes": 2204852,
+        "sha256": "c0a3eec23648132af5b220b5e4723aeec47658fc75dc05d7ef05c3d868ed0d72"
+      },
+      "source-artifact-inspection.json": {
+        "bytes": 497,
+        "sha256": "37471181e6f62ad49f02d18d38ee50b41b2bc1ad2798cd235a5e6a6d00c7fcaf"
+      },
+      "ASSET_MANIFEST.json": {
+        "bytes": 5939,
+        "sha256": "f7fa8337a397555dc792371ec2f2014851b568de2849b488e6eb88816f7030f2"
+      },
+      "cui-0.1.0-alpha.16-go-source-proxy.tar.gz": {
+        "bytes": 2492711,
+        "sha256": "c4051c784e3d5e5520e217f8d5b4883f574500fb584fbe0e03ea3550e6914bb3"
+      },
+      "cui-0.1.0-alpha.16-source.tar.gz": {
+        "bytes": 31606866,
+        "sha256": "1f86151bd8595a0e82308073d9ffee1c25e49fd8f85f7831349dc606332d5d5c"
+      },
+      "RELEASE_NOTES.md": {
+        "bytes": 1449,
+        "sha256": "bccf30d86b67bc4b7c342927100b31c7d7c3cedd4ef227edca3565dc128e4094"
+      }
+    }
+  },
+  "public_go_module": {
+    "source_revision": "1b7b3f36aa4df0a3332f51bfa2fc9b489e4a01ab",
+    "version": "v0.1.0-alpha.16",
+    "endpoint": "https://proxy.golang.org/github.com/mattmezza/cui/bindings/go/@v/v0.1.0-alpha.16",
+    "public_zip_sha256": "b39673aafe68149f807cf2531d2feb2152fd1811c451d0806801fb0eaf09eace",
+    "verified_files": 731,
+    "version_info": {
+      "Version": "v0.1.0-alpha.16",
+      "Time": "2026-11-27T10:20:39Z",
+      "Origin": {
+        "VCS": "git",
+        "URL": "https://github.com/mattmezza/cui",
+        "Subdir": "bindings/go",
+        "Hash": "1b7b3f36aa4df0a3332f51bfa2fc9b489e4a01ab",
+        "Ref": "refs/tags/bindings/go/v0.1.0-alpha.16"
+      }
+    }
+  },
+  "limitations": [
+    "Native binaries target Linux x86_64 and require system dependencies.",
+    "Physical devices, hardware GPU rendering and assistive-technology qualification remain open.",
+    "All 78 scoped component families have tested subsets. Full feature verification remains open.",
+    "Python, npm and Rust are GitHub release assets. Separate package registry publication remains open."
+  ]
+}

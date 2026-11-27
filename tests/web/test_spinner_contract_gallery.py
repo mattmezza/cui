@@ -17,6 +17,7 @@ from test_questionnaire_progress_gallery import compile_usage
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, required=True)
+    parser.add_argument('--chromium')
     args = parser.parse_args()
     class Handler(SimpleHTTPRequestHandler):
         def log_message(self, *args):
@@ -25,7 +26,7 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
+            browser = pw.chromium.launch(headless=True, executable_path=args.chromium)
             for width, dpr in ((1280, 1), (1280, 2), (390, 1), (390, 2)):
                 context = browser.new_context(viewport={'width': width, 'height': 1000}, device_scale_factor=dpr, reduced_motion='reduce')
                 page = context.new_page(); errors = []

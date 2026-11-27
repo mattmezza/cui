@@ -8,6 +8,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import threading
 from playwright.sync_api import sync_playwright
+from test_questionnaire_progress_gallery import compile_usage
 
 IMAGE = '''()=>{const e=cuiGallery.exports;for(let i=0;i<e.gallery_count();i++)if(e.gallery_command(i,0)===5){
  return {rect:[1,2,3,4].map(f=>e.gallery_command(i,f)),tint:[10,11,12,13].map(f=>e.gallery_bitmap(i,f)),
@@ -42,13 +43,16 @@ def main():
                     page.wait_for_function('('+IMAGE+')()?.tint[0]===220')
                     assert page.evaluate(IMAGE)['tint']==[220,40,90,255]
                     masks=[];shots=[]
-                    for icon in range(3):
-                        page.locator('#spinner-icon').select_option(str(icon))
-                        page.wait_for_timeout(70)
+                    icon_control=page.locator('#spinner-icon')
+                    for icon in range(4):
+                        if icon_control.input_value()!=str(icon):
+                            frame=page.evaluate('cuiGallery.frame')
+                            icon_control.select_option(str(icon))
+                            page.wait_for_function('(f)=>cuiGallery.frame>f',arg=frame)
                         masks.append(page.evaluate(IMAGE)['mask'])
                         shots.append(page.locator('canvas').screenshot())
-                    assert len({bytes(m) for m in masks})==3
-                    assert len(set(shots))==3
+                    assert len({bytes(m) for m in masks})==4
+                    assert len(set(shots))==4
                     assert page.evaluate('cuiGallery.exports.gallery_next_wake()')==0
                     idle=page.evaluate('cuiGallery.frame');shot=page.locator('canvas').screenshot()
                     page.wait_for_timeout(100)
@@ -62,15 +66,19 @@ def main():
                     page.emulate_media(reduced_motion='no-preference')
                     page.wait_for_function('cuiGallery.renderedReducedMotion===false')
                     moving=page.locator('canvas').screenshot();frame=page.evaluate('cuiGallery.frame')
-                    page.wait_for_function('(f)=>cuiGallery.frame>f+3',arg=frame)
+                    page.wait_for_function('(f)=>cuiGallery.frame>f+18',arg=frame)
                     assert page.locator('canvas').screenshot()!=moving
+                    assert any(page.evaluate(IMAGE)['mask'][3::4])
                     assert page.evaluate('cuiGallery.exports.gallery_next_wake()')>0
                     assert page.evaluate('cuiGallery.exports.gallery_redraw()')==0
                     assert page.locator('#accessible [role=status],#accessible [aria-busy=true]').count()==0
                     assert page.evaluate('cuiGallery.exports.gallery_error()')==0
                     page.evaluate('''()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>window.copiedSpinner=t}})''')
                     page.locator('#copy-snippet').click()
-                    page.wait_for_function('window.copiedSpinner?.includes("cui_spinner_ex")')
+                    page.wait_for_function('window.copiedSpinner?.includes("cui_icon_set_data")')
+                    snippet=page.evaluate('window.copiedSpinner')
+                    assert 'cui_spinner_ex' in snippet
+                    compile_usage(snippet)
                     page.locator('#component-guides').get_by_role('link',name='Spinner',exact=True).click()
                     page.locator('#docs-title').filter(has_text='Spinner').wait_for(state='visible')
                     assert not errors,errors

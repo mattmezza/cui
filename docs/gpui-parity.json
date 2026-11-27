@@ -3499,6 +3499,13 @@
           ]
         },
         {
+          "name": "custom SVG artwork in the WASM gallery",
+          "status": "tested",
+          "evidence": [
+            "tests/web/test_spinner_gallery.py"
+          ]
+        },
+        {
           "name": "retained C shared Icon resource artwork",
           "status": "tested",
           "evidence": ["tests/unit/test_bridge_spinner.c", "bindings/bridge/examples/spinner_status.c"]

@@ -238,7 +238,7 @@ static cui_loading_motion_result spinner_result;
 static bool spinner_valid, spinner_unchanged;
 void gallery_spinner_options(float size, int icon, int color, int easing) {
     spinner_size = isfinite(size) && size >= 1 && size <= 128 ? size : 16;
-    spinner_icon = icon >= 0 && icon <= 2 ? icon : 0;
+    spinner_icon = icon >= 0 && icon <= 3 ? icon : 0;
     spinner_color = color >= 0 && color <= 2 ? color : 0;
     spinner_easing = easing >= 0 && easing <= 8 ? easing : 0;
 }
@@ -304,19 +304,45 @@ static float gallery_spinner_ease(float phase, void *user) {
     }
 }
 
+typedef struct {
+    cui_icon_state icon;
+    bool ready;
+} gallery_spinner_artwork;
+
+static void gallery_spinner_artwork_collect(void *resource) {
+    cui_icon_state_collect(&((gallery_spinner_artwork *)resource)->icon);
+}
+
+static void gallery_spinner_artwork_destroy(void *resource) {
+    cui_icon_state_destroy(&((gallery_spinner_artwork *)resource)->icon);
+}
+
 static bool gallery_spinner_icon(cui_context *context, cui_id id, const cui_theme *theme,
                                  float size, cui_color color, float radians, void *user) {
     spinner_paints++;
     spinner_paint_size = size;
     spinner_paint_radians = radians;
-    return cui_icon_named(context, id, theme, cui_string(user),
-                          (cui_icon_options){.size = CUI_ICON_CUSTOM,
-                                             .custom_size = size,
-                                             .custom_color = true,
-                                             .color = color,
-                                             .custom_transform = true,
-                                             .transform = cui_icon_rotation(radians)}) ==
-           CUI_ICON_OK;
+    cui_icon_options options = {.size = CUI_ICON_CUSTOM,
+                                .custom_size = size,
+                                .custom_color = true,
+                                .color = color,
+                                .custom_transform = true,
+                                .transform = cui_icon_rotation(radians)};
+    if (user)
+        return cui_icon_named(context, id, theme, cui_string(user), options) == CUI_ICON_OK;
+    gallery_spinner_artwork *artwork =
+        cui_resource_get(context, id, UINT64_C(0x6d5c60713bb44f7a), sizeof(*artwork),
+                         gallery_spinner_artwork_collect, gallery_spinner_artwork_destroy);
+    if (!artwork)
+        return false;
+    if (!artwork->ready) {
+        artwork->ready = cui_icon_set_data(
+            &artwork->icon, cui_string("<svg viewBox='0 0 24 24'>"
+                                       "<path d='M12 2 L20 14 L12 20 L6 13 L11 13 Z'/></svg>"));
+        if (!artwork->ready)
+            return false;
+    }
+    return cui_icon(context, id, theme, &artwork->icon, options) == CUI_ICON_OK;
 }
 
 static float host_seconds, host_dt = 1.0f / 60;
@@ -5922,7 +5948,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             options.sizing = &sizing;
         if (spinner_icon) {
             options.paint = gallery_spinner_icon;
-            options.paint_user = spinner_icon == 1 ? "loader-circle" : "arrow-right";
+            options.paint_user = spinner_icon == 1   ? "loader-circle"
+                                 : spinner_icon == 2 ? "arrow-right"
+                                                     : NULL;
         }
         options.now_seconds = cui_frame_time(ui);
         options.reduced_motion = reduced_motion;
@@ -5941,7 +5969,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                     ? host_seconds + fmax(0, spinner_result.next_wake_seconds - cui_frame_time(ui))
                     : 0;
         else
-            cui_label(ui, &t, cui_string("Custom easing rejected: expected finite turns."));
+            cui_label(ui, &t,
+                      cui_string(spinner_easing >= 6 ? "Custom easing rejected: expected finite turns."
+                                                      : "The Spinner could not paint this icon."));
         break;
     }
     case 20: {

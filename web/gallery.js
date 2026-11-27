@@ -367,7 +367,7 @@ for(const [id,label,choices] of [
  ['hover-policy','HoverCard dismissal',[['0','Legacy hover/focus'],['1','Tap toggle · conservative outside tap'],['2','Tap toggle · outside release']]],
  ['hover-preview','HoverCard content',[['0','Compact profile'],['1','Wrapped bio'],['2','Near bottom edge']]],
  ['spinner-size','Spinner size',[['12','Extra small · 12px'],['14','Small · 14px'],['16','Medium · 16px'],['24','Large · 24px'],['64','Custom · 64px']]],
- ['spinner-icon','Spinner icon',[['0','Loader'],['1','Loader circle'],['2','Arrow right']]],
+ ['spinner-icon','Spinner icon',[['0','Loader'],['1','Loader circle'],['2','Arrow right'],['3','Custom SVG']]],
  ['spinner-color','Spinner color',[['0','Theme foreground'],['1','Custom pink'],['2','Transparent']]],
  ['spinner-easing','Spinner easing',[['0','Source ease in out'],['1','Linear'],['2','Quarter turn'],['3','Negative −0.75 turns'],['4','Extra 1.25 turns'],['5','Shifted linear +0.25'],['6','Reject NaN'],['7','Reject +Infinity'],['8','Reject −Infinity']]],
  ['spinner-sizing','Spinner size identity',[['0','Legacy pixels'],['1','Named XS'],['2','Named S'],['3','Named M'],['4','Named L'],['5','Custom pixels']]],

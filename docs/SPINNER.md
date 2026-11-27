@@ -126,22 +126,22 @@ wake scheduling. The two APIs intentionally have distinct contracts.
 
 ## Gallery and verification
 
-The existing **Spinner** gallery entry offers source preset/custom sizes,
-Loader/Loader circle/Arrow right, theme/custom/transparent colors, and default
-quadratic/linear easing. Optional size-identity/rem selectors exercise the named
-descriptor while legacy pixels remain the default. Additional easing choices
-show quarter, negative/extra turns, shifted linear easing and deliberate nonfinite
-rejection. Copy its concrete C example and open this guide from the component.
-No extra catalog family is introduced.
+The **Spinner** gallery offers preset and custom sizes, Loader, Loader circle,
+Arrow right and an app-authored SVG, plus theme, custom and transparent colors.
+Choose **Custom SVG** and copy the example to see how the CUI context manages
+the artwork's lifetime. The size selectors let you compare fixed pixels with
+rem-based sizing. Easing choices include quadratic, linear, shifted and full
+turn variants, plus deliberate nonfinite rejection.
 
 `tests/unit/test_spinner_contract.c` verifies all source pixel sizes plus custom
 64, default color, transparent color, actual rotated custom SVG pixels, static
 reduced-motion restoration, supported Icon background/radius styling, ancestor
 opacity and clipping, and decorative/quiescent behavior. Existing
 `test_status_motion.c` covers clocks, callbacks, custom easing and rejection.
-`tests/web/test_spinner_gallery.py` loads real WASM and exercises controls,
-bitmap/pixel changes, reduced-motion quiescence, desktop/390px and DPR 1/2,
-copyable usage and guide navigation. Native tests run through
+`tests/web/test_spinner_gallery.py` loads real WASM and compares rendered pixels
+for each artwork. It checks sustained custom SVG rotation, reduced-motion
+quiescence, desktop and 390px viewports at DPR 1 and 2, compilable usage and
+guide navigation. Native tests run through
 `python scripts/test_local.py --build-dir <build>`; browsers stay headless.
 These tests are evidence for the listed behavior, not hardware/GPU acceptance.
 

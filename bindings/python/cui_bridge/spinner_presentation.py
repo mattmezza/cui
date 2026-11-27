@@ -8,6 +8,7 @@ from enum import IntEnum
 from types import SimpleNamespace
 
 from . import BridgeError, Widget, _Handle
+from .icons import IconResource
 
 
 class SpinnerSize(IntEnum):
@@ -152,9 +153,8 @@ class RotatingSpinner(Widget):
         self._spinner_config = config
         return self
 
-    def set_icon_resource(self, resource: "IconResource | None") -> RotatingSpinner:
+    def set_icon_resource(self, resource: IconResource | None) -> RotatingSpinner:
         """Bind same-app shared SVG artwork after mounting; None restores catalog artwork."""
-        from .icons import IconResource
         if self._app is None:
             raise RuntimeError("rotating Spinner is not mounted")
         app = self._app

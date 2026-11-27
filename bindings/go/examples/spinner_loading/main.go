@@ -33,6 +33,14 @@ func main() {
 		must(finish.SetText("Profile loaded"))
 	})
 	must(app.Mount(cui.Column("root").GapUnits(2).Children(title, spinner, status, finish)))
+	// Older providers keep the catalog Loader; capable providers share custom SVG.
+	artworkSupported, err := app.SupportsSpinnerIconResources()
+	must(err)
+	if artworkSupported {
+		artwork, err := app.NewIconResource(cui.IconSVG(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7z"/></svg>`), cui.IconLimits{})
+		must(err)
+		must(spinner.SetSpinnerIconResource(artwork))
+	}
 	if *font != "" && !*smoke {
 		must(app.Run(.016))
 		return

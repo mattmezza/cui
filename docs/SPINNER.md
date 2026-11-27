@@ -322,5 +322,34 @@ with a separately installed bridge. The probe checks the complete V1 export
 group and both record sizes. Existing providers keep the ordinary Spinner.
 The rotating constructor's configuration, including color, size and icon, is
 subject to V1 validation. The builders support catalog icons and the built-in
-quadratic and linear curves. Custom retained SVG is currently exposed in C.
-Use immediate C for custom paint or easing callbacks.
+quadratic and linear curves. Use immediate C for custom paint or easing callbacks.
+
+### Share SVG artwork in a language builder
+
+Create an Icon resource in the same app and bind it to a mounted rotating
+Spinner. The complete examples above probe the optional artwork API before
+binding, so the configured catalog icon still works with older providers.
+
+```python
+from cui_bridge import IconSource
+
+if app.supports_spinner_icon_resource():
+    artwork = app.icon_resource(IconSource.svg(
+        '<svg viewBox="0 0 24 24"><path d="M12 2L22 12H12Z"/></svg>'))
+    loading.set_icon_resource(artwork)
+    # When switching back to the configured catalog icon:
+    loading.set_icon_resource(None)
+    artwork.close()
+```
+
+| Builder | Capability check | Bind or clear after mounting | Read bound resource |
+| --- | --- | --- | --- |
+| Python | `app.supports_spinner_icon_resource()` | `loading.set_icon_resource(artwork)` or `None` | — |
+| JS/TS | `app.supports_spinner_icon_resource()` | `loading.set_icon_resource(artwork)` or `null` | — |
+| Go | `app.SupportsSpinnerIconResources()` | `loading.SetSpinnerIconResource(artwork)` or `nil` | `loading.SpinnerIconResource()` |
+| Rust | `app.supports_spinner_icon_resources()` | `app.set_spinner_icon_resource(loading, Some(artwork))` or `None` | `app.spinner_icon_resource(loading)` |
+
+Keep the resource reference in your application when you need it in Python
+or JS/TS. Go and Rust can read a handle that refers to the same resource with
+its existing app ownership. Clear or remove every consuming widget before
+closing the resource. Changes to the source appear on the next step.

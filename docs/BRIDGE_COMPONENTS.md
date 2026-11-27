@@ -40,7 +40,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | GroupBox | `cui_begin_group_box` | copied title, width, child tree | Native group container |
 | Kbd | `cui_kbd` / `cui_kbd_ex` | Copied literal or typed single stroke, platform key labels, plain and outline modes, optional accessible label | [Retained C and language builders](KBD.md#show-a-shortcut-in-a-retained-ui). Custom box, typography and text paint are immediate C. |
 | Skeleton | `cui_skeleton`, optional retained presentation | Legacy fixed dimensions and responsive sizing, styling and wake hints in [Python](PYTHON_SKELETON.md), [JS/TS](NODE_SKELETON.md), [Go](GO_SKELETON.md) and [Rust](RUST_SKELETON.md) | Direct C palette lookup, custom easing and full Core box descriptor |
-| Spinner | `cui_spinner_ex` | Opt-in rotation, sizes, color, built-in easing and motion samples | Language builders use embedded catalog keys. C also accepts shared Icon resources. [Spinner guide](SPINNER.md) |
+| Spinner | `cui_spinner_ex` | Opt-in rotation, sizes, color, built-in easing and motion samples | C and language builders support catalog icons and optional shared Icon artwork. [Spinner guide](SPINNER.md) |
 | Tag | `cui_tag` | copied text | Default style |
 | Marker | `cui_marker` | copied text, retained state | Single text child |
 | Shimmer | `cui_shimmer_text` | copied text, retained state | Single line |

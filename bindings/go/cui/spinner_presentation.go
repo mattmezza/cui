@@ -6,6 +6,8 @@ import (
 	"unicode/utf8"
 )
 
+var ErrSpinnerIconResourcesUnavailable = errors.New("Spinner Icon resources V1 are unavailable")
+
 var ErrSpinnerPresentationUnavailable = errors.New("Spinner V1 is unavailable")
 
 type SpinnerSize uint32

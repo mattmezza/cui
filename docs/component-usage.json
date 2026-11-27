@@ -1004,7 +1004,7 @@
       ],
       "state_ownership": "Immediate C caller owns persistent motion state, host clock and reduced-motion preference. Optional sizing and callback userdata are borrowed through submission. The retained C bridge copies configuration and owns the clock per node.",
       "interaction": "Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.",
-      "usage": "Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Use optional rem or custom-pixel sizing, a custom SVG painter or finite turns from custom easing. Retained builders offer copied catalog icons and motion settings. Retained C also accepts same-app Icon resources for custom SVG.",
+      "usage": "Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Use optional rem or custom-pixel sizing, a custom SVG painter or finite turns from custom easing. Retained builders offer copied catalog icons and motion settings, and can bind same-app Icon resources for custom SVG after mount.",
       "docs": [
         "docs/SPINNER.md",
         "docs/CONTENT.md"

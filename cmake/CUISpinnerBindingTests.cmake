@@ -44,6 +44,8 @@ endfunction()
 
 set(_go_test test ./cui -count=1 -run "^Test(RotatingSpinner|SpinnerConfigurationValidation)$")
 set(_rust_test ${CUI_SPINNER_CARGO} test --offline --locked -j1 --test spinner_presentation)
+set(_go_artwork_test test ./cui -count=1 -run "^TestSpinnerIconResources$")
+set(_rust_artwork_test ${CUI_SPINNER_CARGO} test --offline --locked -j1 --test spinner_icon_resources)
 set(_rust_shared "${CUI_RUST_SKELETON_TARGET_DIR}")
 set(_rust_bundled "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}")
 set(_rust_current CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>)
@@ -54,6 +56,10 @@ cui_spinner_rust_test(dynamic "${_rust_shared}" 0 ${_rust_current} ${_rust_test}
 cui_spinner_rust_test(bundled "${_rust_bundled}" 0 ${_rust_test})
 cui_spinner_rust_test(example "${_rust_bundled}" 0
  ${CUI_SPINNER_CARGO} run --offline --locked -j1 --example spinner_loading)
+cui_spinner_go_test(artwork_dynamic $<TARGET_FILE:cui_bridge> 0 ${_go_artwork_test} -tags cui_dynamic)
+cui_spinner_go_test(artwork_bundled "" 0 ${_go_artwork_test})
+cui_spinner_rust_test(artwork_dynamic "${_rust_shared}" 0 ${_rust_current} ${_rust_artwork_test})
+cui_spinner_rust_test(artwork_bundled "${_rust_bundled}" 0 ${_rust_artwork_test})
 
 foreach(kind LEGACY PARTIAL)
  set(provider "${CUI_SPINNER_${kind}_LIBRARY}")

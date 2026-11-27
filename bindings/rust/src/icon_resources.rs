@@ -5,6 +5,7 @@ mod ffi;
 mod presentation;
 mod presentation_ffi;
 mod rating;
+mod spinner;
 
 pub use badge::{BadgeConfig, BadgeResult, BadgeSize, BadgeVariant};
 pub use presentation::{

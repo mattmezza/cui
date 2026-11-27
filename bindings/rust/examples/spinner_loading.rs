@@ -1,5 +1,7 @@
 //! An authored loading profile. Add --font PATH to open the native UI.
-use cui_builders::{App, Kind, Phase, Result, SpinnerConfig, Variant, WindowOptions};
+use cui_builders::{
+    App, IconLimits, IconSource, Kind, Phase, Result, SpinnerConfig, Variant, WindowOptions,
+};
 use std::{cell::Cell, rc::Rc};
 
 fn main() -> Result<()> {
@@ -38,6 +40,14 @@ fn main() -> Result<()> {
         .text("Workspace profile")?
         .finish();
     let spinner = app.rotating_spinner(root, "loading", SpinnerConfig::default())?;
+    // Older providers keep Loader; capable providers use shared app-owned SVG.
+    if app.supports_spinner_icon_resources() {
+        let artwork = app.create_icon_resource(
+            &IconSource::svg(r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7z"/></svg>"#),
+            IconLimits::default(),
+        )?;
+        app.set_spinner_icon_resource(spinner, Some(artwork))?;
+    }
     let status = app
         .build_child(root, Kind::Label, "status")?
         .text("Loading profile…")?

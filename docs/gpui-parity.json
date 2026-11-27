@@ -3457,7 +3457,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Decorative source-style SVG, selected finite-turn easing/reduced ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in software and actual WASM. Retained C and the language builders offer catalog icons and two easing curves. Retained C also supports shared custom Icon artwork. The app owns announcements and scheduling. Foreign resource bindings, inherited Icon style, broader custom-curve/mount cases and hardware/GPU acceptance remain open."
+        "Decorative source-style SVG, selected finite-turn easing/reduced ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in software and actual WASM. Retained C and the language builders offer catalog icons, two easing curves and shared Icon artwork. Python and JS/TS support binding and clearing artwork; C, Go and Rust also read the bound handle. The app owns announcements and scheduling. Inherited Icon style, broader custom-curve/mount cases and hardware/GPU acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3509,6 +3509,18 @@
           "name": "retained C shared Icon resource artwork",
           "status": "tested",
           "evidence": ["tests/unit/test_bridge_spinner.c", "bindings/bridge/examples/spinner_status.c"]
+        },
+        {
+          "name": "optional shared Spinner artwork across language builders",
+          "status": "tested",
+          "evidence": [
+            "bindings/python/test_spinner_presentation.py",
+            "bindings/node/test/spinner-presentation.test.cjs",
+            "bindings/node/test/spinner-presentation.types.ts",
+            "bindings/typescript/examples/spinner_status.ts",
+            "bindings/go/cui/spinner_icon_test.go",
+            "bindings/rust/tests/spinner_icon_resources.rs"
+          ]
         },
         {
           "name": "optional retained Spinner V1 across language builders",

@@ -390,6 +390,7 @@ static void go_load_optional_symbol(void *destination, size_t size, const char *
  if (symbol && sizeof symbol == size)
   memcpy(destination, &symbol, size);
 }
+#include "spinner_icon_ffi.h"
 
 #include "pagination_ffi.h"
 #include "rating_ffi.h"
@@ -818,6 +819,7 @@ static int bridge_open(const char *path) {
  go_data_table_initialize();
  go_skeleton_initialize();
  go_spinner_initialize();
+ go_spinner_icon_initialize();
  go_pagination_initialize();
  go_rating_initialize();
  go_radio_motion_initialize();
@@ -860,6 +862,7 @@ static int bridge_open(const char *path) {
  go_data_table_initialize();
  go_skeleton_initialize();
  go_spinner_initialize();
+ go_spinner_icon_initialize();
  go_pagination_initialize();
  go_rating_initialize();
  go_radio_motion_initialize();
@@ -944,6 +947,7 @@ type Options struct {
 }
 type Node struct {
 	timeLocalized                        *TimeFieldConfig
+	spinnerIconResource                  *IconResource
 	spinnerConfig                        *SpinnerConfig
 	skeletonConfig                       *SkeletonConfig
 	paginationConfig                     *PaginationConfig
@@ -6648,4 +6652,67 @@ func (n *Node) SpinnerPresentation() (SpinnerPresentation, bool, error) {
 		return SpinnerPresentation{}, false, errors.New("invalid copied Spinner presentation")
 	}
 	return p, true, nil
+}
+
+// SupportsSpinnerIconResources checks the optional shared artwork group and Icon resources.
+func (a *App) SupportsSpinnerIconResources() (bool, error) {
+	ok, err := a.SupportsIconResources()
+	return ok && C.go_spinner_icon_supported() != 0, err
+}
+
+// SetSpinnerIconResource binds shared app-owned artwork on a mounted Spinner.
+// nil restores its configured catalog icon. The resource remains caller-owned.
+func (n *Node) SetSpinnerIconResource(resource *IconResource) error {
+	if n == nil || n.app == nil || n.removed || n.kind != 36 {
+		return errors.New("artwork requires a mounted Spinner")
+	}
+	supported, err := n.app.SupportsSpinnerIconResources()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrSpinnerIconResourcesUnavailable
+	}
+	var handle C.cui_bridge_icon_handle_v1
+	if resource != nil {
+		handle, err = resource.handleFor(n.app)
+		if err != nil {
+			return err
+		}
+	}
+	if err = result(C.go_spinner_icon_set(n.app.ptr, n.handle, handle)); err != nil {
+		return err
+	}
+	n.spinnerIconResource = resource.alias()
+	return nil
+}
+
+// SpinnerIconResource returns an alias sharing the original resource ownership.
+func (n *Node) SpinnerIconResource() (*IconResource, error) {
+	if n == nil || n.app == nil || n.removed || n.kind != 36 {
+		return nil, errors.New("artwork requires a mounted Spinner")
+	}
+	supported, err := n.app.SupportsSpinnerIconResources()
+	if err != nil {
+		return nil, err
+	}
+	if !supported {
+		return nil, ErrSpinnerIconResourcesUnavailable
+	}
+	var handle C.cui_bridge_icon_handle_v1
+	status := C.go_spinner_icon_get(n.app.ptr, n.handle, &handle)
+	if status == C.CUI_BRIDGE_EMPTY {
+		return nil, nil
+	}
+	if err = result(status); err != nil {
+		return nil, err
+	}
+	saved, err := n.spinnerIconResource.handleFor(n.app)
+	if err != nil {
+		return nil, err
+	}
+	if saved != handle {
+		return nil, errors.New("unknown Spinner resource ownership")
+	}
+	return n.spinnerIconResource.alias(), nil
 }

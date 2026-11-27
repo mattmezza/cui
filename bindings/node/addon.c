@@ -276,6 +276,33 @@ static napi_value make_node(napi_env env, napi_callback_info info) {
     return expose_node(env, v[0], node);
 }
 static int optional_bridge_symbol(void *out, size_t size, const char *name);
+static napi_value supports_text_defaults(napi_env env, napi_callback_info info) {
+    napi_value v[1], result;
+    js_app *app;
+    void (*symbol)(void) = NULL;
+    if (!args(env, info, 1, v) || !app_arg(env, v[0], &app))
+        return NULL;
+    bool supported =
+        optional_bridge_symbol(&symbol, sizeof symbol, "cui_bridge_set_text_defaults_v1");
+    return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
+}
+static napi_value set_text_defaults(napi_env env, napi_callback_info info) {
+    napi_value v[5];
+    js_app *app;
+    js_node *node;
+    double size;
+    uint32_t rgba, custom;
+    cui_bridge_status (*set)(cui_bridge_app *, cui_bridge_node, float, uint32_t, uint32_t) = NULL;
+    if (!args(env, info, 5, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !number_arg(env, v[2], &size) || !uint_arg(env, v[3], &rgba) ||
+        !uint_arg(env, v[4], &custom))
+        return NULL;
+    if (!isfinite(size) || size < 0 || size > 4096 || (size && !(float)size) || custom > 1)
+        return fail(env, "invalid text defaults");
+    if (!optional_bridge_symbol(&set, sizeof set, "cui_bridge_set_text_defaults_v1"))
+        return fail(env, "text defaults unavailable in this bridge");
+    return status(env, set(app->bridge, node->node, (float)size, rgba, custom));
+}
 /* Optional symbol keeps addons usable with older bridge providers. */
 static napi_value notification_auto_hide(napi_env env, napi_callback_info info) {
     napi_value v[1], result;
@@ -3348,6 +3375,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("timeFieldLocalized", time_field_localized, 0);
     EXPORT("skeletonPresentation", skeleton_presentation, 0);
     EXPORT("spinnerIconResource", spinner_icon_resource, 0);
+    EXPORT("supportsTextDefaults", supports_text_defaults, 0);
+    EXPORT("setTextDefaults", set_text_defaults, 0);
     EXPORT("spinnerPresentation", spinner_presentation, 0);
     EXPORT("popoverOptions", popover_options, 0);
     EXPORT("dialogOptions", dialog_options, 0);

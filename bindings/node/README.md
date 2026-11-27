@@ -127,3 +127,17 @@ Run `CUI_NODE_ADDON=/path/to/cui.node node bindings/node/examples/attachment-slo
 for a headless example. Pass `--font /absolute/font.ttf` to opt into its native window; automated tests
 must remain headless. The headless example clicks Inspect using public bounds
 and pointer input and verifies that its ordinary handler updates the sibling summary.
+
+Row and Column support retained text refinements when
+`app.supports_text_defaults()` is true. Chain `.textDefaults(24, 0x336699ff)`
+to share a pixel size and packed RGBA tint with descendants. Pass `null` for
+an inherited field, or call `.textDefaults()` to reset both. Explicit `0` tint
+is transparent; size `0` inherits. Nested containers refine the outer defaults
+without changing siblings. Label uses size and tint, Icon uses size and tint,
+and Spinner uses tint. Mounted calls replace the refinement immediately for
+the next frame. Providers without `cui_bridge_set_text_defaults_v1` continue to
+support existing builders and reject this extension only when used.
+
+Run `node examples/text-defaults.cjs` for the headless example, or pass a font
+path to open it with SDL. Python exposes the equivalent
+`.text_defaults(size=None, tint=None)` method.

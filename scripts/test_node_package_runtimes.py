@@ -22,6 +22,7 @@ SUITES = (
     ("test/models.test.cjs", (), ()),
     ("examples/workspace.cjs", (), ("--headless",)),
     ("examples/sidebar-workspace.cjs", (), ("--headless",)),
+    ("examples/text-defaults.cjs", (), ()),
 )
 
 

@@ -43,8 +43,9 @@ The audit covered all reference branches:
   box decoration (background, border, radius, clip, opacity, inert/layout-only,
   offsets), while explicit icon dimensions remain authoritative. Uniform or per-edge padding participates in the border-box sizing floor.
   SVG paint covers the complete resulting bounds without a content inset.
-  Box scopes cover size and solid color in immediate C. Other source refinements,
-  including a general style cascade and arbitrary flex properties, remain open.
+  Box scopes cover size and solid color in immediate C and retained builders.
+  Other source refinements, including a general style cascade and arbitrary flex
+  properties, remain open.
 
 Validation of the new fields occurs before state preparation, cache allocation,
 layout or semantics. Decorative labels are ignored entirely, so they need not

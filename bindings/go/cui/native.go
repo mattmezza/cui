@@ -793,6 +793,21 @@ static cui_bridge_status go_disclosure_title(cui_bridge_app *app, cui_bridge_nod
 static cui_bridge_status go_disclosure_divider(cui_bridge_app *app, cui_bridge_node node,
  const cui_bridge_disclosure_divider_v1 *style) { return disclosure_divider(app, node, style); }
 
+static cui_bridge_status (*text_defaults)(cui_bridge_app *, cui_bridge_node, float, uint32_t, uint32_t);
+static void go_text_defaults_initialize(void) {
+ if (bridge_lib)
+  go_load_optional_symbol(&text_defaults, sizeof text_defaults, "cui_bridge_set_text_defaults_v1");
+#if defined(CUI_GO_STATIC)
+ else
+  text_defaults = cui_bridge_set_text_defaults_v1;
+#endif
+}
+static int go_text_defaults_supported(void) { return text_defaults != NULL; }
+static cui_bridge_status go_text_defaults(cui_bridge_app *a, cui_bridge_node n, float size,
+                                         uint32_t color, uint32_t custom) {
+ return text_defaults(a, n, size, color, custom);
+}
+
 static cui_bridge_status (*attachment_configure)(cui_bridge_app *, cui_bridge_node,
  const cui_bridge_attachment_config_v1 *);
 static cui_bridge_status (*attachment_preview)(cui_bridge_app *, cui_bridge_node,
@@ -987,6 +1002,7 @@ static int bridge_open(const char *path) {
  go_dialog_initialize();
  go_virtual_list_initialize();
  go_disclosure_initialize();
+ go_text_defaults_initialize();
  go_attachment_initialize();
  go_carousel_initialize();
  go_kbd_stroke_initialize();
@@ -1035,6 +1051,7 @@ static int bridge_open(const char *path) {
  go_dialog_initialize();
  go_virtual_list_initialize();
  go_disclosure_initialize();
+ go_text_defaults_initialize();
  go_attachment_initialize();
  go_carousel_initialize();
  go_kbd_stroke_initialize();
@@ -1114,6 +1131,7 @@ type Node struct {
 	dialogAction   DialogAction
 
 	notificationAction                   bool
+	textDefaults                         *TextDefaults
 	notificationAutoHide                 *bool
 	timeLocalized                        *TimeFieldConfig
 	spinnerIconResource                  *IconResource
@@ -2406,6 +2424,9 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("Notification cannot be nested inside an Attachment slot")
 		}
 		seen[n] = true
+		if n.textDefaults != nil && C.go_text_defaults_supported() == 0 {
+			return ErrTextDefaultsUnavailable
+		}
 		if n.notificationAutoHide != nil && C.go_notification_auto_hide_supported() == 0 {
 			return ErrNotificationAutoHideUnavailable
 		}
@@ -3050,6 +3071,12 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 			mountedAttachmentPreviews = append(mountedAttachmentPreviews, n)
+		}
+		if n.textDefaults != nil {
+			color, custom := n.textDefaults.rawColor()
+			if e := result(C.go_text_defaults(a.ptr, h, C.float(n.textDefaults.FontSize), C.uint32_t(color), C.uint32_t(custom))); e != nil {
+				return e
+			}
 		}
 		if n.notificationAutoHide != nil {
 			if e := result(C.go_notification_auto_hide(a.ptr, h, C.uint32_t(btoi(*n.notificationAutoHide)))); e != nil {
@@ -7364,4 +7391,50 @@ func (n *Node) setDialogAction(action DialogAction) error {
 		return ErrDialogCompositionUnavailable
 	}
 	return result(C.go_dialog_set_action(n.app.ptr, n.handle, C.uint32_t(action)))
+}
+
+// SupportsTextDefaults probes optional retained Row/Column text inheritance.
+func (a *App) SupportsTextDefaults() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_text_defaults_supported() != 0, nil
+}
+
+// TextDefaults replaces the Row/Column's scoped defaults. Zero size and nil color
+// inherit; an empty value resets both. Icon inherits size/tint, Label both, Spinner tint.
+func (n *Node) TextDefaults(options TextDefaults) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 1 && n.kind != 2 {
+		n.err = errors.New("TextDefaults requires Row or Column")
+		return n
+	}
+	if err := options.validate(); err != nil {
+		n.err = err
+		return n
+	}
+	if n.app != nil {
+		supported, err := n.app.SupportsTextDefaults()
+		if err != nil {
+			n.err = err
+			return n
+		}
+		if !supported {
+			n.err = ErrTextDefaultsUnavailable
+			return n
+		}
+		color, custom := options.rawColor()
+		if err := result(C.go_text_defaults(n.app.ptr, n.handle, C.float(options.FontSize), C.uint32_t(color), C.uint32_t(custom))); err != nil {
+			n.err = err
+			return n
+		}
+	}
+	if options.ColorRGBA != nil {
+		color := *options.ColorRGBA
+		options.ColorRGBA = &color
+	}
+	n.textDefaults = &options
+	return n
 }

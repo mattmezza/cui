@@ -103,6 +103,9 @@ const stepperWrappedFillUnavailable = 'Stepper wrapped Fill requires cui_bridge_
 const stepperCenteredFillUnavailable = 'Stepper centered Fill requires cui_bridge_set_stepper_centered_fill_v1';
 const stepperFillUnavailable = 'Stepper Fill requires cui_bridge_set_stepper_fill';
 function preflightNodeOptions(app, node, insideDecoration = false, insideAttachmentSlot = false) {
+  if (node.textDefaultsValue && !app.supports_text_defaults()) {
+    throw new Error('text defaults unavailable in this bridge');
+  }
   if (node.kbdStyleValue && !app.supportsKbdStyle()) throw new Error('Kbd style requires cui_bridge_set_kbd_style_v1');
   if (node.kbdStrokeValue && !app.supportsKbdStroke()) throw new Error('Typed Kbd requires cui_bridge_set_kbd_stroke_v1');
   if (node.virtualListAxisValue === 'horizontal' && !app.supportsVirtualListAxis()) throw new Error('VirtualList axis unavailable');
@@ -239,6 +242,25 @@ class Node {
     this.radioContentValue = false;
     this.radioTooltipValue = null;
     this.partShadowStyles=new Map(); this.shadowStyleValue = null; this.hoverValue = undefined; this.clickValue = undefined;
+  }
+  textDefaults(size = null, tint = null) {
+    if (![1, 2].includes(this.kind)) throw new TypeError('textDefaults requires Row or Column');
+    if (size !== null &&
+        (typeof size !== 'number' || !Number.isFinite(size) || size < 0 || size > 4096 ||
+         (size && !Math.fround(size)))) {
+      throw new RangeError('size must be finite and in [0, 4096]');
+    }
+    if (tint !== null && (!Number.isInteger(tint) || tint < 0 || tint > 0xffffffff)) {
+      throw new RangeError('tint must be numeric 0xRRGGBBAA or null');
+    }
+    const values = [Math.fround(size ?? 0), tint ?? 0, tint !== null ? 1 : 0];
+    this.owner?._alive();
+    if (this.owner) {
+      if (!this.owner.supports_text_defaults()) throw new Error('text defaults unavailable in this bridge');
+      native.setTextDefaults(this.owner.handle, this[NODE], ...values);
+    }
+    this.textDefaultsValue = values;
+    return this;
   }
   setKbdStyle(style = null) {
     if (this.kind !== 34) throw new TypeError('setKbdStyle requires a Kbd');
@@ -1104,6 +1126,7 @@ class App {
       if(node.kind===55)native.setTime(this.handle,node[NODE],...node.timeValue);
       localizedTimes.mount(this,node);
       skeletons.mount(this, node);
+      if (node.textDefaultsValue) native.setTextDefaults(this.handle, node[NODE], ...node.textDefaultsValue);
       spinners.mount(this, node);
       popoverOptions.mount(this, node);
       paginationOptions.mount(this, node);
@@ -1378,6 +1401,11 @@ class App {
     this._alive();
     return typeof native.supportsRadioItemContent === 'function' &&
       typeof native.setRadioItemContent === 'function' && native.supportsRadioItemContent();
+  }
+  supports_text_defaults() {
+    this._alive();
+    return typeof native.supportsTextDefaults === 'function' &&
+      typeof native.setTextDefaults === 'function' && native.supportsTextDefaults(this.handle);
   }
   supportsKbdStyle() {
     this._alive();

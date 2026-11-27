@@ -133,6 +133,12 @@ add_test(NAME bridge_python
   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python
   CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
   ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_bridge.py)
+add_test(NAME bridge_python_text_defaults_authoring COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_text_defaults.py)
+add_test(NAME bridge_python_text_defaults_live COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_text_defaults_live.py)
 add_test(NAME bridge_python_dialog_composition COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_dialog_composition.py)

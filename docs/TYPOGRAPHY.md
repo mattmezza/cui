@@ -66,8 +66,47 @@ including for nested absolute boxes and portals, and closing the box restores
 the surrounding defaults. Use `cui_get_text_defaults` to opt a custom component
 into the same behavior. The setter accepts finite logical sizes from 0 to 4096.
 Explicit `cui_text` calls take their arguments directly. Font families, weights
-and gradients remain explicit, and the retained language builders do not
-provide a text-defaults scope.
+and gradients remain explicit.
+
+### Share defaults in a retained UI
+
+Set defaults on a retained **Row** or **Column**. Nested containers can set size
+and color independently. Each call replaces that container's refinements.
+An omitted field inherits from the parent. Clearing both restores both parent
+values. The app copies the settings and uses them on the next step.
+
+Icon and Label follow both fields. Both Spinner presentations follow the tint
+and keep their own size. Per-Icon size and tint options and rotating Spinner's
+explicit tint still take priority. A Badge indicator keeps its semantic paint
+while the contents inside the Badge can inherit.
+
+In retained C, call the optional setter after creating the Row or Column and
+between bridge steps. The last argument distinguishes inheritance from an
+explicit transparent tint.
+
+```c
+/* app, status_column and status_row are already created. */
+cui_bridge_set_text_defaults_v1(app, status_column, 24, 0x3060b0ff, 1);
+cui_bridge_set_text_defaults_v1(app, status_row, 0, 0xe09020ff, 1);
+/* Clear the row's refinements to inherit both from the column. */
+cui_bridge_set_text_defaults_v1(app, status_row, 0, 0, 0);
+```
+
+| Language | Set a scope | Run the authored example from a checkout |
+| --- | --- | --- |
+| Python | `column().text_defaults(24, 0x3060b0ff)` | `PYTHONPATH=bindings/python CUI_BRIDGE_LIBRARY="$PWD/build/libcui_bridge.so" python bindings/python/examples/text_defaults.py` |
+| JavaScript | `column().textDefaults(24, 0x3060b0ff)` | `node bindings/node/examples/text-defaults.cjs` |
+| TypeScript | `column().textDefaults(24, 0x3060b0ff)` | `node bindings/typescript/examples/text_defaults.ts` |
+| Go | `column.TextDefaults(cui.TextDefaults{FontSize: 24, ColorRGBA: &tint})` | `cd bindings/go && go run ./examples/text_defaults` |
+| Rust | `app.text_defaults(column, TextDefaults { font_size: 24., color_rgba: Some(0x3060b0ff) })?` | `cd bindings/rust && cargo run --offline --example text_defaults` |
+
+The examples render a nested workspace status UI. They start headless. Follow
+the [language build guides](BINDING_BUILDERS.md) to build or select the bridge
+and Node addon. The TypeScript command uses Node with built-in type stripping.
+Python, Node, Go and Rust offer a native window option in their source examples.
+For mixed provider versions, call `supports_text_defaults()` in Python, JS/TS
+or Rust, or `SupportsTextDefaults()` in Go, before authoring this option. An
+older provider can still mount and render a tree with these settings omitted.
 
 ## Use multiple font families
 

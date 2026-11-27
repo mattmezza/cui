@@ -1405,6 +1405,8 @@ void cui_spinner(cui_context *ui, cui_id id, const cui_theme *t, float size, flo
     phase = isfinite(phase) ? phase - floorf(phase) : 0;
     unsigned head = reduced ? 0 : (unsigned)(phase * 8);
     const unsigned ring[9] = {0, 1, 2, 7, 8, 3, 6, 5, 4};
+    cui_text_defaults defaults = cui_get_text_defaults(ui);
+    cui_color tint = defaults.custom_color ? defaults.color : t->primary;
     cui_begin_box(ui, id, (cui_box){.width = size, .height = size});
     cui_content_semantic(ui, id, CUI_ROLE_STATUS, cui_string("Loading"), false, false, 0);
     for (unsigned y = 0; y < 3; ++y) {
@@ -1412,7 +1414,7 @@ void cui_spinner(cui_context *ui, cui_id id, const cui_theme *t, float size, flo
                       (cui_box){.row = true, .width = size, .height = size / 3});
         for (unsigned x = 0; x < 3; ++x) {
             unsigned index = ring[y * 3 + x];
-            cui_color color = t->primary;
+            cui_color color = tint;
             if (index == 8)
                 color.a = 0;
             else

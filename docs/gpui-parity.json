@@ -1852,7 +1852,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "The default build embeds 128 SVGs from a 1,830-entry catalog. Named/path/raw sources, size, transforms, tint and immutable bounded caches have scoped tests. Immediate C Icon supports box-scoped size and solid tint. Full inherited styling, source SVG fidelity and native visual acceptance remain open.",
+        "The default build embeds 128 SVGs from a 1,830-entry catalog. Named/path/raw sources, size, transforms, tint and immutable bounded caches have scoped tests. Immediate C and retained builders support box-scoped size and solid tint. Full inherited styling, source SVG fidelity and native visual acceptance remain open.",
         "Icon is decorative by default. Callers can set an explicit accessible name or choose decorative rendering. Native assistive-technology coverage remains open.",
         "The optional retained C, Python, JavaScript, TypeScript, Go and Rust APIs support copied Icon and Badge configuration and app-owned SVG resources. Resource and presentation support can differ by provider."
       ],
@@ -1908,11 +1908,12 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_icon_style_source.c",
+            "tests/unit/test_bridge_badge.c",
             "tests/web/test_browser.py",
             "docs/TYPOGRAPHY.md"
           ],
           "limitations": [
-            "The scope is available to immediate C. Retained builders use their copied per-Icon options."
+            "Immediate C and retained C, Python, JavaScript, TypeScript, Go and Rust expose the size and solid-color scope. Explicit Icon options override it."
           ]
         },
         {
@@ -2172,7 +2173,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Secondary text, Unicode lowercase highlighting, scalar masking, control association, copied colored wrapping and left/center/right alignment have scoped tests. Immediate C Label uses box-scoped size and foreground when supplied. Full inherited typography and platform visual acceptance remain open."
+        "Secondary text, Unicode lowercase highlighting, scalar masking, control association, copied colored wrapping and left/center/right alignment have scoped tests. Immediate and retained Label use box-scoped size and foreground when supplied. Full inherited typography and platform visual acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3589,7 +3590,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Decorative SVG, selected finite-turn easing, reduced-motion ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in software and WASM. Immediate C uses a box's solid tint as a fallback. Retained C and language builders offer catalog icons, two easing curves and shared Icon artwork. Python and JS/TS support binding and clearing artwork; C, Go and Rust also read the bound handle. The app owns announcements and scheduling. General style inheritance, broader custom-curve/mount cases and hardware/GPU acceptance remain open."
+        "Decorative SVG, selected finite-turn easing, reduced-motion ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in software and WASM. Both immediate and retained Spinner styles use a box's solid tint as a fallback. Retained C and language builders offer catalog icons, two easing curves and shared Icon artwork. Python and JS/TS support binding and clearing artwork; C, Go and Rust also read the bound handle. The app owns announcements and scheduling. General style inheritance, broader custom-curve/mount cases and hardware/GPU acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

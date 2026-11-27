@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_software.h"
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 static unsigned allocations_until_failure;
@@ -390,6 +391,126 @@ static void badge_admission(void) {
     cui_bridge_destroy(app);
 }
 
+static bool same_color(cui_color a, cui_color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+
+static void expect_text(const char *text, float size, cui_color foreground) {
+    for (size_t i = 0; i < bridge_draw.count; ++i) {
+        const cui_draw_command *command = &bridge_draw.commands[i];
+        if (command->type != CUI_DRAW_TEXT || command->text.length != strlen(text) ||
+            memcmp(command->text.data, text, command->text.length))
+            continue;
+        if (command->font_size != size || !same_color(command->color, foreground))
+            fprintf(stderr, "Unexpected '%s' at %.2f (expected %.2f) in RGBA %u/%u/%u/%u\n", text,
+                    command->font_size, size, command->color.r, command->color.g, command->color.b,
+                    command->color.a);
+        assert(command->font_size == size && same_color(command->color, foreground));
+        return;
+    }
+    assert(!"expected text draw command");
+}
+
+static void expect_icon(cui_bridge_app *app, cui_bridge_node node, float size, cui_color tint) {
+    cui_bridge_rect box = bounds(app, node);
+    assert(box.width == size && box.height == size);
+    for (size_t i = 0; i < bridge_draw.count; ++i) {
+        const cui_draw_command *command = &bridge_draw.commands[i];
+        if (command->type == CUI_DRAW_IMAGE &&
+            fabsf(command->bounds.x + command->bounds.w / 2 - box.x - size / 2) < 1 &&
+            fabsf(command->bounds.y + command->bounds.h / 2 - box.y - size / 2) < 1) {
+            assert(command->bitmap.custom_tint && same_color(command->bitmap.tint, tint));
+            return;
+        }
+    }
+    assert(!"expected icon draw command");
+}
+
+static void text_defaults(void) {
+    const uint32_t teal_rgba = UINT32_C(0x129887ff), gold_rgba = UINT32_C(0xefa533ff);
+    cui_color teal = bridge_rgba_color(teal_rgba), gold = bridge_rgba_color(gold_rgba);
+    cui_bridge_app *app = make_app();
+    cui_bridge_node root = create(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root");
+    cui_bridge_node row = create(app, root, CUI_BRIDGE_ROW, "sync");
+    cui_bridge_node child = create(app, row, CUI_BRIDGE_COLUMN, "status");
+    cui_bridge_node icon = create(app, row, CUI_BRIDGE_ICON, "check");
+    cui_bridge_node label = create(app, row, CUI_BRIDGE_LABEL, "label");
+    cui_bridge_node nested = create(app, child, CUI_BRIDGE_ICON, "nested");
+    cui_bridge_node spinner = create(app, child, CUI_BRIDGE_SPINNER, "rotating");
+    cui_bridge_node ring = create(app, row, CUI_BRIDGE_SPINNER, "ring");
+    cui_bridge_node badge = create(app, row, CUI_BRIDGE_BADGE, "updates");
+    cui_bridge_node sibling = create(app, root, CUI_BRIDGE_ICON, "outside");
+    assert(cui_bridge_set_gap(app, row, 6) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, icon, "check") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, nested, "check") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, sibling, "check") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, label, "Sync") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, badge, "8") == CUI_BRIDGE_OK);
+    cui_bridge_spinner_config_v1 config = {.struct_size = sizeof config,
+                                           .schema_version = CUI_BRIDGE_SPINNER_V1,
+                                           .size = CUI_BRIDGE_SPINNER_MEDIUM};
+    assert(cui_bridge_spinner_configure_v1(app, spinner, &config) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text_defaults_v1(app, row, 26, teal_rgba, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text_defaults_v1(app, child, 0, gold_rgba, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text_defaults_v1(app, row, NAN, gold_rgba, 1) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_text_defaults_v1(app, row, 42, gold_rgba, 2) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_text_defaults_v1(app, label, 50, 0, 0) == CUI_BRIDGE_INVALID_ARGUMENT);
+    app->stepping = true;
+    assert(cui_bridge_set_text_defaults_v1(app, row, 50, 0, 0) == CUI_BRIDGE_INVALID_STATE);
+    app->stepping = false;
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_text("Sync", 26, teal);
+    expect_text("8", app->theme.font_size * .8f, app->theme.on_primary);
+    expect_icon(app, icon, 26, teal);
+    expect_icon(app, nested, 26, gold);
+    expect_icon(app, spinner, 16, gold);
+    expect_icon(app, sibling, app->theme.font_size, app->theme.text);
+    cui_bridge_rect ring_box = bounds(app, ring);
+    assert(ring_box.width == 16 && ring_box.height == 16);
+    size_t dots = 0;
+    for (size_t i = 0; i < bridge_draw.count; ++i) {
+        const cui_draw_command *command = &bridge_draw.commands[i];
+        if (command->type == CUI_DRAW_RECT && command->bounds.x >= ring_box.x &&
+            command->bounds.x < ring_box.x + ring_box.width) {
+            assert(command->color.r == teal.r && command->color.g == teal.g &&
+                   command->color.b == teal.b);
+            ++dots;
+        }
+    }
+    assert(dots == 8);
+    assert(cui_bridge_set_text_defaults_v1(app, child, 20, 0, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_icon(app, nested, 20, (cui_color){0});
+    expect_icon(app, spinner, 16, (cui_color){0});
+    assert(cui_bridge_set_text_defaults_v1(app, child, 0, 0, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_icon(app, nested, 26, teal);
+    cui_bridge_icon_handle_v1 artwork = art(app);
+    cui_bridge_icon_options_v1 icon_options = {.struct_size = sizeof icon_options,
+                                               .schema_version = 1,
+                                               .flags = CUI_BRIDGE_ICON_COLOR_V1,
+                                               .size = CUI_ICON_CUSTOM,
+                                               .custom_size = 18,
+                                               .color_rgba = gold_rgba};
+    assert(cui_bridge_icon_configure_node_v1(app, nested, artwork, &icon_options, NULL, 0) ==
+           CUI_BRIDGE_OK);
+    config.flags = CUI_BRIDGE_SPINNER_CUSTOM_COLOR;
+    config.rgba = gold_rgba;
+    assert(cui_bridge_spinner_configure_v1(app, spinner, &config) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_icon(app, nested, 18, gold);
+    expect_icon(app, spinner, 16, gold);
+    assert(cui_bridge_set_text_defaults_v1(app, row, 0, 0, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    expect_text("Sync", app->theme.font_size, app->theme.text);
+    expect_icon(app, icon, app->theme.font_size, app->theme.text);
+    assert(cui_bridge_node_remove(app, row) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text_defaults_v1(app, row, 30, gold_rgba, 1) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+}
+
 int main(void) {
     assert(cui_bridge_badge_versions() == 1);
     assert(cui_bridge_badge_record_size_v1(CUI_BRIDGE_BADGE_CONFIG_RECORD_V1) == 64);
@@ -397,4 +518,5 @@ int main(void) {
     assert(cui_bridge_badge_record_size_v1(2) == 0 && cui_bridge_icon_record_size_v1(6) == 0);
     badge_visuals();
     badge_admission();
+    text_defaults();
 }

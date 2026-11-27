@@ -4355,6 +4355,23 @@ cui_bridge_status cui_bridge_set_gap(cui_bridge_app *app, cui_bridge_node handle
     node->gap = gap;
     return CUI_BRIDGE_OK;
 }
+cui_bridge_status cui_bridge_set_text_defaults_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                  float font_size, uint32_t color_rgba,
+                                                  uint32_t custom_color) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if ((node->kind != CUI_BRIDGE_ROW && node->kind != CUI_BRIDGE_COLUMN) || !isfinite(font_size) ||
+        font_size < 0 || font_size > 4096 || custom_color > 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->text_defaults =
+        (cui_text_defaults){.font_size = font_size,
+                            .color = bridge_rgba_color(custom_color ? color_rgba : 0),
+                            .custom_color = custom_color != 0};
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
 cui_bridge_status cui_bridge_set_root_padding(cui_bridge_app *app, cui_bridge_node handle,
                                               float padding) {
     cui_bridge_node_record *node;
@@ -7273,7 +7290,7 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         /* Items are rendered by their owning composite. */
     } else if (node->kind == CUI_BRIDGE_LABEL) {
         cui_begin_box(app->ui, node->id, (cui_box){0});
-        cui_text(app->ui, cui_string(node->text), app->theme.font_size, app->theme.text);
+        cui_label(app->ui, &app->theme, cui_string(node->text));
         cui_end_box(app->ui);
     } else if (node->kind == CUI_BRIDGE_COLLAPSIBLE) {
         bridge_panel_binding binding = {app, slot};
@@ -7586,6 +7603,8 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
         box.padding = 16;
     }
     cui_begin_box(app->ui, node->id, box);
+    if (node->text_defaults.font_size || node->text_defaults.custom_color)
+        (void)cui_set_text_defaults(app->ui, node->text_defaults);
     for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
         bridge_render_node(app, child);
     cui_end_box(app->ui);

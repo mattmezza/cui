@@ -252,7 +252,7 @@
           "languages": ["python", "javascript", "typescript", "go", "rust"],
           "types": ["cui_text_defaults"],
           "symbols": ["cui_set_text_defaults", "cui_get_text_defaults"],
-          "note": "Box-scoped size and solid tint apply to immediate C. Retained Icon builders use explicit per-widget options."
+          "note": "The direct submission-box functions are immediate C. Retained Icon inherits size and tint from Row and Column defaults via the optional bridge setter. Explicit Icon options take precedence."
         }
       ]
     },
@@ -300,7 +300,7 @@
           "languages": ["python", "javascript", "typescript", "go", "rust"],
           "types": ["cui_text_defaults"],
           "symbols": ["cui_set_text_defaults", "cui_get_text_defaults"],
-          "note": "Inherited size and solid foreground apply to immediate C Label. Retained Label builders do not expose box text defaults."
+          "note": "The direct submission-box functions are immediate C. Retained Label inherits size and foreground from Row and Column defaults through the optional bridge setter."
         }
       ]
     },
@@ -472,7 +472,7 @@
           "languages": ["python", "javascript", "typescript", "go", "rust"],
           "types": ["cui_text_defaults"],
           "symbols": ["cui_set_text_defaults", "cui_get_text_defaults"],
-          "note": "Immediate C Spinner can use a scoped foreground as its fallback tint. Retained Spinner builders accept explicit color."
+          "note": "The direct submission-box functions are immediate C. Both retained Spinner styles inherit a Row or Column tint, and rotating Spinner accepts an explicit color override."
         }
       ]
     },

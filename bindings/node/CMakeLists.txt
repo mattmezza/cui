@@ -272,6 +272,11 @@ add_test(NAME node_spinner_presentation COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME node_spinner_example COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/examples/spinner-status.cjs)
+add_test(NAME node_text_defaults_authoring COMMAND ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/text-defaults.test.cjs)
+add_test(NAME node_text_defaults_live COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/text-defaults-live.test.cjs)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
  foreach(kind LEGACY PARTIAL)
   if(CUI_SPINNER_${kind}_LIBRARY)

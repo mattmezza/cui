@@ -204,6 +204,10 @@ class _API:
         if hasattr(lib, "cui_bridge_radio_item_set_content_v1"):
             self.radio_item_set_content = bind("radio_item_set_content_v1", C.c_int,
                                                C.c_void_p, _Handle, C.c_uint32)
+        self.set_text_defaults = None
+        if hasattr(lib, "cui_bridge_set_text_defaults_v1"):
+            self.set_text_defaults = bind("set_text_defaults_v1", C.c_int, C.c_void_p, _Handle,
+                                          C.c_float, C.c_uint32, C.c_uint32)
         self.set_kbd_style = None
         if hasattr(lib, "cui_bridge_set_kbd_style_v1"):
             self.set_kbd_style = bind("set_kbd_style_v1", C.c_int, C.c_void_p, _Handle, C.POINTER(KbdStyleWire))
@@ -586,6 +590,7 @@ class Widget:
         self.key = key
         self._text = text
         self._children: list[Widget] = []
+        self._text_defaults = None
         self._gap = 0.0
         self._root_padding = 0.0
         self._question_flags = None
@@ -659,6 +664,26 @@ class Widget:
         self._app: App | None = None
         self._handle: _Handle | None = None
         self._disposed = False
+
+    def text_defaults(self, size: float | None = None, tint: int | None = None) -> "Widget":
+        """Replace Row/Column text refinements; omitted fields inherit, no arguments reset."""
+        if self._disposed:
+            raise RuntimeError("widget belongs to a disposed App")
+        if self.kind not in ("row", "column"):
+            raise TypeError("text_defaults requires Row or Column")
+        if size is not None and (type(size) not in (int, float) or not 0 <= size <= 4096):
+            raise ValueError("size must be finite and in [0, 4096]")
+        if tint is not None and (type(tint) is not int or not 0 <= tint <= 0xffffffff):
+            raise ValueError("tint must be numeric 0xRRGGBBAA or None")
+        values = (C.c_float(size or 0).value, tint or 0, int(tint is not None))
+        if size and not values[0]:
+            raise ValueError("size underflows a bridge float")
+        if self._app is not None:
+            if not self._app.supports_text_defaults():
+                raise RuntimeError("text defaults unavailable in this bridge")
+            self._change("set_text_defaults", *values)
+        self._text_defaults = values
+        return self
 
     def kbd_style(self, style=None) -> "Widget":
         """Replace retained Kbd styling; None restores defaults."""
@@ -2367,6 +2392,10 @@ class App:
         if current_thread() is not self._creation_thread:
             raise RuntimeError("Icon and Badge App calls require the app's owner thread")
 
+    def supports_text_defaults(self) -> bool:
+        self._ensure_open()
+        return self._api.set_text_defaults is not None
+
     def supports_keyed_data_table(self) -> bool:
         """Report whether the loaded bridge exports keyed DataTable replacement."""
         self._ensure_open()
@@ -2553,6 +2582,8 @@ class App:
                 raise ValueError("widget belongs to a different App")
             if node._disposed:
                 raise ValueError("widget belongs to a disposed App")
+            if node._text_defaults is not None and not self.supports_text_defaults():
+                raise RuntimeError("text defaults unavailable in this bridge")
             seen.add(id(node))
             popover_preflight(node, self)
             from .dialog_composition import preflight as dialog_preflight
@@ -2758,6 +2789,8 @@ class App:
                     node._mount_pagination()
                 if isinstance(node, Rating):
                     node._mount_rating()
+                if node._text_defaults is not None:
+                    node._change("set_text_defaults", *node._text_defaults)
                 disclosure_mount(node)
                 if node.kind in _NUMERIC:
                     node._change("set_value", node._value)

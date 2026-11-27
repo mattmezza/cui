@@ -1741,6 +1741,15 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_get_selected(cui_bridge_app *, cui_b
                                                          cui_bridge_node *out_item);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_gap(cui_bridge_app *app, cui_bridge_node node,
                                                     float gap);
+/* Optional retained Row/Column defaults. Call between steps. A zero font size
+ * or custom_color=0 inherits that field. Size must be finite and in [0,4096].
+ * custom_color=1 sets RGBA in 0xRRGGBBAA order, including transparent zero.
+ * Passing zero size and no custom color clears this box's refinements.
+ * Values are copied. Invalid calls preserve the previous defaults. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_text_defaults_v1(cui_bridge_app *, cui_bridge_node,
+                                                                 float font_size,
+                                                                 uint32_t color_rgba,
+                                                                 uint32_t custom_color);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_variant(cui_bridge_app *app,
                                                                cui_bridge_node node,
                                                                cui_bridge_button_variant variant);

@@ -96,6 +96,8 @@ size and solid color. Without a scope, zero options use `theme.font_size` and
 `custom_inherited_color`/`inherited_color`, which take precedence over box
 defaults. Explicit component sizes and tints keep their usual precedence.
 See the [text defaults example](TYPOGRAPHY.md#share-size-and-color-with-a-box).
+Retained Icon can also inherit from a Row or Column defined in the C bridge or
+the language builders. [Retained example](TYPOGRAPHY.md#share-defaults-in-a-retained-ui)
 
 XS, S, M and L are 12, 14, 16 and 24 pixels at a 16-pixel theme font size, scaled by
 `theme.font_size / 16` to represent source rem units. Custom size is an unscaled

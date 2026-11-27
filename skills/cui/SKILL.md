@@ -559,7 +559,9 @@ copy its compilable C example. See `docs/RESIZABLE_BROWSER_REAUDIT.md`.
 In immediate C, call `cui_set_text_defaults` inside a box to share a font size
 and solid color with nested Icon and Label components. Spinner uses the scoped
 color as its fallback. Explicit component options override the scope. See
-`docs/TYPOGRAPHY.md` for a composable example.
+`docs/TYPOGRAPHY.md` for a composable example. Retained Row and Column expose
+the same defaults through the optional bridge setter and all five language
+builders. Probe support when loading an older provider.
 
 For Spinner, read `docs/SPINNER.md`. Immediate C `cui_spinner_ex` supports
 decorative custom painting and finite easing turns, including reduced ease(0).

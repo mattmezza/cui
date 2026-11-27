@@ -9,8 +9,8 @@ export type PointerButton = 'primary' | 'secondary' | 'middle';
 export interface ClickEvent<T extends Node = Button> { node: T; frame: number }
 export interface Node { key(value: string): this; bounds(): Bounds; remove(): this }
 export interface Container extends Node { children(...items: (Node | Node[])[]): this; gap(value: number): this; gap_px(value: number): this; gap_units(value: number): this }
-export interface Row extends Container {}
-export interface Column extends Container {}
+export interface Row extends Container { textDefaults(size?: number | null, tint?: number | null): this }
+export interface Column extends Container { textDefaults(size?: number | null, tint?: number | null): this }
 export interface Label extends Node { label(value: string): this }
 export type DesignSize = 'inherit' | 'xs' | 'sm' | 'base' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | '8xl' | '9xl';
 /** Shared scale is currently supported by Button, Avatar and Stepper. */
@@ -610,6 +610,7 @@ export interface App {
   supports_skeleton_presentation(): boolean;
   supports_spinner_icon_resource(): boolean;
   supports_spinner_presentation(): boolean;
+  supports_text_defaults(): boolean;
   supports_pagination_custom_size(): boolean;
   supports_rating_options(): boolean;
   supports_dialog_composition(): boolean;

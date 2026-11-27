@@ -5,8 +5,8 @@ event layout, and functions are unchanged. New kinds are appended.
 
 | Kind | Native CUI renderer | State and events | Current limit |
 | --- | --- | --- | --- |
-| Row, Column | `cui_begin_box` | gap | One root; depth 128 |
-| Label | `cui_text` | copied UTF-8 text | Text only |
+| Row, Column | `cui_begin_box` | Gap and optional size and color defaults | One root, depth 128. [Text defaults](TYPOGRAPHY.md#share-defaults-in-a-retained-ui) |
+| Label | `cui_label` | Copied UTF-8 text | Text only, inherits scoped size and color when set |
 | Button | `cui_button_ex` | copied text, click | Existing options |
 | Checkbox | `cui_checkbox` | checked, change, disabled | Boolean only |
 | Radio | `cui_radio_present` | checked, change, disabled, optional animated selection | Standalone radio; use RadioGroup for exclusivity |

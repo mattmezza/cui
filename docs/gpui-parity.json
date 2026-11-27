@@ -2503,7 +2503,9 @@
         "tests/web/test_notification_shadows.py",
         "tests/web/test_surface_shadow_gallery.py",
         "tests/unit/test_compound_shadow_parts.c",
-        "tests/unit/test_compound_shadow_legacy.c"
+        "tests/unit/test_compound_shadow_legacy.c",
+        "tests/unit/test_root.c",
+        "tests/web/test_root_notifications.py"
       ],
       "status": "tested",
       "platforms": {
@@ -2511,7 +2513,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Portable host callbacks are opt-in; built-in OS adapters and physical assistive technology acceptance remain open. Severity icons use themed SVG assets. Legacy presentation uses the original typography and supports an opt-in drop-shadow policy. The responsive C presenter wraps and uses semibold titles, keeps Close reachable before hover, and protects its lane on narrow cards. Root and retained language builders currently use the existing presentation. Custom content and action descriptors remain borrowed through lifecycle callbacks."
+        "Portable host callbacks are opt-in; built-in OS adapters and physical assistive technology acceptance remain open. Severity icons use themed SVG assets. Legacy presentation uses the original typography and supports an opt-in drop-shadow policy. The responsive C presenter wraps and uses semibold titles, keeps Close reachable before hover, and protects its lane on narrow cards. Immediate C Root mounting can opt in and report its next wake. Retained language builders keep the original presentation. Custom content and action descriptors remain borrowed through lifecycle callbacks."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2546,9 +2548,11 @@
           "evidence": [
             "tests/unit/test_status.c",
             "tests/unit/test_compound_shadow_legacy.c",
-            "tests/web/test_browser.py"
+            "tests/web/test_browser.py",
+            "tests/unit/test_root.c",
+            "tests/web/test_root_notifications.py"
           ],
-          "scope": "Explicit C frame presenter and gallery. Headless pointer, keyboard, touch and semantic activation. Preserves prior submission through legacy entry points."
+          "scope": "Explicit C frame presenter, optional C Root mounting and gallery. Headless pointer, keyboard, touch and semantic activation. Preserves prior submission through legacy entry points."
         },
         {
           "name": "portable transactional system delivery hooks and bounded registry",
@@ -6797,16 +6801,18 @@
         "cui_base_root_render"
       ],
       "public_header": "include/cui/cui_root.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_root.c"
+        "tests/unit/test_root.c",
+        "tests/web/test_root_notifications.py"
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Per-window plugin snapshots, ordered render stages, field-specific style overrides, factory rollback, automatic Sheet/Dialog/Notification layers and Sheet-aware notification placement are tested. Window creation, entity observations, global selection/copy service, tooltip/native-menu/touch-selection hosts and automatic chrome remain incomplete; see docs/ROOT.md."
+        "Per-window plugin snapshots, ordered render stages, field-specific style overrides, factory rollback, automatic Sheet/Dialog/Notification layers and Sheet-aware notification placement are tested. The C Root renderer has optional responsive notification mounting and wake reporting. Window creation, entity observations, global selection/copy service, tooltip/native-menu/touch-selection hosts and automatic chrome remain incomplete; see docs/ROOT.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -6831,6 +6837,16 @@
           "evidence": [
             "tests/unit/test_root.c"
           ]
+        },
+        {
+          "name": "responsive notifications and timed wake reporting",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_root.c",
+            "tests/web/test_root_notifications.py",
+            "docs/ROOT.md"
+          ],
+          "scope": "Opt-in immediate C Root submission, isolated touch Review and Close, and deadline-driven gallery frames. Retained authoring does not expose these options."
         },
         {
           "name": "complete styled window services and host lifecycle parity",

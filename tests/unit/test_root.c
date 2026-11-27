@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_root.h"
 #include <assert.h>
+#include <stdio.h>
 #include <string.h>
 typedef struct {
     char log[128];
@@ -278,11 +279,114 @@ static void test_styled_facilities(void) {
     }
     cui_destroy(ui);
 }
+static const cui_semantic *root_control(cui_context *ui, const char *name) {
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(ui, &count);
+    size_t length = strlen(name);
+    for (size_t i = 0; i < count; i++)
+        if (nodes[i].role == CUI_ROLE_BUTTON && nodes[i].name.length == length &&
+            !memcmp(nodes[i].name.data, name, length))
+            return &nodes[i];
+    return NULL;
+}
+static void render_with_notices(cui_context *ui, cui_root *root, const cui_theme *theme, double now,
+                                cui_notification_advance *advance) {
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    assert(cui_root_render_with_options(
+        ui, 500, root, theme, (cui_rect){0, 0, 400, 300}, NULL, plain_content, NULL, now,
+        (cui_root_render_options){.responsive_notifications = true,
+                                  .notification_advance = advance}));
+    cui_end_frame(ui);
+    if (cui_last_error(ui) != CUI_OK)
+        fprintf(stderr, "Root notification frame at %.3f failed with %d\n", now,
+                cui_last_error(ui));
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void count_notice_callback(void *user, cui_notification_id id) {
+    assert(id.type == 42 && id.key == 2);
+    (*(unsigned *)user)++;
+}
+static void test_root_responsive_notifications(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_theme theme = cui_theme_light();
+    cui_root root = {0};
+    assert(ui && cui_root_init(&root, NULL, 0, NULL, NULL));
+    cui_notification_advance advance = {.next_wake_seconds = 999};
+    render_with_notices(ui, &root, &theme, 0, &advance);
+    assert(advance.next_wake_seconds == 999);
+
+    cui_notification_entry entry;
+    cui_notification_state notes;
+    cui_notification_settings settings = cui_notification_settings_default();
+    settings.reduced_motion = true;
+    assert(cui_notification_init(&notes, &entry, 1, settings, (cui_notification_host){0}));
+    assert(cui_root_bind_facilities(&root, NULL, 0, &notes));
+    unsigned closed = 0;
+    cui_notification note = cui_notification_default();
+    note.id = (cui_notification_id){42, 2};
+    note.title = cui_string("Workspace changes");
+    note.message = cui_string("A new workspace report is ready. Review the report before sharing.");
+    note.action_label = cui_string("Review");
+    note.autohide = false;
+    note.on_close = count_notice_callback;
+    note.user = &closed;
+    assert(cui_root_notification_push(&root, note, 0));
+    render_with_notices(ui, &root, &theme, -1, &advance);
+    assert(advance.next_wake_seconds == 999 && notes.count == 1 && closed == 0);
+    assert(root_control(ui, "Application") && !root_control(ui, "Close"));
+    styled_frame(ui, &root, &theme, 0);
+    assert(root_control(ui, "Review") && !root_control(ui, "Close"));
+
+    render_with_notices(ui, &root, &theme, .1, &advance);
+    assert(advance.next_wake_seconds > .1 && advance.next_wake_seconds < .5);
+    const cui_semantic *close = root_control(ui, "Close");
+    assert(close && !close->disabled && !close->tab_stop_disabled && close->bounds.w == 28);
+    cui_id close_id = close->id;
+    render_with_notices(ui, &root, &theme, .5, &advance);
+    assert(advance.presented == 1 && advance.next_wake_seconds == 0);
+    float wide_height = entry.bounds.h;
+
+    cui_surface_state sheet;
+    cui_surface_init(&sheet, 1004, CUI_SURFACE_SHEET);
+    cui_id inner_control = 204;
+    assert(
+        cui_root_sheet_open(&root, ui,
+                            (cui_root_surface){.surface = &sheet,
+                                               .options = {.edge = CUI_SHEET_RIGHT, .width = 220},
+                                               .content = dialog_content,
+                                               .user = &inner_control},
+                            1));
+    render_with_notices(ui, &root, &theme, .6, &advance);
+    render_with_notices(ui, &root, &theme, .7, &advance);
+    cui_rect panel = cui_bounds(ui, 1004);
+    assert(panel.w == 220 && entry.bounds.x + entry.bounds.w <= panel.x);
+    assert(entry.bounds.h > wide_height);
+    cui_surface_request_close(ui, &sheet, CUI_SURFACE_CLOSED);
+    render_with_notices(ui, &root, &theme, .8, &advance);
+    assert(!sheet.overlay.open);
+    close = root_control(ui, "Close");
+    const cui_semantic *action = root_control(ui, "Review");
+    assert(close && close->id == close_id && action);
+    assert(action->bounds.x + action->bounds.w <= close->bounds.x ||
+           action->bounds.y >= close->bounds.y + close->bounds.h);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
+                                           .accessibility_target = close_id,
+                                           .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
+    render_with_notices(ui, &root, &theme, .9, &advance);
+    assert(notes.count == 1 && entry.phase == CUI_NOTIFICATION_ENDING && !closed);
+    assert(advance.next_wake_seconds > .9);
+    render_with_notices(ui, &root, &theme, 1.2, &advance);
+    assert(notes.count == 0 && advance.removed == 1 && closed == 1);
+    assert(!root_control(ui, "Close") && advance.next_wake_seconds == 0);
+    cui_root_dispose(&root);
+    cui_destroy(ui);
+}
 #endif
 int main(void) {
     test_registry_and_base_root();
 #ifndef CUI_ROOT_BASE_ONLY
     test_styled_facilities();
+    test_root_responsive_notifications();
 #endif
     return 0;
 }

@@ -6,6 +6,9 @@ typedef struct {
     cui_rect viewport;
     cui_id id;
     double now_seconds;
+    bool responsive_notifications;
+    bool notifications_submitted;
+    cui_notification_advance notification_advance;
 } cui_root_facility_frame;
 static void cui_root_facilities(cui_context *ui, void *user) {
     cui_root_facility_frame *frame = user;
@@ -55,17 +58,41 @@ static void cui_root_facilities(cui_context *ui, void *user) {
             break;
         }
     }
-    if (root->notifications)
-        (void)cui_notifications(ui, frame->id ^ UINT64_C(0x94fbd6a19873c20e), frame->theme,
-                                root->notifications, notification_viewport, frame->now_seconds);
+    if (root->notifications) {
+        cui_id scope = frame->id ^ UINT64_C(0x94fbd6a19873c20e);
+        frame->notifications_submitted =
+            frame->responsive_notifications
+                ? cui_notifications_responsive(ui, scope, frame->theme, root->notifications,
+                                               notification_viewport, frame->now_seconds,
+                                               &frame->notification_advance)
+                : cui_notifications_checked(ui, scope, frame->theme, root->notifications,
+                                            notification_viewport, frame->now_seconds,
+                                            &frame->notification_advance);
+    }
+}
+bool cui_root_render_with_options(cui_context *ui, cui_id id, cui_root *root,
+                                  const cui_theme *theme, cui_rect viewport,
+                                  const cui_root_style_override *instance_override,
+                                  cui_root_content_fn content, void *content_user,
+                                  double now_seconds, cui_root_render_options options) {
+    if (!theme || !root || root->dialog_capacity > 8 || (root->dialog_count && !root->dialogs))
+        return false;
+    cui_root_facility_frame frame = {.root = root,
+                                     .theme = theme,
+                                     .viewport = viewport,
+                                     .id = id,
+                                     .now_seconds = now_seconds,
+                                     .responsive_notifications = options.responsive_notifications};
+    cui_root_style defaults = {.background = theme->background, .foreground = theme->text};
+    bool rendered = cui_base_root_render(ui, id, root, viewport, defaults, instance_override,
+                                         content, content_user, cui_root_facilities, &frame);
+    if (rendered && frame.notifications_submitted && options.notification_advance)
+        *options.notification_advance = frame.notification_advance;
+    return rendered;
 }
 bool cui_root_render(cui_context *ui, cui_id id, cui_root *root, const cui_theme *theme,
                      cui_rect viewport, const cui_root_style_override *instance_override,
                      cui_root_content_fn content, void *content_user, double now_seconds) {
-    if (!theme || !root || root->dialog_capacity > 8 || (root->dialog_count && !root->dialogs))
-        return false;
-    cui_root_facility_frame frame = {root, theme, viewport, id, now_seconds};
-    cui_root_style defaults = {.background = theme->background, .foreground = theme->text};
-    return cui_base_root_render(ui, id, root, viewport, defaults, instance_override, content,
-                                content_user, cui_root_facilities, &frame);
+    return cui_root_render_with_options(ui, id, root, theme, viewport, instance_override, content,
+                                        content_user, now_seconds, (cui_root_render_options){0});
 }

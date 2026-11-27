@@ -731,7 +731,7 @@ cui_video_player_with_audio(ui, id, &theme, &controls, confirmed_view,
    acknowledge success in the next view. Volume changes preserve mute. Keep decoded RGBA8 pixels
    unchanged until rendering completes; increment bitmap.revision on edits.
    The host decodes/schedules frames and rejects stale source/generation requests. */`,
- 'Root View':'cui_root_init(&root, plugins, 1, &registry, window);\ncui_root_bind_facilities(&root, dialogs, 2, &notifications);\ncui_root_render(ui, id, &root, &theme, viewport, NULL, content, user, now);'
+ 'Root View':'cui_root_init(&root, plugins, 1, &registry, window);\ncui_root_bind_facilities(&root, dialogs, 2, &notifications);\ncui_notification_advance advance = {0};\ncui_root_render_with_options(ui, id, &root, &theme, viewport, NULL, content, user, now,\n    (cui_root_render_options){.responsive_notifications = true, .notification_advance = &advance});\n// Schedule the next frame at advance.next_wake_seconds when nonzero.'
 };
 let wasm, catalog, documents, themes, selected, framePending=false, wakeTimer, lastTime=performance.now();
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');

@@ -727,9 +727,15 @@ static cui_root_surface root_dialog_slots[2];
 static cui_surface_state root_dialog_surface, root_sheet_surface;
 static cui_notification_state root_notices;
 static cui_notification_entry root_notice_entries[4];
-static char root_notice_titles[4][40];
 static bool root_dialog_checked;
 static bool root_disabled;
+static unsigned root_notice_reviews;
+static void gallery_root_notice_review(void *user, cui_notification_id id) {
+    (void)user;
+    (void)id;
+    root_notice_reviews++;
+    redraw = true;
+}
 static void *gallery_root_plugin_build(void *registration_user, void *window_user) {
     (void)window_user;
     gallery_root_counts *counts = registration_user;
@@ -802,33 +808,36 @@ static void gallery_root_content(cui_context *context, void *user) {
                                .options = {.edge = CUI_SHEET_RIGHT, .width = 320, .margin = 16},
                                .content = gallery_root_sheet_content},
             sheet);
+    bool notices_full = root_notices.count == root_notices.capacity;
     if (cui_button(context, cui_id_from(context, "root-notify"), &current_theme,
-                   cui_string("Notify workspace"), root_disabled) &&
-        root_counts.notices < 4) {
-        unsigned index = root_counts.notices++;
-        snprintf(root_notice_titles[index], sizeof(root_notice_titles[index]), "Root notice %u",
-                 index + 1);
+                   cui_string("Notify workspace"), root_disabled || notices_full)) {
         cui_notification notice = cui_notification_default();
-        notice.id = (cui_notification_id){2, index + 1};
-        notice.title = cui_string(root_notice_titles[index]);
-        notice.message = cui_string("Mounted above app content.");
+        notice.id = (cui_notification_id){2, ++root_counts.notices};
+        notice.title = cui_string("Workspace update");
+        notice.message = cui_string("Your workspace tasks are ready to review. Check the latest "
+                                    "changes before sharing the update with your team.");
+        notice.action_label = cui_string("Review");
+        notice.on_action = gallery_root_notice_review;
         notice.autohide = false;
         (void)cui_root_notification_push(&root_view, notice, host_seconds);
     }
+    if (root_notice_reviews)
+        cui_label(context, &current_theme, cui_string("Workspace update reviewed"));
     cui_end_box(context);
 }
 float gallery_root_stats(int field) {
-    return field == 0   ? root_counts.builds
-           : field == 1 ? root_counts.prepares
-           : field == 2 ? root_counts.styles
-           : field == 3 ? root_counts.overlays
-           : field == 4 ? root_counts.content
-           : field == 5 ? root_counts.dialogs
-           : field == 6 ? root_counts.sheets
-           : field == 7 ? root_notices.count
-           : field == 8 ? root_dialog_surface.overlay.open
-           : field == 9 ? root_sheet_surface.overlay.open
-                        : 0;
+    return field == 0    ? root_counts.builds
+           : field == 1  ? root_counts.prepares
+           : field == 2  ? root_counts.styles
+           : field == 3  ? root_counts.overlays
+           : field == 4  ? root_counts.content
+           : field == 5  ? root_counts.dialogs
+           : field == 6  ? root_counts.sheets
+           : field == 7  ? root_notices.count
+           : field == 8  ? root_dialog_surface.overlay.open
+           : field == 9  ? root_sheet_surface.overlay.open
+           : field == 10 ? root_notice_reviews
+                         : 0;
 }
 static void gallery_command_action(void *user) {
     (void)user;
@@ -4527,12 +4536,18 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         }
         break;
     }
-    case 75:
+    case 75: {
         root_disabled = disabled != 0;
-        (void)cui_root_render(ui, cui_id_from(ui, "root-view"), &root_view, &t,
-                              (cui_rect){0, 0, width, height}, NULL, gallery_root_content, NULL,
-                              host_seconds);
+        root_notices.settings.reduced_motion = reduced_motion;
+        cui_notification_advance advance = {0};
+        (void)cui_root_render_with_options(
+            ui, cui_id_from(ui, "root-view"), &root_view, &t, (cui_rect){0, 0, width, height}, NULL,
+            gallery_root_content, NULL, host_seconds,
+            (cui_root_render_options){.responsive_notifications = true,
+                                      .notification_advance = &advance});
+        next_wake = advance.next_wake_seconds;
         break;
+    }
     case 76: {
         if (cui_button(ui, cui_id_from(ui, "text-view-append"), &t, cui_string("Append update"),
                        disabled)) {

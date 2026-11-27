@@ -328,7 +328,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "The responsive presenter, automatic first Close target and stacked action layout are direct C frame APIs. Retained builders and automatic Root submission do not expose this presentation."
+        "The responsive presenter, Close before hover and stacked action layout are available in direct C submission and through opt-in immediate C Root mounting. Retained language builders keep the original presentation."
       ]
     },
     {
@@ -844,7 +844,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "Automatic responsive notifications and the optional notification scheduling result in cui_root_render_with_options are immediate C APIs."
+      ]
     },
     {
       "name": "Scrollable",

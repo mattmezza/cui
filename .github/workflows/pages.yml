@@ -264,6 +264,9 @@ jobs:
       - name: Verify source Label privacy and Empty actions
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_source_composition_gallery.py
+      - name: Verify Root responsive notification geometry and touch
+        if: ${{ matrix.shard == 3 }}
+        run: uv run tests/web/test_root_notifications.py
       - name: Verify Tabs nested wheel and touch event ownership
         if: ${{ matrix.shard == 2 }}
         run: uv run tests/web/test_tabs_scroll_chaining.py

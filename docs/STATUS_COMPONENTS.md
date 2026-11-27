@@ -133,11 +133,12 @@ if (cui_notifications_responsive(ui, scope, theme, &notifications,
 ```
 
 Submit one renderer per stack and frame. `cui_notifications`,
-`cui_notifications_checked` and the automatic Root layer use the original
-presentation, including hover or focus to reveal Close. Both presentations use
-the same manager, callbacks, logical IDs, shadow policies and scheduling contract.
-The responsive presenter is a direct C API. Retained language builders do not
-expose this presenter.
+`cui_notifications_checked` and `cui_root_render` use the original presentation,
+including hover or focus to reveal Close. A C application that binds the stack to
+Root can opt into responsive cards and receive the wake deadline through
+`cui_root_render_with_options`. Both presentations use the same manager, callbacks,
+logical IDs, shadow policies and scheduling contract. Retained language builders
+use the original presentation. [Root example](ROOT.md#responsive-notifications)
 
 To use OS delivery, explicitly configure portable host `send`, `retract`, and
 `activate` callbacks and select System or Both delivery. No native OS adapters are

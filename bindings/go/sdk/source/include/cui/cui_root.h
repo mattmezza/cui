@@ -84,6 +84,20 @@ bool cui_base_root_render(cui_context *, cui_id, cui_root *, cui_rect viewport,
 bool cui_root_render(cui_context *, cui_id, cui_root *, const cui_theme *, cui_rect viewport,
                      const cui_root_style_override *instance_override, cui_root_content_fn content,
                      void *content_user, double now_seconds);
+typedef struct {
+    bool responsive_notifications;
+    cui_notification_advance *notification_advance;
+} cui_root_render_options;
+/* Same facilities, geometry and ordering as cui_root_render. Enable responsive_notifications
+ * for wrapped cards and an independently reachable Close button. Supply optional,
+ * independent caller-owned notification_advance storage for this call. It is
+ * written only if Root rendered and its bound notification submission succeeded.
+ * Use it to schedule a wake in the same clock as now_seconds. */
+bool cui_root_render_with_options(cui_context *, cui_id, cui_root *, const cui_theme *,
+                                  cui_rect viewport,
+                                  const cui_root_style_override *instance_override,
+                                  cui_root_content_fn content, void *content_user,
+                                  double now_seconds, cui_root_render_options);
 #ifdef __cplusplus
 }
 #endif

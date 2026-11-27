@@ -152,7 +152,15 @@ export interface Surface extends Label, OpenState {detail(text: string): this; o
 export interface Dialog extends Surface, Composite {}
 export interface AlertDialog extends Surface {}
 export interface Sheet extends Surface, Composite {}
-export interface Popover extends Surface, Composite {anchor(node: Node): this}
+/** Anchor: 0 top-left, 1 top-center, 2 top-right, 3 bottom-left,
+ * 4 bottom-center, 5 bottom-right, 6 left-center, 7 right-center. Zero dimensions use defaults. */
+export interface PopoverOptions {
+  anchor?: 0|1|2|3|4|5|6|7;
+  width?: number; height?: number; margin?: number; offset?: number; reference_rem?: number;
+  arrow?: boolean; hide_close?: boolean; keep_pointer_focus?: boolean; focus_content?: boolean;
+  no_escape_dismiss?: boolean; no_outside_dismiss?: boolean;
+}
+export interface Popover extends Surface, Composite {anchor(node: Node): this; popover_options(options: PopoverOptions|null): this}
 export interface HoverSurface extends Label {on_change(callback: (event: ChangeEvent) => void): this; anchor(node: Node): this; is_open(): boolean; disabled(value?: boolean): this}
 export interface HoverCard extends HoverSurface, Composite {}
 export function dialog(key?: string, text?: string): Dialog;
@@ -583,6 +591,7 @@ export interface App {
   supports_spinner_presentation(): boolean;
   supports_pagination_custom_size(): boolean;
   supports_rating_options(): boolean;
+  supports_popover_options(): boolean;
   supports_pagination_options(): boolean;
 }
 

@@ -159,6 +159,8 @@ class _API:
         bind_skeleton_api(self, bind)
         from .spinner_presentation import bind_api as bind_spinner_api
         bind_spinner_api(self, bind)
+        from .popover_options import bind_api as bind_popover_api
+        bind_popover_api(self, bind)
         from .pagination_options import bind_api as bind_pagination_api
         bind_pagination_api(self, bind)
         from .rating_options import bind_api as bind_rating_api
@@ -2511,6 +2513,7 @@ class App:
 
     def mount(self, tree: Widget) -> "App":
         from .disclosure import preflight as disclosure_preflight, mount as disclosure_mount
+        from .popover_options import preflight as popover_preflight, mount as popover_mount
         self._ensure_open()
         if self._root is not None:
             raise RuntimeError("App already has a root; dispose it before remounting")
@@ -2530,6 +2533,7 @@ class App:
             if node._disposed:
                 raise ValueError("widget belongs to a disposed App")
             seen.add(id(node))
+            popover_preflight(node, self)
             disclosure_preflight(node, parent, self)
             from .attachment_options import preflight as attachment_preflight
             attachment_preflight(node, self)
@@ -2779,6 +2783,7 @@ class App:
                     node._change("set_stepper_visual", *node._stepper_visual)
                 if node._design_size is not None:
                     node._change("set_design_size", _SIZE[node._design_size])
+                popover_mount(node)
                 from .attachment_options import mount as attachment_mount
                 attachment_mount(node)
                 from .attachment_actions import mount as actions_mount
@@ -3261,6 +3266,10 @@ class App:
         from .rating_options import supported
         return supported(self)
 
+    def supports_popover_options(self) -> bool:
+        from .popover_options import supported
+        return supported(self)
+
     def supports_pagination_options(self) -> bool:
         from .pagination_options import supported
         return supported(self)
@@ -3519,3 +3528,5 @@ from .spinner_presentation import (SpinnerSize, SpinnerEasing, SpinnerConfig, Sp
                                    RotatingSpinner, rotating_spinner)
 from .spinner_presentation import __all__ as _spinner_exports
 __all__ += _spinner_exports
+
+from . import popover_options as _popover_options

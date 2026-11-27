@@ -6674,7 +6674,8 @@
         "tests/unit/test_popover_surface.c",
         "tests/integration/test_popover_surface_native.c",
         "tests/web/test_mesh_canvas.py",
-        "tests/web/test_popover_anchor_gallery.py"
+        "tests/web/test_popover_anchor_gallery.py",
+        "tests/unit/test_bridge_popover.c"
       ],
       "status": "tested",
       "platforms": {
@@ -6684,8 +6685,8 @@
       },
       "limitations": [
         "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. C supports deferred close requests. Automatic root overlay management, Popover-specific overflow acceptance, customizable part styles, transitions and full controlled-open notification remain pending.",
-        "Legacy placement retains side-based flip/clamp. The optional C trigger link, explicit focus entry/return, opt-in nonmodal outside focus preservation and secondary trigger have Base, Styled and actual WASM subset coverage. Foreign authoring and native screen-reader validation remain pending.",
-        "Additive C anchor/offset/arrow positioning retains legacy defaults and uses frame-owned copied paint. Scoped software/WASI and private-Xvfb Sokol evidence does not establish complete family parity: SDL3 and Canvas analytic mesh subsets have runtime pixel evidence, but exact reference stroke/raster antialiasing remains pending; language builders omit the positioning API."
+        "Legacy placement retains side-based flip/clamp. The optional C trigger link, explicit focus entry/return, opt-in nonmodal outside focus preservation and secondary trigger have Base, Styled and actual WASM subset coverage. Retained foreign builders expose optional placement and common focus policies. Routed secondary-click authoring and native screen-reader validation remain pending.",
+        "Additive C anchor/offset/arrow positioning retains legacy defaults and uses frame-owned copied paint. Scoped software/WASI and private-Xvfb Sokol evidence does not establish complete family parity: SDL3 and Canvas analytic mesh subsets have runtime pixel evidence, but exact reference stroke/raster antialiasing remains pending. Retained placement uses the last completed bounds and may need a follow-up frame."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -6740,6 +6741,21 @@
             "tests/unit/test_surface.c",
             "docs/validation/gcc-surfaces.txt"
           ]
+        },
+        {
+          "name": "opt-in retained anchors and focus policies",
+          "status": "tested",
+          "evidence": [
+            "include/cui/cui_bridge.h",
+            "tests/unit/test_bridge_popover.c",
+            "bindings/python/test_popover_options.py",
+            "bindings/node/test/popover-options.test.cjs",
+            "bindings/node/test/popover-options.types.ts",
+            "bindings/go/cui/popover_options_test.go",
+            "bindings/rust/tests/popover_options.rs",
+            "docs/POPOVER_ANCHORS.md"
+          ],
+          "scope": "Headless retained placement, first body Tab stop, Escape restoration, outside focus policy, explicit close and legacy provider compatibility. Native assistive technology and retained secondary-click dispatch remain unverified."
         },
         {
           "name": "checked legacy source and none appearance policies",

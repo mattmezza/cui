@@ -180,7 +180,7 @@ def generate(name,sources):
         code=code.replace('#include "cui_shadow_profile_internal.h"', (ROOT/'src/effects/cui_shadow_profile_internal.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_drop_shadow_bounds_internal.h"', '#include "../core/cui_drop_shadow_bounds_internal.h"']:
             code=code.replace(private_include, (ROOT/'src/core/cui_drop_shadow_bounds_internal.h').read_text(encoding='utf-8'))
-        for private_name in ['cui_background_valid_internal.h', 'cui_background_output_internal.h', 'cui_column_width_internal.h', 'cui_draw_v2_internal.h', 'cui_ordered_input_internal.h', 'cui_prepaint_bounds_internal.h', 'cui_scroll_x_internal.h', 'cui_scroll_focus_internal.h']:
+        for private_name in ['cui_background_valid_internal.h', 'cui_background_output_internal.h', 'cui_column_width_internal.h', 'cui_draw_v2_internal.h', 'cui_focus_entry_internal.h', 'cui_layout_bounds_internal.h', 'cui_ordered_input_internal.h', 'cui_prepaint_bounds_internal.h', 'cui_scroll_x_internal.h', 'cui_scroll_focus_internal.h']:
             for prefix in ['', '../core/']:
                 code=code.replace(f'#include "{prefix}{private_name}"', (ROOT/'src/core'/private_name).read_text(encoding='utf-8'))
         code=code.replace('#include "cui_scroll_layout_internal.h"', (ROOT/'src/core/cui_scroll_layout_internal.h').read_text(encoding='utf-8'))

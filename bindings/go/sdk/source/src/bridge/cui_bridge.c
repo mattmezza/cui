@@ -3,6 +3,8 @@
 #include "../base/cui_table_internal.h"
 #include "../components/cui_media_internal.h"
 #include "../components/cui_status_internal.h"
+#include "../core/cui_focus_entry_internal.h"
+#include "../core/cui_layout_bounds_internal.h"
 #include "../core/cui_text_paint_internal.h"
 #include "cui/cui_kbd.h"
 #include "cui/cui_media.h"
@@ -1225,6 +1227,8 @@ failed:
     return NULL;
 }
 static void bridge_free_node_resources(cui_bridge_node_record *node) {
+    free(node->popover_config);
+    node->popover_config = NULL;
     bridge_slider_remove(node->owner, node->own_slot);
     bridge_time_remove(node->owner, node->own_slot);
     bridge_skeleton_remove(node->owner, node->own_slot);
@@ -2225,6 +2229,12 @@ cui_bridge_status cui_bridge_notification_action_create_v1(cui_bridge_app *app,
 }
 static void bridge_remove_subtree(cui_bridge_app *app, uint32_t slot) {
     cui_bridge_node_record *node = &app->nodes[slot];
+    if (node->popover_config) {
+        const cui_overlay *overlay = &node->surface_state.overlay;
+        if (overlay->open && cui_focus_within(app->ui, overlay->id))
+            (void)cui_focus_restore(app->ui, overlay->trigger);
+        cui_invalidate(app->ui);
+    }
     if (node->kind == CUI_BRIDGE_NOTIFICATION && app->notifications)
         for (size_t i = 0; i < app->notifications->count; i++)
             if (app->notifications->entries[i].notification.id.key == node->id) {
@@ -3354,8 +3364,8 @@ cui_bridge_status cui_bridge_set_scroll_extent(cui_bridge_app *app, cui_bridge_n
     return CUI_BRIDGE_OK;
 }
 cui_bridge_status cui_bridge_notification_set_auto_hide_v1(cui_bridge_app *app,
-                                                             cui_bridge_node handle,
-                                                             uint32_t enabled) {
+                                                           cui_bridge_node handle,
+                                                           uint32_t enabled) {
     cui_bridge_node_record *node;
     cui_bridge_status status = bridge_valid_node(app, handle, &node);
     if (status != CUI_BRIDGE_OK)
@@ -3441,12 +3451,21 @@ cui_bridge_status cui_bridge_set_open(cui_bridge_app *app, cui_bridge_node handl
     if (node->kind >= CUI_BRIDGE_DIALOG && node->kind <= CUI_BRIDGE_POPOVER) {
         if (open > 1)
             return CUI_BRIDGE_INVALID_ARGUMENT;
-        if (open && node->kind == CUI_BRIDGE_POPOVER && !bridge_node(app, node->anchor))
+        cui_bridge_node_record *anchor =
+            node->kind == CUI_BRIDGE_POPOVER ? bridge_node(app, node->anchor) : NULL;
+        if (open && node->kind == CUI_BRIDGE_POPOVER && !anchor)
             return CUI_BRIDGE_INVALID_STATE;
-        if (open)
-            cui_surface_open(app->ui, &node->surface_state, 0);
-        else
+        if (open) {
+            bool opening = !node->surface_state.overlay.open;
+            cui_surface_open(app->ui, &node->surface_state, node->popover_config ? anchor->id : 0);
+            if (opening)
+                node->popover_focus_pending =
+                    node->popover_config &&
+                    (node->popover_config->flags & CUI_BRIDGE_POPOVER_FOCUS_CONTENT_V1);
+        } else {
+            node->popover_focus_pending = false;
             cui_surface_request_close(app->ui, &node->surface_state, CUI_SURFACE_CLOSED);
+        }
         return CUI_BRIDGE_OK;
     }
     if (node->kind != CUI_BRIDGE_COLLAPSIBLE &&
@@ -3511,6 +3530,60 @@ cui_bridge_status cui_bridge_set_anchor(cui_bridge_app *app, cui_bridge_node sur
         if (ancestor == surface.slot)
             return CUI_BRIDGE_INVALID_ARGUMENT;
     node->anchor = anchor;
+    if (node->popover_config) {
+        if (node->surface_state.overlay.open)
+            node->surface_state.overlay.trigger = trigger->id;
+        cui_invalidate(app->ui);
+    }
+    return CUI_BRIDGE_OK;
+}
+_Static_assert(sizeof(cui_bridge_popover_config_v1) == 32 &&
+                   offsetof(cui_bridge_popover_config_v1, reserved) == 28,
+               "Popover config v1 wire layout");
+_Static_assert((int)CUI_BRIDGE_POPOVER_RIGHT_CENTER_V1 == (int)CUI_POPOVER_RIGHT_CENTER,
+               "Popover anchor values");
+cui_bridge_status cui_bridge_popover_configure_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                  uint32_t size,
+                                                  const cui_bridge_popover_config_v1 *config) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_POPOVER)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (!config && size == 0) {
+        free(node->popover_config);
+        node->popover_config = NULL;
+        node->popover_focus_pending = false;
+        cui_invalidate(app->ui);
+        return CUI_BRIDGE_OK;
+    }
+    const uint32_t flags =
+        CUI_BRIDGE_POPOVER_ARROW_V1 | CUI_BRIDGE_POPOVER_HIDE_CLOSE_V1 |
+        CUI_BRIDGE_POPOVER_KEEP_POINTER_FOCUS_V1 | CUI_BRIDGE_POPOVER_FOCUS_CONTENT_V1 |
+        CUI_BRIDGE_POPOVER_NO_ESCAPE_DISMISS_V1 | CUI_BRIDGE_POPOVER_NO_OUTSIDE_DISMISS_V1 |
+        CUI_BRIDGE_POPOVER_CUSTOM_OFFSET_V1;
+    if (!config || size != sizeof(*config) || config->reserved || (config->flags & ~flags) ||
+        config->anchor > CUI_BRIDGE_POPOVER_RIGHT_CENTER_V1 ||
+        !(config->width >= 0 && config->width <= 4096) ||
+        !(config->height >= 0 && config->height <= 4096) ||
+        !(config->margin >= 0 && config->margin <= 4096) ||
+        !(config->offset >= -4096 && config->offset <= 4096) ||
+        !(config->reference_rem >= 0 && config->reference_rem <= 256) ||
+        (!(config->flags & CUI_BRIDGE_POPOVER_CUSTOM_OFFSET_V1) && config->offset != 0))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (!node->popover_config) {
+        node->popover_config = malloc(sizeof(*config));
+        if (!node->popover_config)
+            return CUI_BRIDGE_OUT_OF_MEMORY;
+    }
+    *node->popover_config = *config;
+    if (!(config->flags & CUI_BRIDGE_POPOVER_FOCUS_CONTENT_V1))
+        node->popover_focus_pending = false;
+    cui_bridge_node_record *anchor = bridge_node(app, node->anchor);
+    if (anchor && node->surface_state.overlay.open)
+        node->surface_state.overlay.trigger = anchor->id;
+    cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
 static bool bridge_group_kind(cui_bridge_kind kind) {
@@ -4918,10 +4991,9 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                         layout = CUI_STEPPER_LAYOUT_WRAPPED_FILL;
                     else if (node->stepper_layout == BRIDGE_STEPPER_CENTERED_FILL)
                         layout = CUI_STEPPER_LAYOUT_CENTERED_FILL;
-                    cui_stepper_presentation_options presentation = {
-                        .layout = layout,
-                        .width = node->visual_width,
-                        .height = node->visual_height};
+                    cui_stepper_presentation_options presentation = {.layout = layout,
+                                                                     .width = node->visual_width,
+                                                                     .height = node->visual_height};
                     result = cui_stepper_present(app->ui, node->id, &app->theme, scratch->steps,
                                                  count, current, options, presentation, handler);
                     if (result.valid && request.requested != current)
@@ -6553,8 +6625,8 @@ static void bridge_render_questionnaire(cui_bridge_app *app, uint32_t slot,
     node->checked = owned->state.complete;
     (void)slot;
 }
-static void bridge_render_button(cui_bridge_app *app, uint32_t slot,
-                                 cui_bridge_node_record *node, float width, bool disabled) {
+static void bridge_render_button(cui_bridge_app *app, uint32_t slot, cui_bridge_node_record *node,
+                                 float width, bool disabled) {
     cui_button_options options = {.variant = (cui_button_variant)node->variant,
                                   .size = CUI_CONTROL_MEDIUM,
                                   .design_size = (cui_design_size)node->size,
@@ -6591,6 +6663,110 @@ static void bridge_render_notification_action(void *user, float width) {
     bridge_render_button(app, slot, button, width, disabled);
     bridge_apply_shadows(app, button);
 }
+static void bridge_render_surface(cui_bridge_app *app, uint32_t slot,
+                                  cui_bridge_node_record *node) {
+    cui_context *ui = app->ui;
+    cui_surface_state *state = &node->surface_state;
+    cui_surface_options options = {.viewport = {0, 0, app->width, app->height}};
+    cui_str title = cui_string(node->text), detail = cui_string(node->detail);
+    cui_bridge_node_record *anchor = bridge_node(app, node->anchor);
+    const cui_bridge_popover_config_v1 *config = node->popover_config;
+    bool admitted = false;
+    if (config) {
+        if (anchor) {
+            if (anchor->popover_bounds_frame == app->last_core_frame - 1)
+                options.anchor = anchor->tracked_popover_anchor;
+            anchor->popover_measure_frame = app->last_core_frame;
+            app->popover_anchor_requested = true;
+        }
+        options.width = config->width;
+        options.height = config->height;
+        options.margin = config->margin;
+        options.hide_close = (config->flags & CUI_BRIDGE_POPOVER_HIDE_CLOSE_V1) != 0;
+        options.no_escape_dismiss = (config->flags & CUI_BRIDGE_POPOVER_NO_ESCAPE_DISMISS_V1) != 0;
+        options.no_outside_dismiss =
+            (config->flags & CUI_BRIDGE_POPOVER_NO_OUTSIDE_DISMISS_V1) != 0;
+        options.popover_appearance = CUI_POPOVER_APPEARANCE_SOURCE;
+        if (state->overlay.open && options.anchor.w > 0 && options.anchor.h > 0) {
+            cui_popover_position position = {
+                .mode = CUI_POPOVER_POSITION_ANCHOR,
+                .anchor = (cui_popover_anchor)config->anchor,
+                .reference_rem = config->reference_rem,
+                .offset = config->offset,
+                .custom_offset = (config->flags & CUI_BRIDGE_POPOVER_CUSTOM_OFFSET_V1) != 0,
+                .arrow = (config->flags & CUI_BRIDGE_POPOVER_ARROW_V1) != 0};
+            cui_popover_outside_focus focus =
+                config->flags & CUI_BRIDGE_POPOVER_KEEP_POINTER_FOCUS_V1
+                    ? CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER
+                    : CUI_POPOVER_OUTSIDE_FOCUS_RESTORE_TRIGGER;
+            admitted = cui_popover_begin_with_outside_focus(ui, &app->theme, state, title, detail,
+                                                            options, position, focus);
+        } else if (state->pending_close != CUI_SURFACE_NONE) {
+            (void)cui_base_surface_update(ui, state, options);
+        }
+    } else if (node->kind == CUI_BRIDGE_ALERT_DIALOG) {
+        cui_alert_dialog(ui, &app->theme, state, title, detail, cui_string("Confirm"),
+                         cui_string("Cancel"), options);
+    } else {
+        if (anchor)
+            options.anchor = cui_bounds(ui, anchor->id);
+        admitted = cui_surface_begin(ui, &app->theme, state, title, detail, options);
+    }
+    if (admitted) {
+        size_t first_body_semantic = 0;
+        if (node->popover_focus_pending)
+            (void)cui_semantics(ui, &first_body_semantic);
+        for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
+            bridge_render_node(app, child);
+        if (node->popover_focus_pending) {
+            (void)cui_core_focus_enter(ui, state->overlay.id, first_body_semantic);
+            node->popover_focus_pending = false;
+        }
+        cui_surface_end(ui);
+        if (config && anchor) {
+            anchor->popover_link_frame = app->last_core_frame;
+            anchor->popover_link_slot = slot;
+        }
+    }
+    cui_surface_result result = cui_surface_take_result(state);
+    if (result != CUI_SURFACE_NONE) {
+        node->popover_focus_pending = false;
+        bridge_surface_close(app, slot, result);
+    }
+}
+
+static void bridge_link_popovers(cui_bridge_app *app) {
+    if (!app->popover_anchor_requested)
+        return;
+    /* Anchor nodes can follow the Popover in the retained tree. */
+    for (uint32_t slot = 1; slot <= app->max_nodes; ++slot) {
+        cui_bridge_node_record *trigger = &app->nodes[slot];
+        if (!trigger->live || trigger->popover_link_frame != app->last_core_frame ||
+            !trigger->popover_link_slot)
+            continue;
+        const cui_bridge_node_record *popover = &app->nodes[trigger->popover_link_slot];
+        (void)cui_popover_link_trigger(app->ui, &popover->surface_state, trigger->id, true);
+    }
+}
+
+static void bridge_measure_popover_anchors(cui_bridge_app *app) {
+    if (!app->popover_anchor_requested)
+        return;
+    for (uint32_t slot = 1; slot <= app->max_nodes; ++slot) {
+        cui_bridge_node_record *anchor = &app->nodes[slot];
+        if (!anchor->live || anchor->popover_measure_frame != app->last_core_frame)
+            continue;
+        cui_rect bounds = {0}, previous = anchor->tracked_popover_anchor;
+        (void)cui_core_completed_box_bounds(app->ui, anchor->id, &bounds);
+        bool newly_measured = anchor->popover_bounds_frame != app->last_core_frame - 1;
+        anchor->tracked_popover_anchor = bounds;
+        anchor->popover_bounds_frame = app->last_core_frame;
+        if (newly_measured || bounds.x != previous.x || bounds.y != previous.y ||
+            bounds.w != previous.w || bounds.h != previous.h)
+            cui_invalidate(app->ui);
+    }
+}
+
 static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
     cui_bridge_node_record *node = &app->nodes[slot];
     bool previous_disabled = node->disabled;
@@ -6753,25 +6929,7 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
             }
         }
     } else if (node->kind >= CUI_BRIDGE_DIALOG && node->kind <= CUI_BRIDGE_POPOVER) {
-        cui_surface_options options = {.viewport = {0, 0, app->width, app->height}};
-        if (node->kind == CUI_BRIDGE_POPOVER) {
-            cui_bridge_node_record *anchor = bridge_node(app, node->anchor);
-            if (anchor)
-                options.anchor = cui_bounds(app->ui, anchor->id);
-        }
-        if (node->kind == CUI_BRIDGE_ALERT_DIALOG) {
-            cui_alert_dialog(app->ui, &app->theme, &node->surface_state, cui_string(node->text),
-                             cui_string(node->detail), cui_string("Confirm"), cui_string("Cancel"),
-                             options);
-        } else if (cui_surface_begin(app->ui, &app->theme, &node->surface_state,
-                                     cui_string(node->text), cui_string(node->detail), options)) {
-            for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
-                bridge_render_node(app, child);
-            cui_surface_end(app->ui);
-        }
-        cui_surface_result result = cui_surface_take_result(&node->surface_state);
-        if (result != CUI_SURFACE_NONE)
-            bridge_surface_close(app, slot, result);
+        bridge_render_surface(app, slot, node);
     } else if (bridge_group_kind(node->kind)) {
         bridge_render_group(app, slot, node);
     } else if (node->kind == CUI_BRIDGE_ITEM) {
@@ -7143,6 +7301,7 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
         goto done;
     }
     app->last_core_frame = cui_frame_sequence(app->ui);
+    app->popover_anchor_requested = false;
     if (app->icons)
         app->icons->presentation_frame = app->last_core_frame;
     bridge_spinner_collect_icons(app);
@@ -7159,13 +7318,16 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
         const cui_id scope = UINT64_C(0x4e4f544946594255);
         cui_rect viewport = {0, 0, app->width, app->height};
         cui_notification_advance advance;
-        if (cui_notifications_retained(app->ui, scope, &app->theme, app->notifications,
-                                       viewport, app->now_seconds, app->responsive_notifications,
+        if (cui_notifications_retained(app->ui, scope, &app->theme, app->notifications, viewport,
+                                       app->now_seconds, app->responsive_notifications,
                                        bridge_render_notification_action, &advance))
             app->notification_wake_seconds = advance.next_wake_seconds;
     }
+    bridge_link_popovers(app);
     cui_draw_list list = cui_end_frame(app->ui);
     status = cui_last_error(app->ui) == CUI_OK ? CUI_BRIDGE_OK : CUI_BRIDGE_CORE_ERROR;
+    if (status == CUI_BRIDGE_OK)
+        bridge_measure_popover_anchors(app);
     if (status == CUI_BRIDGE_OK && app->backend == CUI_BRIDGE_BACKEND_SDL)
         status = cui_bridge_native_render(app, &list);
     if (status == CUI_BRIDGE_OK)
@@ -7269,7 +7431,13 @@ cui_bridge_status cui_bridge_node_bounds(cui_bridge_app *app, cui_bridge_node ha
     if (node->kind == CUI_BRIDGE_ITEM && node->parent &&
         app->nodes[node->parent].kind == CUI_BRIDGE_TREE)
         id = cui_tree_row_id(app->nodes[node->parent].id, node->id);
-    cui_rect rect = cui_bounds(app->ui, id);
+    cui_rect rect;
+    if (node->popover_config) {
+        if (!cui_core_completed_box_bounds(app->ui, node->surface_state.overlay.id, &rect))
+            return CUI_BRIDGE_INVALID_STATE;
+    } else {
+        rect = cui_bounds(app->ui, id);
+    }
     if (!isfinite(rect.x) || !isfinite(rect.y) || rect.w <= 0 || rect.h <= 0)
         return CUI_BRIDGE_INVALID_STATE;
     *out_bounds = (cui_bridge_rect){rect.x, rect.y, rect.w, rect.h};

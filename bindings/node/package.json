@@ -22,6 +22,8 @@
     "time-field-localized.cjs",
     "skeleton-presentation.cjs",
     "spinner-presentation.cjs",
+    "popover-options.cjs",
+    "popover_options_internal.h",
     "pagination-options.cjs",
     "icon-resources.cjs",
     "icon-badge.cjs",

@@ -31,7 +31,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Dialog | `cui_surface_begin` | open, close result, child body | Native modal surface |
 | AlertDialog | `cui_alert_dialog` | open, accept/cancel/close result | Native confirm/cancel content |
 | Sheet | `cui_surface_begin` | open, close result, child body | Default right edge |
-| Popover | `cui_surface_begin` | open, close result, anchor, child body | Anchor must be a live node |
+| Popover | `cui_surface_begin`, `cui_popover_begin_with_outside_focus` | open, close result, anchor, child body, optional placement and focus | Anchor must be a live node. [Account menu and options](POPOVER_ANCHORS.md#retained-account-menu) |
 | Tooltip | `cui_tooltip` | native hover lifecycle, open/close change, disabled | Anchor must be a live node |
 | HoverCard | `cui_begin_hover_card` | native hover lifecycle, open/close change, disabled, child body | Anchor must be a live node |
 | Avatar | `cui_avatar` | copied name, size | Initials avatar |

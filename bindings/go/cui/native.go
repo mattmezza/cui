@@ -453,6 +453,28 @@ static cui_bridge_status go_stepper_centered_fill(cui_bridge_app *a, cui_bridge_
 }
 
 
+#if defined(CUI_GO_STATIC)
+#pragma weak cui_bridge_popover_configure_v1
+#endif
+static cui_bridge_status (*popover_configure)(cui_bridge_app *, cui_bridge_node, uint32_t,
+                                              const cui_bridge_popover_config_v1 *);
+static void go_popover_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&popover_configure, sizeof popover_configure,
+                          "cui_bridge_popover_configure_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else { popover_configure = cui_bridge_popover_configure_v1; }
+#endif
+}
+static int go_popover_supported(void) { return popover_configure != NULL; }
+static cui_bridge_status go_popover_configure(cui_bridge_app *app, cui_bridge_node node,
+                                              const cui_bridge_popover_config_v1 *config) {
+ return popover_configure
+  ? popover_configure(app, node, config ? sizeof(*config) : 0, config)
+  : CUI_BRIDGE_INVALID_STATE;
+}
+
 static cui_bridge_status (*radio_tooltip_set)(cui_bridge_app *, cui_bridge_node, const char *, uint32_t);
 static void go_radio_tooltip_initialize(void) {
  if (bridge_lib) {
@@ -911,6 +933,7 @@ static int bridge_open(const char *path) {
  go_stepper_fill_initialize();
  go_stepper_wrapped_fill_initialize();
  go_stepper_centered_fill_initialize();
+ go_popover_initialize();
  go_virtual_list_initialize();
  go_disclosure_initialize();
  go_attachment_initialize();
@@ -957,6 +980,7 @@ static int bridge_open(const char *path) {
  go_stepper_fill_initialize();
  go_stepper_wrapped_fill_initialize();
  go_stepper_centered_fill_initialize();
+ go_popover_initialize();
  go_virtual_list_initialize();
  go_disclosure_initialize();
  go_attachment_initialize();
@@ -1032,6 +1056,8 @@ type Options struct {
 	MaxNodes, MaxEvents      uint32
 }
 type Node struct {
+	popoverOptions *PopoverOptions
+
 	notificationAction                   bool
 	notificationAutoHide                 *bool
 	timeLocalized                        *TimeFieldConfig
@@ -3070,6 +3096,11 @@ func (a *App) Mount(root *Node) error {
 				return errors.New("popover anchor must belong to app")
 			}
 			if e := result(C.go_set_anchor(a.ptr, n.handle, n.anchor.handle)); e != nil {
+				return e
+			}
+		}
+		if n.popoverOptions != nil {
+			if e := n.configurePopover(n.popoverOptions); e != nil {
 				return e
 			}
 		}
@@ -7153,4 +7184,40 @@ func (n *Node) AutoHide(enabled bool) *Node {
 	}
 	n.notificationAutoHide = &enabled
 	return n
+}
+
+// SupportsPopoverOptions reports optional retained Popover presentation support.
+func (a *App) SupportsPopoverOptions() (bool, error) {
+	if e := a.check(); e != nil {
+		return false, e
+	}
+	return C.go_popover_supported() != 0, nil
+}
+func (n *Node) configurePopover(o *PopoverOptions) error {
+	if e := n.app.check(); e != nil {
+		return e
+	}
+	if C.go_popover_supported() == 0 {
+		return ErrPopoverOptionsUnavailable
+	}
+	var c C.cui_bridge_popover_config_v1
+	if o == nil {
+		return result(C.go_popover_configure(n.app.ptr, n.handle, nil))
+	}
+	c.anchor = C.uint32_t(o.Anchor)
+	c.width = C.float(o.Width)
+	c.height = C.float(o.Height)
+	c.margin = C.float(o.Margin)
+	c.reference_rem = C.float(o.ReferenceRem)
+	flags := uint32(0)
+	for i, b := range []bool{o.Arrow, o.HideClose, o.KeepPointerFocus, o.FocusContent, o.NoEscapeDismiss, o.NoOutsideDismiss, o.CustomOffset} {
+		if b {
+			flags |= 1 << i
+		}
+	}
+	c.flags = C.uint32_t(flags)
+	if o.CustomOffset {
+		c.offset = C.float(o.Offset)
+	}
+	return result(C.go_popover_configure(n.app.ptr, n.handle, &c))
 }

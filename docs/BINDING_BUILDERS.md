@@ -565,6 +565,8 @@ other component styling APIs are a separate unfinished bridge capability.
 
 Surface builders use `open()` and `on_close()`; popovers and hover surfaces
 require a live `anchor(node)`. Dialog, Sheet and Popover accept child components.
+The [retained account menu](POPOVER_ANCHORS.md#retained-account-menu) demonstrates
+anchor placement, focus entry and Escape dismissal in all five languages.
 AlertDialog uses its native confirmation actions. A Tree uses up to 64 flat Item
 children in preorder; Item `step_status(depth)` sets depth and `checked(True)`
 starts a branch expanded. In JavaScript use `checked(true)`.

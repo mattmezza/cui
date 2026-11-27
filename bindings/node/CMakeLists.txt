@@ -83,6 +83,13 @@ add_test(NAME node_responsive_notifications COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_EXPECT_RESPONSIVE_NOTIFICATIONS=1
  ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/responsive-notifications.test.cjs)
 
+add_test(NAME node_popover_options COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/popover-options.test.cjs)
+add_test(NAME node_popover_account_menu COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/account-menu.cjs)
+
 # Synthetic protocol boundaries stay in a Linux test-only preload library.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
  add_library(cui_notification_v1_fixture SHARED ../tests/notification_v1_fixture.c)
@@ -203,6 +210,10 @@ if(CUI_NODE_TSC_EXECUTABLE)
  add_test(NAME node_notification_action_types COMMAND ${CUI_NODE_TSC_EXECUTABLE}
   --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --noEmit
   ${CMAKE_CURRENT_SOURCE_DIR}/test/notification-action.types.ts)
+ add_test(NAME node_popover_options_types COMMAND ${CUI_NODE_TSC_EXECUTABLE}
+  --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --noEmit
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/popover-options.types.ts
+  ${CMAKE_CURRENT_SOURCE_DIR}/../typescript/examples/account_menu.ts)
  add_test(NAME node_responsive_notifications_types COMMAND ${CUI_NODE_TSC_EXECUTABLE}
   --strict --target ES2020 --module commonjs --skipLibCheck --noEmit
   ${CMAKE_CURRENT_SOURCE_DIR}/test/responsive-notifications.types.ts)

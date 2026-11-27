@@ -1015,9 +1015,9 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_responsive_notifications_v1(cui_
  * Button frees the slot, and removing the card removes the Button. Its click
  * is independent of the card body and Close, and leaves the card open unless
  * the application closes it. Action cards use a bounded row below the body. */
-CUI_BRIDGE_API cui_bridge_status cui_bridge_notification_action_create_v1(
-    cui_bridge_app *, cui_bridge_node notification, const char *key_utf8,
-    cui_bridge_node *out_button);
+CUI_BRIDGE_API cui_bridge_status
+cui_bridge_notification_action_create_v1(cui_bridge_app *, cui_bridge_node notification,
+                                         const char *key_utf8, cui_bridge_node *out_button);
 /* Configure the next opening of an in-app Notification. 0 is persistent
  * (the default) and 1 opts into five seconds of unpaused visible time after
  * entrance. Changing this setting while open leaves that lifetime intact.
@@ -1391,6 +1391,50 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_get_open(cui_bridge_app *, cui_bridg
                                                      uint32_t *out_open);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_anchor(cui_bridge_app *, cui_bridge_node surface,
                                                        cui_bridge_node anchor);
+/* Positions name the Popover's own anchor. Top opens below its trigger,
+ * Bottom above, LeftCenter to the right, and RightCenter to the left. */
+typedef enum {
+    CUI_BRIDGE_POPOVER_TOP_LEFT_V1 = 0,
+    CUI_BRIDGE_POPOVER_TOP_CENTER_V1,
+    CUI_BRIDGE_POPOVER_TOP_RIGHT_V1,
+    CUI_BRIDGE_POPOVER_BOTTOM_LEFT_V1,
+    CUI_BRIDGE_POPOVER_BOTTOM_CENTER_V1,
+    CUI_BRIDGE_POPOVER_BOTTOM_RIGHT_V1,
+    CUI_BRIDGE_POPOVER_LEFT_CENTER_V1,
+    CUI_BRIDGE_POPOVER_RIGHT_CENTER_V1
+} cui_bridge_popover_anchor_v1;
+enum {
+    CUI_BRIDGE_POPOVER_ARROW_V1 = 1u << 0,
+    CUI_BRIDGE_POPOVER_HIDE_CLOSE_V1 = 1u << 1,
+    CUI_BRIDGE_POPOVER_KEEP_POINTER_FOCUS_V1 = 1u << 2,
+    CUI_BRIDGE_POPOVER_FOCUS_CONTENT_V1 = 1u << 3,
+    CUI_BRIDGE_POPOVER_NO_ESCAPE_DISMISS_V1 = 1u << 4,
+    CUI_BRIDGE_POPOVER_NO_OUTSIDE_DISMISS_V1 = 1u << 5,
+    CUI_BRIDGE_POPOVER_CUSTOM_OFFSET_V1 = 1u << 6
+};
+typedef struct {
+    uint32_t anchor, flags;
+    float width, height, margin, offset, reference_rem;
+    uint32_t reserved;
+} cui_bridge_popover_config_v1;
+/* Opt into anchor placement and the Popover theme surface. Copies an exact
+ * 32-byte v1 record. NULL with size 0 restores legacy presentation. Call
+ * between steps on the owner thread. Errors preserve prior settings.
+ * Width, height and margin are finite in [0,4096]. Zero width/height select
+ * 420/260. Rem in [0,256], zero selects 16. Signed gap is in [-4096,4096]
+ * and must be zero unless CUSTOM_OFFSET is enabled. The default gap is rem/4.
+ * Use set_anchor and set_open as before. The first visible frame requires
+ * a completed positive anchor rectangle. Changed anchor bounds schedule a
+ * follow-up. A hidden anchor can omit paint without changing open status.
+ * FOCUS_CONTENT requests first enabled body Tab stop on initial admission.
+ * KEEP_POINTER_FOCUS preserves focus on an accepted outside primary press.
+ * Escape and explicit close retain trigger restoration and the queued CLOSE
+ * contract. Removing the node discards the panel and restores the trigger
+ * if its body owned focus. Removal does not queue CLOSE. An admitted panel
+ * links its trigger in the current semantics.
+ * The bounds query returns its painted panel and fails while it is omitted. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_popover_configure_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t config_size, const cui_bridge_popover_config_v1 *);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_visual_size(cui_bridge_app *, cui_bridge_node,
                                                             float width, float height);
 /* Optional Carousel operation. Item must be a direct child of a Carousel.

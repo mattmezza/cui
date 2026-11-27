@@ -8,8 +8,8 @@ base Popup live anchor positioning and Positioner corner clamping.
 arrows. Existing `cui_surface_begin` retains its legacy side placement, 6px gap,
 opposite-side overflow selection and size reduction. Existing public state and
 options structs have unchanged ABI. Recompile/link against the new library to
-use the added symbols. This API is C-only until binding coverage is explicitly
-updated; family catalog presence does not imply binding option parity.
+use the added symbols. Retained builders expose a subset through their own
+options. See [Retained account menu](#retained-account-menu).
 
 ```c
 cui_surface_options options = {
@@ -206,3 +206,70 @@ through a captured gesture. A touch press can close an overflowing Popover
 before release. Deferring the toolbar reflow preserves the canvas position
 so the same tap can activate the control underneath. The mobile regression
 renders the closed Popover between touch-down and touch-up.
+
+## Retained account menu
+
+A retained Popover accepts child controls. Anchor it to a live node, and open it
+from that control's activation handler. The application chooses whether and
+when to open the menu. An empty options record opts into anchored placement.
+Python, JavaScript and TypeScript use `popover_options`. Go uses
+`Node.PopoverOptions`. Rust uses `App::popover_options`. Older providers keep the
+original `anchor`, `open` and close event. Check support before opting in.
+
+```python
+from cui_bridge import App, button, column, popover
+
+account = button("account").label("Account")
+close = button("close").label("Close account menu")
+menu = popover("account-menu").anchor(account).children(close)
+
+with App() as app:
+    if app.supports_popover_options():
+        menu.popover_options(anchor=0, width=220, height=96, margin=8,
+                             hide_close=True, focus_content=True)
+    account.on_click(lambda event: menu.open())
+    close.on_click(lambda event: menu.open(False))
+    app.mount(column().children(account, menu))
+    app.step()
+```
+
+Python and JS/TS use anchor numbers 0–7 in the order TopLeft, TopCenter,
+TopRight, BottomLeft, BottomCenter, BottomRight, LeftCenter and RightCenter.
+They name the facing edge of the popup. A top anchor opens below the trigger
+when space permits. Go and Rust provide named anchors. Options include width,
+height, viewport margin, arrow, close-button visibility, and Escape and
+outside-pointer dismissal. A signed custom offset replaces the default gap of
+one quarter of the reference rem. An `offset` property enables the custom value
+in Python and JS/TS, including zero. Set `CustomOffset` in Go or
+`custom_offset` in Rust. Clear options with `None`, `null` or `nil` as
+appropriate. The C bridge exposes the same subset through
+`cui_bridge_popover_configure_v1` in `cui/cui_bridge.h`.
+
+`focus_content` moves focus to the first eligible Tab stop in the body when the
+open panel first appears. `keep_pointer_focus` preserves the new target's focus on
+an accepted outside press. Escape and explicit close restore the trigger.
+The normal queued close event still reports accepted dismissals. Removing
+the node restores the trigger if the body owns focus and drops the panel
+without a close event. Retained options use the Popover theme colors and link the trigger while the panel is
+admitted. Arrow paint requires a compatible renderer.
+
+Placement uses the trigger's most recently completed layout. Showing or
+moving an anchor can require a follow-up frame. A hidden anchor can temporarily
+leave the panel logically open with no rendered bounds. The application can
+still close it explicitly. Retained options omit routed secondary-click
+opening, arbitrary part-styling refinements and transitions.
+
+The following examples drive an account menu with a real trigger click and
+Escape. From a repo checkout with a current bridge, run:
+
+```sh
+CUI_BRIDGE_LIBRARY="$PWD/build/libcui_bridge.so" PYTHONPATH=bindings/python python bindings/python/examples/account_menu.py
+node bindings/node/examples/account-menu.cjs
+node bindings/typescript/examples/account_menu.ts
+(cd bindings/go && go run ./examples/account_menu)
+cargo run --manifest-path bindings/rust/Cargo.toml --example account_menu
+```
+
+Use [Binding builders](BINDING_BUILDERS.md) to build the Node addon and select the
+platform's bridge library. The TypeScript command uses a Node version with
+built-in type stripping.

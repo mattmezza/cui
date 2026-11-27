@@ -97,6 +97,11 @@ typedef struct {
     cui_menu_tree_state menu_state;
     cui_surface_state surface_state;
     cui_bridge_node anchor;
+    cui_bridge_popover_config_v1 *popover_config;
+    cui_rect tracked_popover_anchor;
+    uint64_t popover_measure_frame, popover_bounds_frame, popover_link_frame;
+    uint32_t popover_link_slot;
+    bool popover_focus_pending;
     cui_hover_state hover_state;
     cui_marker_state marker_state;
     cui_shimmer_state shimmer_state;
@@ -187,6 +192,7 @@ struct cui_bridge_app {
     cui_bridge_node_record *nodes;
     uint32_t max_nodes, root;
     uint64_t next_id;
+    bool popover_anchor_requested;
     uint64_t last_core_frame; /* Actual Core sequence captured inside bridge begin. */
     cui_bridge_event *events;
     cui_bridge_event_payload *event_payloads;

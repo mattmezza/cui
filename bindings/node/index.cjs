@@ -1006,6 +1006,7 @@ const iconBadges = require('./icon-badge.cjs')(native, Node, NODE, icons, design
 containers.add(iconBadges.badgeKind);
 const spinners = require('./spinner-presentation.cjs')(native, Node, NODE, icons);
 const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
+const popoverOptions = require('./popover-options.cjs')(native, Node, NODE);
 const paginationOptions = require('./pagination-options.cjs')(native, Node, NODE);
 const ratingOptions = require('./rating-options.cjs')(native, Node, NODE, icons, designSizes);
 const attachments = require('./attachment-options.cjs')(native, Node, NODE, attachmentStatuses);
@@ -1043,6 +1044,7 @@ class App {
     preflightDataTables(this, root);
     skeletons.preflight(this, root);
     spinners.preflight(this, root);
+    popoverOptions.preflight(this, root);
     paginationOptions.preflight(this, root);
     ratingOptions.preflight(this, root);
     disclosures.preflight(this, root);
@@ -1097,6 +1099,7 @@ class App {
       localizedTimes.mount(this,node);
       skeletons.mount(this, node);
       spinners.mount(this, node);
+      popoverOptions.mount(this, node);
       paginationOptions.mount(this, node);
       ratingOptions.mount(this, node);
       disclosures.mount(this, node);
@@ -1397,6 +1400,7 @@ class App {
   supports_attachment_options() { return attachments.supports(this); }
   supports_attachment_preview() { return attachments.supports(this,true); }
   supports_rating_options() { return ratingOptions.supports(this); }
+  supports_popover_options() { return popoverOptions.supports(this); }
   supports_pagination_options() { return paginationOptions.supports(this); }
   supports_spinner_icon_resource() { return spinners.supportsResource(this); }
   supports_spinner_presentation() { return spinners.supports(this); }

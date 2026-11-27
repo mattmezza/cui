@@ -2643,6 +2643,11 @@ target_link_libraries(test_bridge_stepper_visual PRIVATE cui_software)
 cui_warnings(test_bridge_stepper_visual)
 add_test(NAME bridge_stepper_visual COMMAND test_bridge_stepper_visual)
 
+add_executable(test_bridge_popover tests/unit/test_bridge_popover.c)
+target_link_libraries(test_bridge_popover PRIVATE cui)
+cui_warnings(test_bridge_popover)
+add_test(NAME bridge_popover COMMAND test_bridge_popover)
+
 add_executable(test_bridge_rating tests/unit/test_bridge_rating.c)
 target_link_libraries(test_bridge_rating PRIVATE cui)
 cui_warnings(test_bridge_rating)

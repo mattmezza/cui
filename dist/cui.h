@@ -1473,6 +1473,24 @@ static inline bool cui_inset_shadow_bounds_checked(cui_inset_shadow_paint p, cui
 #endif
 
 /* SPDX-License-Identifier: MIT */
+#ifndef CUI_FOCUS_ENTRY_INTERNAL_H
+#define CUI_FOCUS_ENTRY_INTERNAL_H
+
+/* Select among the current scope's eligible Tab stops submitted at or after
+ * first_semantic. Run after submitting the content and before layout. */
+bool cui_core_focus_enter(cui_context *, cui_id scope, size_t first_semantic);
+#endif
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_LAYOUT_BOUNDS_INTERNAL_H
+#define CUI_LAYOUT_BOUNDS_INTERNAL_H
+
+/* Final named box from the latest successful layout only. The box need not
+ * have semantics. Missing, inert and layout-only boxes produce no bounds. */
+bool cui_core_completed_box_bounds(cui_context *, cui_id, cui_rect *);
+#endif
+
+/* SPDX-License-Identifier: MIT */
 #ifndef CUI_ORDERED_INPUT_INTERNAL_H
 #define CUI_ORDERED_INPUT_INTERNAL_H
 
@@ -12570,6 +12588,24 @@ cui_rect cui_bounds(cui_context *ui, cui_id id) {
     Clay_ElementData d = Clay_GetElementData((Clay_ElementId){.id = cui_core_folded(id)});
     return (cui_rect){d.boundingBox.x, d.boundingBox.y, d.boundingBox.width, d.boundingBox.height};
 }
+bool cui_core_completed_box_bounds(cui_context *ui, cui_id id, cui_rect *out) {
+    if (!ui || ui->in_frame || ui->error != CUI_OK || ui->ambiguous_box_ids || !id || !out)
+        return false;
+    uint32_t folded = cui_core_folded(id);
+    if (*cui_core_box_id_slot(ui, folded) != folded)
+        return false;
+    cui_core_select_context(ui);
+    Clay_LayoutElementHashMapItem *item = Clay__GetHashMapItem(folded);
+    if (item == &Clay_LayoutElementHashMapItem_DEFAULT || !item->layoutElement)
+        return false;
+    const cui_core_box_node *node = item->layoutElement->config.userData;
+    if (!node || (const void *)node == ui || node->id != id || node->inert || node->layout_only ||
+        node->scrollbar_hidden)
+        return false;
+    Clay_BoundingBox b = item->boundingBox;
+    *out = (cui_rect){b.x, b.y, b.width, b.height};
+    return true;
+}
 bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained) {
     if (ui && !id) {
         cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
@@ -15572,6 +15608,45 @@ bool cui_focus_within(cui_context *ui, cui_id scope) {
     }
     return false;
 }
+static bool cui_core_scope_tab_candidate(cui_context *ui, size_t index, size_t owner) {
+    const cui_semantic *candidate = &ui->semantics[index];
+    size_t scope = ui->semantic_scopes[index];
+    if (!cui_core_focusable(candidate) || !cui_core_tab_stop(candidate) ||
+        !cui_core_scope_contains(ui->focus_scopes, scope, owner) ||
+        !cui_core_scope_contains(ui->focus_scopes, scope, ui->top_modal))
+        return false;
+    for (size_t n = scope; n != SIZE_MAX; n = ui->focus_scopes[n].parent)
+        if (!ui->focus_scopes[n].active)
+            return false;
+    /* Behavior can be registered before its own inert paint box. */
+    uint32_t folded = cui_core_folded(candidate->id);
+    for (size_t n = 0; n < ui->node_count; ++n)
+        if (ui->nodes[n].clay_id == folded && (ui->nodes[n].inert || ui->nodes[n].layout_only))
+            return false;
+    return true;
+}
+
+bool cui_core_focus_enter(cui_context *ui, cui_id scope, size_t first_semantic) {
+    if (!cui_core_active(ui) || !scope || cui_core_inert(ui))
+        return false;
+    size_t owner = SIZE_MAX;
+    for (size_t i = 0; i < ui->focus_scope_count; ++i)
+        if (ui->focus_scopes[i].id == scope && ui->focus_scopes[i].active)
+            owner = i;
+    if (owner == SIZE_MAX)
+        return false;
+    size_t best = SIZE_MAX;
+    for (size_t i = first_semantic; i < ui->semantic_count; ++i)
+        if (cui_core_scope_tab_candidate(ui, i, owner) &&
+            (best == SIZE_MAX ||
+             cui_core_tab_compare(&ui->semantics[i], i, &ui->semantics[best], best) < 0))
+            best = i;
+    if (best == SIZE_MAX)
+        return false;
+    cui_focus(ui, ui->semantics[best].id);
+    return true;
+}
+
 bool cui_focus_step_within(cui_context *ui, cui_id scope, bool forward) {
     if (!cui_core_mutation(ui))
         return false;
@@ -15591,22 +15666,9 @@ bool cui_focus_step_within(cui_context *ui, cui_id scope, bool forward) {
         return false;
     size_t next = SIZE_MAX, wrap = SIZE_MAX;
     for (size_t i = 0; i < ui->semantic_count; ++i) {
+        if (!cui_core_scope_tab_candidate(ui, i, owner))
+            continue;
         cui_semantic *candidate = &ui->semantics[i];
-        if (!cui_core_focusable(candidate) || !cui_core_tab_stop(candidate) ||
-            !cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], owner) ||
-            !cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal))
-            continue;
-        bool active = true;
-        for (size_t n = ui->semantic_scopes[i]; n != SIZE_MAX; n = ui->focus_scopes[n].parent)
-            if (!ui->focus_scopes[n].active)
-                active = false;
-        /* A control may submit behavior before its own inert paint box. */
-        uint32_t folded = cui_core_folded(candidate->id);
-        for (size_t n = 0; n < ui->node_count; ++n)
-            if (ui->nodes[n].clay_id == folded && (ui->nodes[n].inert || ui->nodes[n].layout_only))
-                active = false;
-        if (!active)
-            continue;
         if (wrap == SIZE_MAX ||
             (forward ? cui_core_tab_compare(candidate, i, &ui->semantics[wrap], wrap) < 0
                      : cui_core_tab_compare(candidate, i, &ui->semantics[wrap], wrap) > 0))

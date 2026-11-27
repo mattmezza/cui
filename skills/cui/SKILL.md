@@ -375,8 +375,11 @@ named Dialog/Notification actions use `cui_bridge_set_button_focus_v1`.
 Probe provider support before opting in on a runtime-selected bridge. Read
 `docs/BINDING_BUILDERS.md#choose-button-focus-paint` for language methods and
 examples. Immediate C joined groups use `cui_button_group_focus_ex`; see
-`docs/BUTTON_GROUP.md` for inherited clips and sibling paint order. Retained
-groups and style-callback integration remain open.
+`docs/BUTTON_GROUP.md` for inherited clips and sibling paint order.
+`cui_button_styled_focus_ex` and `cui_button_surface_focus_ex` apply the chosen
+mode before the existing focused callback. Their paint-only variants use
+independently registered interaction. The focused patch's BORDER field applies
+to the structural border. Retained groups and style callbacks remain open.
 
 Typed builder root shadows cover only Row, Column, Label, Button, Badge and
 Input. Read `docs/BRIDGE_SHADOWS.md` and the owning `include/cui/cui_bridge.h`

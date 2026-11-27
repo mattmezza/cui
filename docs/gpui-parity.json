@@ -909,7 +909,7 @@
         "Twelve variants, source XS/S/M/L and all14 design sizes, centered labels, real bundled SVG leading/trailing/caret and custom child slots, bounded grapheme-safe ellipsis, inert loading, hover/click callbacks, tooltip and custom cursor/pointer-focus policy tested. Loading source foreground opacity, compact/custom height/font/radius controls and keyboard/focus opt-outs have headless tests. Actual integrated browser11/11 passes. Shadows, ordered tab indices, action-tooltip registries and complete native accessibility remain partial. Named icons outside the default bundled set explicitly return NOT_FOUND unless all assets or a provider is supplied.",
         "Caller-owned controlled joined ButtonGroup, ordered accepted-event callbacks, pointer-only source callback policy and explicit all-activation extension are tested across864 size/density/axis/variant cases and actual SDL/browser touch/keyboard paths. Complete remaining Button contracts still require source audit; see docs/BUTTON_GROUP.md.",
         "Numeric sizing, independent open presentation, passive lifecycle, release-derived click payload and typed loading artwork have bounded tests. Press snapshots, previous keyboard hitbox evidence, exact focus styles, ordered tab indices, event-local capture/bubble propagation, action tooltips, arbitrary gradients and shadow refinement beyond the bounded C surface facade and full accessibility remain incomplete.",
-        "The additive surface facade copies up to eight mixed shadow layers and reports rejected phase patches. Immediate C, WASM and retained Button builders support focus treatments. Joined ButtonGroup supports the treatments in immediate C and WASM with sibling paint order and its existing edge widths. Shape-specific outer band gaps, retained ButtonGroup and style-callback integration remain open. See docs/BUTTON_STYLES.md."
+        "The immediate C styled and surface facades support focus modes and focused callbacks. The surface facade copies up to eight mixed shadow layers and reports rejected phase patches. WASM demonstrates focus and custom shadows together. Joined ButtonGroup supports the treatments in immediate C and WASM with sibling paint order and existing edge widths. Retained builders select the built-in Button treatments. Shape-specific outer band gaps, retained ButtonGroup and binding style callbacks remain open. See docs/BUTTON_STYLES.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -939,11 +939,14 @@
           "evidence": [
             "tests/unit/test_button_focus.c",
             "tests/unit/test_button_group.c",
+            "tests/unit/test_button_styles.c",
+            "tests/unit/test_button_surface.c",
             "tests/unit/test_bridge_button_focus.c",
             "tests/unit/test_core.c",
             "tests/web/test_button_behavior.py",
             "tests/web/test_button_collection_gallery.py",
             "tests/web/test_selected_usage_gallery.py",
+            "tests/web/test_control_surface_shadow_gallery.py",
             "bindings/python/test_button_focus.py",
             "bindings/node/test/button-focus.test.cjs",
             "bindings/typescript/components.typecheck.ts",

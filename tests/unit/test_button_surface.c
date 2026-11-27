@@ -493,6 +493,70 @@ static void input_and_passive(void) {
     assert(status.rejected_phases == 0);
     cui_destroy(ui);
 }
+static void focused_surfaces(void) {
+    cui_context *ui = create(128, 512);
+    cui_theme theme = cui_theme_light();
+    owner_t owner = {0};
+    owner.descriptor = styles(&owner.paint);
+    owner.paint.patch[CUI_BUTTON_STYLE_INSTANCE] = shadow(red);
+    cui_button_surface_patch *focused = &owner.paint.patch[CUI_BUTTON_STYLE_FOCUS];
+    *focused = shadow(blue);
+    focused->fields |= CUI_BUTTON_PAINT_CORNERS | CUI_BUTTON_PAINT_OPACITY;
+    focused->value.paint.root.custom_corners = true;
+    focused->value.paint.root.corner_radii = (cui_corner_radii){4, 6, 8, 10};
+    focused->value.paint.root.opacity = .5f;
+    cui_button_options options = {.width = 140,
+                                  .variant = CUI_BUTTON_OUTLINE,
+                                  .selected = true,
+                                  .on_click = click,
+                                  .action_user = &owner};
+    frame(ui, options, owner.descriptor, NULL, false, false, parent(), NULL);
+    cui_rect original = cui_bounds(ui, 10);
+
+    owner.paint.calls = 0;
+    cui_focus(ui, 10);
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    cui_begin_box(ui, 900, parent());
+    cui_button_surface_status status = {63};
+    assert(!cui_button_surface_focus_ex(ui, 10, &theme, cui_string("Save"), options,
+                                        owner.descriptor, CUI_BUTTON_FOCUS_OUTER_RING, &status));
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK && !status.rejected_phases && !owner.count);
+    assert(owner.paint.calls == 3 && owner.paint.phases[1] == CUI_BUTTON_STYLE_SELECTED &&
+           owner.paint.phases[2] == CUI_BUTTON_STYLE_FOCUS);
+    const cui_button_surface_paint *before = &owner.paint.seen[CUI_BUTTON_STYLE_FOCUS];
+    assert(before->shadow_count == 1 && before->shadows[0].layer.color.r == red.r);
+    assert(before->paint.root.border.r == theme.focus.r && before->paint.root.border_width == 1);
+    const cui_draw_command *drop = nth(draw, CUI_DRAW_DROP_SHADOW, 0);
+    assert(drop && drop->shadow.layer.color.b == blue.b && drop->shadow.layer.color.a == 127);
+    const cui_draw_command *ring = nth(draw, CUI_DRAW_BORDER, 0);
+    assert(ring && ring->stroke == 3 && ring->bounds.x == original.x - 3 &&
+           ring->corner_radii.top_left == 7 && ring->corner_radii.bottom_left == 11 &&
+           ring->color.a == (unsigned)(theme.focus.a / 2) / 2);
+
+    owner.paint.calls = 0;
+    focused->value.shadow_count = CUI_BOX_SHADOW_MAX + 1;
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    cui_interact(ui, 10, CUI_ROLE_BUTTON, cui_string("Save"), false, false, 0);
+    cui_button_surface_focus_paint_only(ui, 10, &theme, cui_string("Save"), options,
+                                        owner.descriptor, CUI_BUTTON_FOCUS_VARIANT, &status);
+    draw = cui_end_frame(ui);
+    drop = nth(draw, CUI_DRAW_DROP_SHADOW, 0);
+    const cui_draw_command *edge = nth(draw, CUI_DRAW_BORDER, 0);
+    assert(status.rejected_phases == 1u << CUI_BUTTON_STYLE_FOCUS && !owner.count &&
+           owner.paint.calls == 3 && drop && drop->shadow.layer.color.r == red.r && edge &&
+           edge->stroke == 1 && edge->color.a == theme.focus.a);
+
+    owner.paint.calls = 0;
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    assert(!cui_button_surface_focus_ex(ui, 10, &theme, cui_string("Save"), options,
+                                        owner.descriptor, (cui_button_focus_mode)99, &status));
+    assert(!cui_end_frame(ui).count && !status.rejected_phases && !owner.paint.calls &&
+           !owner.count);
+    cui_destroy(ui);
+}
+
 static void resource_failure(void) {
     cui_context *ui = create(64, 4);
     cui_theme theme = cui_theme_light();
@@ -515,6 +579,7 @@ int main(void) {
     transactional_validation();
     geometry_pixels_and_lifetimes();
     input_and_passive();
+    focused_surfaces();
     resource_failure();
     puts("Button surface: bounded owned shadows, phase/reset/input/software checks pass");
     return 0;

@@ -1287,7 +1287,8 @@ function render(){
      $('rating-shape').value==='1',$('rating-half').checked,$('rating-preview').checked);
  if(disclosure)$('snippet').textContent=styledDisclosureHeadings?disclosureHeadingUsage(accordion,disclosureMode===6):snippets[selected.name];
  if(pagination)$('snippet').textContent=paginationUsage(designScale,$('disabled').checked,paginationMode,paginationPages,paginationFrench,paginationCustom);
- if(controlShadowsEnabled()&&['Button','Checkbox','Switch','Slider'].includes(selected.name))$('snippet').textContent=controlShadowUsage(selected.name,Number($('control-size').value),Number($('design-size').value));
+ if(controlShadowsEnabled()&&['Button','Checkbox','Switch','Slider'].includes(selected.name))
+  $('snippet').textContent=controlShadowUsage(selected.name,Number($('control-size').value),Number($('design-size').value),buttonFocusModes[Number(buttonFocusControl.value)]);
  if(selected.name==='Radio') {
   const standalone=$('radio-mode').value==='1';
   for(const id of ['radio-tab-order-control','radio-styled-cards-control'])$(id).hidden=standalone;

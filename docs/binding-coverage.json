@@ -108,9 +108,9 @@
         {
           "header": "include/cui/cui_button_styles.h",
           "languages": ["python", "javascript", "typescript", "go", "rust"],
-          "types": ["cui_button_surface_styles"],
-          "symbols": ["cui_button_surface_ex", "cui_button_surface_paint_only"],
-          "note": "Per-phase C style callbacks with owned shadow layers remain immediate C. The separate retained Button focus setter supports variant focus and the outside ring across all five builders."
+          "types": ["cui_button_styles", "cui_button_surface_styles"],
+          "symbols": ["cui_button_surface_ex", "cui_button_surface_paint_only", "cui_button_styled_focus_ex", "cui_button_styled_focus_paint", "cui_button_surface_focus_ex", "cui_button_surface_focus_paint_only"],
+          "note": "Per-phase style callbacks and owned shadow layers are immediate C. The retained Button setter selects the built-in focus treatments across all five builders."
         },
         {
           "header": "include/cui/cui_button_styles.h",

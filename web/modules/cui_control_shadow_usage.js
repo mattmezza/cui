@@ -18,17 +18,18 @@ const buttonHelper = `static void button_shadow(void *user, const cui_button_sty
     if (info->disabled) return; /* Present empty list clears DROP and INSET. */
     bool pressed = info->phase == CUI_BUTTON_STYLE_ACTIVE;
     bool hovered = info->phase == CUI_BUTTON_STYLE_HOVER;
+    bool focused = info->phase == CUI_BUTTON_STYLE_FOCUS;
     out->value.shadow_count = 1;
     out->value.shadows[0] = (cui_box_shadow){
         .kind = pressed ? CUI_BOX_SHADOW_INSET : CUI_BOX_SHADOW_DROP,
-        .layer = {.offset_y = pressed ? 2 : hovered ? 6 : 3,
-                  .sigma = pressed ? 1 : hovered ? 3 : 2,
+        .layer = {.offset_y = focused ? 0 : pressed ? 2 : hovered ? 6 : 3,
+                  .sigma = focused ? 4 : pressed ? 1 : hovered ? 3 : 2,
                   .color = {20, 40, 80, 150}}};
 }
 static unsigned actions;
 static void activated(void *user) { (void)user; actions++; }
 `;
-export function controlShadowUsage(name, size=0, design=0) {
+export function controlShadowUsage(name, size=0, design=0, focus='CUI_BUTTON_FOCUS_LEGACY') {
  const sizing=`.size = (cui_control_size)${size}, .design_size = (cui_design_size)${design},`;
  const extent=`static float indicator_extent(const cui_theme *theme) {
     cui_design_metrics metrics;
@@ -43,13 +44,13 @@ export function controlShadowUsage(name, size=0, design=0) {
  if(name==='Button') {
   headers+='#include "cui/cui_button_styles.h"\n';helper=buttonHelper;
   body=`    cui_button_surface_status status;
-    cui_button_surface_ex(ui, cui_id_from(ui, "action"), theme,
+    cui_button_surface_focus_ex(ui, cui_id_from(ui, "action"), theme,
         cui_string("Run action"),
         (cui_button_options){${sizing} .disabled = disabled, .on_click = activated,
                             .prevent_pointer_focus = true},
         (cui_button_surface_styles){.instance = button_shadow,
             .hovered = button_shadow, .active = button_shadow,
-            .disabled = button_shadow}, &status);
+            .disabled = button_shadow, .focused = button_shadow}, ${focus}, &status);
     /* status.rejected_phases reports invalid paint patches, not activation. */`;
  } else if(name==='Checkbox')body=`    static cui_check_state value;
     cui_id id = cui_id_from(ui, "check"), indicator = cui_id_from(ui, "indicator");

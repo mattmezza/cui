@@ -156,8 +156,7 @@ In the Button gallery, choose **Variant focus**, **Outer focus ring** or
 **Classic focus**, then tab into the preview to inspect the variants. Retained
 builders select the same modes for individual Buttons, including named Dialog
 and Notification actions. Immediate C ButtonGroup uses the same modes through
-`cui_button_group_focus_ex`. The style-callback facades keep their existing
-focus phase.
+`cui_button_group_focus_ex`.
 [Retained builder examples](BINDING_BUILDERS.md#choose-button-focus-paint) ·
 [ButtonGroup focus paint](BUTTON_GROUP.md#keyboard-focus-paint)
 Native assistive-technology and physical GPU validation remain open.
@@ -165,6 +164,25 @@ Native assistive-technology and physical GPU validation remain open.
 The variant line placements follow the frozen Button and focus-helper sources.
 CUI uses the existing focus-visible gate and a uniform spacing for its
 outer band. [Reference Button paint](https://github.com/longbridge/gpui-kit/blob/87d10ae5e1299d1be18670a37570c5402f952e34/crates/component/src/button/button.rs#L559-L588) · [Reference focus helper](https://github.com/longbridge/gpui-kit/blob/87d10ae5e1299d1be18670a37570c5402f952e34/crates/component/src/styled.rs#L216-L305)
+
+### Combine a focus treatment with style callbacks
+
+Pass the same mode to `cui_button_styled_focus_ex` for scalar styles or
+`cui_button_surface_focus_ex` for scalar styles and shadows. Use
+`cui_button_styled_focus_paint` or `cui_button_surface_focus_paint_only` when the
+owner has already registered interaction. The callback order ends with the
+built-in focus treatment and then `.focused`. The callback receives the
+resolved box and, in the surface API, the shadow list from the preceding phases.
+All phases receive the actual focus-visible flag. `hide_focus_ring` suppresses
+focus decoration and the focused callback.
+
+In the focused callback, `CUI_BUTTON_PAINT_BORDER` sets the structural border
+color. The mode defines the separate band's color, and the final corner and
+opacity values apply to both. An invalid surface patch preserves the
+resolved paint and marks its phase in `rejected_phases`. An invalid mode
+omits the submission and callbacks. The original style functions use Classic
+focus. The Button gallery combines **Surface shadows** with the selected
+focus treatment and shows the resulting C example.
 
 Worker validation: strict Release build and eight affected Button tests passed
 through the private wrapper. The new fixture also passed AddressSanitizer plus
@@ -181,9 +199,8 @@ headers/facades. These APIs are absent from the published alpha.3 packages.
 additive C APIs in the same header. Existing styled records, signatures, numeric
 rules and callbacks keep their behavior. The surface facade adds an owned fixed
 array of at most `CUI_BOX_SHADOW_MAX` (eight) mixed DROP/INSET layers. It adds no
-builtin/default shadow and does not add gradients, fonts, border styles or source
-focus rings. Complete source state-style refinement remains incomplete; see
-[the source audit](design/BUTTON_STYLE_COMPLETION.md).
+builtin shadow. Gradients, fonts and general border styles remain outside the
+patch surface. [Source audit](design/BUTTON_STYLE_COMPLETION.md)
 
 Prepare typed layers outside the pure style callback:
 
@@ -197,7 +214,8 @@ static void raised_style(void *user, const cui_button_style_info *info,
                          cui_button_surface_patch *out) {
     const raised_button *owner = user;
     (void)current;
-    if (info->phase == CUI_BUTTON_STYLE_HOVER) {
+    if (info->phase == CUI_BUTTON_STYLE_HOVER ||
+        info->phase == CUI_BUTTON_STYLE_FOCUS) {
         out->fields = CUI_BUTTON_SURFACE_SHADOWS;
         out->value.shadow_count = 1;
         out->value.shadows[0] = owner->elevation;
@@ -209,9 +227,11 @@ bool raised_button_draw(cui_context *ui, cui_id id, const cui_theme *theme,
     if (!cui_box_shadow_from_css(0, 3, 8, -1, (cui_color){0, 0, 0, 64},
                                 CUI_BOX_SHADOW_DROP, &owner->elevation))
         return false;
-    return cui_button_surface_ex(ui, id, theme, cui_string("Save"),
+    return cui_button_surface_focus_ex(ui, id, theme, cui_string("Save"),
         (cui_button_options){0},
-        (cui_button_surface_styles){.hovered = raised_style, .user = owner}, status);
+        (cui_button_surface_styles){.hovered = raised_style,
+            .focused = raised_style, .user = owner},
+        CUI_BUTTON_FOCUS_OUTER_RING, status);
 }
 ```
 

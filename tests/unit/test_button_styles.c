@@ -276,6 +276,51 @@ static void layers(void) {
     CHECK(log.count == 1);
     cui_destroy(ui);
 }
+static void focused_styles(void) {
+    cui_context *ui = create();
+    cui_button_options options = {.width = 140, .variant = CUI_BUTTON_OUTLINE};
+    cui_theme theme = cui_theme_light();
+    log_t log = {0};
+    cui_button_styles styles = all_styles(&log);
+    frame(ui, options, styles, true, false, NULL);
+    cui_rect original = cui_bounds(ui, 10);
+    cui_focus(ui, 10);
+    log.count = 0;
+    log.patches[CUI_BUTTON_STYLE_FOCUS] = (cui_button_paint_patch){
+        .fields = CUI_BUTTON_PAINT_BORDER | CUI_BUTTON_PAINT_RADIUS,
+        .paint.root = {.border = blue, .radius = 8},
+    };
+
+    CHECK(cui_begin_frame(ui, 320, 160, .016f));
+    CHECK(!cui_button_styled_focus_ex(ui, 10, &theme, cui_string("Save"), options, styles,
+                                      CUI_BUTTON_FOCUS_VARIANT));
+    cui_draw_list draw = cui_end_frame(ui);
+    CHECK(cui_last_error(ui) == CUI_OK && rect_equal(cui_bounds(ui, 10), original));
+    CHECK(log.count == 2 && log.phases[1] == CUI_BUTTON_STYLE_FOCUS);
+    CHECK(log.info[CUI_BUTTON_STYLE_INSTANCE].focus_visible);
+    CHECK(color_equal(log.seen[CUI_BUTTON_STYLE_FOCUS].root.border, theme.focus));
+    const cui_draw_command *border = command(draw, CUI_DRAW_BORDER);
+    CHECK(border && color_equal(border->color, blue) && border->stroke == 1 && border->radius == 8);
+
+    log.count = 0;
+    CHECK(cui_begin_frame(ui, 320, 160, .016f));
+    cui_interact(ui, 10, CUI_ROLE_BUTTON, cui_string("Save"), false, false, 0);
+    cui_button_styled_focus_paint(ui, 10, &theme, cui_string("Save"), options, styles,
+                                  CUI_BUTTON_FOCUS_OUTER_RING);
+    draw = cui_end_frame(ui);
+    CHECK(cui_last_error(ui) == CUI_OK && log.count == 2 &&
+          log.phases[1] == CUI_BUTTON_STYLE_FOCUS);
+    size_t count;
+    cui_semantics(ui, &count);
+    CHECK(count == 1 && rect_equal(cui_bounds(ui, 10), original));
+    const cui_draw_command *ring = NULL;
+    for (size_t i = 0; i < draw.count; ++i)
+        if (draw.commands[i].type == CUI_DRAW_BORDER && draw.commands[i].stroke == 3)
+            ring = &draw.commands[i];
+    CHECK(ring && ring->corner_radii.top_left == 11 && ring->color.a == theme.focus.a / 2);
+    cui_destroy(ui);
+}
+
 static void masks_geometry(void) {
     cui_context *ui = create();
     cui_button_options o = {.width = 140, .hide_focus_ring = true};
@@ -487,6 +532,7 @@ static void mutation_equivalence(void) {
 int main(void) {
     zero_equivalence();
     layers();
+    focused_styles();
     masks_geometry();
     input_passive();
     slots_and_invalid_continuation();

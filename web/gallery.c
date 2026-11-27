@@ -1611,13 +1611,16 @@ static void gallery_button_shadow(void *user, const cui_button_style_info *info,
         return; /* Explicit empty list clears both DROP and INSET. */
     bool pressed = info->phase == CUI_BUTTON_STYLE_ACTIVE;
     bool hovered = info->phase == CUI_BUTTON_STYLE_HOVER;
+    bool focused = info->phase == CUI_BUTTON_STYLE_FOCUS;
     out->value.shadow_count = 1;
     out->value.shadows[0] =
         (cui_box_shadow){.kind = pressed ? CUI_BOX_SHADOW_INSET : CUI_BOX_SHADOW_DROP,
-                         .layer = {.offset_y = pressed   ? 2
+                         .layer = {.offset_y = focused   ? 0
+                                               : pressed ? 2
                                                : hovered ? 6
                                                          : 3,
-                                   .sigma = pressed   ? 1
+                                   .sigma = focused   ? 4
+                                            : pressed ? 1
                                             : hovered ? 3
                                                       : 2,
                                    .color = {20, 40, 80, 150}}};
@@ -4915,13 +4918,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                  .cursor = CUI_CURSOR_POINTER};
         if (control_surface_shadows) {
             cui_button_surface_status status;
-            cui_button_surface_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
-                                  action_options,
-                                  (cui_button_surface_styles){.instance = gallery_button_shadow,
-                                                              .hovered = gallery_button_shadow,
-                                                              .active = gallery_button_shadow,
-                                                              .disabled = gallery_button_shadow},
-                                  &status);
+            cui_button_surface_focus_ex(
+                ui, cui_id_from(ui, "button"), &t, cui_string("Run action"), action_options,
+                (cui_button_surface_styles){.instance = gallery_button_shadow,
+                                            .hovered = gallery_button_shadow,
+                                            .active = gallery_button_shadow,
+                                            .disabled = gallery_button_shadow,
+                                            .focused = gallery_button_shadow},
+                button_focus_mode, &status);
             control_shadow_rejections += status.rejected_phases != 0;
         } else
             cui_button_focus_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),

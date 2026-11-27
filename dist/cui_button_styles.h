@@ -124,6 +124,21 @@ typedef enum {
  * button and returns false. Legacy callers keep their existing focus paint. */
 bool cui_button_focus_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_button_options,
                          cui_button_focus_mode);
+/* The selected treatment runs before the focused callback. The callback
+ * refines the resolved paint and shadow layers. BORDER refers to the
+ * structural border; the focus band uses the mode's color. Resolved corner
+ * radii and opacity apply to the decoration. Invalid modes omit submission
+ * and callbacks. Surface variants still zero the optional status on entry. */
+bool cui_button_styled_focus_ex(cui_context *, cui_id, const cui_theme *, cui_str,
+                                cui_button_options, cui_button_styles, cui_button_focus_mode);
+void cui_button_styled_focus_paint(cui_context *, cui_id, const cui_theme *, cui_str,
+                                   cui_button_options, cui_button_styles, cui_button_focus_mode);
+bool cui_button_surface_focus_ex(cui_context *, cui_id, const cui_theme *, cui_str,
+                                 cui_button_options, cui_button_surface_styles,
+                                 cui_button_focus_mode, cui_button_surface_status *);
+void cui_button_surface_focus_paint_only(cui_context *, cui_id, const cui_theme *, cui_str,
+                                         cui_button_options, cui_button_surface_styles,
+                                         cui_button_focus_mode, cui_button_surface_status *);
 /* Shared focus treatment for the joined children of cui_button_group_ex.
  * Existing edge widths are preserved in opt-in modes. The outside band paints
  * in sibling order and uses ancestor clipping. A one-child group uses the

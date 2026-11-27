@@ -284,6 +284,10 @@
         "cui_button_surface_ex",
         "cui_button_surface_paint_only",
         "cui_button_focus_ex",
+        "cui_button_styled_focus_ex",
+        "cui_button_styled_focus_paint",
+        "cui_button_surface_focus_ex",
+        "cui_button_surface_focus_paint_only",
         "cui_button_group_focus_ex",
         "cui_bridge_set_button_focus_v1",
         "cui_set_outline_offset"
@@ -297,7 +301,7 @@
       ],
       "state_ownership": "Caller owns application data and options. Button style callbacks/user are borrowed through submission; surface shadow arrays are copied by value, bounded to eight layers; no callback/list persists across frames.",
       "interaction": "Returns true on activation; invoke the application action in that branch.",
-      "usage": "For Save, call save_document only when cui_button returns true. Choose keyboard focus paint with cui_button_focus_ex for a Button, cui_button_group_focus_ex for a joined group, or cui_bridge_set_button_focus_v1 for a retained Button. Content callbacks compose children.",
+      "usage": "For Save, call save_document only when cui_button returns true. Choose keyboard focus paint with cui_button_focus_ex for a Button, cui_button_group_focus_ex for a joined group, or cui_bridge_set_button_focus_v1 for a retained Button. Use cui_button_styled_focus_ex or cui_button_surface_focus_ex to combine the mode with existing style callbacks.",
       "docs": [
         "docs/BUTTON.md",
         "docs/BUTTON_GROUP.md",

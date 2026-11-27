@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Box-scoped text defaults set a fallback size and solid color for Labels
+  and Icons and a fallback color for Spinners. Use them from immediate C or
+  retained C, Python, JavaScript, TypeScript, Go and Rust.
+- Immediate C Kbd can resolve key labels through a host callback. The gallery
+  previews resolved labels and the portable fallback.
+- Buttons can use Variant focus or a translucent Outer Ring. Immediate C
+  supports both with joined groups and style callbacks. Retained builders
+  support both on Buttons, including Dialog and Notification actions.
+  In the gallery, the focus selector also applies with Surface shadows enabled.
+
 ## 0.1.0-alpha.16
 
 - Styled C Root can mount composed Dialog and AlertDialog owners. Retained C,

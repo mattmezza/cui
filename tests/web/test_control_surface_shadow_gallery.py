@@ -125,6 +125,30 @@ def main():
                         page.mouse.click(point['x'], point['y'])
                         assert page.evaluate('cuiGallery.exports.gallery_clicks()') == clicks + 1
                         a.configure('disabled', False)
+                        page.mouse.move(1, 1)
+                        a.configure('button-focus', 1)
+                        page.evaluate('cuiGallery.exports.gallery_focus(0xffffffff); cuiGallery.render();')
+                        page.locator('canvas').focus()
+                        page.keyboard.press('Tab')
+                        page.wait_for_function('''()=>{const e=cuiGallery.exports;
+                          return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>
+                            e.gallery_command(i,0)===7 && e.gallery_shadow_value(i,9)===0 &&
+                            e.gallery_shadow_value(i,10)===4);}''')
+                        assert [(v['type'], v['v'][9], v['v'][10]) for v in shadows()] == [(7, 0, 4)]
+                        x, y, w, _ = geometry
+                        sample = [x + w / 2, y - 2]
+                        pixel = '''([x,y])=>{const c=document.querySelector('canvas'),s=c.width/c.clientWidth;
+                          return [...c.getContext('2d').getImageData(Math.floor(x*s),Math.floor(y*s),1,1).data];}'''
+                        variant = page.evaluate(pixel, sample)
+                        a.configure('button-focus', 2)
+                        assert [(v['type'], v['v'][9], v['v'][10]) for v in shadows()] == [(7, 0, 4)]
+                        assert page.evaluate(pixel, sample) != variant
+                        focused = a.target(label)['f']
+                        assert focused[7] and focused[1:5] == geometry
+                        text = page.locator('#snippet').inner_text()
+                        assert 'cui_button_surface_focus_ex' in text and 'CUI_BUTTON_FOCUS_OUTER_RING' in text
+                        code(name)
+                        results[-1]['focus_treatment_with_shadow'] = True
                     elif name == 'Slider':
                         old = page.evaluate('cuiGallery.exports.gallery_control_stats(15)')
                         page.mouse.click(point['x'], point['y'])

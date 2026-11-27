@@ -27,9 +27,10 @@ int main(void) {
     assert(
         cui_box_shadow_from_css(0, 2, 4, 0, (cui_color){0, 0, 0, 80}, CUI_BOX_SHADOW_DROP, &value));
     cui_button_surface_status status = {63};
-    assert(!cui_button_surface_ex(ui, 10, &theme, cui_string("Save"), (cui_button_options){0},
-                                  (cui_button_surface_styles){.instance = shadow, .user = &value},
-                                  &status));
+    assert(!cui_button_surface_focus_ex(
+        ui, 10, &theme, cui_string("Save"), (cui_button_options){0},
+        (cui_button_surface_styles){.instance = shadow, .user = &value},
+        CUI_BUTTON_FOCUS_OUTER_RING, &status));
     cui_draw_list list = cui_end_frame(ui);
     unsigned shadows = 0;
     for (size_t i = 0; i < list.count; ++i)

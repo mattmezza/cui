@@ -111,6 +111,19 @@ bool cui_button_surface_ex(cui_context *, cui_id, const cui_theme *, cui_str, cu
 void cui_button_surface_paint_only(cui_context *, cui_id, const cui_theme *, cui_str,
                                    cui_button_options, cui_button_surface_styles,
                                    cui_button_surface_status *);
+typedef enum {
+    CUI_BUTTON_FOCUS_LEGACY,
+    CUI_BUTTON_FOCUS_VARIANT,
+    CUI_BUTTON_FOCUS_OUTER_RING
+} cui_button_focus_mode;
+/* Same activation and geometry as cui_button_ex. VARIANT tints an existing
+ * explicit, Default or Outline border without resizing it. Borderless Ghost
+ * draws on the edge, Link/Text outside, and filled variants inside the fill.
+ * OUTER_RING adds a translucent outside band and tints structural borders.
+ * Both modes honor focus-visible and hide_focus_ring. Invalid mode omits the
+ * button and returns false. Legacy callers keep their existing focus paint. */
+bool cui_button_focus_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_button_options,
+                         cui_button_focus_mode);
 #ifdef __cplusplus
 }
 #endif

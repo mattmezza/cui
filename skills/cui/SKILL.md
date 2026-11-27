@@ -368,8 +368,10 @@ For C Button phase-dependent shadows, read `docs/BUTTON_STYLES.md` and
 `include/cui/cui_button_styles.h`: the additive surface facade copies at most
 eight mixed layers, preserves instance replay, and reports rejected phase
 patches independently of activation. Existing styled structs keep their ABI.
-This is not gradient/focus-ring/full Styled completion and has no typed foreign
-phase authoring or event/group overload.
+The separate C `cui_button_focus_ex` route adds variant-specific focus paint
+or an outer ring with the existing focus-visible policy. The generic
+`cui_set_outline_offset` places a paint-only box outline. Retained builders
+and compound Button groups keep the existing focus route.
 
 Typed builder root shadows cover only Row, Column, Label, Button, Badge and
 Input. Read `docs/BRIDGE_SHADOWS.md` and the owning `include/cui/cui_bridge.h`

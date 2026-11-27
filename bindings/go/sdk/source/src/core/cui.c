@@ -67,7 +67,7 @@ typedef struct {
     cui_mesh_paint mesh;
     bool has_mesh;
     bool bitmap_underlay, has_underlay;
-    float outline_width;
+    float outline_width, outline_offset;
     cui_color outline_color;
     cui_corner_radii outline_radii;
     cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
@@ -2883,20 +2883,26 @@ bool cui_set_shadow_preset(cui_context *ui, cui_shadow_preset preset, cui_corner
         return false;
     return cui_set_drop_shadows(ui, layers, count, radii);
 }
-bool cui_set_outline(cui_context *ui, float width, cui_color color, cui_corner_radii radii) {
+bool cui_set_outline_offset(cui_context *ui, float width, float offset, cui_color color,
+                            cui_corner_radii radii) {
     if (!cui_core_mutation(ui))
         return false;
     if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
-        !isfinite(width) || width < 0 || !isfinite(radii.top_left) || !isfinite(radii.top_right) ||
-        !isfinite(radii.bottom_left) || !isfinite(radii.bottom_right) || radii.top_left < 0 ||
-        radii.top_right < 0 || radii.bottom_left < 0 || radii.bottom_right < 0)
+        !isfinite(width) || width < 0 || !isfinite(offset) || !isfinite(width + offset) ||
+        !isfinite(radii.top_left) || !isfinite(radii.top_right) || !isfinite(radii.bottom_left) ||
+        !isfinite(radii.bottom_right) || radii.top_left < 0 || radii.top_right < 0 ||
+        radii.bottom_left < 0 || radii.bottom_right < 0)
         return false;
     cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
     node->outline_width = width;
+    node->outline_offset = offset;
     node->outline_color = color;
     node->outline_radii = radii;
     Clay__GetOpenLayoutElement()->config.custom.customData = node;
     return true;
+}
+bool cui_set_outline(cui_context *ui, float width, cui_color color, cui_corner_radii radii) {
+    return cui_set_outline_offset(ui, width, 0, color, radii);
 }
 bool cui_set_underlay_ex(cui_context *ui, cui_underlay_layout layout, cui_color color,
                          cui_corner_radii radii) {
@@ -4514,6 +4520,32 @@ static int32_t cui_core_prepaint_layer(cui_context *ui, Clay_RenderCommandArray 
 }
 #include "cui_scroll_layout_internal.h"
 
+static bool cui_core_box_outline(const cui_core_box_node *node, cui_rect bounds, float opacity,
+                                 cui_draw_command *out) {
+    if (node->outline_width <= 0)
+        return false;
+    float expansion = node->outline_width + node->outline_offset;
+    bounds.x -= expansion;
+    bounds.y -= expansion;
+    bounds.w += expansion * 2;
+    bounds.h += expansion * 2;
+    if (!isfinite(bounds.w) || !isfinite(bounds.h) || bounds.w <= 0 || bounds.h <= 0)
+        return false;
+    cui_color color = node->outline_color;
+    color.a = (uint8_t)(color.a * opacity);
+    cui_corner_radii radii = node->outline_radii;
+    *out = (cui_draw_command){.type = CUI_DRAW_BORDER,
+                              .bounds = bounds,
+                              .color = color,
+                              .stroke = node->outline_width,
+                              .custom_corners = true,
+                              .corner_radii = {fmaxf(0, radii.top_left + expansion),
+                                               fmaxf(0, radii.top_right + expansion),
+                                               fmaxf(0, radii.bottom_left + expansion),
+                                               fmaxf(0, radii.bottom_right + expansion)}};
+    return true;
+}
+
 static cui_draw_list cui_core_end_frame(cui_context *ui) {
     if (!cui_core_active(ui))
         return (cui_draw_list){0};
@@ -4620,9 +4652,10 @@ static cui_draw_list cui_core_end_frame(cui_context *ui) {
             cui_color background = cui_core_color(c->renderData.custom.backgroundColor);
             background.a = (uint8_t)(background.a * opacity);
             const cui_background *brush = cui_core_background_for(ui, node);
+            cui_draw_command outline;
+            bool has_outline = cui_core_box_outline(node, d.bounds, opacity, &outline);
             size_t needed = (node->has_underlay ? 3 : 0) + ((brush || background.a) ? 1 : 0) +
-                            (node->outline_width > 0 ? 1 : 0) + (node->has_mesh ? 1 : 0) +
-                            node->shadow_count;
+                            has_outline + (node->has_mesh ? 1 : 0) + node->shadow_count;
             if (needed > cui_core_command_limit(ui) - ui->count) {
                 cui_core_capacity_at(ui, "box paint commands",
                                      ui->frame_v2 ? "cui_end_frame_v2" : "cui_end_frame", node->id,
@@ -4646,21 +4679,8 @@ static cui_draw_list cui_core_end_frame(cui_context *ui) {
                 }
                 cui_core_emit(ui, command);
             }
-            if (node->outline_width > 0) {
-                float w = node->outline_width;
-                cui_color color = node->outline_color;
-                color.a = (uint8_t)(color.a * opacity);
-                cui_corner_radii r = node->outline_radii;
-                cui_core_emit(ui, (cui_draw_command){
-                                      .type = CUI_DRAW_BORDER,
-                                      .bounds = {d.bounds.x - w, d.bounds.y - w, d.bounds.w + 2 * w,
-                                                 d.bounds.h + 2 * w},
-                                      .color = color,
-                                      .stroke = w,
-                                      .custom_corners = true,
-                                      .corner_radii = {r.top_left + w, r.top_right + w,
-                                                       r.bottom_left + w, r.bottom_right + w}});
-            }
+            if (has_outline && node->outline_offset >= 0)
+                cui_core_emit(ui, outline);
             if (brush) {
                 cui_core_background_emit(ui, d.bounds, c->renderData.custom.cornerRadius, brush,
                                          opacity);
@@ -4739,6 +4759,8 @@ static cui_draw_list cui_core_end_frame(cui_context *ui) {
                                                      .custom_corners = true});
                 cui_core_emit(ui, (cui_draw_command){.type = CUI_DRAW_CLIP_POP});
             }
+            if (has_outline && node->outline_offset < 0)
+                cui_core_emit(ui, outline);
             if (node->prepaint != SIZE_MAX &&
                 !cui_core_prepaint_output(ui, &ui->prepaints[node->prepaint], false))
                 goto cui_core_commands_done;

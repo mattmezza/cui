@@ -1575,6 +1575,12 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
 static int clicks;
 static cui_button_state gallery_button_label;
 static int button_collection;
+static cui_button_focus_mode button_focus_mode = CUI_BUTTON_FOCUS_VARIANT;
+void gallery_button_focus(int mode) {
+    button_focus_mode = mode >= CUI_BUTTON_FOCUS_LEGACY && mode <= CUI_BUTTON_FOCUS_OUTER_RING
+                            ? (cui_button_focus_mode)mode
+                            : CUI_BUTTON_FOCUS_LEGACY;
+}
 static bool button_collection_selected[3] = {true, false, false};
 static unsigned button_collection_requests;
 static cui_button_group_style_workspace button_collection_workspace;
@@ -4918,8 +4924,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                   &status);
             control_shadow_rejections += status.rejected_phases != 0;
         } else
-            cui_button_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
-                          action_options);
+            cui_button_focus_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
+                                action_options, button_focus_mode);
         snprintf(label, sizeof(label), "Clicked %d times", clicks);
         cui_label(ui, &t, cui_string(label));
         int columns = design_size == CUI_DESIGN_INHERIT ? 3 : width < 600 ? 1 : 2;
@@ -4936,14 +4942,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 int v = row * columns + column;
                 if (v >= 12)
                     break;
-                cui_button_ex(ui, cui_id_from(ui, names[v]), &t, cui_string(names[v]),
-                              (cui_button_options){.variant = variants[v],
-                                                   .size = CUI_CONTROL_SMALL,
-                                                   .design_size = design_size,
-                                                   .disabled = disabled || v == 2,
-                                                   .loading = v == 5,
-                                                   .custom_colors = v == 11,
-                                                   .colors = t.buttons[CUI_THEME_BUTTON_INFO]});
+                cui_button_focus_ex(
+                    ui, cui_id_from(ui, names[v]), &t, cui_string(names[v]),
+                    (cui_button_options){.variant = variants[v],
+                                         .size = CUI_CONTROL_SMALL,
+                                         .design_size = design_size,
+                                         .disabled = disabled,
+                                         .loading = v == 5,
+                                         .custom_colors = v == 11,
+                                         .colors = t.buttons[CUI_THEME_BUTTON_INFO]},
+                    button_focus_mode);
             }
             cui_end_box(ui);
         }

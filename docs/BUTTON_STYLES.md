@@ -122,6 +122,46 @@ Root owns canonical registration, metadata and SDK/distribution/skill refresh.
 Consumers adopting this header must rebuild CUI and bindings from matching
 headers/source; there is no promise of compatibility with an older library.
 
+## Choose how keyboard focus appears
+
+Use `cui_button_focus_ex` when a button should show a variant-specific focus
+line or an outside ring. The rendering choice keeps the existing layout,
+focus-visible policy, hit area, action callback timing and activation result.
+
+```c
+#include "cui/cui_button_styles.h"
+
+bool draw_save_button(cui_context *ui, cui_id id, const cui_theme *theme,
+                      bool saving) {
+    return cui_button_focus_ex(ui, id, theme, cui_string("Save changes"),
+        (cui_button_options){.variant = CUI_BUTTON_PRIMARY, .loading = saving},
+        CUI_BUTTON_FOCUS_VARIANT);
+}
+```
+
+- `CUI_BUTTON_FOCUS_VARIANT` tints a Default, Outline or explicitly edged
+  border without changing its width. A borderless Ghost gets a one-pixel
+  line on its edge. Link and Text reserve the interior for the label and
+  paint a line outside it. Other variants use the normal foreground at
+  60% alpha for an inset line. The inset and outside gaps scale with the
+  theme's base font size and equal two logical pixels at size 16.
+- `CUI_BUTTON_FOCUS_OUTER_RING` adds a three-pixel band directly outside the
+  box using half the theme focus alpha, alongside any structural border tint.
+  The band follows the box corners and ancestor clipping and preserves the
+  fill, including translucent fills.
+- `CUI_BUTTON_FOCUS_LEGACY` uses the existing paint. All modes honor
+  `hide_focus_ring`. A mode outside the enum omits the button for that frame.
+
+In the Button gallery, choose **Variant focus**, **Outer focus ring** or
+**Classic focus**, then tab into the preview to inspect the variants. The mode
+is selected per Button in immediate C. Compound ButtonGroup, the separate style-callback
+facades and retained language builders keep their existing focus route.
+Native assistive-technology and physical GPU validation remain open.
+
+The variant line placements follow the frozen Button and focus-helper sources.
+CUI uses the existing focus-visible gate and a uniform spacing for its
+outer band. [Reference Button paint](https://github.com/longbridge/gpui-kit/blob/87d10ae5e1299d1be18670a37570c5402f952e34/crates/component/src/button/button.rs#L559-L588) · [Reference focus helper](https://github.com/longbridge/gpui-kit/blob/87d10ae5e1299d1be18670a37570c5402f952e34/crates/component/src/styled.rs#L216-L305)
+
 Worker validation: strict Release build and eight affected Button tests passed
 through the private wrapper. The new fixture also passed AddressSanitizer plus
 UndefinedBehaviorSanitizer with leak detection enabled, and the header passed

@@ -723,6 +723,11 @@ bool cui_set_underlay(cui_context *, cui_rect, cui_color, cui_corner_radii);
 /* Paint an outside border band without affecting layout or filling its interior.
  * Uses current-frame box bounds and ancestor clipping. Zero width clears it. */
 bool cui_set_outline(cui_context *, float width, cui_color, cui_corner_radii);
+/* Signed gap from the box edge to the inner edge of the band. Zero abuts
+ * outside, -width puts the outer edge at the box edge. Negative offsets paint
+ * over the background; positive offsets leave an unpainted gap. Corner radii
+ * describe the box edge and expand or contract with the band. */
+bool cui_set_outline_offset(cui_context *, float width, float offset, cui_color, cui_corner_radii);
 /* Copies <=8 layers immediately; count 0 clears. Paints before background. */
 /* Replaces the copied complete mixed list, at most eight total layers. */
 bool cui_set_box_shadows(cui_context *, const cui_box_shadow *, size_t count, cui_corner_radii);

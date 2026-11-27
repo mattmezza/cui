@@ -27,6 +27,14 @@ controlShadowInput.addEventListener('change',requestFrame);
 controlShadowLabel.append(controlShadowInput,' Surface shadows');
 $('control-size').after(controlShadowLabel);
 function controlShadowsEnabled(){return controlShadowInput.checked&&!(selected.name==='Button'&&$('button-collection').value!=='0');}
+const buttonFocusControl=document.createElement('select');
+buttonFocusControl.id='button-focus';
+buttonFocusControl.setAttribute('aria-label','Button focus treatment');
+for(const [i,label] of ['Classic focus','Variant focus','Outer focus ring'].entries())
+ buttonFocusControl.add(new Option(label,i));
+buttonFocusControl.hidden=true;
+buttonFocusControl.addEventListener('change',requestFrame);
+$('button-collection').after(buttonFocusControl);
 const sliderControls=document.createElement('span');
 sliderControls.id='slider-controls';sliderControls.hidden=true;
 for(const [key,label,choices,initial] of [
@@ -552,7 +560,7 @@ void render_date_actions(cui_context *ui, const cui_theme *theme,
 }`;}
 const attachmentSlotsUsage = '__CUI_ATTACHMENT_SLOTS__';
 const snippets = {
- Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
+ Button:'cui_button_focus_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_PRIMARY,\n        .size = CUI_CONTROL_SMALL\n    }, CUI_BUTTON_FOCUS_VARIANT);',
  Checkbox:'cui_checkbox_ex(ui, id, &theme, label, &state,\n    (cui_checkbox_options){.size = CUI_CONTROL_SMALL,\n                           .required = true});',
  Switch:'cui_switch_ex(ui, id, &theme, label, &enabled,\n    &spring, (cui_switch_options){.now_seconds = now});',
  Toggle:'cui_toggle_group_ex(ui, group_id, &theme,\n    items, selected, 3, options);',
@@ -1126,6 +1134,8 @@ function render(){
  for(const input of popoverControls.querySelectorAll('select,input'))
   if(!['popover-mode','popover-trigger'].includes(input.id))input.disabled=$('popover-mode').value==='0';
  wasm.gallery_button_collection(Number($('button-collection').value));
+ wasm.gallery_button_focus(Number(buttonFocusControl.value));
+ buttonFocusControl.disabled=$('button-collection').value!=='0';
  wasm.gallery_input_mode(Number($('input-mode').value));
  wasm.gallery_disclosure_options(disclosureMode,Number($('disclosure-multiple').checked));
  wasm.gallery_image_options(Number($('image-state').value),Number($('image-fit').value),Number($('image-grayscale').checked),Number($('image-opacity').checked));
@@ -1262,7 +1272,9 @@ function render(){
  if(['Video','VideoPlayer'].includes(selected.name))videoHost.drain();
  if(selected.name==='Button'||selected.name==='Input'){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
-  $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
+  const defaultUsage=selected.name==='Button'?snippets.Button.replace('CUI_BUTTON_FOCUS_VARIANT',
+      ['CUI_BUTTON_FOCUS_LEGACY','CUI_BUTTON_FOCUS_VARIANT','CUI_BUTTON_FOCUS_OUTER_RING'][Number(buttonFocusControl.value)]):snippets.Input;
+  $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||defaultUsage;
  }
  if(selected.name==='Icon'){
   const followsText=iconLayoutControl.value==='4';
@@ -1695,6 +1707,7 @@ function selectComponent(){
  $('group-mode').hidden=selected.name!=='Input Group';$('group-mode').value='0';
  $('form-mode').hidden=selected.name!=='Form';$('form-mode').value='0';
  $('button-collection').hidden=selected.name!=='Button';$('button-collection').value='0';
+ buttonFocusControl.hidden=selected.name!=='Button';buttonFocusControl.value='1';
  controlShadowLabel.hidden=!['Button','Checkbox','Radio','Switch','Slider'].includes(selected.name);controlShadowInput.checked=false;
  $('input-mode').hidden=selected.name!=='Input';$('input-mode').value='0';
  $('menu-kind').hidden=selected.name!=='Menu';$('menu-kind').value='0';

@@ -281,17 +281,20 @@
         "cui_button_styled_ex",
         "cui_button_styled_paint",
         "cui_button_surface_ex",
-        "cui_button_surface_paint_only"
+        "cui_button_surface_paint_only",
+        "cui_button_focus_ex",
+        "cui_set_outline_offset"
       ],
       "state_types": [
         "cui_button_options",
         "cui_button_styles",
         "cui_button_surface_styles",
-        "cui_button_surface_status"
+        "cui_button_surface_status",
+        "cui_button_focus_mode"
       ],
       "state_ownership": "Caller owns application data and options. Button style callbacks/user are borrowed through submission; surface shadow arrays are copied by value, bounded to eight layers; no callback/list persists across frames.",
       "interaction": "Returns true on activation; invoke the application action in that branch.",
-      "usage": "For Save, call save_document only when cui_button returns true. content is a composition callback, not an action handler.",
+      "usage": "For Save, call save_document only when cui_button returns true. In immediate C, choose variant-specific keyboard focus paint or an outside ring with cui_button_focus_ex. Content callbacks compose children.",
       "docs": [
         "docs/BUTTON.md",
         "docs/BUTTON_GROUP.md",
@@ -310,7 +313,8 @@
       "public_header": "include/cui/cui_components.h",
       "composition": "immediate frame submission",
       "additional_public_headers": [
-        "include/cui/cui_button_styles.h"
+        "include/cui/cui_button_styles.h",
+        "include/cui/cui.h"
       ]
     },
     {

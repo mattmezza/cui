@@ -21,6 +21,34 @@ def main():
    browser=pw.chromium.launch(headless=True,**({'executable_path':args.chromium}if args.chromium else{}));a=Audit(browser,f'http://127.0.0.1:{server.server_port}');a.route('Button')
    def clicks():return a.page.evaluate('cuiGallery.exports.gallery_clicks()')
    def target():return a.target('Run action',1)
+   def focus_treatments():
+    canvas = a.page.locator('canvas')
+    a.page.evaluate('cuiGallery.exports.gallery_focus(0xffffffff); cuiGallery.render();')
+    canvas.focus()
+    bounds = target()['f'][1:5]
+    x, y, width, height = bounds
+    pixel = '''([x,y])=>{const c=document.querySelector('canvas'),ratio=c.width/c.clientWidth;
+      return [...c.getContext('2d').getImageData(Math.floor(x*ratio),Math.floor(y*ratio),1,1).data];}'''
+    outer_point = [x + width / 2, y - 2]
+    inner_point = [x + width / 2, y + 2]
+    before = a.page.evaluate(pixel, outer_point)
+    inside = a.page.evaluate(pixel, inner_point)
+    a.page.keyboard.press('Tab')
+    a.page.wait_for_function('''b=>{const w=cuiGallery.exports;
+      return Array.from({length:w.gallery_count()},(_,i)=>w.gallery_command(i,0)===1 &&
+        Math.abs(w.gallery_command(i,1)-b[0]-2)<.1 &&
+        Math.abs(w.gallery_command(i,2)-b[1]-2)<.1 && w.gallery_command(i,10)===1).some(Boolean);}''',
+                             arg=bounds)
+    assert a.page.evaluate(pixel, inner_point) != inside
+    assert a.page.evaluate(pixel, outer_point) == before
+    a.configure('button-focus', 2)
+    assert a.page.evaluate(pixel, outer_point) != before
+    assert a.page.evaluate(pixel, inner_point) == inside
+    assert target()['f'][1:5] == bounds and target()['f'][7]
+    assert 'CUI_BUTTON_FOCUS_OUTER_RING' in a.page.locator('#snippet').inner_text()
+    a.page.evaluate('cuiGallery.exports.gallery_focus(0xffffffff); cuiGallery.render();')
+    a.configure('button-focus', 1)
+   a.case('Button','keyboard focus visibly changes canvas paint without moving the control',focus_treatments)
    def activation():
     n=clicks();a.tap(target());assert clicks()==n+1,'Touch callback count';a.page.wait_for_timeout(400);assert clicks()==n+1,'Ghost mouse duplicated touch callback'
     pt=a.point(target());a.page.mouse.click(pt['x'],pt['y']);a.page.wait_for_function('(n)=>cuiGallery.exports.gallery_clicks()===n',arg=n+2);assert clicks()==n+2,'Mouse callback count';a.page.wait_for_timeout(150);assert clicks()==n+2,'Mouse callback duplicated'

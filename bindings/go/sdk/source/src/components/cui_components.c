@@ -506,11 +506,49 @@ cui_button_surface_resolve(cui_box geometry, cui_id id, const cui_theme *theme,
     }
     return paint;
 }
+typedef struct {
+    float width, offset;
+    cui_color color;
+} cui_button_focus_band;
+
+static cui_button_focus_band
+cui_button_focus_decoration(cui_button_style_paint *paint, const cui_theme *theme,
+                            cui_button_options options, cui_button_focus_mode mode, float density) {
+    cui_box *box = &paint->root;
+    bool bordered = options.variant == CUI_BUTTON_DEFAULT ||
+                    options.variant == CUI_BUTTON_OUTLINE || options.outline;
+    if (box->custom_border_edges) {
+        cui_border_edges edges = box->border_edges;
+        bordered = edges.left > 0 || edges.right > 0 || edges.top > 0 || edges.bottom > 0;
+    }
+    if (bordered)
+        box->border = theme->focus;
+    if (mode == CUI_BUTTON_FOCUS_OUTER_RING) {
+        cui_color color = theme->focus;
+        color.a /= 2;
+        return (cui_button_focus_band){.width = 3, .color = color};
+    }
+    if (bordered)
+        return (cui_button_focus_band){0};
+    if (options.variant == CUI_BUTTON_GHOST)
+        return (cui_button_focus_band){.width = 1, .offset = -1, .color = theme->focus};
+    if (options.variant == CUI_BUTTON_LINK || options.variant == CUI_BUTTON_TEXT)
+        return (cui_button_focus_band){.width = 1, .offset = 2 * density, .color = theme->focus};
+    /* The normal foreground stays legible over a filled variant's surface. */
+    cui_button_options normal = options;
+    normal.selected = normal.open = normal.disabled = normal.loading = false;
+    cui_color color =
+        cui_button_default_paint(*box, theme, normal, (cui_interaction){0}, NULL).foreground;
+    color.a = (uint8_t)(color.a * .6f);
+    return (cui_button_focus_band){.width = 1, .offset = -1 - 2 * density, .color = color};
+}
+
 static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                    cui_button_options o, cui_interaction state,
                                    const cui_button_styles *styles,
                                    const cui_button_surface_styles *surface_styles,
-                                   cui_button_surface_status *surface_status) {
+                                   cui_button_surface_status *surface_status,
+                                   cui_button_focus_mode focus_mode) {
     cui_design_metrics design;
     if (!ui || !t || !cui_frame_is_submitting(ui) ||
         !cui_components_design(t, o.design_size, &design) || !cui_button_shape_valid(o))
@@ -634,6 +672,10 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     else if (o.rounding == CUI_BUTTON_ROUNDED_CUSTOM && isfinite(o.radius) && o.radius >= 0)
         b.radius = o.radius;
     cui_color caret_color;
+    bool focus_decoration =
+        focus_mode != CUI_BUTTON_FOCUS_LEGACY && state.focus_visible && !o.hide_focus_ring;
+    if (focus_decoration)
+        state.focus_visible = false;
     cui_button_style_paint paint = cui_button_default_paint(b, t, o, state, &caret_color);
     if (styles && (styles->instance || styles->hovered || styles->active || styles->selected ||
                    styles->disabled || styles->focused))
@@ -645,12 +687,18 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         surface = cui_button_surface_resolve(b, id, t, o, state, *surface_styles, surface_status);
         paint = surface.paint;
     }
+    cui_button_focus_band focus = {0};
+    if (focus_decoration)
+        focus = cui_button_focus_decoration(&paint, t, o, focus_mode, density);
     b = paint.root;
     cui_color foreground = paint.foreground;
     cui_begin_box(ui, id, b);
     if (surface.shadow_count && cui_frame_paint_enabled(ui))
         (void)cui_set_box_shadows(ui, surface.shadows, surface.shadow_count,
                                   cui_button_surface_corners(b));
+    if (focus.width > 0 && cui_frame_paint_enabled(ui))
+        (void)cui_set_outline_offset(ui, focus.width, focus.offset, focus.color,
+                                     cui_button_surface_corners(b));
     /* Clipping boxes retain natural child widths for scrolling. A percentage
      * child establishes the resolved viewport width without compression by the
      * clipping parent; its ordinary row can then shrink content for wrapping. */
@@ -814,7 +862,7 @@ void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str na
     cui_interaction state = cui_interaction_state(ui, id);
     if (o.disabled || o.loading)
         state.hovered = state.pressed = false;
-    cui_button_paint_state(ui, id, t, name, o, state, NULL, NULL, NULL);
+    cui_button_paint_state(ui, id, t, name, o, state, NULL, NULL, NULL, CUI_BUTTON_FOCUS_LEGACY);
 }
 static bool cui_button_shape_valid(cui_button_options o) {
     if (!cui_button_artwork_valid(o.leading_artwork, false) ||
@@ -922,7 +970,8 @@ static cui_button_click_event cui_button_click_snapshot(cui_context *ui, cui_id 
 static bool cui_button_submit(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                               cui_button_options o, const cui_button_styles *styles,
                               const cui_button_surface_styles *surface_styles,
-                              cui_button_surface_status *surface_status) {
+                              cui_button_surface_status *surface_status,
+                              cui_button_focus_mode focus_mode) {
     if (!ui || !t || !cui_button_shape_valid(o))
         return false;
     /* Freeze descriptor values before accepted callbacks; resource handles remain borrowed. */
@@ -946,7 +995,7 @@ static bool cui_button_submit(cui_context *ui, cui_id id, const cui_theme *t, cu
          * The borrowed state survives through deferred label paint, whose inert guard
          * preserves the diagnostic prefix cap without writing it. */
         cui_button_paint_state(ui, id, t, name, o, (cui_interaction){0}, styles, surface_styles,
-                               surface_status);
+                               surface_status, focus_mode);
         return false;
     }
     bool inert = o.disabled || o.loading;
@@ -967,31 +1016,39 @@ static bool cui_button_submit(cui_context *ui, cui_id id, const cui_theme *t, cu
             if (o.on_click_event)
                 o.on_click_event(o.action_user, &event);
         }
-    cui_button_paint_state(ui, id, t, name, o, interaction, styles, surface_styles, surface_status);
+    cui_button_paint_state(ui, id, t, name, o, interaction, styles, surface_styles, surface_status,
+                           focus_mode);
     cui_button_tooltip(ui, id, t, o);
     return activated;
 }
 bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                    cui_button_options o) {
-    return cui_button_submit(ui, id, t, name, o, NULL, NULL, NULL);
+    return cui_button_submit(ui, id, t, name, o, NULL, NULL, NULL, CUI_BUTTON_FOCUS_LEGACY);
+}
+bool cui_button_focus_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
+                         cui_button_options options, cui_button_focus_mode mode) {
+    if (mode < CUI_BUTTON_FOCUS_LEGACY || mode > CUI_BUTTON_FOCUS_OUTER_RING)
+        return false;
+    return cui_button_submit(ui, id, theme, name, options, NULL, NULL, NULL, mode);
 }
 bool cui_button_styled_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                           cui_button_options o, cui_button_styles styles) {
-    return cui_button_submit(ui, id, t, name, o, &styles, NULL, NULL);
+    return cui_button_submit(ui, id, t, name, o, &styles, NULL, NULL, CUI_BUTTON_FOCUS_LEGACY);
 }
 void cui_button_styled_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                              cui_button_options o, cui_button_styles styles) {
     cui_interaction state = cui_interaction_state(ui, id);
     if (o.disabled || o.loading)
         state.hovered = state.pressed = false;
-    cui_button_paint_state(ui, id, t, name, o, state, &styles, NULL, NULL);
+    cui_button_paint_state(ui, id, t, name, o, state, &styles, NULL, NULL, CUI_BUTTON_FOCUS_LEGACY);
 }
 bool cui_button_surface_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                            cui_button_options options, cui_button_surface_styles styles,
                            cui_button_surface_status *status) {
     if (status)
         *status = (cui_button_surface_status){0};
-    return cui_button_submit(ui, id, theme, name, options, NULL, &styles, status);
+    return cui_button_submit(ui, id, theme, name, options, NULL, &styles, status,
+                             CUI_BUTTON_FOCUS_LEGACY);
 }
 void cui_button_surface_paint_only(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                                    cui_button_options options, cui_button_surface_styles styles,
@@ -1001,7 +1058,8 @@ void cui_button_surface_paint_only(cui_context *ui, cui_id id, const cui_theme *
     cui_interaction state = cui_interaction_state(ui, id);
     if (options.disabled || options.loading)
         state.hovered = state.pressed = false;
-    cui_button_paint_state(ui, id, theme, name, options, state, NULL, &styles, status);
+    cui_button_paint_state(ui, id, theme, name, options, state, NULL, &styles, status,
+                           CUI_BUTTON_FOCUS_LEGACY);
 }
 
 typedef struct {
@@ -1172,7 +1230,7 @@ bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
                                                     .bottom = width};
             }
             cui_button_paint_state(ui, child.id, t, child.label, o, w->behavior.interactions[i],
-                                   NULL, NULL, NULL);
+                                   NULL, NULL, NULL, CUI_BUTTON_FOCUS_LEGACY);
             if (!passive)
                 cui_button_tooltip(ui, child.id, t, o);
         }

@@ -216,6 +216,14 @@ This permits image/gradient backgrounds without floating over interactive text.
 After `cui_end_frame`, `cui_semantic_parent(ui, id)` returns the explicit semantic parent when supplied, otherwise the closest layout ancestor whose box is owned by that semantic ID. A control registered without its own layout box does not become the semantic owner of its surrounding box. Explicit parent links must be acyclic. It returns zero for roots, unknown IDs and while a frame is open. Hosts can use this alongside `cui_semantics` to build the accessibility tree without guessing parentage from rectangles. `CUI_ROLE_RADIOGROUP` is appended to the role enum, preserving earlier role values.
 
 `cui_set_outline` paints an outside border band for the current open box using its current-frame bounds, independent corner radii and inherited opacity. It consumes no layout space, preserves the interior, follows ancestor clipping, and can coexist with a solid/bitmap underlay. Zero width clears the band; invalid geometry leaves the prior setting intact. Like underlays, command-capacity failure produces an empty draw list and a capacity error.
+
+`cui_set_outline_offset` also takes a signed distance from the box edge to
+the band's inner edge. An offset of zero abuts the box outside. A positive
+offset leaves a visible gap. An offset of `-width` puts the band inside the
+box edge, and more negative values inset it further. Negative offsets paint
+over the own-box background, shadows and underlay before child paint.
+The stroke follows the supplied box-edge radii, adjusted to its bounds.
+An inset that resolves to an empty rectangle produces no band.
 Hosts may supply `cui_event.click_count` on pointer events. Zero and one preserve ordinary click behavior; larger values retain the host’s multi-click sequence metadata. The SDL adapter forwards SDL’s count directly, and the core queue preserves it unchanged. Text selection policies remain the component’s responsibility.
 
 `cui_pointer_position` returns the latest Move/Down/Up coordinates processed by `cui_begin_frame`; queued events wait until then, idle frames retain the position and a new context starts at `(0,0)`. It does not infer pointer visibility, hover, clipping or occlusion. Invalid/nonfinite values preserve both output variables. Use the accessor for host-driven plot cursors; current-layout prepaint callbacks remain a separate missing Core seam.

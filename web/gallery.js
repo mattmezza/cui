@@ -3,7 +3,7 @@ import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
 import {createCuiMeshRenderer} from "./modules/cui_mesh.js";
 import {paintGradientText} from "./modules/cui_text_paint.js";
-import {selectedUsage,paginationUsage,ratingUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage,radioStyledUsage,radioControlledUsage,disclosureHeadingUsage,carouselBasisUsage} from "./modules/cui_usage.js";
+import {selectedUsage,paginationUsage,ratingUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage,radioStyledUsage,radioControlledUsage,disclosureHeadingUsage,carouselBasisUsage,iconTextDefaultsUsage} from "./modules/cui_usage.js";
 import {resizableUsage} from "./modules/cui_resizable_usage.js";
 import {stepperUsage} from "./modules/cui_stepper_usage.js";
 import {spinnerUsage} from "./modules/cui_spinner_usage.js";
@@ -372,7 +372,7 @@ ${refinement}
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const iconLayoutControl=document.createElement('select');iconLayoutControl.id='icon-layout';
 iconLayoutControl.hidden=true;iconLayoutControl.setAttribute('aria-label','Icon box styling');
-for(const [value,label] of [['0','Default icon box'],['1','Padding 4px'],['2','Padding 24px floor'],['3','Maximum width 8px']]){
+for(const [value,label] of [['0','Default icon box'],['1','Padding 4px'],['2','Padding 24px floor'],['3','Maximum width 8px'],['4','Follow parent text']]){
  const option=document.createElement('option');option.value=value;option.textContent=label;iconLayoutControl.append(option);
 }
 $('icon-size').after(iconLayoutControl);iconLayoutControl.addEventListener('change',requestFrame);
@@ -1157,6 +1157,7 @@ function render(){
  wasm.gallery_effects_options(Number($('effect-angle').value),Number($('effect-opacity').value),Number($('effect-blur').value));
  wasm.gallery_plot_mode(Number($('plot-mode').value),Number($('plot-pan-axes').value));
  wasm.gallery_virtual_mode(Number($('virtual-axis').value));
+ if(selected.name==='Icon')$('design-size').hidden=iconLayoutControl.value==='4';
  wasm.gallery_design_options(($('design-size').hidden?0:Number($('design-size').value)),Number($('design-radius').value),Number($('design-spacing').value));
  wasm.gallery_slider_options(...sliderValues());
  wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value),Number(controlShadowsEnabled()),Number($('radio-tab-order').checked),Number($('radio-styled-cards').checked),Number($('radio-mode').value),Number($('radio-accept').checked));
@@ -1256,6 +1257,13 @@ function render(){
  if(selected.name==='Button'||selected.name==='Input'){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
+ }
+ if(selected.name==='Icon'){
+  const followsText=iconLayoutControl.value==='4';
+  $('snippet').textContent=followsText
+      ? iconTextDefaultsUsage(['check','bell','arrow-right'][Number($('icon-choice').value)],
+          $('icon-rotate').checked,$('icon-color').checked)
+      : snippets.Icon;
  }
  if(selected.name==='Rating')$('snippet').textContent=ratingUsage(designScale,$('disabled').checked,
      $('rating-shape').value==='1',$('rating-half').checked,$('rating-preview').checked);
@@ -1649,6 +1657,7 @@ function selectComponent(){
  $('resizable-nested').checked=false;$('resizable-vertical').checked=false;$('resizable-disabled').checked=false;
  for(const id of ['icon-choice','icon-size','icon-rotate-control','icon-color-control','icon-layout'])$(id).hidden=selected.name!=='Icon';
  $('icon-choice').value='0';$('icon-size').value='3';$('icon-rotate').checked=false;$('icon-color').checked=false;
+ iconLayoutControl.value='0';
  for(const id of ['toolbar-size','toolbar-grouped-control','toolbar-input-control'])$(id).hidden=selected.name!=='Toolbar';
  $('toolbar-size').value='2';$('toolbar-grouped').checked=true;$('toolbar-input').checked=true;
  for(const id of ['title-decoration','title-close-control','title-fullscreen-control'])$(id).hidden=selected.name!=='TitleBar';

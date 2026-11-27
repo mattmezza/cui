@@ -4179,8 +4179,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          : icon_layout == 2 ? 24
                                                             : 0,
                               .max_width = icon_layout == 3 ? 8 : 0};
-        cui_icon_options options = {
-            .size = (cui_icon_size)icon_size, .design_size = design_size, .style = &icon_style};
+        bool follow_text = icon_layout == 4;
+        cui_icon_options options = {.size =
+                                        follow_text ? CUI_ICON_INHERITED : (cui_icon_size)icon_size,
+                                    .design_size = follow_text ? 0 : design_size,
+                                    .style = &icon_style};
         if (icon_rotate) {
             options.custom_transform = true;
             options.transform = cui_icon_rotation(.785398163f);
@@ -4189,8 +4192,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             options.custom_color = true;
             options.color = t.primary;
         }
+        if (follow_text) {
+            cui_begin_box(ui, cui_id_from(ui, "icon-text-row"),
+                          (cui_box){.row = true, .align_y = CUI_ALIGN_CENTER, .gap = 8});
+            cui_set_text_defaults(
+                ui, (cui_text_defaults){.font_size = 28, .custom_color = true, .color = t.info});
+        }
         cui_icon(ui, cui_id_from(ui, "icon-preview"), &t, &icon_state, options);
         cui_label(ui, &t, cui_string(names[icon_choice]));
+        if (follow_text)
+            cui_end_box(ui);
         break;
     }
     case 68: {
@@ -7713,7 +7724,7 @@ float gallery_resizable_size(unsigned index) {
     return index < resizable_state.count ? resizable_state.slots[index].size : 0;
 }
 void gallery_icon_options(int choice, int size, int rotate, int color, int layout) {
-    icon_layout = layout >= 0 && layout <= 3 ? layout : 0;
+    icon_layout = layout >= 0 && layout <= 4 ? layout : 0;
     icon_choice = choice >= 0 && choice < 3 ? choice : 0;
     icon_size = size >= CUI_ICON_INHERITED && size <= CUI_ICON_LARGE ? size : CUI_ICON_MEDIUM;
     icon_rotate = rotate != 0;

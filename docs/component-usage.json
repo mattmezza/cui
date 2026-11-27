@@ -541,14 +541,16 @@
         "cui_icon",
         "cui_icon_named",
         "cui_icon_state_init",
-        "cui_icon_state_destroy"
+        "cui_icon_state_destroy",
+        "cui_set_text_defaults",
+        "cui_get_text_defaults"
       ],
       "state_types": [
         "cui_icon_state"
       ],
       "state_ownership": "Caller retains cui_icon_state for custom SVG/resource preparation; named helper uses context resources.",
       "interaction": "cui_icon_loader_fn resolves SVG resources; no click callback.",
-      "usage": "Initialize custom icon state, load data/name/path, submit each frame and destroy prepared resources after use.",
+      "usage": "Initialize custom icon state, load data/name/path, submit each frame and destroy prepared resources after use. Share inherited size and solid tint with a surrounding text defaults box.",
       "docs": [
         "docs/ICON.md",
         "docs/BRIDGE_ICON_RESOURCES.md",
@@ -567,6 +569,7 @@
       "scope": "styled frame component",
       "name": "Icon",
       "public_header": "include/cui/cui_icon.h",
+      "additional_public_headers": ["include/cui/cui.h"],
       "composition": "application model + frame composition"
     },
     {
@@ -626,12 +629,13 @@
       "api_symbols": [
         "cui_label",
         "cui_label_source",
-        "cui_label_prepare"
+        "cui_label_prepare",
+        "cui_set_text_defaults"
       ],
       "state_types": [],
       "state_ownership": "Caller owns label text.",
       "interaction": "Optional semantic control association; presentation has no action callback.",
-      "usage": "Compose secondary text, Unicode highlights and private scalar masking with cui_label_options; the plain wrapper remains available.",
+      "usage": "Compose secondary text, Unicode highlights and private scalar masking with cui_label_options. Both immediate Label routes can share scoped size and solid color with an Icon.",
       "docs": [
         "docs/COMPONENTS.md",
         "docs/TYPOGRAPHY.md",
@@ -641,6 +645,7 @@
       "scope": "styled frame component",
       "name": "Label",
       "public_header": "include/cui/cui_components.h",
+      "additional_public_headers": ["include/cui/cui_label.h", "include/cui/cui.h"],
       "composition": "immediate frame submission"
     },
     {
@@ -1003,7 +1008,8 @@
         "cui_bridge_spinner_get_presentation_v1",
         "cui_bridge_spinner_icon_resource_versions",
         "cui_bridge_spinner_set_icon_resource_v1",
-        "cui_bridge_spinner_get_icon_resource_v1"
+        "cui_bridge_spinner_get_icon_resource_v1",
+        "cui_set_text_defaults"
       ],
       "state_types": [
         "cui_loading_motion",
@@ -1016,7 +1022,7 @@
       ],
       "state_ownership": "Immediate C caller owns persistent motion state, host clock and reduced-motion preference. Optional sizing and callback userdata are borrowed through submission. The retained C bridge copies configuration and owns the clock per node.",
       "interaction": "Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.",
-      "usage": "Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Use optional rem or custom-pixel sizing, a custom SVG painter or finite turns from custom easing. Retained builders offer copied catalog icons and motion settings, and can bind same-app Icon resources for custom SVG after mount.",
+      "usage": "Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Set custom sizing or a box's fallback tint, and use a custom SVG painter or easing. Retained builders offer copied settings and mounted same-app Icon resources.",
       "docs": [
         "docs/SPINNER.md",
         "docs/CONTENT.md"
@@ -1029,6 +1035,7 @@
       "name": "Spinner",
       "public_header": "include/cui/cui_content.h",
       "additional_public_headers": [
+        "include/cui/cui.h",
         "include/cui/cui_bridge.h"
       ],
       "composition": "immediate frame submission",

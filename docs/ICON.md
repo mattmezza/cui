@@ -89,10 +89,13 @@ mask, tinted with the control's semantic foreground color.
 
 ## Size, color and transforms
 
-Zero options inherit `theme.font_size` and `theme.text`. Hosts with their own text
-scopes can supply `inherited_text_size` and `custom_inherited_color`/
-`inherited_color`. General automatic text-style scope inheritance is not yet
-provided by the core.
+In immediate C, zero options use the enclosing box's text defaults if present.
+Use `cui_set_text_defaults` to give an icon and its label the same logical font
+size and solid color. Without a scope, zero options use `theme.font_size` and
+`theme.text`. Hosts can also pass `inherited_text_size` and
+`custom_inherited_color`/`inherited_color`, which take precedence over box
+defaults. Explicit component sizes and tints keep their usual precedence.
+See the [text defaults example](TYPOGRAPHY.md#share-size-and-color-with-a-box).
 
 XS, S, M and L are 12, 14, 16 and 24 pixels at a 16-pixel theme font size, scaled by
 `theme.font_size / 16` to represent source rem units. Custom size is an unscaled

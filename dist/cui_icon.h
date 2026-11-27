@@ -111,8 +111,9 @@ typedef struct {
      * Explicit descriptor maxima replace corresponding legacy style maxima. */
     const cui_icon_constraints *constraints;
 } cui_icon_options;
-/* Decorative by default, or named noninteractive image; never a focus stop. Theme supplies fallback
- * size/color; explicit inherited overrides bridge hosts with their own text scopes. */
+/* Decorative by default, or named noninteractive image; never a focus stop.
+ * Explicit inherited overrides take priority over the enclosing box's text
+ * defaults. The theme supplies the final fallback size and color. */
 cui_icon_error cui_icon(cui_context *, cui_id, const cui_theme *, cui_icon_state *,
                         cui_icon_options);
 /* Context-owned convenience cache; accepts catalog names or paths. Its masks
@@ -16258,12 +16259,14 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
                         cui_icon_options options) {
     if (!ui || !id || !theme || !state || !cui_icon_options_valid(options))
         return CUI_ICON_INVALID;
+    cui_text_defaults defaults = cui_get_text_defaults(ui);
     float size = options.size == CUI_ICON_XSMALL   ? 12
                  : options.size == CUI_ICON_SMALL  ? 14
                  : options.size == CUI_ICON_MEDIUM ? 16
                  : options.size == CUI_ICON_LARGE  ? 24
                  : options.size == CUI_ICON_CUSTOM ? options.custom_size
                  : options.inherited_text_size > 0 ? options.inherited_text_size
+                 : defaults.font_size > 0          ? defaults.font_size
                                                    : theme->font_size;
     if (options.size >= CUI_ICON_XSMALL && options.size <= CUI_ICON_LARGE &&
         ((isfinite(theme->font_size) && theme->font_size > 0) || options.rem_size > 0))
@@ -16288,6 +16291,7 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
         return CUI_ICON_INVALID;
     cui_color color = options.custom_color             ? options.color
                       : options.custom_inherited_color ? options.inherited_color
+                      : defaults.custom_color          ? defaults.color
                                                        : theme->text;
     cui_icon_error result = cui_icon_prepare(
         state, width, height, options.custom_transform ? options.transform : cui_icon_identity());

@@ -1,8 +1,12 @@
 /* SPDX-License-Identifier: MIT */
+#include "cui/cui_components.h"
+#include "cui/cui_content.h"
 #include "cui/cui_icon.h"
+#include "cui/cui_label.h"
 #include "cui/cui_software.h"
 #include <assert.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 static const char svg[] = "<svg viewBox=\"0 0 24 24\"><path d=\"M2 3h8v5H2z\"/></svg>";
 static unsigned long hash(cui_bitmap b) {
@@ -12,6 +16,102 @@ static unsigned long hash(cui_bitmap b) {
             h = h * 33 + b.pixels[y * b.stride + x];
     return h;
 }
+static bool same_tint(cui_color a, cui_color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+static void text_defaults(cui_context *ui, const cui_theme *theme, cui_icon_state *state) {
+    const cui_color teal = {14, 152, 137, 255}, violet = {119, 24, 189, 255};
+    const cui_color transparent = {14, 18, 22, 0};
+    cui_box row = {.row = true, .width = 440, .gap = 2};
+    cui_loading_motion motion = {0};
+    cui_loading_motion_result sample;
+    assert(!cui_set_text_defaults(ui, (cui_text_defaults){.font_size = 12}));
+    assert(!cui_get_text_defaults(NULL).custom_color);
+    assert(cui_begin_frame(ui, 450, 160, 0));
+    assert(!cui_set_text_defaults(ui, (cui_text_defaults){.font_size = 12}));
+    cui_begin_box(ui, 100, row);
+    assert(cui_set_text_defaults(
+        ui, (cui_text_defaults){.font_size = 26, .custom_color = true, .color = teal}));
+    assert(!cui_set_text_defaults(ui, (cui_text_defaults){.font_size = NAN}));
+    assert(cui_get_text_defaults(ui).font_size == 26);
+    assert(cui_icon(ui, 101, theme, state, (cui_icon_options){0}) == CUI_ICON_OK);
+    cui_label(ui, theme, cui_string("Scope"));
+    assert(cui_label_source(
+        ui, theme,
+        (cui_label_options){.primary = {"Source", 6}, .no_wrap = true, .semantic_id = 111}));
+    cui_text(ui, cui_string("Explicit"), 12, violet);
+    cui_begin_box(ui, 102, (cui_box){.row = true});
+    assert(cui_set_text_defaults(ui, (cui_text_defaults){.font_size = 32}));
+    assert(cui_get_text_defaults(ui).font_size == 32);
+    assert(cui_set_text_defaults(ui, (cui_text_defaults){.custom_color = true, .color = violet}));
+    assert(cui_get_text_defaults(ui).font_size == 26);
+    assert(cui_icon_named(ui, 103, theme, cui_string("check"),
+                          (cui_icon_options){.inherited_text_size = 18,
+                                             .custom_inherited_color = true,
+                                             .inherited_color = teal,
+                                             .custom_color = true,
+                                             .color = transparent}) == CUI_ICON_OK);
+    assert(cui_icon_named(ui, 104, theme, cui_string("check"),
+                          (cui_icon_options){.size = CUI_ICON_SMALL, .rem_size = 16}) ==
+           CUI_ICON_OK);
+    cui_end_box(ui);
+    assert(cui_icon_named(ui, 105, theme, cui_string("check"),
+                          (cui_icon_options){.custom_inherited_color = true,
+                                             .inherited_color = violet}) == CUI_ICON_OK);
+    assert(cui_spinner_ex(ui, 106, theme, &motion, cui_spinner_options_default(), &sample));
+    cui_begin_absolute_box(ui, 107, (cui_box){0}, (cui_rect){8, 90, 40, 40});
+    assert(cui_icon_named(ui, 108, theme, cui_string("check"), (cui_icon_options){0}) ==
+           CUI_ICON_OK);
+    cui_end_box(ui);
+    cui_begin_portal(ui, 109, (cui_box){0}, (cui_rect){60, 90, 40, 40}, 1);
+    assert(cui_get_text_defaults(ui).font_size == 26);
+    assert(cui_icon_named(ui, 110, theme, cui_string("check"), (cui_icon_options){0}) ==
+           CUI_ICON_OK);
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_begin_box(ui, 112, row);
+    assert(cui_get_text_defaults(ui).font_size == 0 && !cui_get_text_defaults(ui).custom_color);
+    assert(cui_icon_named(ui, 113, theme, cui_string("check"), (cui_icon_options){0}) ==
+           CUI_ICON_OK);
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    const cui_id ids[] = {101, 103, 104, 105, 106, 108, 110, 113};
+    const float sizes[] = {26, 18, 14, 26, 16, 26, 26, theme->font_size};
+    const cui_color colors[] = {teal, transparent, violet, violet, teal, teal, teal, theme->text};
+    for (size_t i = 0; i < sizeof(ids) / sizeof(ids[0]); i++) {
+        cui_rect bounds = cui_bounds(ui, ids[i]);
+        assert(bounds.w == sizes[i] && bounds.h == sizes[i]);
+        bool found = false;
+        for (size_t j = 0; j < draw.count; j++) {
+            const cui_draw_command *command = &draw.commands[j];
+            if (command->type == CUI_DRAW_IMAGE && command->bounds.x == bounds.x &&
+                command->bounds.y == bounds.y && command->bounds.w == bounds.w &&
+                same_tint(command->bitmap.tint, colors[i]))
+                found = true;
+        }
+        if (!found)
+            fprintf(stderr, "Missing icon %llu at %.1f,%.1f (%.1f x %.1f), tint %u/%u/%u/%u\n",
+                    (unsigned long long)ids[i], bounds.x, bounds.y, bounds.w, bounds.h, colors[i].r,
+                    colors[i].g, colors[i].b, colors[i].a);
+        assert(found);
+    }
+    size_t scoped = 0, explicit = 0;
+    for (size_t i = 0; i < draw.count; i++) {
+        const cui_draw_command *command = &draw.commands[i];
+        if (command->type == CUI_DRAW_TEXT) {
+            scoped += command->font_size == 26 && same_tint(command->color, teal);
+            explicit += command->font_size == 12 && same_tint(command->color, violet);
+        }
+    }
+    assert(scoped == 2 && explicit == 1);
+    assert(!cui_get_text_defaults(ui).custom_color);
+    assert(cui_begin_frame(ui, 160, 100, 0));
+    cui_begin_box(ui, 100, (cui_box){0});
+    assert(cui_get_text_defaults(ui).font_size == 0 && !cui_get_text_defaults(ui).custom_color);
+    cui_end_box(ui);
+    cui_end_frame(ui);
+}
 int main(void) {
     cui_context *ui =
         cui_create((cui_config){.max_elements = 128, .max_commands = 256, .frame_bytes = 65536});
@@ -20,6 +120,7 @@ int main(void) {
     cui_theme t = cui_theme_light();
     cui_icon_state state = {0};
     assert(cui_icon_set_data(&state, cui_string(svg)));
+    text_defaults(ui, &t, &state);
     for (int pass = 0; pass < 7; pass++) {
         cui_box style = {0};
         cui_icon_constraints limits = {0};

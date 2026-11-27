@@ -246,6 +246,13 @@
           "types": ["cui_icon_loader_fn"],
           "symbols": ["cui_icon_set_path", "cui_icon_set_name"],
           "note": "Direct C accepts arbitrary loader callbacks. Python, JavaScript, TypeScript, Go and Rust path sources use a resource-local map of copied SVG data."
+        },
+        {
+          "header": "include/cui/cui.h",
+          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "types": ["cui_text_defaults"],
+          "symbols": ["cui_set_text_defaults", "cui_get_text_defaults"],
+          "note": "Box-scoped size and solid tint apply to immediate C. Retained Icon builders use explicit per-widget options."
         }
       ]
     },
@@ -286,7 +293,16 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        {
+          "header": "include/cui/cui.h",
+          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "types": ["cui_text_defaults"],
+          "symbols": ["cui_set_text_defaults", "cui_get_text_defaults"],
+          "note": "Inherited size and solid foreground apply to immediate C Label. Retained Label builders do not expose box text defaults."
+        }
+      ]
     },
     {
       "name": "Marker",
@@ -450,6 +466,13 @@
           "languages": ["python", "javascript", "typescript"],
           "symbols": ["cui_bridge_spinner_get_icon_resource_v1"],
           "note": "Python and Node/TypeScript expose binding and clearing. The app keeps the original resource reference. Go and Rust also expose a read of the app-scoped handle."
+        },
+        {
+          "header": "include/cui/cui.h",
+          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "types": ["cui_text_defaults"],
+          "symbols": ["cui_set_text_defaults", "cui_get_text_defaults"],
+          "note": "Immediate C Spinner can use a scoped foreground as its fallback tint. Retained Spinner builders accept explicit color."
         }
       ]
     },

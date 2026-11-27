@@ -556,6 +556,11 @@ The gallery nested editor/console mode uses distinct
 caller-owned states/IDs and supplies current outer pane width to the inner group;
 copy its compilable C example. See `docs/RESIZABLE_BROWSER_REAUDIT.md`.
 
+In immediate C, call `cui_set_text_defaults` inside a box to share a font size
+and solid color with nested Icon and Label components. Spinner uses the scoped
+color as its fallback. Explicit component options override the scope. See
+`docs/TYPOGRAPHY.md` for a composable example.
+
 For Spinner, read `docs/SPINNER.md`. Immediate C `cui_spinner_ex` supports
 decorative custom painting and finite easing turns, including reduced ease(0).
 Retained C and Python, JS/TS, Go and Rust offer an opt-in rotating catalog icon

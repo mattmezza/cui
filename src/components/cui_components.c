@@ -2057,7 +2057,9 @@ bool cui_radio(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int
     return cui_radio_ex(ui, id, t, name, value, option, (cui_radio_options){.disabled = disabled});
 }
 void cui_label(cui_context *ui, const cui_theme *t, cui_str label) {
-    cui_text(ui, label, t->font_size, t->text);
+    cui_text_defaults defaults = cui_get_text_defaults(ui);
+    cui_text(ui, label, defaults.font_size > 0 ? defaults.font_size : t->font_size,
+             defaults.custom_color ? defaults.color : t->text);
 }
 void cui_badge(cui_context *ui, cui_id id, const cui_theme *t, cui_str label) {
     cui_begin_box(ui, id, (cui_box){.padding = 4, .radius = t->radius, .background = t->primary});

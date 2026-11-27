@@ -31,9 +31,10 @@ The audit covered all reference branches:
   Custom pixels, inherited text size, dimension overrides and design metrics retain
   their existing precedence. Explicit size wins over style dimensions.
 - Explicit text color overrides fallback. RenderOnce falls back to inherited text
-  color; entity Render falls back to theme foreground. CUI's existing
-  `custom_inherited_color` bridges RenderOnce scopes; omitting it selects theme
-  foreground as the entity branch does. `custom_color` wins over both. SVG masks
+  color and entity Render falls back to theme foreground. Immediate C supports
+  the surrounding box's defaults via `cui_set_text_defaults`. Explicit
+  `custom_color` and `custom_inherited_color` override the scoped tint in that
+  order. With no scope or overrides, the theme supplies the tint. SVG masks
   are tinted with this current color; the supported parser does not preserve a
   multicolor SVG palette.
 - Rotation and affine transformation replace one another via options. Existing
@@ -41,9 +42,9 @@ The audit covered all reference branches:
 - Source `Styled` accepts generic refinements. New optional `style` supports Core
   box decoration (background, border, radius, clip, opacity, inert/layout-only,
   offsets), while explicit icon dimensions remain authoritative. Uniform or per-edge padding participates in the border-box sizing floor.
-  SVG paint covers the complete resulting bounds, without a content inset. This does not reproduce arbitrary GPUI flex properties, margins, every
-  SVG feature or automatic ambient style inheritance. Callers supply inherited
-  metrics/colors explicitly; no global ambient style stack is introduced.
+  SVG paint covers the complete resulting bounds without a content inset.
+  Box scopes cover size and solid color in immediate C. Other source refinements,
+  including a general style cascade and arbitrary flex properties, remain open.
 
 Validation of the new fields occurs before state preparation, cache allocation,
 layout or semantics. Decorative labels are ignored entirely, so they need not

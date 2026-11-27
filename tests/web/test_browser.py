@@ -2083,6 +2083,26 @@ def main():
             control_change('icon-rotate', True)
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,3)', icon_bitmap()) > 24
             assert page.locator('#accessible [role=img]').count() == 0
+            control_change('icon-rotate', False)
+            control_change('icon-color', False)
+            scaled_width = page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,3)', icon_bitmap())
+            control_change('icon-layout', '4')
+            assert page.locator('#design-size').is_hidden()
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,3)', icon_bitmap()) == 28
+            assert page.evaluate('''(i)=>{
+                const e=cuiGallery.exports;
+                const label=Array.from({length:e.gallery_count()},(_,j)=>j)
+                    .find(j=>e.gallery_command(j,0)===2&&e.gallery_command(j,11)===28);
+                return [5,6,7,8].every((f)=>e.gallery_command(label,f)===e.gallery_bitmap(i,f+5));
+            }''', icon_bitmap())
+            scoped_code = page.locator('#snippet').inner_text()
+            assert 'cui_set_text_defaults' in scoped_code
+            page.locator('#copy-snippet').click()
+            page.wait_for_function("document.querySelector('#copy-snippet').textContent==='Copied'")
+            assert page.evaluate('navigator.clipboard.readText()') == scoped_code
+            control_change('icon-layout', '0')
+            assert not page.locator('#design-size').is_hidden()
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,3)', icon_bitmap()) == scaled_width
             page.evaluate('location.hash="Toolbar"')
             page.wait_for_function('cuiGallery.renderedComponent==="Toolbar"')
             toolbar = page.locator('#accessible [role=toolbar][aria-label="Editing toolbar"]')

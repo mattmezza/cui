@@ -104,8 +104,10 @@ lists expires at the next frame as with other Icon commands.
 Compose a parent `cui_box` for placement, padding, backgrounds, borders, opacity
 and clipping. Supported Icon style fields can also be supplied inside a custom
 callback. Icon padding and borders floor the allocated dimensions while the SVG
-paints the complete box; see the Icon guide for numeric constraints. Arbitrary
-inherited source Icon styling remains an explicit parity limitation.
+paints the complete box; see the Icon guide for numeric constraints. In
+immediate C, `cui_set_text_defaults` can supply the fallback tint for the
+stock or custom painter. Spinner size still comes from its own options.
+Additional inherited styling remains open.
 This guide does not claim complete Icon styling or complete renderer/platform
 parity from Spinner tests. Parent composition also supports content-inset padding.
 Explicit transparent color remains transparent; it is not a fallback sentinel.
@@ -234,7 +236,7 @@ functions. Existing unconfigured Spinner builders keep their eight-dot ring,
 legacy visual size and Loading status. Configured nodes use the V1 size
 fields. Immediate C supports application paint and easing callbacks. The
 retained C route supports embedded catalog icons, shared Icon resources and two
-built-in easing curves. Inherited Icon styling and broader host acceptance
+built-in easing curves. Retained text defaults and broader host acceptance
 remain open. The
 [headless software check](../tests/unit/test_bridge_spinner.c) verifies real
 rotation pixels, sizing, color, reduced motion, omission, failure and handle

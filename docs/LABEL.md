@@ -12,8 +12,15 @@ Caller-selected error presentation uses `custom_color = true` and `color = theme
 Secondary text stays muted and matches override either foreground, including
 matches that cross the primary/secondary separator. Masked bullets use the selected
 base foreground uniformly and never emit secondary/highlight spans. Font size,
-weight, italic, monospace and family are forwarded; line height defaults to
-20 logical pixels, matching the source's 1.25rem at its 16px root size.
+weight, italic, monospace and family are forwarded. With no size scope, line
+height defaults to 20 logical pixels, matching the source's 1.25rem at its 16px
+root size.
+
+Both immediate Label routes accept [box text defaults](TYPOGRAPHY.md#share-size-and-color-with-a-box).
+An inherited font size uses the measured natural line height unless the caller
+sets one. Scoped color supplies the primary foreground and keeps the secondary
+and highlight colors. `cui_label_prepare` uses explicit options and theme
+values because it runs independently of any box.
 
 The frozen `crates/component/src/label.rs:53-59,61-91,192-215` has no disabled or
 error state flags; it accepts inherited Styled text color. Its website error

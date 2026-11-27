@@ -16,7 +16,8 @@ const source=readFileSync(process.argv[1],'utf8');
 const load = name => import('data:text/javascript;base64,' +
     readFileSync(join(process.argv[2], name)).toString('base64'));
 const {paginationUsage, ratingUsage, timeFieldUsage, virtualInboxUsage, liveDataTableUsage, pagedDataTableUsage,
-       radioStyledUsage, radioControlledUsage, disclosureHeadingUsage, carouselBasisUsage} =
+       radioStyledUsage, radioControlledUsage, disclosureHeadingUsage, carouselBasisUsage,
+       iconTextDefaultsUsage} =
     await load('cui_usage.js');
 const {hoverCardUsage} = await load('cui_hover_card_usage.js');
 const pick=(name)=>{const start=source.indexOf('const '+name+' = {');
@@ -37,6 +38,7 @@ const standalone = {
     Radio: [radioStyledUsage, radioControlledUsage],
     DataTable: [liveDataTableUsage, pagedDataTableUsage],
     HoverCard: [0, 1, 2].flatMap(mode => [0, 1, 2].map(preview => hoverCardUsage(mode, preview))),
+    Icon: [iconTextDefaultsUsage('bell', false, false), iconTextDefaultsUsage('check', true, true)],
     Rating: [snippets.Rating, ratingUsage(14, false, true, true, false)],
     TimeField: [snippets.TimeField, timeFieldUsage(3, true)],
     Pagination: [snippets.Pagination, paginationUsage(14, true, 2), paginationUsage(3, false, 1, 10),

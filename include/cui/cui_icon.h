@@ -110,8 +110,9 @@ typedef struct {
      * Explicit descriptor maxima replace corresponding legacy style maxima. */
     const cui_icon_constraints *constraints;
 } cui_icon_options;
-/* Decorative by default, or named noninteractive image; never a focus stop. Theme supplies fallback
- * size/color; explicit inherited overrides bridge hosts with their own text scopes. */
+/* Decorative by default, or named noninteractive image; never a focus stop.
+ * Explicit inherited overrides take priority over the enclosing box's text
+ * defaults. The theme supplies the final fallback size and color. */
 cui_icon_error cui_icon(cui_context *, cui_id, const cui_theme *, cui_icon_state *,
                         cui_icon_options);
 /* Context-owned convenience cache; accepts catalog names or paths. Its masks

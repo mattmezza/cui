@@ -11,7 +11,7 @@ typedef struct {
     bool has_secondary, masked;
     bool no_wrap; /* Default wraps at available parent width. */
     cui_label_match match;
-    float font_size, line_height; /* zero: theme font and 1.25rem (20 logical px). */
+    float font_size, line_height; /* zero: scoped or theme font, natural height when scoped. */
     cui_text_style style;
     bool custom_color;
     cui_color color;
@@ -26,7 +26,8 @@ typedef struct {
  * only, including for the separator, and have zero color spans. */
 bool cui_label_prepare(const cui_theme *, cui_label_options, char *text, size_t text_capacity,
                        cui_text_color_span *spans, size_t span_capacity, cui_label_prepared *);
-/* Copies prepared display bytes into frame storage. No retained secret text. */
+/* Copies prepared display bytes into frame storage. No retained secret text.
+ * Absent a scoped size, zero line height uses 20 logical px. */
 bool cui_label_source(cui_context *, const cui_theme *, cui_label_options);
 #ifdef __cplusplus
 }

@@ -289,6 +289,7 @@ struct cui_context {
     bool reporting_diagnostic, layout_debug, layout_debug_ready;
     cui_error error;
     bool in_frame, focus_visible, dirty;
+    cui_text_defaults text_defaults[CUI_CORE_STACK_MAX];
 };
 #if defined(__cplusplus)
 static thread_local cui_context *cui_core_paint_context;
@@ -2405,6 +2406,8 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                             ui->element_count, 1, ui->config.max_elements);
         return;
     }
+    ui->text_defaults[ui->depth - 1] =
+        ui->depth > 1 ? ui->text_defaults[ui->depth - 2] : (cui_text_defaults){0};
     ui->element_count++;
     if (slot)
         *slot = internal_id;
@@ -2987,6 +2990,29 @@ void cui_end_box(cui_context *ui) {
     }
     if (ui->opened[--ui->depth])
         Clay__CloseElement();
+}
+static bool cui_core_text_defaults_available(const cui_context *ui) {
+    return cui_frame_is_submitting(ui) && ui->depth && !ui->overflow_depth &&
+           ui->opened[ui->depth - 1];
+}
+bool cui_set_text_defaults(cui_context *ui, cui_text_defaults defaults) {
+    if (!cui_core_mutation(ui) || !cui_core_text_defaults_available(ui) ||
+        !isfinite(defaults.font_size) || defaults.font_size < 0 || defaults.font_size > 4096)
+        return false;
+    cui_text_defaults resolved =
+        ui->depth > 1 ? ui->text_defaults[ui->depth - 2] : (cui_text_defaults){0};
+    if (defaults.font_size > 0)
+        resolved.font_size = defaults.font_size;
+    if (defaults.custom_color) {
+        resolved.custom_color = true;
+        resolved.color = defaults.color;
+    }
+    ui->text_defaults[ui->depth - 1] = resolved;
+    return true;
+}
+cui_text_defaults cui_get_text_defaults(const cui_context *ui) {
+    return cui_core_text_defaults_available(ui) ? ui->text_defaults[ui->depth - 1]
+                                                : (cui_text_defaults){0};
 }
 static cui_str cui_core_copy_string(cui_context *ui, cui_str s) {
     if (!s.length)

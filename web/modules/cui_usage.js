@@ -576,3 +576,23 @@ void controlled_choice(cui_context *ui, const cui_theme *theme, choice_owner *ow
     /* Owner changes appear on the next submission; schedule that frame. */
     if (submitted != owner->checked) cui_invalidate(ui);
 }`;
+
+export function iconTextDefaultsUsage(name, rotate, customColor) {
+ const rotation = rotate
+     ? '\n    icon.custom_transform = true;\n    icon.transform = cui_icon_rotation(.785398163f);'
+     : '';
+ const tint = customColor ? '\n    icon.custom_color = true;\n    icon.color = theme->primary;' : '';
+ return `#include "cui/cui_components.h"
+#include "cui/cui_icon.h"
+
+void icon_label(cui_context *ui, const cui_theme *theme) {
+    cui_begin_box(ui, cui_id_from(ui, "icon-text-row"),
+                  (cui_box){.row = true, .align_y = CUI_ALIGN_CENTER, .gap = 8});
+    cui_set_text_defaults(ui, (cui_text_defaults){
+        .font_size = 28, .custom_color = true, .color = theme->info});
+    cui_icon_options icon = {0};${rotation}${tint}
+    cui_icon_named(ui, cui_id_from(ui, "status-icon"), theme, cui_string("${name}"), icon);
+    cui_label(ui, theme, cui_string("${name}"));
+    cui_end_box(ui);
+}`;
+}

@@ -807,6 +807,20 @@ void cui_begin_absolute_box(cui_context *ui, cui_id id, cui_box box, cui_rect bo
  * bounds (zero dimensions fit contents); box controls styling and child layout. */
 void cui_begin_portal(cui_context *ui, cui_id id, cui_box box, cui_rect bounds, int16_t layer);
 void cui_end_box(cui_context *ui);
+/* Text defaults for descendants of the current submission box. A zero size or
+ * custom_color=false inherits that field from the enclosing box. An explicit
+ * color may be transparent. This applies to components that opt in. */
+typedef struct {
+    float font_size;
+    cui_color color;
+    bool custom_color;
+} cui_text_defaults;
+/* Replaces the current box's defaults. Size must be finite and in [0, 4096].
+ * Returns false outside an open, valid submission box or for invalid size.
+ * Defaults are copied by value and expire when the box closes. */
+bool cui_set_text_defaults(cui_context *, cui_text_defaults);
+/* Returns the resolved defaults or zero when no valid submission box is open. */
+cui_text_defaults cui_get_text_defaults(const cui_context *);
 void cui_text(cui_context *ui, cui_str text, float font_size, cui_color color);
 /* Explicit logical line height; zero selects the measured natural line height. */
 void cui_text_with_line_height(cui_context *, cui_str, float font_size, cui_color,

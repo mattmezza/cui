@@ -969,7 +969,10 @@ bool cui_spinner_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_load
                             o.reduced_motion || cui_reduced_motion(ui), o.ease, o.ease_user,
                             &result))
         return false;
-    cui_color color = o.custom_color ? o.color : theme->text;
+    cui_text_defaults defaults = cui_get_text_defaults(ui);
+    cui_color color = o.custom_color          ? o.color
+                      : defaults.custom_color ? defaults.color
+                                              : theme->text;
     /* Reduce in double before multiplication: even FLT_MAX turns stay finite. */
     double turns = fmod((double)result.phase, 1.0);
     if (turns < 0)

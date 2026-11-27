@@ -1832,10 +1832,12 @@
       "category": "fundamentals",
       "base_behavior": [],
       "public_header": "include/cui/cui_icon.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_icon.c",
         "tests/unit/test_icon_accessibility_source.c",
+        "tests/unit/test_icon_style_source.c",
+        "tests/web/test_browser.py",
         "tests/unit/test_bridge_icon_presentation.c",
         "bindings/python/test_icons.py",
         "bindings/node/test/icon-resources.test.cjs",
@@ -1846,10 +1848,11 @@
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "123 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.",
+        "The default build embeds 128 SVGs from a 1,830-entry catalog. Named/path/raw sources, size, transforms, tint and immutable bounded caches have scoped tests. Immediate C Icon supports box-scoped size and solid tint. Full inherited styling, source SVG fidelity and native visual acceptance remain open.",
         "Icon is decorative by default. Callers can set an explicit accessible name or choose decorative rendering. Native assistive-technology coverage remains open.",
         "The optional retained C, Python, JavaScript, TypeScript, Go and Rust APIs support copied Icon and Badge configuration and app-owned SVG resources. Resource and presentation support can differ by provider."
       ],
@@ -1897,7 +1900,19 @@
             "docs/ICON_ACCESSIBILITY.md"
           ],
           "limitations": [
-            "Ambient text style inheritance and general SVG renderer fidelity remain separate gaps."
+            "The box scope covers size and solid tint. General style inheritance and SVG renderer fidelity remain open."
+          ]
+        },
+        {
+          "name": "box-scoped size and solid tint",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_icon_style_source.c",
+            "tests/web/test_browser.py",
+            "docs/TYPOGRAPHY.md"
+          ],
+          "limitations": [
+            "The scope is available to immediate C. Retained builders use their copied per-Icon options."
           ]
         },
         {
@@ -2146,6 +2161,7 @@
       "tests": [
         "tests/unit/test_components.c",
         "tests/unit/test_label_source.c",
+        "tests/unit/test_icon_style_source.c",
         "tests/web/test_source_composition_gallery.py",
         "tests/unit/test_contextual_wrap_source.c"
       ],
@@ -2156,7 +2172,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Secondary text, Unicode lowercase highlighting, scalar masking, control association, copied colored wrapping and left/center/right alignment have scoped tests. Full inherited typography/style refinement and exhaustive native/platform visual acceptance remain incomplete."
+        "Secondary text, Unicode lowercase highlighting, scalar masking, control association, copied colored wrapping and left/center/right alignment have scoped tests. Immediate C Label uses box-scoped size and foreground when supplied. Full inherited typography and platform visual acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3562,6 +3578,7 @@
         "tests/unit/test_status_motion.c",
         "tests/web/test_status_motion.py",
         "tests/unit/test_spinner_contract.c",
+        "tests/unit/test_icon_style_source.c",
         "tests/unit/test_bridge_spinner.c",
         "tests/web/test_spinner_gallery.py",
         "tests/web/test_spinner_contract_gallery.py"
@@ -3572,7 +3589,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Decorative source-style SVG, selected finite-turn easing/reduced ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in software and actual WASM. Retained C and the language builders offer catalog icons, two easing curves and shared Icon artwork. Python and JS/TS support binding and clearing artwork; C, Go and Rust also read the bound handle. The app owns announcements and scheduling. Inherited Icon style, broader custom-curve/mount cases and hardware/GPU acceptance remain open."
+        "Decorative SVG, selected finite-turn easing, reduced-motion ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in software and WASM. Immediate C uses a box's solid tint as a fallback. Retained C and language builders offer catalog icons, two easing curves and shared Icon artwork. Python and JS/TS support binding and clearing artwork; C, Go and Rust also read the bound handle. The app owns announcements and scheduling. General style inheritance, broader custom-curve/mount cases and hardware/GPU acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

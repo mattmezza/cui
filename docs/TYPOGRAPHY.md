@@ -31,6 +31,46 @@ registration, and wide/narrow composed tests. Use `cui_typography_text_painted`
 for [linear gradient glyph paint](TEXT_GRADIENT.md) on supported renderers.
 Tracking, variable axes and arbitrary numeric weights remain future work.
 
+## Share size and color with a box
+
+In immediate C, set text defaults on an open box to share a font size and solid
+foreground with its descendants. This example aligns an icon and label and
+gives them matching 28-pixel styles.
+
+```c
+#include "cui/cui_components.h"
+#include "cui/cui_icon.h"
+
+void sync_label(cui_context *ui, const cui_theme *theme) {
+    cui_begin_box(ui, cui_id_from(ui, "sync-row"),
+                  (cui_box){.row = true, .align_y = CUI_ALIGN_CENTER, .gap = 8});
+    cui_set_text_defaults(ui, (cui_text_defaults){
+        .font_size = 28, .custom_color = true, .color = theme->info});
+    cui_icon_named(ui, cui_id_from(ui, "sync-icon"), theme, cui_string("check"),
+                   (cui_icon_options){0});
+    cui_label(ui, theme, cui_string("Sync complete"));
+    cui_end_box(ui);
+}
+```
+
+Icons use the scoped size and tint as fallbacks. Labels including
+`cui_label_source` pick up both defaults. Rich labels use a natural line height
+when inheriting size and keep their highlight and secondary colors. A Spinner
+uses the scoped tint and keeps its configured size. Component-specific explicit
+values override the defaults.
+
+For nested boxes, a zero font size or `custom_color = false` inherits the
+corresponding field from the enclosing box. Setting defaults again replaces
+the current box's refinements. Core copies the values during submission,
+including for nested absolute boxes and portals, and closing the box restores
+the surrounding defaults. Use `cui_get_text_defaults` to opt a custom component
+into the same behavior. The setter accepts finite logical sizes from 0 to 4096.
+Explicit `cui_text` calls take their arguments directly. Font families, weights
+and gradients remain explicit, and the retained language builders do not
+provide a text-defaults scope.
+
+## Use multiple font families
+
 Family IDs are application-defined `uint32_t` keys. Zero retains the default
 family. Register regular and variant faces for a named family on the same
 `cui_font` used by the context's measurement callbacks and renderer:

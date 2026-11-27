@@ -31,7 +31,7 @@ jobs:
       - name: Install hosted-runner build and invisible-display tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev libgl1-mesa-dev xvfb xauth xdotool
+          sudo apt-get install -y ninja-build pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev libgl1-mesa-dev xvfb xauth xdotool x11-utils x11-apps imagemagick
           rustup toolchain install 1.85.1 --profile minimal
       - name: Configure private dependency paths
         # runner is unavailable in job-level env expressions.

@@ -23,7 +23,8 @@ def validate(text):
         'cmake -S tools/native-deps', 'python tests/test_native_deps.py --prefix',
         '-DCUI_REQUIRE_NATIVE=ON', '-DCUI_BUILD_NATIVE=ON',
         '-DCUI_BUILD_BRIDGE=ON', '-DCUI_SANITIZE=OFF',
-        '--target cui_bridge', 'xvfb xauth xdotool', 'LD_RUN_PATH=$RUNNER_TEMP/cui-run-deps/lib',
+        '--target cui_bridge', 'xvfb xauth xdotool x11-utils x11-apps imagemagick',
+        'LD_RUN_PATH=$RUNNER_TEMP/cui-run-deps/lib',
         'rustup run 1.85.1 python scripts/test_binding_run.py',
         '--source-root "$PWD"', '--build-dir "$RUNNER_TEMP/cui-binding-run"',
         '--library "$RUNNER_TEMP/cui-run-native/libcui_bridge.so"',
@@ -53,6 +54,7 @@ class WorkflowTests(unittest.TestCase):
     def test_rejects_partial_mode_asan_and_mutable_actions(self):
         source = WORKFLOW.read_text()
         for before, after in (('--mode all', '--mode dynamic'),
+                              ('x11-utils x11-apps imagemagick', 'x11-utils'),
                               ('CUI_SANITIZE=OFF', 'CUI_SANITIZE=ON'),
                               ('typescript@5.8.3', 'typescript@latest'),
                               ('scripts/test_window_visibility_bindings.py', 'scripts/omitted_visibility.py'),

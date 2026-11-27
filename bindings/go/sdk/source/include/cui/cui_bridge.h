@@ -213,6 +213,50 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_skeleton_get_config_v1(cui_bridge_ap
  * untouched. The deadline does not change the native runner's cadence. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_skeleton_get_presentation_v1(
     cui_bridge_app *, cui_bridge_node, cui_bridge_skeleton_presentation_v1 *);
+/* Optional decorative rotating Icon presentation for the existing Spinner kind. */
+#define CUI_BRIDGE_SPINNER_V1 1u
+enum {
+    CUI_BRIDGE_SPINNER_CUSTOM,
+    CUI_BRIDGE_SPINNER_XSMALL,
+    CUI_BRIDGE_SPINNER_SMALL,
+    CUI_BRIDGE_SPINNER_MEDIUM,
+    CUI_BRIDGE_SPINNER_LARGE
+};
+enum { CUI_BRIDGE_SPINNER_QUADRATIC, CUI_BRIDGE_SPINNER_LINEAR };
+enum { CUI_BRIDGE_SPINNER_CUSTOM_COLOR = 1u, CUI_BRIDGE_SPINNER_REDUCED_MOTION = 2u };
+enum { CUI_BRIDGE_SPINNER_ICON_BYTES = 64 };
+typedef struct {
+    uint32_t struct_size, schema_version, flags, size;
+    /* CUSTOM: pixels in (0,4096], rem_size zero. Named: pixels zero, rem_size
+     * in [0,4096]; zero selects 16. Resolved size must be in (0,4096].
+     * Duration: [0,60] seconds; zero selects the default float value .8. */
+    float pixels, rem_size, duration;
+    uint32_t rgba, easing; /* Numeric 0xRRGGBBAA; rgba is zero without CUSTOM_COLOR. */
+    /* NUL-terminated embedded catalog key. Empty selects Loader. */
+    char icon[CUI_BRIDGE_SPINNER_ICON_BYTES];
+} cui_bridge_spinner_config_v1;
+typedef struct {
+    uint32_t struct_size, schema_version;
+    uint64_t frame_sequence;
+    double core_time, next_wake_seconds; /* Absolute Core clock; zero deadline means static. */
+    float phase;                         /* Eased turns. */
+    uint32_t reserved;                   /* Always zero. */
+} cui_bridge_spinner_presentation_v1;
+CUI_BRIDGE_API uint32_t cui_bridge_spinner_versions(void);
+CUI_BRIDGE_API uint32_t cui_bridge_spinner_config_size_v1(void);
+CUI_BRIDGE_API uint32_t cui_bridge_spinner_presentation_size_v1(void);
+/* Owner thread, outside step. Copies configuration. A different effective
+ * period or explicit reduced-motion flag restarts motion. Other restyling
+ * preserves it. Configured nodes reject the legacy visual-size setter. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_spinner_configure_v1(
+    cui_bridge_app *, cui_bridge_node, const cui_bridge_spinner_config_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_spinner_get_config_v1(cui_bridge_app *, cui_bridge_node,
+                                                                  cui_bridge_spinner_config_v1 *);
+/* Latest painted sample from a successful step. EMPTY before sampling, after
+ * reconfiguration, on omission or on frame failure. Errors leave output
+ * untouched. The deadline is a hint and does not change the runner's cadence. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_spinner_get_presentation_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_spinner_presentation_v1 *);
 /* Optional copied presentation for the existing Pagination kind. */
 #define CUI_BRIDGE_PAGINATION_V1 1u
 enum { CUI_BRIDGE_PAGINATION_LABEL_BYTES = 128 };

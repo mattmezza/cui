@@ -155,7 +155,72 @@ Arrow-right bitmap and canvas equivalence for .25/−.75/1.25 turns, reduced
 shifted ease(0), NaN/±Infinity rejection without painter or state/result commit,
 recovery and no stale wake after rejection. Named rem 0/16/20/32 is checked through
 both default/custom painters, while CUSTOM and NULL-descriptor pixels stay fixed.
-Logical layout size is exact; rotated bitmap bounds may include a one-pixel
-raster-rounding fringe, so bitmap bounds are not the rem metric. Complete inherited
-Icon styling, source-style bridge Spinner, combined raw-data lifecycle and broader
-host acceptance remain open.
+Logical layout size is exact. Rotated bitmap bounds may include a one-pixel
+raster-rounding fringe. Independently measure the layout bounds when checking
+rem sizes.
+
+## Use a rotating icon in a retained C UI
+
+Create a Spinner in a retained Row or Column and opt into the V1 presentation.
+This example places an arrow next to your application's loading label. Omit
+`icon` for the default Loader.
+
+```c
+cui_bridge_node spinner;
+cui_bridge_status status =
+    cui_bridge_node_create(app, row, CUI_BRIDGE_SPINNER, "sync-spinner", &spinner);
+if (status != CUI_BRIDGE_OK)
+    return status;
+
+const cui_bridge_spinner_config_v1 style = {
+    .struct_size = sizeof style,
+    .schema_version = CUI_BRIDGE_SPINNER_V1,
+    .flags = CUI_BRIDGE_SPINNER_CUSTOM_COLOR,
+    .size = CUI_BRIDGE_SPINNER_LARGE,
+    .rem_size = 20, /* 30 logical pixels */
+    .duration = 1,
+    .rgba = 0x3B82F6FFu,
+    .easing = CUI_BRIDGE_SPINNER_LINEAR,
+    .icon = "arrow-right",
+};
+status = cui_bridge_spinner_configure_v1(app, spinner, &style);
+if (status != CUI_BRIDGE_OK) {
+    (void)cui_bridge_node_remove(app, spinner);
+    return status;
+}
+```
+
+See [the retained C quickstart](BINDING_BUILDERS.md) for app creation, layout,
+building and running. The default color comes from the current theme's text
+color. A custom RGBA value replaces it, including a fully transparent value.
+Use `CUI_BRIDGE_SPINNER_CUSTOM` with `pixels` and leave `rem_size` zero for a fixed
+size. Named sizes use `rem_size` and leave `pixels` zero. Rem zero selects
+16 logical pixels. Easing zero selects quadratic in/out. Duration zero selects
+0.8 seconds. Add `CUI_BRIDGE_SPINNER_REDUCED_MOTION` for a static icon. Query
+`cui_bridge_icon_query_v1` to check whether your build embeds a catalog icon.
+
+The app copies the full configuration and owns the clock per node. Initialize
+both header fields for configuration and presentation reads. Use these APIs on
+the app's owner thread between steps. Replacing size, color, easing or icon
+preserves elapsed motion. A changed effective period or explicit reduced-motion
+flag restarts it. A node that reappears after an omitted frame starts at zero.
+Removal releases the per-node configuration and clock.
+
+After a successful `cui_bridge_step`, `cui_bridge_spinner_get_presentation_v1`
+copies the frame sequence, time, eased turns and absolute wake deadline. A zero
+deadline requests no animation wake. The query returns `CUI_BRIDGE_EMPTY` before
+the first sample, after reconfiguration, after omission or after a failed step.
+Elapsed time can advance if the renderer fails after composition. The deadline
+is for manually stepped hosts. The native runner keeps its current cadence.
+Keep the loading label and any accessibility announcements in the application.
+
+Dynamic consumers can probe `cui_bridge_spinner_versions` and both V1 size
+functions. Existing unconfigured Spinner builders keep their eight-dot ring,
+legacy visual size and Loading status. Configured nodes use the V1 size
+fields. Immediate C supports application paint and easing callbacks. The
+retained C route supports embedded catalog icons and two built-in easing curves.
+Raw SVG resources in this route, language facades, inherited Icon styling and
+broader host acceptance remain open. The
+[headless software check](../tests/unit/test_bridge_spinner.c) verifies real
+rotation pixels, sizing, color, reduced motion, omission, failure and handle
+reuse.

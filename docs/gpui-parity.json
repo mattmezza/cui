@@ -3447,6 +3447,7 @@
         "tests/unit/test_status_motion.c",
         "tests/web/test_status_motion.py",
         "tests/unit/test_spinner_contract.c",
+        "tests/unit/test_bridge_spinner.c",
         "tests/web/test_spinner_gallery.py",
         "tests/web/test_spinner_contract_gallery.py"
       ],
@@ -3456,7 +3457,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Decorative source-style SVG, selected finite-turn easing/reduced ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in native/software and actual WASM. Caller owns announcements and scheduling; 60Hz deadlines do not claim hardware refresh equivalence. Complete inherited Icon style/raw-data lifecycle, broader custom-curve/mount cases, source-style language-builder facade and hardware/GPU acceptance remain open."
+        "Decorative source-style SVG, selected finite-turn easing/reduced ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in software and actual WASM. Opt-in retained C adds copied catalog icons, custom color, two easing curves and motion samples. The caller owns announcements and scheduling. Inherited Icon style, retained raw SVG, language facades, broader custom-curve/mount cases and hardware/GPU acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3488,6 +3489,11 @@
             "tests/unit/test_spinner_contract.c",
             "tests/web/test_spinner_contract_gallery.py"
           ]
+        },
+        {
+          "name": "opt-in retained C rotating catalog icon configuration",
+          "status": "tested",
+          "evidence": ["tests/unit/test_bridge_spinner.c"]
         }
       ],
       "upstream_doc": {

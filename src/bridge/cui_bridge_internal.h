@@ -28,6 +28,7 @@ typedef struct bridge_slider_app bridge_slider_app;
 typedef struct bridge_time_app bridge_time_app;
 typedef struct bridge_icon_app bridge_icon_app;
 typedef struct bridge_skeleton_app bridge_skeleton_app;
+typedef struct bridge_spinner_app bridge_spinner_app;
 typedef struct bridge_radio_hint bridge_radio_hint;
 typedef struct bridge_text_view_owned bridge_text_view_owned;
 typedef struct bridge_chart_owned bridge_chart_owned;
@@ -200,6 +201,7 @@ struct cui_bridge_app {
     bridge_time_app *time_fields;                 /* Lazy localized kind55 route. */
     bridge_icon_app *icons;                       /* Lazy owned resources; no legacy allocation. */
     bridge_skeleton_app *skeletons;               /* Lazy responsive presentation. */
+    bridge_spinner_app *spinners;                 /* Lazy rotating Icon presentation. */
     void **radio_motions;                         /* Radio or RadioGroup storage by slot. */
     bridge_radio_hint **radio_tooltips;           /* Lazy state and text for options. */
     cui_bridge_pagination_config_v1 **pagination; /* Lazily copied per node. */

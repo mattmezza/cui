@@ -982,18 +982,26 @@
         "cui_spinner_ex",
         "cui_spinner_options_default",
         "cui_spinner",
-        "cui_loading_phase"
+        "cui_loading_phase",
+        "cui_bridge_spinner_versions",
+        "cui_bridge_spinner_config_size_v1",
+        "cui_bridge_spinner_presentation_size_v1",
+        "cui_bridge_spinner_configure_v1",
+        "cui_bridge_spinner_get_config_v1",
+        "cui_bridge_spinner_get_presentation_v1"
       ],
       "state_types": [
         "cui_loading_motion",
         "cui_spinner_options",
         "cui_loading_motion_result",
         "cui_spinner_sizing",
-        "cui_spinner_size"
+        "cui_spinner_size",
+        "cui_bridge_spinner_config_v1",
+        "cui_bridge_spinner_presentation_v1"
       ],
-      "state_ownership": "Caller owns persistent motion state, the monotonic host clock and reduced-motion preference. Optional size descriptors and callback userdata are borrowed through submission.",
+      "state_ownership": "Immediate C caller owns persistent motion state, host clock and reduced-motion preference. Optional sizing and callback userdata are borrowed through submission. The retained C bridge copies configuration and owns the clock per node.",
       "interaction": "Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.",
-      "usage": "Submit cui_spinner_ex each frame while loading and schedule result.next_wake_seconds; zero deadline means idle. Use a custom paint callback for another SVG icon. Optional cui_spinner_sizing preserves named rem versus custom pixels; finite eased turns may exceed [0,1], reduced motion evaluates ease(0), and nonfinite easing rejects atomically.",
+      "usage": "Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Use optional rem or custom-pixel sizing, a custom SVG painter or finite turns from custom easing. Retained C can opt an existing Spinner into a copied catalog icon, built-in easing, custom color and reduced motion.",
       "docs": [
         "docs/SPINNER.md",
         "docs/CONTENT.md"
@@ -1005,6 +1013,9 @@
       "scope": "styled frame component",
       "name": "Spinner",
       "public_header": "include/cui/cui_content.h",
+      "additional_public_headers": [
+        "include/cui/cui_bridge.h"
+      ],
       "composition": "immediate frame submission"
     },
     {

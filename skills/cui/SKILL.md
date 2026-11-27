@@ -545,13 +545,12 @@ The gallery nested editor/console mode uses distinct
 caller-owned states/IDs and supplies current outer pane width to the inner group;
 copy its compilable C example. See `docs/RESIZABLE_BROWSER_REAUDIT.md`.
 
-For Spinner, read `docs/SPINNER.md`: `cui_spinner_ex` is decorative and distinct
-from legacy language-builder/eight-dot Spinner. Optional sizing preserves named
-rem versus fixed pixels. Finite easing can return negative or extra turns;
-reduced motion evaluates ease(0), while nonfinite output rejects without committing
-motion/result or painting. Schedule only successful results; do not reuse a stale
-deadline after failure. Gallery selectors and copied C examples cover this subset;
-inherited Icon style/lifecycle and a source-style binding facade remain gaps.
+For Spinner, read `docs/SPINNER.md`. Immediate C `cui_spinner_ex` supports
+decorative custom painting and finite easing turns, including reduced ease(0).
+Retained C can opt a Spinner into copied catalog icons, two easing curves, color,
+named/rem or fixed sizing and a wake deadline. Language builders retain the
+legacy eight-dot ring. Schedule only successful samples. Raw SVG and custom
+callbacks in retained Spinner remain unavailable.
 
 For hidden native windows, read `docs/BINDING_BUILDERS.md` section `Native window
 visibility` and the chosen Go/Rust guide. C SDL3 uses

@@ -1095,6 +1095,7 @@ static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *no
 #include "cui_bridge_badge_internal.h"
 #include "cui_bridge_rating_internal.h"
 #include "cui_bridge_skeleton_internal.h"
+#include "cui_bridge_spinner_internal.h"
 #include "cui_bridge_pagination_internal.h"
 #include "cui_bridge_disclosure_internal.h"
 #include "cui_bridge_attachment_internal.h"
@@ -1225,6 +1226,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     bridge_slider_remove(node->owner, node->own_slot);
     bridge_time_remove(node->owner, node->own_slot);
     bridge_skeleton_remove(node->owner, node->own_slot);
+    bridge_spinner_remove(node->owner, node->own_slot);
     bridge_pagination_remove(node->owner, node->own_slot);
     bridge_icon_presentation_remove(node->owner, node->own_slot);
     bridge_badge_remove(node->owner, node->own_slot);
@@ -1821,6 +1823,7 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app->time_fields);
     bridge_icon_app_destroy(app);
     free(app->skeletons);
+    free(app->spinners);
     free(app->pagination);
     free(app->radio_motions);
     free(app->radio_tooltips);
@@ -3042,6 +3045,8 @@ cui_bridge_status cui_bridge_set_visual_size(cui_bridge_app *app, cui_bridge_nod
         height > 4096 || (node->kind == CUI_BRIDGE_CHART && (width > 512 || height > 512)))
         return CUI_BRIDGE_INVALID_ARGUMENT;
     if (node->kind == CUI_BRIDGE_SKELETON && bridge_skeleton_node(app, handle.slot))
+        return CUI_BRIDGE_INVALID_STATE;
+    if (node->kind == CUI_BRIDGE_SPINNER && bridge_spinner_node(app, handle.slot))
         return CUI_BRIDGE_INVALID_STATE;
     if (node->kind == CUI_BRIDGE_ICON && bridge_icon_node(app, handle.slot))
         return CUI_BRIDGE_INVALID_STATE;
@@ -6595,9 +6600,14 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
                 node->visual_height > 0 ? node->visual_height : 16, 4, phase, false, false);
         }
     } else if (node->kind == CUI_BRIDGE_SPINNER) {
-        float phase = cui_loading_phase(cui_frame_time(app->ui), .8f);
-        cui_spinner(app->ui, node->id, &app->theme,
-                    node->visual_width > 0 ? node->visual_width : 16, phase, false);
+        bridge_spinner_owned *owned = bridge_spinner_node(app, slot);
+        if (owned)
+            bridge_spinner_render(app, node->id, owned);
+        else {
+            float phase = cui_loading_phase(cui_frame_time(app->ui), .8f);
+            cui_spinner(app->ui, node->id, &app->theme,
+                        node->visual_width > 0 ? node->visual_width : 16, phase, false);
+        }
     } else if (node->kind == CUI_BRIDGE_TAG) {
         if (!cui_tag(app->ui, node->id, &app->theme, cui_string(node->text),
                      cui_tag_options_default()))
@@ -6874,6 +6884,8 @@ done:
     bridge_time_finish(app, status);
     if (app->skeletons)
         app->skeletons->step_ok = status == CUI_BRIDGE_OK;
+    if (app->spinners)
+        app->spinners->step_ok = status == CUI_BRIDGE_OK;
     if (app->icons)
         app->icons->presentation_status = status;
     app->stepping = false;

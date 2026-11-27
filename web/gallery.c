@@ -5591,8 +5591,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             badge_inbox_photo photos[3];
             for (unsigned i = 0; i < 3; i++)
                 photos[i] = (badge_inbox_photo){gallery_avatar_source(i), &avatar_images[i]};
-            badge_inbox_draw(ui, "badge-support-inbox", &t, &badge_inbox_example, photos, width - 48,
-                             badge_disabled);
+            badge_inbox_draw(ui, "badge-support-inbox", &t, &badge_inbox_example, photos,
+                             width - 48, badge_disabled);
             break;
         }
         cui_label(ui, &t, cui_string("Counts, overflow, dot and SVG icon badges on any content."));
@@ -5985,8 +5985,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                     : 0;
         else
             cui_label(ui, &t,
-                      cui_string(spinner_easing >= 6 ? "Custom easing rejected: expected finite turns."
-                                                      : "The Spinner could not paint this icon."));
+                      cui_string(spinner_easing >= 6
+                                     ? "Custom easing rejected: expected finite turns."
+                                     : "The Spinner could not paint this icon."));
         break;
     }
     case 20: {

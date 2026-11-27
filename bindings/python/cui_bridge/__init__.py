@@ -3054,6 +3054,10 @@ class App:
         from .pagination_options import supported
         return supported(self)
 
+    def supports_spinner_icon_resource(self) -> bool:
+        from .spinner_presentation import resource_supported
+        return resource_supported(self)
+
     def supports_spinner_presentation(self) -> bool:
         from .spinner_presentation import supported
         return supported(self)

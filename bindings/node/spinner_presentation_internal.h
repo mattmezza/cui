@@ -113,3 +113,43 @@ static napi_value spinner_presentation(napi_env env, napi_callback_info info) {
         return NULL;
     return result;
 }
+
+/* Resolve the complete optional group even though borrowed handles are not public. */
+static napi_value spinner_icon_resource(napi_env env, napi_callback_info info) {
+    uint32_t (*versions)(void);
+    cui_bridge_status (*set)(cui_bridge_app *, cui_bridge_node, cui_bridge_icon_handle_v1);
+    cui_bridge_status (*get)(cui_bridge_app *, cui_bridge_node, cui_bridge_icon_handle_v1 *);
+    napi_value v[4], result;
+    js_app *app;
+    uint32_t op;
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app) || !uint_arg(env, v[1], &op))
+        return NULL;
+    bool supported =
+        optional_bridge_symbol(&versions, sizeof versions,
+                               "cui_bridge_spinner_icon_resource_versions") &&
+        optional_bridge_symbol(&set, sizeof set, "cui_bridge_spinner_set_icon_resource_v1") &&
+        optional_bridge_symbol(&get, sizeof get, "cui_bridge_spinner_get_icon_resource_v1") &&
+        (versions() & 1u);
+    if (op == 0)
+        return napi_get_boolean(env, supported, &result) == napi_ok ? result : NULL;
+    if (!supported)
+        return fail(env,
+                    "Spinner Icon resource V1 requires a complete, compatible bridge symbol group");
+    if (op != 1)
+        return fail(env, "unknown Spinner Icon resource operation");
+    js_node *node;
+    if (!args(env, info, 4, v) || !node_arg(env, v[2], app, &node))
+        return NULL;
+    napi_valuetype type;
+    if (napi_typeof(env, v[3], &type) != napi_ok)
+        return NULL;
+    cui_bridge_icon_handle_v1 handle = {0};
+    if (type != napi_null) {
+        js_icon *icon;
+        if (!icon_arg(env, v[3], app, &icon))
+            return NULL;
+        handle = icon->handle;
+    }
+    cui_bridge_status code = set(app->bridge, node->node, handle);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}

@@ -565,6 +565,7 @@ export const ResponsiveSkeleton: {new(key?: string, config?: SkeletonConfigInput
 export function responsive_skeleton(key?: string, config?: SkeletonConfigInput): ResponsiveSkeleton;
 export interface App {
   supports_skeleton_presentation(): boolean;
+  supports_spinner_icon_resource(): boolean;
   supports_spinner_presentation(): boolean;
   supports_pagination_custom_size(): boolean;
   supports_rating_options(): boolean;
@@ -937,6 +938,8 @@ export interface SpinnerPresentation {
   readonly phase: number;
 }
 export interface RotatingSpinner extends Node {
+  /** Mounted-only shared SVG artwork; null restores configured catalog artwork. */
+  set_icon_resource(resource: IconResource | null): this;
   configure(config: SpinnerConfigInput): this;
   get_config(): SpinnerConfig;
   presentation(): SpinnerPresentation | undefined;

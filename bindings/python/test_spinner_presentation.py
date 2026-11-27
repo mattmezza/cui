@@ -4,7 +4,7 @@ import unittest
 from dataclasses import FrozenInstanceError, replace
 from unittest.mock import patch
 from cui_bridge import (App, SpinnerConfig, SpinnerSize, SpinnerEasing, column,
-                        rotating_spinner, spinner, collapsible, BridgeError)
+                        rotating_spinner, spinner, collapsible, BridgeError, IconSource)
 
 class SpinnerTests(unittest.TestCase):
     def test_runtime(self):
@@ -32,6 +32,44 @@ class SpinnerTests(unittest.TestCase):
             self.assertEqual(node.presentation().phase, 0)
             node.remove()
             with self.assertRaises(RuntimeError): node.get_config()
+
+    def test_shared_svg_resource(self):
+        node = rotating_spinner('svg')
+        shared = rotating_spinner('shared')
+        with self.assertRaises(RuntimeError): node.set_icon_resource(None)
+        with App() as app, App() as other:
+            app.mount(column('root').children(node, shared)); app.step(.1)
+            if os.environ.get('CUI_EXPECT_SPINNER_ICON_UNSUPPORTED') == '1':
+                self.assertFalse(app.supports_spinner_icon_resource())
+                with self.assertRaisesRegex(RuntimeError, 'compatible bridge symbol group'):
+                    node.set_icon_resource(None)
+                self.assertIsNotNone(node.presentation())
+                return
+            self.assertTrue(app.supports_spinner_icon_resource())
+            source = IconSource.svg('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path d="M0 0h16v16H0z"/></svg>')
+            resource = app.icon_resource(source)
+            foreign = other.icon_resource(source)
+            before = node.presentation()
+            with self.assertRaises(ValueError): node.set_icon_resource(foreign)
+            with self.assertRaises(TypeError): node.set_icon_resource(object())
+            self.assertEqual(node.presentation(), before)
+            self.assertIs(node.set_icon_resource(resource), node)
+            shared.set_icon_resource(resource)
+            self.assertIsNone(node.presentation())
+            app.step(.1)
+            self.assertIsNotNone(node.presentation())
+            self.assertGreater(resource.bitmap().width, 0)
+            with self.assertRaises(BridgeError): resource.close()
+            app.step(.1)
+            self.assertIsNotNone(node.presentation())
+            self.assertIs(node.set_icon_resource(None), node)
+            with self.assertRaises(BridgeError): resource.close()
+            shared.set_icon_resource(None)
+            resource.close()
+            with self.assertRaises(RuntimeError): node.set_icon_resource(resource)
+            self.assertIsNone(node.presentation())
+            app.step(.1)
+            self.assertIsNotNone(node.presentation())
 
     def test_validation_atomicity(self):
         for fields in ({'pixels':1}, {'size':SpinnerSize.CUSTOM}, {'rem_size':float('nan')},
@@ -78,6 +116,19 @@ class SpinnerTests(unittest.TestCase):
             library=os.environ.get(name)
             if not library: self.skipTest(name+' not configured')
             with self.subTest(provider=name), App(library=library) as app: self.check_unsupported(app)
+
+    def test_icon_resource_wrong_version(self):
+        with App() as app:
+            if app._api.spinner_icon_resource is None:
+                self.skipTest('optional group absent in provider')
+            node = rotating_spinner('version')
+            app.mount(column('root').children(node))
+            with patch.object(app._api.spinner_icon_resource, 'icon_resource_versions', return_value=0):
+                self.assertFalse(app.supports_spinner_icon_resource())
+                with self.assertRaisesRegex(RuntimeError, 'compatible bridge symbol group'):
+                    node.set_icon_resource(None)
+            app.step()
+            self.assertIsNotNone(node.presentation())
 
     def test_wrong_abi(self):
         for name,value in (('versions',0),('config_size_v1',40),('presentation_size_v1',32)):

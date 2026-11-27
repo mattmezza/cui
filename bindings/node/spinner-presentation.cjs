@@ -34,7 +34,7 @@ function configValue(options) {
   return Object.freeze(config);
 }
 
-module.exports = function spinnerModule(native, Node, NODE) {
+module.exports = function spinnerModule(native, Node, NODE, icons) {
   function supports(app) {
     app._alive();
     return typeof native.spinnerPresentation === 'function' &&
@@ -65,6 +65,15 @@ module.exports = function spinnerModule(native, Node, NODE) {
       const config = configValue(options);
       if (this.owner) configure(this.owner, this, config);
       this[CONFIG] = config;
+      return this;
+    }
+
+    set_icon_resource(resource) {
+      if (!this.owner) throw new Error('rotating Spinner is not mounted');
+      if (!supportsResource(this.owner))
+        throw new Error('Spinner Icon resource V1 requires a complete, compatible bridge symbol group');
+      const handle = resource === null ? null : icons.liveHandle(resource, this.owner);
+      native.spinnerIconResource(this.owner.handle, 1, this[NODE], handle);
       return this;
     }
 
@@ -116,5 +125,11 @@ module.exports = function spinnerModule(native, Node, NODE) {
     if (node instanceof RotatingSpinner) configure(app, node, node[CONFIG]);
   }
 
-  return {exports: {RotatingSpinner, rotating_spinner}, supports, preflight, mount};
+  function supportsResource(app) {
+    app._alive();
+    return supports(app) && icons.supports(app) &&
+      typeof native.spinnerIconResource === 'function' && native.spinnerIconResource(app.handle, 0);
+  }
+
+  return {supportsResource, exports: {RotatingSpinner, rotating_spinner}, supports, preflight, mount};
 };

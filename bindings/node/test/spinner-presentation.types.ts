@@ -24,3 +24,8 @@ indicator.configure({easing:'bounce'});
 indicator.visual_size(20,20);
 // @ts-expect-error legacy Spinner has no copied presentation
 spinner('legacy').presentation();
+
+app.supports_spinner_icon_resource();
+indicator.set_icon_resource(app.icon_resource()).set_icon_resource(null);
+// @ts-expect-error resources must be owned IconResource objects
+indicator.set_icon_resource({});

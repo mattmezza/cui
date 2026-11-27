@@ -926,7 +926,7 @@ const localizedTimes = require('./time-field-localized.cjs')(native, Node, NODE,
 const icons = require('./icon-resources.cjs')(native);
 const iconBadges = require('./icon-badge.cjs')(native, Node, NODE, icons, designSizes);
 containers.add(iconBadges.badgeKind);
-const spinners = require('./spinner-presentation.cjs')(native, Node, NODE);
+const spinners = require('./spinner-presentation.cjs')(native, Node, NODE, icons);
 const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
 const paginationOptions = require('./pagination-options.cjs')(native, Node, NODE);
 const ratingOptions = require('./rating-options.cjs')(native, Node, NODE, icons, designSizes);
@@ -1276,6 +1276,7 @@ class App {
   supports_attachment_preview() { return attachments.supports(this,true); }
   supports_rating_options() { return ratingOptions.supports(this); }
   supports_pagination_options() { return paginationOptions.supports(this); }
+  supports_spinner_icon_resource() { return spinners.supportsResource(this); }
   supports_spinner_presentation() { return spinners.supports(this); }
   supports_skeleton_presentation() { return skeletons.supports(this); }
   supports_localized_time_field(){return localizedTimes.supports(this);}

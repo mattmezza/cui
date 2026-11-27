@@ -89,6 +89,15 @@ def bind_api(api, bind):
         "get_config_v1": (C.c_int, C.c_void_p, _Handle, C.POINTER(_Config)),
         "get_presentation_v1": (C.c_int, C.c_void_p, _Handle, C.POINTER(_Presentation)),
     }
+    resource_specs = {
+        "icon_resource_versions": (C.c_uint32,),
+        "set_icon_resource_v1": (C.c_int, C.c_void_p, _Handle, _Handle),
+        "get_icon_resource_v1": (C.c_int, C.c_void_p, _Handle, C.POINTER(_Handle)),
+    }
+    api.spinner_icon_resource = None
+    if all(hasattr(api.lib, "cui_bridge_spinner_" + name) for name in resource_specs):
+        api.spinner_icon_resource = SimpleNamespace(
+            **{name: bind("spinner_" + name, *spec) for name, spec in resource_specs.items()})
     api.spinner_presentation = None
     if all(hasattr(api.lib, "cui_bridge_spinner_" + name) for name in specs):
         api.spinner_presentation = SimpleNamespace(
@@ -101,6 +110,13 @@ def supported(app) -> bool:
     return bool(api is not None and api.versions() & 1
                 and api.config_size_v1() == C.sizeof(_Config) == 100
                 and api.presentation_size_v1() == C.sizeof(_Presentation) == 40)
+
+
+def resource_supported(app) -> bool:
+    app._ensure_open()
+    api = app._api.spinner_icon_resource
+    return bool(supported(app) and app.supports_icon_resources() and api is not None
+                and api.icon_resource_versions() & 1)
 
 
 def require_api(app):
@@ -134,6 +150,20 @@ class RotatingSpinner(Widget):
             status = require_api(app).configure_v1(app._ptr, self._handle, C.byref(wire))
             app._api.check(status)
         self._spinner_config = config
+        return self
+
+    def set_icon_resource(self, resource: "IconResource | None") -> RotatingSpinner:
+        """Bind same-app shared SVG artwork after mounting; None restores catalog artwork."""
+        from .icons import IconResource
+        if self._app is None:
+            raise RuntimeError("rotating Spinner is not mounted")
+        app = self._app
+        if not resource_supported(app):
+            raise RuntimeError("Spinner Icon resource V1 requires a complete, compatible bridge symbol group")
+        if resource is not None and not isinstance(resource, IconResource):
+            raise TypeError("expected IconResource or None")
+        handle = resource._live_handle(app) if resource is not None else _Handle()
+        app._api.check(app._api.spinner_icon_resource.set_icon_resource_v1(app._ptr, self._handle, handle))
         return self
 
     def get_config(self) -> SpinnerConfig:

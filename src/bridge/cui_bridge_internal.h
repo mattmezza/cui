@@ -196,8 +196,6 @@ struct cui_bridge_app {
     cui_bridge_node_record *nodes;
     uint32_t max_nodes, root;
     uint64_t next_id;
-    bool popover_anchor_requested;
-    cui_id dialog_focus_restore;
     uint64_t last_core_frame; /* Actual Core sequence captured inside bridge begin. */
     cui_bridge_event *events;
     cui_bridge_event_payload *event_payloads;
@@ -207,7 +205,6 @@ struct cui_bridge_app {
     bool stepping, closed;
     bool running, run_dispatching, destroy_requested;
     bool responsive_notifications;
-    double notification_wake_seconds;
     float width, height;
     double now_seconds;
     cui_notification_state *notifications;
@@ -224,6 +221,9 @@ struct cui_bridge_app {
     cui_bridge_pagination_config_v1 **pagination; /* Lazily copied per node. */
     bridge_data_table_owned *staged_table_load_more; /* Only during a step. */
     size_t data_table_capacity_bytes;                /* Committed opt-in matrices. */
+    cui_id dialog_focus_restore;
+    double notification_wake_seconds;
+    bool popover_anchor_requested;
 };
 /* Native functions are implemented only in the optional SDL bridge target. */
 cui_bridge_status cui_bridge_native_create(cui_bridge_app *, const char *, const char *,

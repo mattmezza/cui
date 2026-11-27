@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 import cui_bridge
-from cui_bridge import App, button, carousel, column, item, row
+from cui_bridge import App, button, carousel, column, item, kbd_stroke, row
 assert not os.environ.get("CUI_BRIDGE_LIBRARY")
 assert not os.environ.get("PYTHONPATH")
 backend = os.environ.get("CUI_PACKAGE_SMOKE_BACKEND", "none")
@@ -27,14 +27,20 @@ with App(**kwargs) as app:
     assert app.supports_disclosure_divider(), "installed bridge lacks disclosure dividers"
     assert app.supports_carousel_basis(), "installed bridge lacks fractional Carousel slides"
     assert app.supports_carousel_navigation(), "installed bridge lacks Carousel navigation"
+    assert app.supports_kbd_stroke(), "installed bridge lacks typed Kbd"
     changes = []
     overview = item("overview", "Overview").carousel_basis(0.5)
     activity = item("activity", "Activity").carousel_basis(0.5)
     settings = item("settings", "Settings").carousel_basis(0.5)
     slides = carousel("slides").visual_size(240, 100).children(overview, activity, settings)
     slides.on_change(changes.append)
-    app.mount(column().children(widget, slides))
+    hint = kbd_stroke("shortcut", "ß", modifiers=2, outline=True, accessible_name="Save shortcut")
+    reference = kbd_stroke("reference", "sS", modifiers=2, outline=True)
+    app.mount(column().children(widget, slides, hint, reference))
     app.step()
+    hint_width, hint_height = app.bounds(hint)[2:]
+    assert hint_width > 0 and hint_height > 0
+    assert (hint_width, hint_height) == tuple(app.bounds(reference)[2:])
     assert app.bounds(activity)[0] - app.bounds(overview)[0] == 128
     x, y, w, h = app.bounds(widget)
     assert w > 0 and h > 0

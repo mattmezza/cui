@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-alpha.13
 
 - Command searches UTF-8 labels and keywords using Unicode 17 lowercase and
   whitespace rules. Custom matching and raw query callbacks keep their contracts.

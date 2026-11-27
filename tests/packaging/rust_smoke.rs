@@ -14,6 +14,7 @@ fn main() -> Result<()> {
     assert!(app.supports_disclosure_divider(), "installed bridge lacks disclosure dividers");
     assert!(app.supports_carousel_basis(), "installed bridge lacks fractional Carousel slides");
     assert!(app.supports_carousel_navigation(), "installed bridge lacks Carousel navigation");
+    assert!(app.supports_kbd_stroke(), "installed bridge lacks typed Kbd");
     let root = app.build_root(Kind::Column,"root")?.finish();
     let clicked = Rc::new(Cell::new(0));
     let callback = clicked.clone();
@@ -26,7 +27,19 @@ fn main() -> Result<()> {
         .carousel_basis(0.5)?.finish();
     app.build_child(slides, Kind::Item, "settings")?.text("Settings")?
         .carousel_basis(0.5)?.finish();
+    let shortcut_style = KbdStrokeOptions {
+        modifiers: KbdModifiers::CTRL,
+        outline: true,
+        accessible_name: "Save shortcut".into(),
+        ..Default::default()
+    };
+    let hint = app.child_kbd_stroke(root, "shortcut", "ß", &shortcut_style)?;
+    let reference = app.child_kbd_stroke(root, "reference", "sS", &shortcut_style)?;
     app.step(0.016)?;
+    let expanded = app.bounds(hint)?;
+    let expected = app.bounds(reference)?;
+    assert!(expanded.width > 0. && expanded.height > 0.);
+    assert_eq!((expanded.width, expanded.height), (expected.width, expected.height));
     assert_eq!(app.bounds(activity)?.x - app.bounds(overview)?.x, 128.);
     let bounds = app.bounds(button)?;
     assert!(bounds.width > 0. && bounds.height > 0.);

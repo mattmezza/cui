@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.12**, with native starter and language assets. [Release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.12) |
 | Component coverage | **All 78 families have tested subsets. Zero families are fully verified.** |
 | Public website | Interactive WASM gallery and docs at alpha.12. The Pages deployment from `b36abbd8` served the exact release starter at publication. [Pages verification](https://github.com/mattmezza/cui/actions/runs/45905182265) |
-| Latest integrated work | Alpha.12 ships retained Carousel on both axes with wrapping, content sizing, custom controls and shared navigation events. Working source adds typed retained Kbd, Command selection reflow and Unicode Command search. |
+| Latest integrated work | Alpha.12 ships retained Carousel on both axes with wrapping, content sizing, custom controls and shared navigation events. The alpha.13 candidate adds typed retained Kbd, Command selection reflow and Unicode Command search. |
 | Packages | Alpha.12 GitHub assets and a verified public Go module. PyPI, npm and crates.io publication remain open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green

@@ -44,6 +44,9 @@ func main() {
 	if supported, err := app.SupportsCarouselNavigation(); err != nil || !supported {
 		panic(fmt.Sprintf("installed bridge lacks Carousel navigation: %v", err))
 	}
+	if supported, err := app.SupportsKbdStroke(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks typed Kbd: %v", err))
+	}
 	clicks := 0
 	button := cui.Button("save").Text("Save ✓").OnClick(func(cui.Event) { clicks++ })
 	overview := cui.Item("overview", "Overview").CarouselBasis(0.5)
@@ -52,11 +55,20 @@ func main() {
 	var changes []cui.Event
 	slides := cui.Carousel("slides").VisualSize(240, 100).Children(overview, activity, settings).
 		OnChange(func(event cui.Event) { changes = append(changes, event) })
-	if err := app.Mount(cui.Column("root").Children(button, slides)); err != nil {
+	shortcutStyle := cui.KbdStrokeOptions{Modifiers: cui.KbdCtrl, Outline: true, AccessibleName: "Save shortcut"}
+	hint := cui.KbdStroke("shortcut", "ß", shortcutStyle)
+	reference := cui.KbdStroke("reference", "sS", shortcutStyle)
+	if err := app.Mount(cui.Column("root").Children(button, slides, hint, reference)); err != nil {
 		panic(err)
 	}
 	if err := app.Step(.016); err != nil {
 		panic(err)
+	}
+	hintBounds, hintErr := app.Bounds(hint)
+	referenceBounds, referenceErr := app.Bounds(reference)
+	if hintErr != nil || referenceErr != nil || hintBounds.Width <= 0 || hintBounds.Height <= 0 ||
+		hintBounds.Width != referenceBounds.Width || hintBounds.Height != referenceBounds.Height {
+		panic("installed typed Kbd did not lay out Ctrl+SS")
 	}
 	a, firstErr := app.Bounds(overview)
 	b, secondErr := app.Bounds(activity)

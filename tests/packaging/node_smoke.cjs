@@ -21,13 +21,19 @@ assert.equal(app.supports_disclosure_divider(), true, 'installed bridge lacks di
 assert.equal(app.supportsVirtualListRows(), true, 'installed bridge lacks VirtualList live rows');
 assert.equal(app.supports_carousel_basis(), true, 'installed bridge lacks fractional Carousel slides');
 assert.equal(app.supports_carousel_navigation(), true, 'installed bridge lacks Carousel navigation');
+assert.equal(app.supportsKbdStroke(), true, 'installed bridge lacks typed Kbd');
 const changes = [];
 const overview = cui.item('overview', 'Overview').carousel_basis(0.5);
 const activity = cui.item('activity', 'Activity').carousel_basis(0.5);
 const settings = cui.item('settings', 'Settings').carousel_basis(0.5);
 const slides = cui.carousel('slides').visual_size(240, 100).children(overview, activity, settings)
   .on_change(event => changes.push(event.node));
-app.mount(cui.column().children(widget, slides)); app.step();
+const hint = cui.kbdStroke('shortcut', 'ß', {modifiers:2, outline:true, accessibleName:'Save shortcut'});
+const reference = cui.kbdStroke('reference', 'sS', {modifiers:2, outline:true});
+app.mount(cui.column().children(widget, slides, hint, reference)); app.step();
+const {width:hintWidth, height:hintHeight} = hint.bounds();
+assert(hintWidth > 0 && hintHeight > 0);
+assert.deepEqual([hintWidth, hintHeight], [reference.bounds().width, reference.bounds().height]);
 assert.equal(activity.bounds().x - overview.bounds().x, 128);
 const bounds = widget.bounds();
 assert(bounds.width > 0 && bounds.height > 0);

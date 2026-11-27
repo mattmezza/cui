@@ -443,7 +443,13 @@
           "symbols": [
             "cui_spinner_ex"
           ],
-          "note": "Python, JavaScript, TypeScript, Go and Rust expose optional retained Spinner V1 for catalog icons, copied settings and motion samples. Legacy builders remain usable with older providers. Arbitrary paint and easing callbacks remain immediate C, and retained raw SVG is unavailable."
+          "note": "Python, JavaScript, TypeScript, Go and Rust expose optional retained Spinner V1 for catalog icons, copied settings and motion samples. Legacy builders remain usable with older providers. Arbitrary paint and easing callbacks remain immediate C. Retained C supports shared Icon artwork."
+        },
+        {
+          "header": "include/cui/cui_bridge.h",
+          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "symbols": ["cui_bridge_spinner_set_icon_resource_v1", "cui_bridge_spinner_get_icon_resource_v1"],
+          "note": "The additive shared Icon resource accessors are currently C-only."
         }
       ]
     },

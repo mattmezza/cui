@@ -73,6 +73,132 @@ static pixel_stats inspect_pixels(cui_bridge_app *app, cui_bridge_rect rect) {
     return stats;
 }
 
+static const char blade_svg[] = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>"
+                                "<path d='M12 2 L20 14 L12 20 L6 13 L11 13 Z'/></svg>";
+static const char block_svg[] = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>"
+                                "<path d='M4 4 H20 V20 H4 Z'/></svg>";
+
+static cui_bridge_icon_handle_v1 artwork(cui_bridge_app *app, const char *svg) {
+    cui_bridge_icon_limits_v1 limits = {
+        .struct_size = sizeof limits, .schema_version = 1, .max_versions = 4};
+    cui_bridge_icon_handle_v1 handle;
+    assert(cui_bridge_icon_create_v1(app, &limits, &handle) == CUI_BRIDGE_OK);
+    assert(cui_bridge_icon_set_source_v1(app, handle, CUI_BRIDGE_ICON_DATA_V1, svg,
+                                         (uint32_t)strlen(svg)) == CUI_BRIDGE_OK);
+    return handle;
+}
+
+static cui_bridge_icon_info_v1 icon_info(cui_bridge_app *app, cui_bridge_icon_handle_v1 handle) {
+    cui_bridge_icon_info_v1 info = {.struct_size = sizeof info, .schema_version = 1};
+    assert(cui_bridge_icon_get_info_v1(app, handle, &info) == CUI_BRIDGE_OK);
+    return info;
+}
+
+static void test_shared_artwork(cui_bridge_options options) {
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK && cui_bridge_spinner_icon_resource_versions() == 1);
+    cui_bridge_node root = create(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root");
+    cui_bridge_node badge_icon = create(app, root, CUI_BRIDGE_ICON, "identity");
+    cui_bridge_node first = create(app, root, CUI_BRIDGE_SPINNER, "sync");
+    cui_bridge_node second = create(app, root, CUI_BRIDGE_SPINNER, "upload");
+    cui_bridge_icon_handle_v1 a = artwork(app, blade_svg);
+    cui_bridge_icon_handle_v1 b = artwork(app, block_svg);
+    const cui_bridge_icon_handle_v1 null = {0};
+
+    cui_bridge_icon_handle_v1 readback = {123, 456};
+    assert(cui_bridge_spinner_get_icon_resource_v1(app, first, &readback) == CUI_BRIDGE_EMPTY);
+    assert(readback.slot == 123 && readback.generation == 456);
+    assert(cui_bridge_spinner_set_icon_resource_v1(app, first, a) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_spinner_set_icon_resource_v1(app, root, a) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_spinner_get_icon_resource_v1(app, first, NULL) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    const cui_bridge_icon_options_v1 style = {.struct_size = sizeof style,
+                                              .schema_version = 1,
+                                              .size = CUI_ICON_CUSTOM,
+                                              .custom_size = 18};
+    assert(cui_bridge_icon_configure_node_v1(app, badge_icon, a, &style, NULL, 0) == CUI_BRIDGE_OK);
+    cui_bridge_spinner_config_v1 c = config_default();
+    c.size = CUI_BRIDGE_SPINNER_CUSTOM;
+    c.pixels = 32;
+    c.duration = 1;
+    c.easing = CUI_BRIDGE_SPINNER_LINEAR;
+    c.flags = CUI_BRIDGE_SPINNER_CUSTOM_COLOR;
+    c.rgba = UINT32_C(0xFF00FFFF);
+    strcpy(c.icon, "arrow-right");
+    assert(cui_bridge_spinner_configure_v1(app, first, &c) == CUI_BRIDGE_OK);
+    c.pixels = 24;
+    assert(cui_bridge_spinner_configure_v1(app, second, &c) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .125f) == CUI_BRIDGE_OK);
+    cui_bridge_rect rect = bounds(app, first, 32);
+    uint64_t catalog = inspect_pixels(app, rect).fingerprint;
+
+    assert(cui_bridge_spinner_set_icon_resource_v1(app, first, a) == CUI_BRIDGE_OK);
+    assert(cui_bridge_spinner_set_icon_resource_v1(app, second, a) == CUI_BRIDGE_OK);
+    assert(cui_bridge_spinner_get_icon_resource_v1(app, first, &readback) == CUI_BRIDGE_OK);
+    assert(readback.slot == a.slot && readback.generation == a.generation);
+    (void)sample(app, first, CUI_BRIDGE_EMPTY);
+    assert(icon_info(app, a).reference_count == 3);
+    assert(cui_bridge_icon_destroy_v1(app, a) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_step(app, 0) == CUI_BRIDGE_OK);
+    pixel_stats start = inspect_pixels(app, rect);
+    assert(start.magenta && start.fingerprint != catalog);
+    uint64_t identity = inspect_pixels(app, bounds(app, badge_icon, 18)).fingerprint;
+    assert(identity);
+
+    /* A single resource supplies three distinct painted variants per frame. */
+    for (unsigned i = 0; i < 90; i++) {
+        assert(cui_bridge_step(app, .013f) == CUI_BRIDGE_OK);
+        assert(inspect_pixels(app, rect).magenta);
+        assert(inspect_pixels(app, bounds(app, second, 24)).magenta);
+        assert(inspect_pixels(app, bounds(app, badge_icon, 18)).fingerprint == identity);
+        cui_bridge_icon_info_v1 info = icon_info(app, a);
+        assert(info.cache_versions >= 3 && info.cache_versions <= 4 && info.parse_count == 1);
+    }
+    assert(inspect_pixels(app, rect).fingerprint != start.fingerprint);
+    cui_bridge_spinner_presentation_v1 moving = sample(app, first, CUI_BRIDGE_OK);
+    assert(moving.phase > 0);
+    assert(cui_bridge_spinner_set_icon_resource_v1(app, first, a) == CUI_BRIDGE_OK);
+    assert(sample(app, first, CUI_BRIDGE_OK).frame_sequence == moving.frame_sequence);
+    assert(cui_bridge_spinner_set_icon_resource_v1(app, first, (cui_bridge_icon_handle_v1){0, 1}) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_spinner_set_icon_resource_v1(
+               app, first, (cui_bridge_icon_handle_v1){a.slot, a.generation + 1}) ==
+           CUI_BRIDGE_STALE_HANDLE);
+    assert(sample(app, first, CUI_BRIDGE_OK).phase == moving.phase);
+
+    assert(cui_bridge_spinner_set_icon_resource_v1(app, first, b) == CUI_BRIDGE_OK);
+    assert(icon_info(app, a).reference_count == 2 && icon_info(app, b).reference_count == 1);
+    assert(cui_bridge_step(app, 0) == CUI_BRIDGE_OK);
+    assert(sample(app, first, CUI_BRIDGE_OK).phase == moving.phase);
+    uint64_t block = inspect_pixels(app, rect).fingerprint;
+    assert(cui_bridge_icon_set_source_v1(app, b, CUI_BRIDGE_ICON_DATA_V1, blade_svg,
+                                         sizeof blade_svg - 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, 0) == CUI_BRIDGE_OK);
+    assert(icon_info(app, b).parse_count == 2 && inspect_pixels(app, rect).fingerprint != block);
+
+    const char missing[] = "app/missing.svg";
+    assert(cui_bridge_icon_set_source_v1(app, b, CUI_BRIDGE_ICON_PATH_V1, missing,
+                                         sizeof missing - 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, 0) == CUI_BRIDGE_OK);
+    (void)sample(app, first, CUI_BRIDGE_EMPTY);
+    (void)sample(app, second, CUI_BRIDGE_OK);
+    assert(icon_info(app, b).icon_error == CUI_ICON_NOT_FOUND);
+    assert(!inspect_pixels(app, rect).painted);
+    assert(cui_bridge_spinner_set_icon_resource_v1(app, first, null) == CUI_BRIDGE_OK);
+    assert(cui_bridge_icon_destroy_v1(app, b) == CUI_BRIDGE_OK);
+    assert(cui_bridge_spinner_get_icon_resource_v1(app, first, &readback) == CUI_BRIDGE_EMPTY);
+    assert(readback.slot == a.slot);
+    assert(cui_bridge_step(app, 0) == CUI_BRIDGE_OK);
+    assert(sample(app, first, CUI_BRIDGE_OK).phase == 0);
+
+    assert(cui_bridge_node_remove(app, second) == CUI_BRIDGE_OK);
+    assert(icon_info(app, a).reference_count == 1);
+    assert(cui_bridge_node_remove(app, badge_icon) == CUI_BRIDGE_OK);
+    assert(cui_bridge_icon_destroy_v1(app, a) == CUI_BRIDGE_OK);
+    cui_bridge_destroy(app);
+}
+
 int main(void) {
     cui_bridge_options options = {
         .struct_size = sizeof options,
@@ -199,4 +325,5 @@ int main(void) {
     cui_bridge_event event;
     assert(cui_bridge_poll_event(app, &event) == CUI_BRIDGE_EMPTY);
     cui_bridge_destroy(app);
+    test_shared_artwork(options);
 }

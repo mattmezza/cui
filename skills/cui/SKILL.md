@@ -550,7 +550,8 @@ decorative custom painting and finite easing turns, including reduced ease(0).
 Retained C and Python, JS/TS, Go and Rust offer an opt-in rotating catalog icon
 with copied size, color, easing and motion samples. Probe Spinner V1 for older
 providers. Ordinary Spinner builders keep the legacy eight-dot ring. Schedule
-only successful samples. Retained raw SVG and custom callbacks remain unavailable.
+only successful samples. Retained C can bind a same-app Icon resource for custom
+SVG. Custom callbacks remain immediate C.
 
 For hidden native windows, read `docs/BINDING_BUILDERS.md` section `Native window
 visibility` and the chosen Go/Rust guide. C SDL3 uses

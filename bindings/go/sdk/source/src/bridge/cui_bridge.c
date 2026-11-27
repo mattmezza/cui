@@ -6860,6 +6860,7 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
     app->last_core_frame = cui_frame_sequence(app->ui);
     if (app->icons)
         app->icons->presentation_frame = app->last_core_frame;
+    bridge_spinner_collect_icons(app);
     bridge_slider_begin(app);
     for (uint32_t i = 1; i <= app->max_nodes; i++)
         if (app->nodes[i].live && app->nodes[i].speech)

@@ -233,12 +233,42 @@ Dynamic consumers can probe `cui_bridge_spinner_versions` and both V1 size
 functions. Existing unconfigured Spinner builders keep their eight-dot ring,
 legacy visual size and Loading status. Configured nodes use the V1 size
 fields. Immediate C supports application paint and easing callbacks. The
-retained C route supports embedded catalog icons and two built-in easing curves.
-Raw SVG resources in this route, inherited Icon styling and broader host
-acceptance remain open. The
+retained C route supports embedded catalog icons, shared Icon resources and two
+built-in easing curves. Inherited Icon styling and broader host acceptance
+remain open. The
 [headless software check](../tests/unit/test_bridge_spinner.c) verifies real
 rotation pixels, sizing, color, reduced motion, omission, failure and handle
 reuse.
+
+### Supply your own SVG artwork in retained C
+
+Create an [Icon resource](ICON.md) in the same app, then bind it to a configured
+Spinner with `cui_bridge_spinner_set_icon_resource_v1`. You can set the resource
+from copied SVG data, a catalog key, or a path in its app-supplied asset map.
+The Spinner uses the SVG's alpha mask, tinted with the configured color or
+the theme's text color. For example, use the file-sync sample's setup to create
+and store one resource, then reuse it every time you show the loading indicator.
+
+```c
+status = cui_bridge_spinner_set_icon_resource_v1(app, spinner, artwork);
+/* Check status. After clearing the binding, the configured catalog icon returns. */
+status = cui_bridge_spinner_set_icon_resource_v1(app, spinner, (cui_bridge_icon_handle_v1){0});
+```
+
+Binding retains a reference. Clear, replace or remove the Spinner before
+destroying its resource. Replacing artwork keeps the motion clock. The query
+returns a copied handle while the resource is bound. You can read the original
+catalog key through the Spinner configuration query. Resource source updates
+appear on the next step. An artwork error leaves an empty square and no
+Spinner sample while other widgets continue drawing. After an unpainted
+frame the Spinner restarts its animation on the next successful paint.
+
+The bridge collects older raster variants before composing each frame. Several
+Spinners or regular Icons can share a resource. Leave cache room for the
+preceding active bitmap and all distinct size and transform variants drawn
+in one frame. Default limits are appropriate for ordinary control sizes.
+Dynamic consumers can check `cui_bridge_spinner_icon_resource_versions` and both
+accessors before opting in.
 
 ## Use Spinner from a language builder
 
@@ -292,4 +322,5 @@ with a separately installed bridge. The probe checks the complete V1 export
 group and both record sizes. Existing providers keep the ordinary Spinner.
 The rotating constructor's configuration, including color, size and icon, is
 subject to V1 validation. The builders support catalog icons and the built-in
-quadratic and linear curves. Use immediate C for custom paint or easing.
+quadratic and linear curves. Custom retained SVG is currently exposed in C.
+Use immediate C for custom paint or easing callbacks.

@@ -1744,6 +1744,24 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_bitmap_copy_v1(cui_bridge_app *
                                                                 unsigned char *, uint32_t capacity,
                                                                 uint32_t *required);
 
+/* Optional resource artwork for an already configured Spinner. Bit 0
+ * advertises both V1 accessors. A same-app Icon handle overrides the
+ * configured catalog key. Pass {0,0} to restore that key or the default
+ * Loader. The Spinner holds a reference until replacement, clear or removal.
+ * Actual changes clear its current sample and preserve its motion clock.
+ * Reads return EMPTY without a bound resource and leave output untouched on
+ * error. Call on the app owner thread outside step. After each successful
+ * frame begin, the bridge collects older raster variants on bound resources.
+ * Size the cache for the preceding active raster and this frame's variants.
+ * Artwork errors leave an empty square and no current sample. The next
+ * painted submission restarts motion after such a gap. */
+CUI_BRIDGE_API uint32_t cui_bridge_spinner_icon_resource_versions(void);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_spinner_set_icon_resource_v1(cui_bridge_app *,
+                                                                         cui_bridge_node,
+                                                                         cui_bridge_icon_handle_v1);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_spinner_get_icon_resource_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_icon_handle_v1 *);
+
 enum {
     CUI_BRIDGE_RATING_HALF_STEPS_V1 = 1u << 0,
     CUI_BRIDGE_RATING_HOVER_PREVIEW_V1 = 1u << 1,

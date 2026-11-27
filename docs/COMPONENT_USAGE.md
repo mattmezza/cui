@@ -510,9 +510,9 @@ API: `cui_skeleton`, `cui_loading_phase`, `cui_skeleton_options_default`, `cui_s
 
 **Interaction:** Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.
 
-**Usage:** Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Use optional rem or custom-pixel sizing, a custom SVG painter or finite turns from custom easing. Retained C and language builders can opt into a copied catalog icon, built-in easing, custom color and reduced motion.
+**Usage:** Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Use optional rem or custom-pixel sizing, a custom SVG painter or finite turns from custom easing. Retained builders offer copied catalog icons and motion settings. Retained C also accepts same-app Icon resources for custom SVG.
 
-API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loading_phase`, `cui_bridge_spinner_versions`, `cui_bridge_spinner_config_size_v1`, `cui_bridge_spinner_presentation_size_v1`, `cui_bridge_spinner_configure_v1`, `cui_bridge_spinner_get_config_v1`, `cui_bridge_spinner_get_presentation_v1`. [Public header](../include/cui/cui_content.h); [guide](SPINNER.md).
+API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loading_phase`, `cui_bridge_spinner_versions`, `cui_bridge_spinner_config_size_v1`, `cui_bridge_spinner_presentation_size_v1`, `cui_bridge_spinner_configure_v1`, `cui_bridge_spinner_get_config_v1`, `cui_bridge_spinner_get_presentation_v1`, `cui_bridge_spinner_icon_resource_versions`, `cui_bridge_spinner_set_icon_resource_v1`, `cui_bridge_spinner_get_icon_resource_v1`. [Public header](../include/cui/cui_content.h); [guide](SPINNER.md).
 
 ## Stepper
 

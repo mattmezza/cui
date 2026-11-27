@@ -24,6 +24,7 @@ typedef struct {
     cui_icon_limits limits;
     char *source;
     uint32_t source_bytes, source_kind, references, asset_count;
+    uint32_t spinner_references;
     uint64_t revision, native_source_reserved;
     bridge_icon_asset *assets;
 } bridge_icon_owned;

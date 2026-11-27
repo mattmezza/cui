@@ -25,11 +25,14 @@ typedef struct {
     cui_bridge_spinner_config_v1 config;
     cui_loading_motion motion;
     cui_bridge_spinner_presentation_v1 presentation;
+    cui_bridge_icon_handle_v1 artwork;
+    bridge_icon_owned *resource;
     bool sampled;
 } bridge_spinner_owned;
 
 struct bridge_spinner_app {
     bool step_ok;
+    uint32_t artwork_count;
     bridge_spinner_owned *nodes[];
 };
 
@@ -37,9 +40,19 @@ static bridge_spinner_owned *bridge_spinner_node(cui_bridge_app *app, uint32_t s
     return app->spinners ? app->spinners->nodes[slot] : NULL;
 }
 
+static void bridge_spinner_release_artwork(cui_bridge_app *app, bridge_spinner_owned *owned) {
+    if (owned->resource) {
+        owned->resource->references--;
+        owned->resource->spinner_references--;
+        app->spinners->artwork_count--;
+    }
+}
+
 static void bridge_spinner_remove(cui_bridge_app *app, uint32_t slot) {
-    if (app && app->spinners) {
-        free(app->spinners->nodes[slot]);
+    bridge_spinner_owned *owned = app ? bridge_spinner_node(app, slot) : NULL;
+    if (owned) {
+        bridge_spinner_release_artwork(app, owned);
+        free(owned);
         app->spinners->nodes[slot] = NULL;
     }
 }
@@ -62,6 +75,69 @@ static cui_bridge_status bridge_spinner_validate_node(cui_bridge_app *app, cui_b
     if (status != CUI_BRIDGE_OK)
         return status;
     return node->kind == CUI_BRIDGE_SPINNER ? CUI_BRIDGE_OK : CUI_BRIDGE_INVALID_STATE;
+}
+
+uint32_t cui_bridge_spinner_icon_resource_versions(void) {
+    return cui_bridge_icon_versions() & 1u;
+}
+
+cui_bridge_status cui_bridge_spinner_set_icon_resource_v1(cui_bridge_app *app, cui_bridge_node node,
+                                                          cui_bridge_icon_handle_v1 handle) {
+    cui_bridge_status status = bridge_spinner_validate_node(app, node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    bridge_spinner_owned *owned = bridge_spinner_node(app, node.slot);
+    if (!owned || !BRIDGE_SLIDER_SUPPORTED)
+        return CUI_BRIDGE_INVALID_STATE;
+    if ((!handle.slot) != (!handle.generation))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    bridge_icon_owned *resource = NULL;
+    if (handle.slot) {
+        status = bridge_icon_get(app, handle, &resource);
+        if (status != CUI_BRIDGE_OK)
+            return status;
+    }
+    if (resource == owned->resource)
+        return CUI_BRIDGE_OK;
+    bridge_spinner_release_artwork(app, owned);
+    owned->resource = resource;
+    owned->artwork = handle;
+    if (resource) {
+        resource->references++;
+        resource->spinner_references++;
+        app->spinners->artwork_count++;
+    }
+    owned->sampled = false;
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+
+cui_bridge_status cui_bridge_spinner_get_icon_resource_v1(cui_bridge_app *app, cui_bridge_node node,
+                                                          cui_bridge_icon_handle_v1 *out) {
+    cui_bridge_status status = bridge_spinner_validate_node(app, node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!out)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (!BRIDGE_SLIDER_SUPPORTED)
+        return CUI_BRIDGE_INVALID_STATE;
+    const bridge_spinner_owned *owned = bridge_spinner_node(app, node.slot);
+    if (!owned || !owned->resource)
+        return CUI_BRIDGE_EMPTY;
+    *out = owned->artwork;
+    return CUI_BRIDGE_OK;
+}
+
+/* Bridge draw lists are consumed synchronously by step. Collect before
+ * composing any node because several nodes may submit this same resource. */
+static void bridge_spinner_collect_icons(cui_bridge_app *app) {
+    if (!app->spinners || !app->spinners->artwork_count)
+        return;
+    for (uint32_t i = 0; i < app->icons->capacity; i++) {
+        bridge_icon_owned *resource = app->icons->slots[i].value;
+        if (resource && resource->spinner_references)
+            cui_icon_state_collect(&resource->state);
+    }
 }
 
 static bool bridge_spinner_valid_size(const cui_bridge_spinner_config_v1 *config) {
@@ -173,14 +249,17 @@ static float bridge_spinner_linear(float phase, void *user) {
 
 static bool bridge_spinner_paint_icon(cui_context *ui, cui_id id, const cui_theme *theme,
                                       float size, cui_color color, float radians, void *user) {
-    return cui_icon_named(ui, id, theme, cui_string(user),
-                          (cui_icon_options){.size = CUI_ICON_CUSTOM,
-                                             .custom_size = size,
-                                             .custom_color = true,
-                                             .color = color,
-                                             .custom_transform = true,
-                                             .transform = cui_icon_rotation(radians)}) ==
-           CUI_ICON_OK;
+    bridge_spinner_owned *owned = user;
+    cui_icon_options options = {.size = CUI_ICON_CUSTOM,
+                                .custom_size = size,
+                                .custom_color = true,
+                                .color = color,
+                                .custom_transform = true,
+                                .transform = cui_icon_rotation(radians)};
+    cui_icon_error error =
+        owned->resource ? cui_icon(ui, id, theme, &owned->resource->state, options)
+                        : cui_icon_named(ui, id, theme, cui_string(owned->config.icon), options);
+    return error == CUI_ICON_OK;
 }
 
 static void bridge_spinner_render(cui_bridge_app *app, cui_id id, bridge_spinner_owned *owned) {
@@ -198,8 +277,8 @@ static void bridge_spinner_render(cui_bridge_app *app, cui_id id, bridge_spinner
         .color = {(uint8_t)(rgba >> 24), (uint8_t)(rgba >> 16), (uint8_t)(rgba >> 8),
                   (uint8_t)rgba},
         .ease = config->easing == CUI_BRIDGE_SPINNER_LINEAR ? bridge_spinner_linear : NULL,
-        .paint = config->icon[0] ? bridge_spinner_paint_icon : NULL,
-        .paint_user = config->icon,
+        .paint = owned->resource || config->icon[0] ? bridge_spinner_paint_icon : NULL,
+        .paint_user = owned,
     };
     uint64_t frame = app->last_core_frame;
     cui_loading_motion motion = owned->motion;
@@ -207,7 +286,10 @@ static void bridge_spinner_render(cui_bridge_app *app, cui_id id, bridge_spinner
         motion = (cui_loading_motion){0};
     cui_loading_motion_result result;
     if (!cui_spinner_ex(app->ui, id, &app->theme, &motion, options, &result)) {
-        app->frame_error = CUI_BRIDGE_CORE_ERROR;
+        /* Like standalone Icon, broken resource artwork leaves its box
+         * empty and does not stop the rest of the app's frame. */
+        if (!owned->resource)
+            app->frame_error = CUI_BRIDGE_CORE_ERROR;
         return;
     }
     if (cui_frame_paint_enabled(app->ui)) {

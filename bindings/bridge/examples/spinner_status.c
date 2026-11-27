@@ -7,6 +7,7 @@
 typedef struct {
     cui_bridge_app *app;
     cui_bridge_node row, label, button, spinner;
+    cui_bridge_icon_handle_v1 icon;
 } sync_panel;
 
 static cui_bridge_status toggle_sync(sync_panel *panel) {
@@ -29,6 +30,9 @@ static cui_bridge_status toggle_sync(sync_panel *panel) {
         if (status != CUI_BRIDGE_OK)
             return status;
         status = cui_bridge_spinner_configure_v1(panel->app, panel->spinner, &config);
+        if (status == CUI_BRIDGE_OK)
+            status =
+                cui_bridge_spinner_set_icon_resource_v1(panel->app, panel->spinner, panel->icon);
         if (status != CUI_BRIDGE_OK) {
             (void)cui_bridge_node_remove(panel->app, panel->spinner);
             panel->spinner = (cui_bridge_node){0};
@@ -93,6 +97,13 @@ int main(int argc, char **argv) {
     cui_bridge_status status;
     sync_panel panel = {.app = cui_bridge_create(&options, &status)};
     CHECK(panel.app && status == CUI_BRIDGE_OK);
+    const char svg[] = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>"
+                       "<path d='M12 2 L20 14 L12 20 L6 13 L11 13 Z'/></svg>";
+    const cui_bridge_icon_limits_v1 icon_limits = {.struct_size = sizeof icon_limits,
+                                                   .schema_version = 1};
+    CHECK(cui_bridge_icon_create_v1(panel.app, &icon_limits, &panel.icon) == CUI_BRIDGE_OK);
+    CHECK(cui_bridge_icon_set_source_v1(panel.app, panel.icon, CUI_BRIDGE_ICON_DATA_V1, svg,
+                                        sizeof svg - 1) == CUI_BRIDGE_OK);
     cui_bridge_node root;
     CHECK(cui_bridge_node_create(panel.app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "file-sync",
                                  &root) == CUI_BRIDGE_OK);
@@ -117,6 +128,7 @@ int main(int argc, char **argv) {
               CUI_BRIDGE_OK);
         CHECK(sample.next_wake_seconds > sample.core_time);
         CHECK(smoke_click(&panel) && !panel.spinner.slot);
+        CHECK(cui_bridge_icon_destroy_v1(panel.app, panel.icon) == CUI_BRIDGE_OK);
     }
     cui_bridge_destroy(panel.app);
     return EXIT_SUCCESS;

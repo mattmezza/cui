@@ -168,7 +168,8 @@ def main():
         'Speech': 'cui_speech_state state = {0}; cui_speech_workspace workspace = {0}; cui_speech_recognizer recognizer = {0}; cui_speech_input input = {0}; cui_speech_event_fn on_event = 0; cui_speech_button_options options = {0}; cui_speech_waveform_options waveform = {0}; cui_id waveform_id = 0; double now = 0;',
         'Chart': 'cui_chart_options config = {0}; cui_chart_state state = {0};',
         'TextView': 'cui_text_view_state state = {0}; cui_text_view_workspace workspace = {0}; cui_str markdown = {0}; cui_text_view_options options = {0};',
-        'Root View': 'cui_root root = {0}; cui_root_plugin_instance plugins[1] = {0}; cui_root_registry registry = {0}; void *window = 0; cui_root_surface dialogs[2] = {0}; cui_notification_state notifications = {0}; cui_root_content_fn content = 0; cui_rect viewport = {0}; double now = 0;',
+        'Root View': 'cui_root root = {0}; cui_root_plugin_instance plugins[1] = {0}; cui_root_registry registry = {0}; void *window = 0; cui_root_surface dialogs[2] = {0}; cui_notification_state notifications = {0}; cui_root_content_fn content = 0; cui_rect viewport = {0}; double now = 0; '
+                     'cui_root_composed_dialog_v1 composed_dialog = {0}; cui_id trigger = 0;',
     }
     includes = '\n'.join(f'#include "cui/{path.name}"' for path in sorted((ROOT / 'include/cui').glob('*.h'))
                          if not path.stem.startswith(('cui_sdl', 'cui_sokol', 'cui_renderer', 'cui_software')))

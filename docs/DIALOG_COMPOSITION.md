@@ -1,4 +1,4 @@
-# Dialog composition V1 — focused C implementation
+# Dialog and AlertDialog composition in C
 
 This guide describes the additive C implementation originating in source
 checkpoint `138c3a39`, with the focused native proof and cache correction in
@@ -6,8 +6,9 @@ checkpoint `138c3a39`, with the focused native proof and cache correction in
 geometry/current-font software tests, owner actions and the complete example
 have been exercised locally. Configured distribution, canonical generated
 freshness, gallery/browser and wider compatibility checks are tracked separately;
-see the validation receipts before claiming a backend or full parity. Styled Root can mount these dialogs automatically. Native window-service
-integration and all five language composition facades remain unfinished. Use
+see the validation receipts for backend coverage. Styled Root can mount these
+dialogs automatically, and the retained C bridge exposes the same six slots.
+Native window-service integration and language composition facades remain open. Use
 headers, sources, SDK and generated resources from one matching revision.
 
 ## API and ownership
@@ -311,10 +312,8 @@ cleanup:
 ```
 
 For AlertDialog, initialize with `CUI_SURFACE_ALERT`, provide the desired Header
-and Footer callbacks, and omit Body when there are no children. This route does
-not introduce an automatic AlertDialog composition adapter. Existing
-`cui_alert_dialog`, `cui_surface_begin`/footer/end and their measured-height or
-fixed-height behavior stay unchanged.
+and Footer callbacks, and omit Body when there are no children. The legacy
+`cui_alert_dialog` and surface begin/footer/end helpers remain available.
 
 The intended source CMake consumer links `cui`, `cui_text` and `cui_software` from
 the same checkout (native text requires the repository's pinned/configured
@@ -345,3 +344,86 @@ consumer skill guidance; canonical SDK, amalgamation and skill generation; and
 meaningful configured source/distribution/offline-resource checks. Keep all78
 manifest entries. See the exact pending-gate receipt in
 [`dialog-six-slot-source-checkpoint.json`](validation/dialog-six-slot-source-checkpoint.json).
+
+## Compose a retained C dialog
+
+Create a `CUI_BRIDGE_DIALOG` or `CUI_BRIDGE_ALERT_DIALOG`, then opt in with
+`cui_bridge_dialog_configure_v1` while it is closed. The bridge copies configuration
+and owns each slot and descendant until removal. Create slots in any order. Add
+ordinary controls with `cui_bridge_node_create`, using the returned slot as the
+parent. Dialog's ordinary direct children share the scrollable Body with a named
+Body slot. Give the owner a text label and description for accessibility even
+when supplying visual Title and Description children.
+
+A custom Footer replaces AlertDialog's default Confirm and Cancel buttons.
+Mark direct Footer Buttons with `CUI_BRIDGE_DIALOG_ACTION_CONFIRM_V1`,
+`CUI_BRIDGE_DIALOG_ACTION_CANCEL_V1` or `CUI_BRIDGE_DIALOG_ACTION_CLOSE_V1`.
+Drain the ordinary Button click and the owner's typed `CUI_BRIDGE_NOTIFY_LIFECYCLE`
+from the same queue. Use the owner's `payload.surface_result` for the outcome
+and perform each side effect once. For app-controlled validation, use an
+ordinary Button and call `cui_bridge_set_open(app, dialog, 0)` after validation.
+A programmatic close reports `CUI_BRIDGE_SURFACE_CLOSED` on the next submitted
+step. Use the immediate C API when a synchronous decision callback is required.
+
+This headless example creates an AlertDialog with a short Body and an authored
+Footer. Save the program as `retained_dialog.c`.
+
+```c
+#include <assert.h>
+#include <cui/cui_bridge.h>
+
+int main(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_NONE,
+                                  .width = 640,
+                                  .height = 400};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root, alert, body, copy, footer, cancel, confirm;
+    assert(cui_bridge_node_create(app, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN,
+                                  "workspace", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_ALERT_DIALOG,
+                                  "remove-account", &alert) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, alert, "Remove this account?") == CUI_BRIDGE_OK);
+    cui_bridge_dialog_config_v1 layout = {.flags = CUI_BRIDGE_DIALOG_CENTERED_V1, .width = 360};
+    assert(cui_bridge_dialog_configure_v1(app, alert, sizeof layout, &layout) == CUI_BRIDGE_OK);
+    assert(cui_bridge_dialog_slot_create_v1(app, alert, CUI_BRIDGE_DIALOG_BODY_V1,
+                                           "body", &body) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, body, CUI_BRIDGE_LABEL, "details", &copy) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, copy, "Local preferences will be removed.") == CUI_BRIDGE_OK);
+    assert(cui_bridge_dialog_slot_create_v1(app, alert, CUI_BRIDGE_DIALOG_FOOTER_V1,
+                                           "actions", &footer) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, footer, CUI_BRIDGE_BUTTON, "cancel", &cancel) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, cancel, "Keep account") == CUI_BRIDGE_OK);
+    assert(cui_bridge_dialog_set_action_v1(app, cancel, CUI_BRIDGE_DIALOG_ACTION_CANCEL_V1) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, footer, CUI_BRIDGE_BUTTON, "confirm", &confirm) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, confirm, "Remove account") == CUI_BRIDGE_OK);
+    assert(cui_bridge_dialog_set_action_v1(app, confirm, CUI_BRIDGE_DIALOG_ACTION_CONFIRM_V1) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_open(app, alert, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, 0.016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect panel;
+    assert(cui_bridge_node_bounds(app, alert, &panel) == CUI_BRIDGE_OK && panel.width == 360);
+    cui_bridge_destroy(app);
+    return 0;
+}
+```
+
+Run from the matching source checkout on Linux.
+
+```sh
+cmake -S . -B build -G Ninja -DCUI_BUILD_BRIDGE=ON -DCUI_BUILD_NATIVE=OFF
+cmake --build build --target cui_bridge test_bridge_dialog_composition
+cc -std=c11 -Wall -Wextra -Werror -Iinclude retained_dialog.c -Lbuild \
+  -Wl,-rpath,"$PWD/build" -lcui_bridge -o build/retained_dialog
+build/retained_dialog
+python scripts/test_local.py --build-dir build -- -R '^bridge_dialog_composition$'
+```
+
+The test also exercises pointer and keyboard input, the fixed Footer while Body
+scrolls, nested Escape and focus restoration, removal and the legacy helpers.
+The retained C functions are versioned symbols in `cui_bridge.h`. The Python,
+JavaScript, TypeScript, Go and Rust builders still expose their legacy dialogs.

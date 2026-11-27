@@ -244,6 +244,15 @@
             "docs/ROOT.md"
           ],
           "scope": "Shared legacy and composed stack, current viewport, deferred top close and focus restoration in headless C. The gallery exercises a Root-managed Dialog with real touch. Retained language and native host services are outside this evidence."
+        },
+        {
+          "name": "six-slot retained C bridge composition and typed Footer actions",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_dialog_composition.c",
+            "docs/DIALOG_COMPOSITION.md"
+          ],
+          "scope": "Opt-in copied config, retained child handles, fixed Footer, queued CLOSE reasons and legacy behavior in C. Foreign builder wrappers and native host modal services remain open."
         }
       ],
       "upstream_doc": {
@@ -6346,6 +6355,15 @@
             "docs/ROOT.md"
           ],
           "scope": "Shared legacy and composed stack, current viewport, deferred top close and focus restoration in headless C. The gallery exercises a Root-managed Dialog with real touch. Retained language and native host services are outside this evidence."
+        },
+        {
+          "name": "six-slot retained C bridge composition and typed Footer actions",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_dialog_composition.c",
+            "docs/DIALOG_COMPOSITION.md"
+          ],
+          "scope": "Opt-in copied config, retained child handles, fixed Footer, queued CLOSE reasons and legacy behavior in C. Foreign builder wrappers and native host modal services remain open."
         }
       ],
       "upstream_doc": {

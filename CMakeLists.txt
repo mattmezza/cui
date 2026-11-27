@@ -2653,6 +2653,11 @@ target_link_libraries(test_bridge_popover PRIVATE cui)
 cui_warnings(test_bridge_popover)
 add_test(NAME bridge_popover COMMAND test_bridge_popover)
 
+add_executable(test_bridge_dialog_composition tests/unit/test_bridge_dialog_composition.c)
+target_link_libraries(test_bridge_dialog_composition PRIVATE cui)
+cui_warnings(test_bridge_dialog_composition)
+add_test(NAME bridge_dialog_composition COMMAND test_bridge_dialog_composition)
+
 add_executable(test_bridge_rating tests/unit/test_bridge_rating.c)
 target_link_libraries(test_bridge_rating PRIVATE cui)
 cui_warnings(test_bridge_rating)

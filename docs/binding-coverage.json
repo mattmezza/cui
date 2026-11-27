@@ -39,7 +39,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the six-slot C composition API, Root-managed composed dialogs, or the Core focus-scope input cancellation helper."
+        "The retained C bridge exposes named slots, sizing and typed Footer actions. Python, JavaScript, TypeScript, Go and Rust still expose the legacy surface subset. Immediate C slot callbacks, synchronous decisions, Root-managed composition and Core focus-scope input cancellation are unavailable in those builders."
       ]
     },
     {
@@ -780,7 +780,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the six-slot C composition API, Root-managed composed dialogs, or the Core focus-scope input cancellation helper."
+        "The retained C bridge exposes named slots, sizing and typed Footer actions. Python, JavaScript, TypeScript, Go and Rust still expose the legacy surface subset. Immediate C slot callbacks, synchronous decisions, Root-managed composition and Core focus-scope input cancellation are unavailable in those builders."
       ]
     },
     {

@@ -28,8 +28,8 @@ event layout, and functions are unchanged. New kinds are appended.
 | Select | `cui_select` | selected Item, change, disabled | Up to 64 Items; viewport is app surface |
 | ComboBox | `cui_combobox` | query edit model, selected Item, change, disabled | Up to 64 Items, 4096 UTF-8 query bytes |
 | DropdownButton | `cui_dropdown_button` | action click, selected menu Item, change, disabled | Up to 64 leaf menu actions |
-| Dialog | `cui_surface_begin` | open, close result, child body | Native modal surface |
-| AlertDialog | `cui_alert_dialog` | open, accept/cancel/close result | Native confirm/cancel content |
+| Dialog | `cui_surface_begin`, `cui_dialog_compose_v1` | open, close result, child body, optional six-slot layout in C | [Retained C composition](DIALOG_COMPOSITION.md#compose-a-retained-c-dialog) |
+| AlertDialog | `cui_alert_dialog`, `cui_dialog_compose_v1` | open, accept/cancel/close result, optional six-slot layout in C | [Retained C composition](DIALOG_COMPOSITION.md#compose-a-retained-c-dialog) |
 | Sheet | `cui_surface_begin` | open, close result, child body | Default right edge |
 | Popover | `cui_surface_begin`, `cui_popover_begin_with_outside_focus` | open, close result, anchor, child body, optional placement and focus | Anchor must be a live node. [Account menu and options](POPOVER_ANCHORS.md#retained-account-menu) |
 | Tooltip | `cui_tooltip` | native hover lifecycle, open/close change, disabled | Anchor must be a live node |

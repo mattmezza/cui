@@ -6,6 +6,7 @@
 #include "../core/cui_focus_entry_internal.h"
 #include "../core/cui_layout_bounds_internal.h"
 #include "../core/cui_text_paint_internal.h"
+#include "cui/cui_dialog_composition_styled.h"
 #include "cui/cui_kbd.h"
 #include "cui/cui_media.h"
 #include "cui/cui_message.h"
@@ -18,6 +19,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+struct bridge_dialog_owned {
+    cui_bridge_dialog_config_v1 config;
+    cui_dialog_layout_v1 layout;
+};
 struct bridge_text_view_owned {
     cui_text_view_state state;
     char *source, *rendered;
@@ -1229,6 +1234,8 @@ failed:
 static void bridge_free_node_resources(cui_bridge_node_record *node) {
     free(node->popover_config);
     node->popover_config = NULL;
+    free(node->dialog);
+    node->dialog = NULL;
     bridge_slider_remove(node->owner, node->own_slot);
     bridge_time_remove(node->owner, node->own_slot);
     bridge_skeleton_remove(node->owner, node->own_slot);
@@ -1854,7 +1861,11 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app);
 }
 /* Tags used only by the versioned factories. Attachment owns values 1–4. */
-enum { BRIDGE_NOTIFICATION_ACTION = 5, BRIDGE_CAROUSEL_SLOT_BASE = 8 };
+enum {
+    BRIDGE_NOTIFICATION_ACTION = 5,
+    BRIDGE_CAROUSEL_SLOT_BASE = 8,
+    BRIDGE_DIALOG_SLOT_BASE = 16
+};
 static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
                                             cui_bridge_kind kind, const char *key_utf8,
                                             uint32_t slot_tag, cui_bridge_node *out_node) {
@@ -1866,10 +1877,13 @@ static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node
     if (!out_node || kind < CUI_BRIDGE_ROW || kind > CUI_BRIDGE_SETTINGS)
         return CUI_BRIDGE_INVALID_ARGUMENT;
     bool root = parent.slot == 0 && parent.generation == 0;
-    uint32_t carousel_role =
-        slot_tag > BRIDGE_CAROUSEL_SLOT_BASE ? slot_tag - BRIDGE_CAROUSEL_SLOT_BASE : 0;
+    uint32_t dialog_role =
+        slot_tag > BRIDGE_DIALOG_SLOT_BASE ? slot_tag - BRIDGE_DIALOG_SLOT_BASE : 0;
+    uint32_t carousel_role = !dialog_role && slot_tag > BRIDGE_CAROUSEL_SLOT_BASE
+                                 ? slot_tag - BRIDGE_CAROUSEL_SLOT_BASE
+                                 : 0;
     bool notification_action = slot_tag == BRIDGE_NOTIFICATION_ACTION;
-    uint32_t attachment_role = carousel_role || notification_action ? 0 : slot_tag;
+    uint32_t attachment_role = carousel_role || notification_action || dialog_role ? 0 : slot_tag;
     cui_bridge_node_record *p = NULL;
     if (root) {
         if (app->root ||
@@ -1913,7 +1927,8 @@ static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node
             p->kind != CUI_BRIDGE_DOCK && p->kind != CUI_BRIDGE_SETTINGS &&
             p->kind != CUI_BRIDGE_BADGE_CONFIGURED &&
             !(p->kind == CUI_BRIDGE_ATTACHMENT && attachment_role) &&
-            !(p->kind == CUI_BRIDGE_NOTIFICATION && notification_action))
+            !(p->kind == CUI_BRIDGE_NOTIFICATION && notification_action) &&
+            !(p->kind == CUI_BRIDGE_ALERT_DIALOG && dialog_role))
             return CUI_BRIDGE_INVALID_STATE;
         if (p->kind == CUI_BRIDGE_ITEM && p->parent &&
             app->nodes[p->parent].kind == CUI_BRIDGE_ITEM &&
@@ -2068,6 +2083,8 @@ static cui_bridge_status bridge_node_create(cui_bridge_app *app, cui_bridge_node
         .kind = kind,
         .attachment_role = attachment_role,
         .carousel_slot_role = carousel_role,
+        .dialog_slot_role = (uint8_t)dialog_role,
+        .gap = dialog_role == CUI_BRIDGE_DIALOG_FOOTER_V1 ? 8 : 0,
         .owner = app,
         .own_slot = slot,
         .parent = root ? 0 : parent.slot,
@@ -2235,12 +2252,17 @@ cui_bridge_status cui_bridge_notification_action_create_v1(cui_bridge_app *app,
 }
 static void bridge_remove_subtree(cui_bridge_app *app, uint32_t slot) {
     cui_bridge_node_record *node = &app->nodes[slot];
-    if (node->popover_config) {
+    if (node->popover_config || node->dialog) {
         const cui_overlay *overlay = &node->surface_state.overlay;
-        if (overlay->open && cui_focus_within(app->ui, overlay->id))
+        if (overlay->open && cui_focus_within(app->ui, overlay->id)) {
             (void)cui_focus_restore(app->ui, overlay->trigger);
+            if (node->dialog)
+                app->dialog_focus_restore = overlay->trigger;
+        }
         cui_invalidate(app->ui);
     }
+    if (node->parent && app->nodes[node->parent].dialog)
+        cui_invalidate(app->ui);
     if (node->kind == CUI_BRIDGE_NOTIFICATION && app->notifications)
         for (size_t i = 0; i < app->notifications->count; i++)
             if (app->notifications->entries[i].notification.id.key == node->id) {
@@ -3463,6 +3485,10 @@ cui_bridge_status cui_bridge_set_open(cui_bridge_app *app, cui_bridge_node handl
             return CUI_BRIDGE_INVALID_STATE;
         if (open) {
             bool opening = !node->surface_state.overlay.open;
+            if (node->dialog)
+                return cui_dialog_open_v1(app->ui, &node->dialog->layout, 0)
+                           ? CUI_BRIDGE_OK
+                           : CUI_BRIDGE_CORE_ERROR;
             cui_surface_open(app->ui, &node->surface_state, node->popover_config ? anchor->id : 0);
             if (opening)
                 node->popover_focus_pending =
@@ -3543,6 +3569,99 @@ cui_bridge_status cui_bridge_set_anchor(cui_bridge_app *app, cui_bridge_node sur
     }
     return CUI_BRIDGE_OK;
 }
+_Static_assert(sizeof(cui_bridge_dialog_config_v1) == 20 &&
+                   offsetof(cui_bridge_dialog_config_v1, margin) == 16,
+               "Dialog config v1 wire layout");
+_Static_assert(CUI_BRIDGE_DIALOG_FOOTER_V1 == (int)CUI_DIALOG_SLOT_COUNT &&
+                   CUI_BRIDGE_DIALOG_ACTION_CLOSE_V1 == (int)CUI_DIALOG_CLOSE + 1,
+               "Bridge dialog role and action mapping");
+
+cui_bridge_status cui_bridge_dialog_configure_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                 uint32_t size,
+                                                 const cui_bridge_dialog_config_v1 *config) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_DIALOG && node->kind != CUI_BRIDGE_ALERT_DIALOG)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (!config && size == 0) {
+        if (!node->dialog)
+            return CUI_BRIDGE_OK;
+        if (node->surface_state.overlay.open)
+            return CUI_BRIDGE_INVALID_STATE;
+        for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
+            if (app->nodes[child].dialog_slot_role)
+                return CUI_BRIDGE_INVALID_STATE;
+        free(node->dialog);
+        node->dialog = NULL;
+    } else {
+        uint32_t allowed = CUI_BRIDGE_DIALOG_CENTERED_V1 | CUI_BRIDGE_DIALOG_NO_ESCAPE_DISMISS_V1 |
+                           CUI_BRIDGE_DIALOG_NO_OUTSIDE_DISMISS_V1 |
+                           CUI_BRIDGE_DIALOG_HIDE_CLOSE_V1;
+        if (node->kind == CUI_BRIDGE_ALERT_DIALOG)
+            allowed |=
+                CUI_BRIDGE_ALERT_DIALOG_SHOW_CLOSE_V1 | CUI_BRIDGE_ALERT_DIALOG_OUTSIDE_DISMISS_V1;
+        if (!config || size != sizeof(*config) || config->reserved || (config->flags & ~allowed) ||
+            !(config->width >= 0 && config->width <= 4096) ||
+            !(config->height >= 0 && config->height <= 4096) ||
+            !(config->margin >= 0 && config->margin <= 4096))
+            return CUI_BRIDGE_INVALID_ARGUMENT;
+        if (!node->dialog) {
+            if (node->surface_state.overlay.open)
+                return CUI_BRIDGE_INVALID_STATE;
+            bridge_dialog_owned *owned = malloc(sizeof *owned);
+            if (!owned)
+                return CUI_BRIDGE_OUT_OF_MEMORY;
+            if (!cui_dialog_layout_init_v1(&owned->layout, &node->surface_state)) {
+                free(owned);
+                return CUI_BRIDGE_CORE_ERROR;
+            }
+            node->dialog = owned;
+        }
+        node->dialog->config = *config;
+    }
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+
+cui_bridge_status cui_bridge_dialog_slot_create_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                   uint32_t role, const char *key,
+                                                   cui_bridge_node *out) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!node->dialog)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (role < CUI_BRIDGE_DIALOG_HEADER_V1 || role > CUI_BRIDGE_DIALOG_FOOTER_V1 || !out)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
+        if (app->nodes[child].dialog_slot_role == role)
+            return CUI_BRIDGE_INVALID_STATE;
+    cui_bridge_kind kind = role == CUI_BRIDGE_DIALOG_FOOTER_V1 ? CUI_BRIDGE_ROW : CUI_BRIDGE_COLUMN;
+    status = bridge_node_create(app, handle, kind, key, BRIDGE_DIALOG_SLOT_BASE + role, out);
+    if (status == CUI_BRIDGE_OK)
+        cui_invalidate(app->ui);
+    return status;
+}
+
+cui_bridge_status cui_bridge_dialog_set_action_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                  uint32_t action) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_BUTTON || !node->parent ||
+        app->nodes[node->parent].dialog_slot_role != CUI_BRIDGE_DIALOG_FOOTER_V1)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (action > CUI_BRIDGE_DIALOG_ACTION_CLOSE_V1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->dialog_action = (uint8_t)action;
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+
 _Static_assert(sizeof(cui_bridge_popover_config_v1) == 32 &&
                    offsetof(cui_bridge_popover_config_v1, reserved) == 28,
                "Popover config v1 wire layout");
@@ -3685,7 +3804,7 @@ cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *app, cui_bridge_node h
             app->nodes[ancestor].questionnaire &&
             app->nodes[ancestor].questionnaire->state.initialized)
             return CUI_BRIDGE_INVALID_STATE;
-    if (!node->attachment_role &&
+    if (!node->attachment_role && !node->dialog_slot_role && !node->dialog &&
         (node->kind < CUI_BRIDGE_BUTTON ||
          (node->kind > CUI_BRIDGE_SLIDER && node->kind != CUI_BRIDGE_INPUT &&
           node->kind != CUI_BRIDGE_TEXTAREA && node->kind != CUI_BRIDGE_NUMBER_INPUT &&
@@ -3712,7 +3831,8 @@ cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *app, cui_bridge_node h
     if (disabled > 1)
         return CUI_BRIDGE_INVALID_ARGUMENT;
     node->disabled = disabled != 0;
-    if (node->kind == CUI_BRIDGE_ATTACHMENT || node->attachment_role)
+    if (node->kind == CUI_BRIDGE_ATTACHMENT || node->attachment_role || node->dialog_slot_role ||
+        node->dialog)
         cui_invalidate(app->ui);
     if (node->disabled && node->data_table)
         bridge_data_table_clear_load_more(node->data_table);
@@ -6632,7 +6752,7 @@ static void bridge_render_questionnaire(cui_bridge_app *app, uint32_t slot,
     (void)slot;
 }
 static void bridge_render_button(cui_bridge_app *app, uint32_t slot, cui_bridge_node_record *node,
-                                 float width, bool disabled) {
+                                 float width, bool disabled, const cui_dialog_frame *dialog) {
     cui_button_options options = {.variant = (cui_button_variant)node->variant,
                                   .size = CUI_CONTROL_MEDIUM,
                                   .design_size = (cui_design_size)node->size,
@@ -6656,7 +6776,12 @@ static void bridge_render_button(cui_bridge_app *app, uint32_t slot, cui_bridge_
         else
             options.colors.hover = node->hover;
     }
-    (void)cui_button_ex(app->ui, node->id, &app->theme, cui_string(node->text), options);
+    cui_str label = cui_string(node->text);
+    if (dialog && node->dialog_action)
+        (void)cui_dialog_action_v1(app->ui, dialog, &app->theme, node->id, label,
+                                   (cui_dialog_action_kind)(node->dialog_action - 1), options);
+    else
+        (void)cui_button_ex(app->ui, node->id, &app->theme, label, options);
 }
 static void bridge_render_notification_action(void *user, float width) {
     cui_bridge_node_record *card = user;
@@ -6666,8 +6791,132 @@ static void bridge_render_notification_action(void *user, float width) {
     bool disabled = button->disabled;
     for (uint32_t ancestor = card->own_slot; ancestor; ancestor = app->nodes[ancestor].parent)
         disabled = disabled || app->nodes[ancestor].disabled;
-    bridge_render_button(app, slot, button, width, disabled);
+    bridge_render_button(app, slot, button, width, disabled, NULL);
     bridge_apply_shadows(app, button);
+}
+typedef struct {
+    cui_bridge_node_record *owner;
+    uint32_t slot;
+    cui_dialog_slot_kind role;
+} bridge_dialog_slot;
+
+static void bridge_render_dialog_slot(cui_context *ui, const cui_dialog_frame *frame, void *user) {
+    const bridge_dialog_slot *slot = user;
+    cui_bridge_node_record *owner = slot->owner;
+    cui_bridge_app *app = owner->owner;
+    bool previous = app->render_disabled;
+    app->render_disabled = previous || owner->disabled;
+    if (slot->role == CUI_DIALOG_BODY) {
+        /* Existing direct Dialog children and the named Body share one scroll viewport. */
+        for (uint32_t child = owner->first_child; child; child = app->nodes[child].next_sibling)
+            if (!app->nodes[child].dialog_slot_role || child == slot->slot) {
+                app->render_disabled = previous || owner->disabled ||
+                                       (child == slot->slot && app->nodes[child].disabled);
+                bridge_render_node(app, child);
+            }
+    } else if (slot->role != CUI_DIALOG_FOOTER) {
+        app->render_disabled |= app->nodes[slot->slot].disabled;
+        bridge_render_node(app, slot->slot);
+    } else if (slot->slot) {
+        cui_bridge_node_record *footer = &app->nodes[slot->slot];
+        bool disabled = app->render_disabled || footer->disabled;
+        cui_dialog_slot_style_v1 style;
+        float gap = footer->gap;
+        if (!gap && cui_dialog_slot_style_v1_get(frame, CUI_DIALOG_FOOTER, &style))
+            gap = style.gap;
+        cui_begin_box(ui, footer->id,
+                      (cui_box){.row = true, .gap = gap, .align_y = CUI_ALIGN_CENTER});
+        for (uint32_t child = footer->first_child; child; child = app->nodes[child].next_sibling) {
+            cui_bridge_node_record *button = &app->nodes[child];
+            app->render_disabled = disabled || !owner->surface_state.overlay.open;
+            if (button->dialog_action) {
+                bridge_render_button(app, child, button, 0,
+                                     app->render_disabled || button->disabled, frame);
+                bridge_apply_shadows(app, button);
+            } else {
+                bridge_render_node(app, child);
+            }
+        }
+        cui_end_box(ui);
+        bridge_apply_shadows(app, footer);
+    } else {
+        cui_id id = owner->surface_state.overlay.id;
+        (void)cui_dialog_action_v1(
+            ui, frame, &app->theme, cui_surface_part_id(id, 3), cui_string("Cancel"),
+            CUI_DIALOG_CANCEL,
+            (cui_button_options){.variant = CUI_BUTTON_OUTLINE, .disabled = app->render_disabled});
+        (void)cui_dialog_action_v1(
+            ui, frame, &app->theme, cui_surface_part_id(id, 2), cui_string("Confirm"),
+            CUI_DIALOG_CONFIRM,
+            (cui_button_options){.variant = CUI_BUTTON_DANGER, .disabled = app->render_disabled});
+    }
+    app->render_disabled = previous;
+}
+
+static void bridge_render_composed_dialog(cui_bridge_app *app, cui_bridge_node_record *node,
+                                          cui_surface_options options, cui_str title,
+                                          cui_str detail) {
+    if (!node->surface_state.overlay.open)
+        return;
+    const cui_bridge_dialog_config_v1 *config = &node->dialog->config;
+    uint32_t flags = config->flags;
+    options.margin = fminf(config->margin > 0 ? config->margin : 16,
+                           fminf(options.viewport.w, options.viewport.h) * .49f);
+    options.hide_close = node->disabled || (flags & CUI_BRIDGE_DIALOG_HIDE_CLOSE_V1);
+    options.no_escape_dismiss = node->disabled || (flags & CUI_BRIDGE_DIALOG_NO_ESCAPE_DISMISS_V1);
+    options.no_outside_dismiss =
+        node->disabled || (flags & CUI_BRIDGE_DIALOG_NO_OUTSIDE_DISMISS_V1);
+    options.show_alert_close = (flags & CUI_BRIDGE_ALERT_DIALOG_SHOW_CLOSE_V1) != 0;
+    options.alert_outside_dismiss = (flags & CUI_BRIDGE_ALERT_DIALOG_OUTSIDE_DISMISS_V1) != 0;
+    options.layer = 100;
+    for (uint32_t parent = node->parent; parent; parent = app->nodes[parent].parent)
+        if (app->nodes[parent].kind == CUI_BRIDGE_DIALOG ||
+            app->nodes[parent].kind == CUI_BRIDGE_ALERT_DIALOG)
+            options.layer += 2;
+    cui_dialog_sizing_v1 sizing;
+    if (!cui_dialog_sizing_default_v1(options, &sizing)) {
+        app->frame_error = CUI_BRIDGE_CORE_ERROR;
+        return;
+    }
+    if (config->width > 0)
+        sizing.width = config->width;
+    if (config->height > 0) {
+        sizing.mode = CUI_SCROLL_BODY_EXPLICIT;
+        sizing.requested_height =
+            fminf(sizing.max_height, fmaxf(sizing.min_height, config->height));
+    }
+    if (flags & CUI_BRIDGE_DIALOG_CENTERED_V1)
+        sizing.placement = CUI_DIALOG_CENTERED;
+
+    cui_dialog_composition_v1 content = {.struct_size = sizeof content,
+                                         .version = CUI_DIALOG_COMPOSITION_VERSION_1,
+                                         .name = title,
+                                         .description = detail};
+    cui_dialog_refinement_v1 alert_style = {.struct_size = sizeof alert_style,
+                                            .version = CUI_DIALOG_COMPOSITION_VERSION_1};
+    if (node->kind == CUI_BRIDGE_ALERT_DIALOG) {
+        content.present |= 1u << CUI_DIALOG_FOOTER;
+        alert_style.slots[CUI_DIALOG_FOOTER] = (cui_dialog_slot_style_v1){
+            .fields = CUI_DIALOG_STYLE_ALIGN_X, .align_x = CUI_ALIGN_CENTER};
+        content.refinement = &alert_style;
+    }
+    bridge_dialog_slot slots[CUI_DIALOG_SLOT_COUNT] = {0};
+    for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {
+        uint32_t role = app->nodes[child].dialog_slot_role;
+        if (role)
+            slots[role - 1].slot = child;
+        content.present |= 1u << (role ? role - 1 : CUI_DIALOG_BODY);
+    }
+    for (unsigned i = 0; i < CUI_DIALOG_SLOT_COUNT; ++i)
+        if (content.present & (1u << i)) {
+            slots[i].owner = node;
+            slots[i].role = (cui_dialog_slot_kind)i;
+            content.slots[i] = (cui_dialog_slot){bridge_render_dialog_slot, &slots[i]};
+        }
+    cui_dialog_submit_result result = cui_dialog_compose_v1(
+        app->ui, &app->theme, &node->dialog->layout, options, &sizing, &content);
+    if (!result.valid)
+        app->frame_error = CUI_BRIDGE_CORE_ERROR;
 }
 static void bridge_render_surface(cui_bridge_app *app, uint32_t slot,
                                   cui_bridge_node_record *node) {
@@ -6678,7 +6927,9 @@ static void bridge_render_surface(cui_bridge_app *app, uint32_t slot,
     cui_bridge_node_record *anchor = bridge_node(app, node->anchor);
     const cui_bridge_popover_config_v1 *config = node->popover_config;
     bool admitted = false;
-    if (config) {
+    if (node->dialog) {
+        bridge_render_composed_dialog(app, node, options, title, detail);
+    } else if (config) {
         if (anchor) {
             if (anchor->popover_bounds_frame == app->last_core_frame - 1)
                 options.anchor = anchor->tracked_popover_anchor;
@@ -7221,7 +7472,7 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
             bridge_change(app, slot);
         }
     } else {
-        bridge_render_button(app, slot, node, 0, node->disabled);
+        bridge_render_button(app, slot, node, 0, node->disabled, NULL);
     }
     if (cui_bridge_box_shadows_supported_v1(node->kind))
         bridge_apply_shadows(app, node);
@@ -7330,6 +7581,12 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
             app->notification_wake_seconds = advance.next_wake_seconds;
     }
     bridge_link_popovers(app);
+    if (app->dialog_focus_restore) {
+        /* Beginning the frame may have redirected focus into the old modal
+         * snapshot. Restore after submitting the tree without the removed owner. */
+        (void)cui_focus_restore(app->ui, app->dialog_focus_restore);
+        app->dialog_focus_restore = 0;
+    }
     cui_draw_list list = cui_end_frame(app->ui);
     status = cui_last_error(app->ui) == CUI_OK ? CUI_BRIDGE_OK : CUI_BRIDGE_CORE_ERROR;
     if (status == CUI_BRIDGE_OK)
@@ -7438,8 +7695,9 @@ cui_bridge_status cui_bridge_node_bounds(cui_bridge_app *app, cui_bridge_node ha
         app->nodes[node->parent].kind == CUI_BRIDGE_TREE)
         id = cui_tree_row_id(app->nodes[node->parent].id, node->id);
     cui_rect rect;
-    if (node->popover_config) {
-        if (!cui_core_completed_box_bounds(app->ui, node->surface_state.overlay.id, &rect))
+    if (node->popover_config || node->dialog) {
+        if ((node->dialog && !node->surface_state.overlay.open) ||
+            !cui_core_completed_box_bounds(app->ui, node->surface_state.overlay.id, &rect))
             return CUI_BRIDGE_INVALID_STATE;
     } else {
         rect = cui_bounds(app->ui, id);

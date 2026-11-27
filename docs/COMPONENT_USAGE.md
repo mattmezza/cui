@@ -119,11 +119,11 @@ Additional event includes: `cui/cui_disclosure_events.h`.
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains cui_surface_state, cui_dialog_layout_v1 and child data through end_frame; callback tokens are borrowed only during the active callback.
+**State:** Immediate C retains surface, layout and child data through end_frame and borrows the frame token during the active callback. The retained bridge owns copied options and child handles.
 
-**Interaction:** cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.
+**Interaction:** In immediate C, cui_surface_decision_fn can veto close and cui_surface_closed_fn observes closure. Retained Footer actions queue a Button click followed by the owner close result.
 
-**Usage:** Retain surface and layout, then use cui_dialog_compose_v1 or its Base counterpart for six independent slots and current-frame sizing. Alternatively register the styled composition with cui_root_dialog_open_composed_v1 and let Root submit it. Keep storage through end_frame and through mounted ownership. Language slot builders and native window services remain separate.
+**Usage:** Retain surface and layout, then use cui_dialog_compose_v1 or its Base counterpart for six independent slots and current-frame sizing. Alternatively register the styled composition with cui_root_dialog_open_composed_v1 and let Root submit it. Keep storage through end_frame and through mounted ownership. For retained C, configure the owner with cui_bridge_dialog_configure_v1, create containers with cui_bridge_dialog_slot_create_v1, and assign typed Footer actions with cui_bridge_dialog_set_action_v1. Language slot builders and native window services remain open.
 
 API: `cui_surface_init`, `cui_alert_dialog`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
 
@@ -877,11 +877,11 @@ API: `cui_description_list`. [Public header](../include/cui/cui_description.h); 
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains cui_surface_state, cui_dialog_layout_v1 and child data through end_frame; callback tokens are borrowed only during the active callback.
+**State:** Immediate C retains surface, layout and child data through end_frame and borrows the frame token during the active callback. The retained bridge owns copied options and child handles.
 
-**Interaction:** cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.
+**Interaction:** In immediate C, cui_surface_decision_fn can veto close and cui_surface_closed_fn observes closure. Retained Footer actions queue a Button click followed by the owner close result.
 
-**Usage:** Retain surface and layout, then use cui_dialog_compose_v1 or its Base counterpart for six independent slots and current-frame sizing. Alternatively register the styled composition with cui_root_dialog_open_composed_v1 and let Root submit it. Keep storage through end_frame and through mounted ownership. Language slot builders and native window services remain separate.
+**Usage:** Retain surface and layout, then use cui_dialog_compose_v1 or its Base counterpart for six independent slots and current-frame sizing. Alternatively register the styled composition with cui_root_dialog_open_composed_v1 and let Root submit it. Keep storage through end_frame and through mounted ownership. For retained C, configure the owner with cui_bridge_dialog_configure_v1, create containers with cui_bridge_dialog_slot_create_v1, and assign typed Footer actions with cui_bridge_dialog_set_action_v1. Language slot builders and native window services remain open.
 
 API: `cui_surface_init`, `cui_surface_begin`, `cui_surface_end`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
 

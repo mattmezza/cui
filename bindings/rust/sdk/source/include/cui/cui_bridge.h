@@ -1391,6 +1391,60 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_get_open(cui_bridge_app *, cui_bridg
                                                      uint32_t *out_open);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_anchor(cui_bridge_app *, cui_bridge_node surface,
                                                        cui_bridge_node anchor);
+/* Optional composed layout for retained Dialog and AlertDialog. */
+enum {
+    CUI_BRIDGE_DIALOG_CENTERED_V1 = 1u << 0,
+    CUI_BRIDGE_DIALOG_NO_ESCAPE_DISMISS_V1 = 1u << 1,
+    CUI_BRIDGE_DIALOG_NO_OUTSIDE_DISMISS_V1 = 1u << 2,
+    CUI_BRIDGE_DIALOG_HIDE_CLOSE_V1 = 1u << 3,
+    CUI_BRIDGE_ALERT_DIALOG_SHOW_CLOSE_V1 = 1u << 4,
+    CUI_BRIDGE_ALERT_DIALOG_OUTSIDE_DISMISS_V1 = 1u << 5
+};
+typedef struct {
+    uint32_t flags, reserved;
+    float width, height, margin;
+} cui_bridge_dialog_config_v1;
+typedef enum {
+    CUI_BRIDGE_DIALOG_HEADER_V1 = 1,
+    CUI_BRIDGE_DIALOG_TITLE_V1,
+    CUI_BRIDGE_DIALOG_DESCRIPTION_V1,
+    CUI_BRIDGE_DIALOG_CONTENT_V1,
+    CUI_BRIDGE_DIALOG_BODY_V1,
+    CUI_BRIDGE_DIALOG_FOOTER_V1
+} cui_bridge_dialog_slot_v1;
+typedef enum {
+    CUI_BRIDGE_DIALOG_ACTION_NONE_V1 = 0,
+    CUI_BRIDGE_DIALOG_ACTION_CONFIRM_V1,
+    CUI_BRIDGE_DIALOG_ACTION_CANCEL_V1,
+    CUI_BRIDGE_DIALOG_ACTION_CLOSE_V1
+} cui_bridge_dialog_action_v1;
+/* Copies a 20-byte v1 record between steps. Dimensions are finite in
+ * [0,4096] logical units. Zero selects width 420, automatic height and
+ * margin 16. Positive sizes are bounded by the viewport and the panel's
+ * minimum height. The default placement is near the top. AlertDialog's
+ * close icon and outside dismissal are opt-in. Enable/clear composition
+ * while closed. NULL with size 0 clears only after removing named slots.
+ * Reconfiguring an already composed dialog is allowed while open. Disabling
+ * the owner disables its children and implicit dismiss controls; set_open
+ * can still request closure. Removing an open owner retires it without CLOSE. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_dialog_configure_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t config_size, const cui_bridge_dialog_config_v1 *);
+/* Create one container per role on a configured owner. Header, Title,
+ * Description and Content precede the scrolling Body. Footer stays below
+ * it. Ordinary direct Dialog children share Body in insertion order.
+ * Title/Description slots replace the visible text fallback. An AlertDialog
+ * without a Footer slot retains its default Confirm and Cancel buttons. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_dialog_slot_create_v1(cui_bridge_app *, cui_bridge_node,
+                                                                  uint32_t role,
+                                                                  const char *key_utf8,
+                                                                  cui_bridge_node *out);
+/* Mark a Button directly under Footer as a typed close action. Activation
+ * queues its ordinary click, reduces the owner once, then queues the CLOSE
+ * result after submission. NONE restores ordinary Button behavior. To gate
+ * dismissal on application validation, use an ordinary Button and set_open
+ * after accepting its event. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_dialog_set_action_v1(cui_bridge_app *, cui_bridge_node,
+                                                                 uint32_t action);
 /* Positions name the Popover's own anchor. Top opens below its trigger,
  * Bottom above, LeftCenter to the right, and RightCenter to the left. */
 typedef enum {

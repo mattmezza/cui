@@ -632,6 +632,12 @@ Use `cui_root_dialog_open_composed_v1` for Root-managed six-slot Dialogs and
 AlertDialogs in styled C. Keep the borrowed descriptor and layout until Root
 observes closure and the frame ends. See
 `docs/ROOT.md#mount-a-composed-dialog-or-alertdialog`.
+For retained C, use `cui_bridge_dialog_configure_v1`,
+`cui_bridge_dialog_slot_create_v1` and `cui_bridge_dialog_set_action_v1` between
+steps. A typed Footer Button queues a click and an owner CLOSE notification.
+Use an ordinary Button for app validation before `set_open(false)`. See
+`docs/DIALOG_COMPOSITION.md#compose-a-retained-c-dialog`. The five language
+builders still use the legacy modal subset.
 
 For a pinned navigation header/footer with body-only scrolling, use
 `cui_sidebar` with a persistent measurement cache. Tab and accessibility focus

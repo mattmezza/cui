@@ -43,6 +43,7 @@ typedef struct bridge_rating_configured bridge_rating_configured;
 typedef struct bridge_disclosure_headings bridge_disclosure_headings;
 typedef struct bridge_disclosure_titles bridge_disclosure_titles;
 typedef struct bridge_kbd_owned bridge_kbd_owned;
+typedef struct bridge_dialog_owned bridge_dialog_owned;
 typedef enum {
     BRIDGE_STEPPER_BUTTONS,
     BRIDGE_STEPPER_FIXED,
@@ -96,6 +97,8 @@ typedef struct {
     cui_choice_popup choice_popup;
     cui_menu_tree_state menu_state;
     cui_surface_state surface_state;
+    bridge_dialog_owned *dialog;
+    uint8_t dialog_slot_role, dialog_action;
     cui_bridge_node anchor;
     cui_bridge_popover_config_v1 *popover_config;
     cui_rect tracked_popover_anchor;
@@ -193,6 +196,7 @@ struct cui_bridge_app {
     uint32_t max_nodes, root;
     uint64_t next_id;
     bool popover_anchor_requested;
+    cui_id dialog_focus_restore;
     uint64_t last_core_frame; /* Actual Core sequence captured inside bridge begin. */
     cui_bridge_event *events;
     cui_bridge_event_payload *event_payloads;

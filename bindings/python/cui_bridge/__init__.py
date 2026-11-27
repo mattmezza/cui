@@ -15,6 +15,8 @@ from pathlib import Path
 from threading import current_thread
 from typing import Callable, ClassVar, Iterable, Iterator, Literal
 
+from .kbd_style import KbdStyleWire, style_wire
+
 from .radio_paint import RadioPaint, RadioPaintLayer, bind_radio_paint, radio_paint_wire
 
 _DATA_TABLE_LEGACY_ROWS = 32
@@ -187,6 +189,9 @@ class _API:
         if hasattr(lib, "cui_bridge_radio_item_set_content_v1"):
             self.radio_item_set_content = bind("radio_item_set_content_v1", C.c_int,
                                                C.c_void_p, _Handle, C.c_uint32)
+        self.set_kbd_style = None
+        if hasattr(lib, "cui_bridge_set_kbd_style_v1"):
+            self.set_kbd_style = bind("set_kbd_style_v1", C.c_int, C.c_void_p, _Handle, C.POINTER(KbdStyleWire))
         self.set_kbd_stroke = None
         if hasattr(lib, "cui_bridge_set_kbd_stroke_v1"):
             self.set_kbd_stroke = bind("set_kbd_stroke_v1", C.c_int, C.c_void_p, _Handle,
@@ -581,6 +586,7 @@ class Widget:
         self._radio_paints: dict[RadioPaintLayer, RadioPaint] | None = None
         self._radio_content = False
         self._kbd_stroke = None
+        self._kbd_style = None
         self._radio_tooltip: tuple[bytes, int] | None = None
         self._detail = ""
         self._open = False
@@ -624,6 +630,18 @@ class Widget:
         self._app: App | None = None
         self._handle: _Handle | None = None
         self._disposed = False
+
+    def kbd_style(self, style=None) -> "Widget":
+        """Replace retained Kbd styling; None restores defaults."""
+        if self.kind != "kbd" or self._disposed:
+            raise ValueError("kbd_style requires a live Kbd")
+        wire = style_wire(style)
+        if self._app is not None and (wire is not None or self._kbd_style is not None):
+            if not self._app.supports_kbd_style():
+                raise RuntimeError("Kbd style requires cui_bridge_set_kbd_style_v1")
+            self._change("set_kbd_style", C.byref(wire) if wire is not None else None)
+        self._kbd_style = wire
+        return self
 
     def _change(self, name: str, *args) -> None:
         if self._disposed:
@@ -2325,6 +2343,10 @@ class App:
         if not self.supports_radio_item_content():
             raise RuntimeError("Radio decoration requires cui_bridge_radio_item_set_content_v1")
 
+    def supports_kbd_style(self) -> bool:
+        self._ensure_open()
+        return self._api.set_kbd_style is not None
+
     def supports_kbd_stroke(self) -> bool:
         """Report whether the loaded bridge can format typed shortcut hints."""
         self._ensure_open()
@@ -2426,6 +2448,8 @@ class App:
                 node._preflight_rating(self)
             if isinstance(node, Pagination):
                 node._preflight_pagination(self)
+            if node._kbd_style is not None and not self.supports_kbd_style():
+                raise RuntimeError("Kbd style requires cui_bridge_set_kbd_style_v1")
             if node._kbd_stroke is not None and not self.supports_kbd_stroke():
                 raise RuntimeError("Typed Kbd requires cui_bridge_set_kbd_stroke_v1")
             if node._stepper_fill is not None:
@@ -2565,6 +2589,8 @@ class App:
                     node._change("radio_item_set_content", 1)
                 if node._kbd_stroke is not None:
                     node._change("set_kbd_stroke", *node._kbd_stroke)
+                if node._kbd_style is not None:
+                    node._change("set_kbd_style", C.byref(node._kbd_style))
                 if node._radio_tooltip is not None:
                     node._change("radio_set_tooltip", *node._radio_tooltip)
                 if node.kind in {"slider", "number_input"}:

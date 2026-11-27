@@ -50,6 +50,11 @@ typedef struct {
  * false before submission. Use Core's named box API to add shadows after it. */
 bool cui_kbd_styled(cui_context *, cui_id, const cui_theme *, cui_kbd_stroke, cui_kbd_options,
                     const cui_kbd_style *);
+/* Style a passive literal hint using the same box, typography and paint as a
+ * typed hint. Text must be valid UTF-8 and is used as the accessible name.
+ * NULL fields keep the literal pill's themed border, fill and typography. */
+bool cui_kbd_label_styled(cui_context *, cui_id, const cui_theme *, cui_str label,
+                          const cui_kbd_style *);
 #ifdef __cplusplus
 }
 #endif
@@ -1828,23 +1833,23 @@ static inline bool cui_text_paints_supported(const cui_draw_list *list, bool lin
 
 #include <math.h>
 
-bool cui_kbd_styled(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_stroke stroke,
-                    cui_kbd_options options, const cui_kbd_style *style) {
-    char text[CUI_KBD_TEXT_CAPACITY];
-    if (!ui || !id || !theme || !cui_frame_is_submitting(ui) || !isfinite(theme->font_size) ||
-        theme->font_size <= 0 || theme->font_size > 512 || !isfinite(theme->radius) ||
-        theme->radius < 0 || options.accessible_name.length > CUI_KBD_NAME_MAX_BYTES ||
-        !cui_kbd_line_valid(options.accessible_name) ||
-        cui_kbd_format_stroke(stroke, options.mac_symbols, text, sizeof text) == SIZE_MAX)
-        return false;
-    cui_str formatted = cui_string(text);
+static bool kbd_ready(cui_context *ui, cui_id id, const cui_theme *theme) {
+    return ui && id && theme && cui_frame_is_submitting(ui) && isfinite(theme->font_size) &&
+           theme->font_size > 0 && theme->font_size <= 512 && isfinite(theme->radius) &&
+           theme->radius >= 0;
+}
+
+static bool kbd_draw_label(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
+                           cui_kbd_options options, const cui_kbd_style *style, bool literal) {
     float scale = theme->font_size / 16;
     if (options.plain)
         style = NULL;
     const cui_typography_token *custom_type = style ? style->typography : NULL;
     const cui_text_paint *custom_paint = style ? style->text_paint : NULL;
-    cui_typography_token type = {.size = options.plain ? theme->font_size : 12 * scale,
-                                 .line_height = options.plain ? 0 : 12 * scale,
+    cui_typography_token type = {.size = literal         ? theme->font_size * .8f
+                                         : options.plain ? theme->font_size
+                                                         : 12 * scale,
+                                 .line_height = literal || options.plain ? 0 : 12 * scale,
                                  .align = CUI_TEXT_ALIGN_CENTER,
                                  .wrap = true};
     if (custom_type)
@@ -1857,8 +1862,14 @@ bool cui_kbd_styled(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_
     cui_box box = {0};
     if (style && style->box)
         box = *style->box;
-    else if (!options.plain) {
-        cui_size measured = cui_measure_text_ex(ui, formatted, type.size, type.style);
+    else if (literal) {
+        box = (cui_box){.padding = 4,
+                        .radius = theme->radius * .5f,
+                        .background = theme->background,
+                        .border = theme->border,
+                        .border_width = 1};
+    } else if (!options.plain) {
+        cui_size measured = cui_measure_text_ex(ui, label, type.size, type.style);
         float line = type.line_height > 0 ? type.line_height : measured.height;
         box = (cui_box){.width = fmaxf(20 * scale, measured.width + 8 * scale + 2 * border),
                         .height = (custom_type ? line + 4 * scale : 16 * scale) + 2 * border,
@@ -1873,19 +1884,38 @@ bool cui_kbd_styled(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_
     }
     cui_begin_box(ui, id, box);
     cui_interact(ui, id, CUI_ROLE_LABEL,
-                 options.accessible_name.length ? options.accessible_name : formatted, false, false,
-                 0);
+                 options.accessible_name.length ? options.accessible_name : label, false, false, 0);
     cui_set_tab_stop(ui, id, false);
-    cui_color color = options.plain ? theme->text : theme->muted;
+    cui_color color = literal || options.plain ? theme->text : theme->muted;
     bool submitted = true;
-    if (custom_paint)
-        submitted = cui_typography_text_painted(ui, formatted, type, *custom_paint);
-    else if (custom_type)
-        submitted = cui_typography_text(ui, formatted, type, color);
-    else
-        cui_text_with_line_height(ui, formatted, type.size, color, type.line_height);
+    if (label.length) {
+        if (custom_paint)
+            submitted = cui_typography_text_painted(ui, label, type, *custom_paint);
+        else if (custom_type)
+            submitted = cui_typography_text(ui, label, type, color);
+        else
+            cui_text_with_line_height(ui, label, type.size, color, type.line_height);
+    }
     cui_end_box(ui);
     return submitted;
+}
+
+bool cui_kbd_styled(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_stroke stroke,
+                    cui_kbd_options options, const cui_kbd_style *style) {
+    char text[CUI_KBD_TEXT_CAPACITY];
+    if (!kbd_ready(ui, id, theme) || options.accessible_name.length > CUI_KBD_NAME_MAX_BYTES ||
+        !cui_kbd_line_valid(options.accessible_name) ||
+        cui_kbd_format_stroke(stroke, options.mac_symbols, text, sizeof text) == SIZE_MAX)
+        return false;
+    return kbd_draw_label(ui, id, theme, cui_string(text), options, style, false);
+}
+
+bool cui_kbd_label_styled(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
+                          const cui_kbd_style *style) {
+    if (!kbd_ready(ui, id, theme) || !cui_text_line_source_valid((cui_text_line_source){
+                                         .paragraph = label, .byte_end = label.length}))
+        return false;
+    return kbd_draw_label(ui, id, theme, label, (cui_kbd_options){0}, style, true);
 }
 
 bool cui_kbd_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_kbd_stroke stroke,

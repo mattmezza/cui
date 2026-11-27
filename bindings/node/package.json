@@ -17,6 +17,7 @@
   "files": [
     "index.cjs",
     "shadows.cjs",
+    "kbd-style.cjs",
     "slider-model.cjs",
     "time-field-localized.cjs",
     "skeleton-presentation.cjs",

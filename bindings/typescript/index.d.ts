@@ -168,7 +168,7 @@ export function avatar(key?: string, text?: string): Avatar;
 export function bubble(key?: string, text?: string): Label;
 export function empty_view(key?: string, text?: string): EmptyView;
 export function group_box(key?: string, text?: string): GroupBox;
-export function kbd(key?: string, text?: string): Label;
+export function kbd(key?: string, text?: string): Kbd;
 export function skeleton(key?: string, text?: string): Visual;
 export function spinner(key?: string, text?: string): Visual;
 export function tag(key?: string, text?: string): Label;
@@ -921,7 +921,7 @@ export interface KbdStrokeOptions {
   accessibleName?: string;
 }
 /** Retained typed keyboard stroke. Requires the optional Kbd V1 bridge. */
-export function kbdStroke(key: string, strokeKey: string, options?: KbdStrokeOptions): Label;
+export function kbdStroke(key: string, strokeKey: string, options?: KbdStrokeOptions): Kbd;
 export interface App { supportsKbdStroke(): boolean; }
 
 export type SpinnerSize = 'custom' | 'xsmall' | 'small' | 'medium' | 'large';
@@ -953,3 +953,19 @@ export interface RotatingSpinner extends Node {
 }
 export const RotatingSpinner: {new(key?: string, config?: SpinnerConfigInput): RotatingSpinner};
 export function rotating_spinner(key?: string, config?: SpinnerConfigInput): RotatingSpinner;
+
+/** Numeric RGBA colors (0xRRGGBBAA); logical pixel dimensions. */
+export interface KbdGradient {
+  stops: ReadonlyArray<{position: number; color: number}>;
+  x0?: number; y0?: number; x1?: number; y1?: number;
+}
+/** Replacement style. Missing padding axis defaults to X=4/Y=2; border requires both fields. */
+export type KbdStyle = {
+  maxWidth?: number; fill?: boolean; wrap?: boolean;
+  paddingX?: number; paddingY?: number; radius?: number; background?: number;
+  fontSize?: number; lineHeight?: number;
+  weight?: 'normal' | 'medium' | 'semibold' | 'bold'; italic?: boolean; monospace?: boolean;
+} & ({borderWidth: number; borderColor: number} | {borderWidth?: never; borderColor?: never})
+  & ({textColor?: number; textGradient?: never} | {textColor?: never; textGradient?: KbdGradient});
+export interface Kbd extends Label { setKbdStyle(style?: KbdStyle | null): this; }
+export interface App { supportsKbdStyle(): boolean; }

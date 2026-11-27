@@ -2006,7 +2006,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Typed single-stroke hints are available in immediate C, retained C and all five language bindings. Per-hint box and typography overrides and solid or linear text paint are immediate C. Host Action/keybinding lookup and general inherited styling remain open; see docs/KBD.md."
+        "Typed single-stroke hints are available in immediate C, retained C and all five language bindings. Retained C and all five language bindings offer optional width constraints, wrapping, padding, border, rounding, typography and solid or block-linear text paint. Host Action/keybinding lookup and general inherited styling remain open; see docs/KBD.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2061,6 +2061,20 @@
             "bindings/rust/tests/builders.rs",
             "docs/KBD.md"
           ]
+        },
+        {
+          "name": "retained literal and typed keycap styling",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_kbd.c",
+            "bindings/python/test_kbd_stroke.py",
+            "bindings/node/test/kbd-stroke.test.cjs",
+            "bindings/typescript/components.typecheck.ts",
+            "bindings/go/cui/kbd_stroke_test.go",
+            "bindings/rust/tests/builders.rs",
+            "docs/KBD.md"
+          ],
+          "scope": "Headless wrapping during resize, typography and gradient draw data, literal and typed rendering, copied inputs, passive semantics, and alpha.14 provider fallback."
         },
         {
           "name": "accessible description",

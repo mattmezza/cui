@@ -56,6 +56,7 @@ typedef struct {
     cui_id id;
     char *key, *text, *detail;
     bridge_kbd_owned *kbd;
+    cui_bridge_kbd_style_v1 *kbd_style;
     float gap, custom_radius;
     cui_bridge_button_variant variant;
     cui_bridge_button_size size;

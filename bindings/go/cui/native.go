@@ -752,13 +752,20 @@ static cui_bridge_status go_kbd_stroke_set(cui_bridge_app *a, cui_bridge_node n,
                                            const char *name, size_t nb) {
  return kbd_stroke_set(a, n, m, f, k, kb, name, nb);
 }
+static cui_bridge_status (*kbd_style_set)(cui_bridge_app *, cui_bridge_node, const cui_bridge_kbd_style_v1 *);
+static int go_kbd_style_supported(void) { return kbd_style_set != NULL; }
+static cui_bridge_status go_kbd_style_set(cui_bridge_app *a, cui_bridge_node n, const cui_bridge_kbd_style_v1 *s) { return kbd_style_set(a, n, s); }
 static void go_kbd_stroke_initialize(void) {
- if (bridge_lib)
+ if (bridge_lib) {
+  go_load_optional_symbol(&kbd_style_set, sizeof kbd_style_set, "cui_bridge_set_kbd_style_v1");
   go_load_optional_symbol(&kbd_stroke_set, sizeof kbd_stroke_set,
                           "cui_bridge_set_kbd_stroke_v1");
+ }
 #if defined(CUI_GO_STATIC)
- else
+ else {
+  kbd_style_set = cui_bridge_set_kbd_style_v1;
   kbd_stroke_set = cui_bridge_set_kbd_stroke_v1;
+ }
 #endif
 }
 static void go_carousel_initialize(void) {
@@ -1031,6 +1038,7 @@ type Node struct {
 	attachmentSlotWidth                  float32
 	carouselBasis                        float32
 	carouselFit                          bool
+	kbdStyle                             *C.cui_bridge_kbd_style_v1
 	kbdStroke                            *kbdStrokeConfig
 	virtualListAxis                      VirtualListAxis
 	carouselAxis                         CarouselAxis
@@ -2173,6 +2181,9 @@ func (a *App) Mount(root *Node) error {
 		if err := a.validateCarouselSlots(n, parent); err != nil {
 			return err
 		}
+		if n.kbdStyle != nil && C.go_kbd_style_supported() == 0 {
+			return ErrKbdStyleUnavailable
+		}
 		if n.kbdStroke != nil && C.go_kbd_stroke_supported() == 0 {
 			return ErrKbdStrokeUnavailable
 		}
@@ -2724,6 +2735,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.carouselAxis == CarouselVertical {
 			if err := result(C.go_carousel_set_axis(a.ptr, h, C.uint32_t(n.carouselAxis))); err != nil {
+				return err
+			}
+		}
+		if n.kbdStyle != nil {
+			if err := n.setKbdStyle(n.kbdStyle); err != nil {
 				return err
 			}
 		}
@@ -6822,4 +6838,91 @@ func (a *App) SetResponsiveNotifications(enabled bool) error {
 		return ErrResponsiveNotificationsUnavailable
 	}
 	return result(C.go_set_responsive_notifications(a.ptr, C.uint32_t(btoi(enabled))))
+}
+
+// SupportsKbdStyle reports optional retained Kbd style support.
+func (a *App) SupportsKbdStyle() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_kbd_style_supported() != 0, nil
+}
+func (n *Node) setKbdStyle(style *C.cui_bridge_kbd_style_v1) error {
+	supported, err := n.app.SupportsKbdStyle()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrKbdStyleUnavailable
+	}
+	return result(C.go_kbd_style_set(n.app.ptr, n.handle, style))
+}
+
+func makeKbdStyleWire(s KbdStyleOptions) *C.cui_bridge_kbd_style_v1 {
+	var w C.cui_bridge_kbd_style_v1
+	w.struct_size = C.sizeof_cui_bridge_kbd_style_v1
+	w.schema_version = 1
+	if s.MaxWidth != nil {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_MAX_WIDTH
+		w.max_width = C.float(*s.MaxWidth)
+	}
+	if s.Radius != nil {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_RADIUS
+		w.radius = C.float(*s.Radius)
+	}
+	if s.FontSize != nil {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_FONT_SIZE
+		w.font_size = C.float(*s.FontSize)
+	}
+	if s.LineHeight != nil {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_LINE_HEIGHT
+		w.line_height = C.float(*s.LineHeight)
+	}
+	if s.Fill {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_FILL
+	}
+	if s.Wrap {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_WRAP
+	}
+	if s.Italic {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_ITALIC
+	}
+	if s.Monospace {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_MONOSPACE
+	}
+	if s.Padding != nil {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_PADDING
+		w.padding_x = C.float(s.Padding.X)
+		w.padding_y = C.float(s.Padding.Y)
+	}
+	if s.Background != nil {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_BACKGROUND
+		w.background_rgba = C.uint32_t(*s.Background)
+	}
+	if s.Border != nil {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_BORDER
+		w.border_width = C.float(s.Border.Width)
+		w.border_rgba = C.uint32_t(s.Border.Color)
+	}
+	if s.Weight != nil {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_WEIGHT
+		w.weight = C.uint32_t(*s.Weight)
+	}
+	if s.TextColor != nil {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_TEXT_COLOR
+		w.text_rgba = C.uint32_t(*s.TextColor)
+	}
+	if g := s.TextGradient; g != nil {
+		w.fields |= C.CUI_BRIDGE_KBD_STYLE_TEXT_GRADIENT
+		w.x0 = C.float(g.X0)
+		w.y0 = C.float(g.Y0)
+		w.x1 = C.float(g.X1)
+		w.y1 = C.float(g.Y1)
+		w.stop_count = C.uint32_t(len(g.Stops))
+		for i, v := range g.Stops {
+			w.stops[i].position = C.float(v.Position)
+			w.stops[i].color_rgba = C.uint32_t(v.Color)
+		}
+	}
+	return &w
 }

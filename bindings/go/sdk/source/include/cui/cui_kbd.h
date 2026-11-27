@@ -49,6 +49,11 @@ typedef struct {
  * false before submission. Use Core's named box API to add shadows after it. */
 bool cui_kbd_styled(cui_context *, cui_id, const cui_theme *, cui_kbd_stroke, cui_kbd_options,
                     const cui_kbd_style *);
+/* Style a passive literal hint using the same box, typography and paint as a
+ * typed hint. Text must be valid UTF-8 and is used as the accessible name.
+ * NULL fields keep the literal pill's themed border, fill and typography. */
+bool cui_kbd_label_styled(cui_context *, cui_id, const cui_theme *, cui_str label,
+                          const cui_kbd_style *);
 #ifdef __cplusplus
 }
 #endif

@@ -316,8 +316,10 @@ including expansions. Use `CUI_KBD_TEXT_CAPACITY` for a complete result. Hosts
 own shortcut bindings. Retained C and the five language builders support
 typed strokes and accessible names when the provider exports
 `cui_bridge_set_kbd_stroke_v1`. Use a literal with older providers.
-Use `cui_kbd_styled` with shared box, typography or text paint for keycaps.
-Plain hints skip those overrides. See `docs/KBD.md`.
+Use `cui_kbd_styled` for typed hints or `cui_kbd_label_styled` for a literal.
+Retained builders probe `cui_bridge_set_kbd_style_v1` separately for responsive
+width, wrapping, box paint and typography. Plain hints skip style overrides.
+See `docs/KBD.md` for language examples and renderer requirements.
 For loading placeholders, see `docs/SKELETON_RESPONSIVE.md`. Keep motion per
 shape, schedule the earliest wake and attach busy state to the application region.
 

@@ -104,8 +104,10 @@ bool draw_styled_shortcut(cui_context *ui, const cui_theme *theme, cui_id id) {
 }
 ```
 
-Plain mode keeps its theme typography and ignores all keycap overrides.
-Style values are read during the call. Gradient stops are copied for that
+Use `cui_kbd_label_styled` to apply the same style to a preformatted literal.
+The given label is also its accessible name. Plain typed hints keep their
+theme typography and ignore keycap overrides. Style values are read during
+the call. Gradient stops are copied for that
 frame, so local arrays are safe. Invalid typography and gradient definitions
 fail before the hint is submitted. To add a shadow, use
 `cui_element_set_shadow_preset` on the submitted keycap ID. Backgrounds use
@@ -132,6 +134,9 @@ with App(backend="none", width=400, height=180) as app:
     hint = (kbd_stroke("keys", "k", modifiers=2 | 1, outline=True,
                        accessible_name="Control Shift K")
             if app.supports_kbd_stroke() else kbd("keys", "Ctrl+Shift+K"))
+    if app.supports_kbd_style():
+        hint.kbd_style({"max_width": 128, "wrap": True, "font_size": 14,
+                        "line_height": 20, "monospace": True, "radius": 6})
     app.mount(column("root").children(
         row("shortcut").children(label("action", "Open command palette"), hint)
     ))
@@ -146,6 +151,15 @@ try {
   const hint = app.supportsKbdStroke()
     ? kbdStroke('keys', 'k', {modifiers: 2 | 1, outline: true, accessibleName: 'Control Shift K'})
     : kbd('keys', 'Ctrl+Shift+K');
+  if (app.supportsKbdStyle()) {
+    hint.setKbdStyle({
+      maxWidth: 128, wrap: true, fontSize: 14, monospace: true, radius: 6,
+      textGradient: {stops: [
+        {position: 0, color: 0x0e7490ff},
+        {position: 1, color: 0x7e22ceff},
+      ]},
+    });
+  }
   app.mount(column('root').children(
     row('shortcut').children(label('action', 'Open command palette'), hint)
   ));
@@ -183,8 +197,62 @@ Passing zero flags, zero modifiers, two NULL pointers and two zero lengths
 restores the literal held by the node. The literal remains available through
 `cui_bridge_get_text` and can be changed with `cui_bridge_set_text`. Older
 providers keep the literal API. The language probes detect the optional
-export before the typed node is attached. Custom box, typography and text
-paint, and standalone formatting remain immediate C APIs.
+export before the typed node is attached.
+
+### Fit the retained keycap to its container
+
+Style is optional for both literal and typed hints. Probe it independently of
+typed stroke support. The alpha.14 provider supports typed and literal
+labels using their default styles.
+
+| Language | Capability probe | Replace or restore a style |
+| --- | --- | --- |
+| Python | `app.supports_kbd_style()` | `hint.kbd_style({"max_width": 128, "wrap": True})` or `hint.kbd_style(None)` |
+| JavaScript / TypeScript | `app.supportsKbdStyle()` | `hint.setKbdStyle({maxWidth: 128, wrap: true})` or `hint.setKbdStyle(null)` |
+| Go | `app.SupportsKbdStyle()` | `hint.KbdStyle(cui.KbdStyleOptions{MaxWidth: &maxWidth, Wrap: true})` or `hint.ClearKbdStyle()` |
+| Rust | `app.supports_kbd_style()` | `app.kbd_style(hint, &KbdStyle { max_width: Some(128.), wrap: true, ..Default::default() })?` or `app.reset_kbd_style(hint)?` |
+
+In retained C, pass a copied, versioned `cui_bridge_kbd_style_v1` record to
+`cui_bridge_set_kbd_style_v1`. For example, use a column with bounded width
+to let a hint grow up to 176 logical pixels and wrap as the column narrows.
+
+```c
+#include <cui/cui_bridge.h>
+
+cui_bridge_status style_shortcut(cui_bridge_app *app, cui_bridge_node hint) {
+    const cui_bridge_kbd_style_v1 style = {
+        .struct_size = sizeof style, .schema_version = 1,
+        .fields = CUI_BRIDGE_KBD_STYLE_FILL | CUI_BRIDGE_KBD_STYLE_MAX_WIDTH |
+                  CUI_BRIDGE_KBD_STYLE_WRAP | CUI_BRIDGE_KBD_STYLE_PADDING |
+                  CUI_BRIDGE_KBD_STYLE_RADIUS | CUI_BRIDGE_KBD_STYLE_TEXT_GRADIENT,
+        .max_width = 176, .padding_x = 8, .padding_y = 4, .radius = 6,
+        .x1 = 1, .stop_count = 2, .stops = {{0, 0x0e7490ff}, {1, 0x7e22ceff}},
+    };
+    return cui_bridge_set_kbd_style_v1(app, hint, &style);
+}
+```
+
+A style replaces the previous record. Omitted fields inherit the pill's
+theme or mode defaults. Set `fill` to use the space offered by the parent,
+`max_width` (`maxWidth` in JS/TS) to cap it, and `wrap` for a height that
+fits the resulting lines. Use a bounded container to give wrapping a width.
+Padding sets horizontal and vertical edges as a group. Python and JS/TS
+supply 4 and 2 logical pixels for a missing padding axis when the other
+axis is specified. Supply both border width and border color to override
+the border. Colors are numeric `0xRRGGBBAA`, including transparent colors.
+
+Text can use a solid color or a block-anchored linear gradient. Provide 2–8
+ordered stops and distinct endpoints in normalized coordinates. Python
+and JS/TS default the endpoints to left-to-right. Gradient rendering needs a
+compatible renderer. Font size, line height, weight, italic and monospace use
+the host font provider. Explicit font family and letter spacing are available
+through immediate C. A plain typed hint ignores the saved style. Resetting the
+stroke restores the literal without clearing the style. Styling stays passive
+and produces no events.
+
+The previous style stays active when an update fails. A provider that lacks
+style support can mount the same tree after
+clearing a detached style, with normal default pills.
 
 ## Verification
 
@@ -194,8 +262,9 @@ helper, geometry and accessible labels. The style fixture covers first-frame
 width, responsive wrapping, copied gradient stops and the unstyled plain
 path. The headless gallery inspects the semantic and draw labels, pill width,
 monospace style and gradient stops.
-Retained tests cover copied inputs, paint, accessible names, passive pointer
-behavior, malformed input, and literal restoration after a typed hint.
+Retained tests cover copied inputs, width and line count during resize,
+gradient draw commands, accessible names, passive pointer behavior,
+malformed updates, reset and removal, and fallback on alpha.14.
 
 ```sh
 cmake -S tests/fixtures/kbd -B /path/to/private-build -G Ninja \

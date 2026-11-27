@@ -2298,3 +2298,47 @@ fn typed_kbd_optional_provider() {
     app.remove(node).unwrap();
     assert_eq!(app.kbd_stroke(node, "S", &options).err(), Some(Error(4)));
 }
+
+#[test]
+fn retained_kbd_style_optional_provider() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(400., 200.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let node = app.child(root, Kind::Kbd, "literal").unwrap();
+    app.text(node, "Ctrl+S").unwrap();
+    let style = KbdStyle {
+        max_width: Some(80.),
+        padding: Some(KbdPadding { x: 0., y: 0. }),
+        ..Default::default()
+    };
+    let supported = app.supports_kbd_style();
+    if let Ok(expected) = std::env::var("CUI_EXPECT_KBD_STYLE") {
+        assert_eq!(supported, expected == "1");
+    }
+    if !supported {
+        assert_eq!(
+            app.kbd_style(node, &style).err(),
+            Some(Error::KBD_STYLE_UNAVAILABLE)
+        );
+        assert_eq!(
+            app.reset_kbd_style(node).err(),
+            Some(Error::KBD_STYLE_UNAVAILABLE)
+        );
+        app.step(0.016).unwrap();
+        return;
+    }
+    app.kbd_style(node, &style).unwrap();
+    app.step(0.016).unwrap();
+    assert!(app.bounds(node).unwrap().width > 0.);
+    let invalid = KbdStyle {
+        max_width: Some(f32::NAN),
+        ..Default::default()
+    };
+    assert_eq!(app.kbd_style(node, &invalid).err(), Some(Error(3)));
+    app.reset_kbd_style(node).unwrap();
+    app.step(0.016).unwrap();
+    let label = app.child(root, Kind::Label, "wrong").unwrap();
+    assert_eq!(app.kbd_style(label, &style).err(), Some(Error(8)));
+    app.remove(node).unwrap();
+    assert_eq!(app.reset_kbd_style(node).err(), Some(Error(4)));
+}

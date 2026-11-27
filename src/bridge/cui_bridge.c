@@ -2,6 +2,7 @@
 #include "../base/cui_kbd_internal.h"
 #include "../base/cui_table_internal.h"
 #include "../components/cui_media_internal.h"
+#include "../core/cui_text_paint_internal.h"
 #include "cui/cui_kbd.h"
 #include "cui/cui_media.h"
 #include "cui/cui_message.h"
@@ -560,15 +561,15 @@ cui_bridge_status cui_bridge_radio_set_paint_v1(cui_bridge_app *app, cui_bridge_
     cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
-static cui_color bridge_radio_color(uint32_t rgba) {
+static cui_color bridge_rgba_color(uint32_t rgba) {
     return (cui_color){rgba >> 24, rgba >> 16, rgba >> 8, rgba};
 }
 static void bridge_radio_apply_root(cui_box *box, const cui_bridge_radio_paint_v1 *layer) {
     uint32_t fields = layer->fields;
     if (fields & CUI_BRIDGE_RADIO_ROOT_BG)
-        box->background = bridge_radio_color(layer->root_background_rgba);
+        box->background = bridge_rgba_color(layer->root_background_rgba);
     if (fields & CUI_BRIDGE_RADIO_ROOT_BORDER)
-        box->border = bridge_radio_color(layer->root_border_rgba);
+        box->border = bridge_rgba_color(layer->root_border_rgba);
     if (fields & CUI_BRIDGE_RADIO_ROOT_BORDER_WIDTH)
         box->border_width = layer->root_border_width;
     if (fields & CUI_BRIDGE_RADIO_ROOT_RADIUS)
@@ -583,9 +584,9 @@ static void bridge_radio_apply_option(cui_radio_paint *paint,
     bridge_radio_apply_root(&paint->root, layer);
     uint32_t fields = layer->fields;
     if (fields & CUI_BRIDGE_RADIO_INDICATOR_BG)
-        paint->indicator.background = bridge_radio_color(layer->indicator_background_rgba);
+        paint->indicator.background = bridge_rgba_color(layer->indicator_background_rgba);
     if (fields & CUI_BRIDGE_RADIO_INDICATOR_BORDER)
-        paint->indicator.border = bridge_radio_color(layer->indicator_border_rgba);
+        paint->indicator.border = bridge_rgba_color(layer->indicator_border_rgba);
     if (fields & CUI_BRIDGE_RADIO_INDICATOR_BORDER_WIDTH)
         paint->indicator.border_width = layer->indicator_border_width;
     if (fields & CUI_BRIDGE_RADIO_INDICATOR_RADIUS)
@@ -593,11 +594,11 @@ static void bridge_radio_apply_option(cui_radio_paint *paint,
     if (fields & CUI_BRIDGE_RADIO_INDICATOR_EXTENT)
         paint->indicator.width = paint->indicator.height = layer->indicator_extent;
     if (fields & CUI_BRIDGE_RADIO_MARK_COLOR)
-        paint->mark = bridge_radio_color(layer->mark_rgba);
+        paint->mark = bridge_rgba_color(layer->mark_rgba);
     if (fields & CUI_BRIDGE_RADIO_LABEL_COLOR)
-        paint->label.color = bridge_radio_color(layer->label_rgba);
+        paint->label.color = bridge_rgba_color(layer->label_rgba);
     if (fields & CUI_BRIDGE_RADIO_DESCRIPTION_COLOR)
-        paint->description.color = bridge_radio_color(layer->description_rgba);
+        paint->description.color = bridge_rgba_color(layer->description_rgba);
     if (fields & CUI_BRIDGE_RADIO_LABEL_SIZE)
         paint->label.font_size = layer->label_size;
     if (fields & CUI_BRIDGE_RADIO_DESCRIPTION_SIZE)
@@ -1248,6 +1249,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     free(node->key);
     free(node->text);
     free(node->kbd);
+    free(node->kbd_style);
     free(node->detail);
     free(node->avatar_placeholder);
     cui_edit_destroy(node->edit);
@@ -1292,6 +1294,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     node->part_shadows = NULL;
     node->key = node->text = node->detail = NULL;
     node->kbd = NULL;
+    node->kbd_style = NULL;
     node->avatar_placeholder = NULL;
     node->edit = NULL;
     node->edit_buffer = NULL;
@@ -2311,6 +2314,89 @@ cui_bridge_status cui_bridge_set_kbd_stroke_v1(cui_bridge_app *app, cui_bridge_n
         memcpy(owned->text + key_bytes, accessible_name, name_bytes);
     free(node->kbd);
     node->kbd = owned;
+    cui_invalidate(app->ui);
+    return CUI_BRIDGE_OK;
+}
+
+_Static_assert(sizeof(cui_bridge_kbd_style_v1) == 144 &&
+                   offsetof(cui_bridge_kbd_style_v1, stops) == 80,
+               "Kbd style v1 wire layout");
+
+static cui_text_paint bridge_kbd_gradient(const cui_bridge_kbd_style_v1 *style,
+                                          cui_text_gradient_stop stops[8]) {
+    for (size_t i = 0; i < style->stop_count; ++i)
+        stops[i] = (cui_text_gradient_stop){style->stops[i].position,
+                                            bridge_rgba_color(style->stops[i].color_rgba)};
+    return (cui_text_paint){.kind = CUI_TEXT_PAINT_LINEAR,
+                            .x0 = style->x0,
+                            .y0 = style->y0,
+                            .x1 = style->x1,
+                            .y1 = style->y1,
+                            .stops = stops,
+                            .stop_count = style->stop_count};
+}
+
+static bool bridge_kbd_dimension(float value, float max) {
+    return isfinite(value) && value >= 0 && value <= max;
+}
+
+static bool bridge_kbd_style_valid(const cui_bridge_kbd_style_v1 *style) {
+    uint32_t fields = style->fields;
+    const uint32_t supported = (CUI_BRIDGE_KBD_STYLE_TEXT_GRADIENT << 1) - 1;
+    if (fields & ~supported)
+        return false;
+    if ((fields & CUI_BRIDGE_KBD_STYLE_MAX_WIDTH) &&
+        (!bridge_kbd_dimension(style->max_width, 4096) || style->max_width == 0))
+        return false;
+    if ((fields & CUI_BRIDGE_KBD_STYLE_PADDING) && (!bridge_kbd_dimension(style->padding_x, 4096) ||
+                                                    !bridge_kbd_dimension(style->padding_y, 4096)))
+        return false;
+    if ((fields & CUI_BRIDGE_KBD_STYLE_RADIUS) && !bridge_kbd_dimension(style->radius, 4096))
+        return false;
+    if ((fields & CUI_BRIDGE_KBD_STYLE_BORDER) && !bridge_kbd_dimension(style->border_width, 4096))
+        return false;
+    if ((fields & CUI_BRIDGE_KBD_STYLE_FONT_SIZE) &&
+        (!bridge_kbd_dimension(style->font_size, 512) || style->font_size == 0))
+        return false;
+    if ((fields & CUI_BRIDGE_KBD_STYLE_LINE_HEIGHT) &&
+        !bridge_kbd_dimension(style->line_height, 4096))
+        return false;
+    if ((fields & CUI_BRIDGE_KBD_STYLE_WEIGHT) && style->weight > CUI_TEXT_WEIGHT_BOLD)
+        return false;
+    if (fields & CUI_BRIDGE_KBD_STYLE_TEXT_GRADIENT) {
+        if ((fields & CUI_BRIDGE_KBD_STYLE_TEXT_COLOR) || style->stop_count < 2 ||
+            style->stop_count > 8)
+            return false;
+        cui_text_gradient_stop stops[8];
+        return cui_text_paint_valid(bridge_kbd_gradient(style, stops), false);
+    }
+    return true;
+}
+
+cui_bridge_status cui_bridge_set_kbd_style_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                              const cui_bridge_kbd_style_v1 *style) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_KBD)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (style && (style->struct_size != sizeof *style || style->schema_version != 1 ||
+                  style->reserved || !bridge_kbd_style_valid(style)))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (style && style->fields) {
+        if (!node->kbd_style) {
+            node->kbd_style = malloc(sizeof *style);
+            if (!node->kbd_style)
+                return CUI_BRIDGE_OUT_OF_MEMORY;
+        }
+        *node->kbd_style = *style;
+    } else {
+        if (!node->kbd_style)
+            return CUI_BRIDGE_OK;
+        free(node->kbd_style);
+        node->kbd_style = NULL;
+    }
     cui_invalidate(app->ui);
     return CUI_BRIDGE_OK;
 }
@@ -5901,6 +5987,96 @@ static bool bridge_virtual_model_changed(const cui_virtual_list *model, const ui
     return false;
 }
 
+static cui_box bridge_kbd_box(const cui_theme *theme, const cui_bridge_kbd_style_v1 *style,
+                              bool literal, bool outline) {
+    uint32_t fields = style->fields;
+    float scale = theme->font_size / 16;
+    float padding_x = literal ? 4 : 4 * scale;
+    float padding_y = literal ? 4 : 2 * scale;
+    if (fields & CUI_BRIDGE_KBD_STYLE_PADDING) {
+        padding_x = style->padding_x;
+        padding_y = style->padding_y;
+    }
+    bool bordered = literal || outline;
+    cui_box box = {.width = fields & CUI_BRIDGE_KBD_STYLE_FILL ? -1 : 0,
+                   .max_width = fields & CUI_BRIDGE_KBD_STYLE_MAX_WIDTH ? style->max_width : 0,
+                   .custom_padding = true,
+                   .padding_edges = {padding_x, padding_x, padding_y, padding_y},
+                   .align_x = CUI_ALIGN_CENTER,
+                   .align_y = CUI_ALIGN_CENTER,
+                   .background = bordered ? theme->background : theme->muted_background,
+                   .border = theme->border,
+                   .border_width = bordered ? 1 : 0,
+                   .radius = theme->radius * .5f};
+    box.clip = (fields & CUI_BRIDGE_KBD_STYLE_MAX_WIDTH) && !(fields & CUI_BRIDGE_KBD_STYLE_WRAP);
+    if (fields & CUI_BRIDGE_KBD_STYLE_BACKGROUND)
+        box.background = bridge_rgba_color(style->background_rgba);
+    if (fields & CUI_BRIDGE_KBD_STYLE_BORDER) {
+        box.border_width = style->border_width;
+        box.border = bridge_rgba_color(style->border_rgba);
+    }
+    if (fields & CUI_BRIDGE_KBD_STYLE_RADIUS)
+        box.radius = style->radius;
+    return box;
+}
+
+static void bridge_render_kbd(cui_bridge_app *app, const cui_bridge_node_record *node) {
+    const bridge_kbd_owned *kbd = node->kbd;
+    const cui_bridge_kbd_style_v1 *wire = node->kbd_style;
+    const cui_theme *theme = &app->theme;
+    if (!kbd && !wire) {
+        cui_kbd(app->ui, node->id, theme, cui_string(node->text));
+        return;
+    }
+    cui_kbd_options options = {0};
+    if (kbd) {
+        options =
+            (cui_kbd_options){.plain = (kbd->flags & CUI_BRIDGE_KBD_PLAIN_V1) != 0,
+                              .outline = (kbd->flags & CUI_BRIDGE_KBD_OUTLINE_V1) != 0,
+                              .mac_symbols = (kbd->flags & CUI_BRIDGE_KBD_MAC_SYMBOLS_V1) != 0,
+                              .accessible_name = {kbd->text + kbd->key_bytes, kbd->name_bytes}};
+    }
+    cui_box box;
+    cui_typography_token type;
+    cui_text_gradient_stop stops[8];
+    cui_text_paint paint;
+    cui_kbd_style style = {0};
+    if (wire && !options.plain) {
+        uint32_t fields = wire->fields;
+        box = bridge_kbd_box(theme, wire, !kbd, options.outline);
+        float size = kbd ? theme->font_size * .75f : theme->font_size * .8f;
+        if (fields & CUI_BRIDGE_KBD_STYLE_FONT_SIZE)
+            size = wire->font_size;
+        type = (cui_typography_token){
+            .size = size,
+            .line_height =
+                fields & CUI_BRIDGE_KBD_STYLE_LINE_HEIGHT ? wire->line_height : (kbd ? size : 0),
+            .align = CUI_TEXT_ALIGN_CENTER,
+            .wrap = (fields & CUI_BRIDGE_KBD_STYLE_WRAP) != 0,
+            .style = {.weight = fields & CUI_BRIDGE_KBD_STYLE_WEIGHT ? (cui_text_weight)wire->weight
+                                                                     : CUI_TEXT_WEIGHT_NORMAL,
+                      .italic = (fields & CUI_BRIDGE_KBD_STYLE_ITALIC) != 0,
+                      .monospace = (fields & CUI_BRIDGE_KBD_STYLE_MONOSPACE) != 0}};
+        style.box = &box;
+        style.typography = &type;
+        if (fields & CUI_BRIDGE_KBD_STYLE_TEXT_COLOR) {
+            paint = (cui_text_paint){.color = bridge_rgba_color(wire->text_rgba)};
+            style.text_paint = &paint;
+        } else if (fields & CUI_BRIDGE_KBD_STYLE_TEXT_GRADIENT) {
+            paint = bridge_kbd_gradient(wire, stops);
+            style.text_paint = &paint;
+        }
+    }
+    bool ok;
+    if (kbd) {
+        cui_kbd_stroke stroke = {.modifiers = kbd->modifiers, .key = {kbd->text, kbd->key_bytes}};
+        ok = cui_kbd_styled(app->ui, node->id, theme, stroke, options, &style);
+    } else
+        ok = cui_kbd_label_styled(app->ui, node->id, theme, cui_string(node->text), &style);
+    if (!ok)
+        app->frame_error = CUI_BRIDGE_INVALID_STATE;
+}
+
 static void bridge_render_virtual_list(cui_bridge_app *app, uint32_t slot,
                                        cui_bridge_node_record *node) {
     if (!node->virtual_list) {
@@ -6564,19 +6740,7 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
             bridge_render_node(app, child);
         cui_end_group_box(app->ui);
     } else if (node->kind == CUI_BRIDGE_KBD) {
-        bridge_kbd_owned *kbd = node->kbd;
-        if (kbd) {
-            cui_kbd_stroke stroke = {.modifiers = kbd->modifiers,
-                                     .key = {kbd->text, kbd->key_bytes}};
-            cui_kbd_options options = {
-                .plain = (kbd->flags & CUI_BRIDGE_KBD_PLAIN_V1) != 0,
-                .outline = (kbd->flags & CUI_BRIDGE_KBD_OUTLINE_V1) != 0,
-                .mac_symbols = (kbd->flags & CUI_BRIDGE_KBD_MAC_SYMBOLS_V1) != 0,
-                .accessible_name = {kbd->text + kbd->key_bytes, kbd->name_bytes}};
-            if (!cui_kbd_ex(app->ui, node->id, &app->theme, stroke, options))
-                app->frame_error = CUI_BRIDGE_INVALID_STATE;
-        } else
-            cui_kbd(app->ui, node->id, &app->theme, cui_string(node->text));
+        bridge_render_kbd(app, node);
     } else if (node->kind == CUI_BRIDGE_ICON) {
         bridge_icon_presented *configured = bridge_icon_node(app, slot);
         if (configured) {

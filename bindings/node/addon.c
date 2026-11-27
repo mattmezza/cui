@@ -1863,6 +1863,46 @@ static napi_value set_radio_tab_index(napi_env env, napi_callback_info info) {
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 
+typedef cui_bridge_status (*kbd_style_fn)(cui_bridge_app *, cui_bridge_node,
+                                          const cui_bridge_kbd_style_v1 *);
+static napi_value supports_kbd_style(napi_env env, napi_callback_info info) {
+    (void)info;
+    return supports_bridge_flag(env, "cui_bridge_set_kbd_style_v1");
+}
+static napi_value set_kbd_style(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *node;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
+        return NULL;
+    kbd_style_fn set = NULL;
+    if (!optional_bridge_symbol(&set, sizeof set, "cui_bridge_set_kbd_style_v1"))
+        return fail(env, "Kbd style requires cui_bridge_set_kbd_style_v1");
+    napi_valuetype type;
+    if (napi_typeof(env, v[2], &type) != napi_ok)
+        return NULL;
+    cui_bridge_kbd_style_v1 wire;
+    const cui_bridge_kbd_style_v1 *style = NULL;
+    if (type != napi_null) {
+        bool is_buffer = false;
+        void *bytes = NULL;
+        size_t size = 0;
+        if (napi_is_buffer(env, v[2], &is_buffer) != napi_ok || !is_buffer ||
+            napi_get_buffer_info(env, v[2], &bytes, &size) != napi_ok || size != sizeof wire)
+            return fail(env, "Kbd style requires a 144-byte wire buffer or null");
+        /* JS serializes little endian; convert each four-byte wire scalar. */
+        for (size_t i = 0; i < sizeof wire; i += 4) {
+            const unsigned char *b = (const unsigned char *)bytes + i;
+            uint32_t word =
+                (uint32_t)b[0] | (uint32_t)b[1] << 8 | (uint32_t)b[2] << 16 | (uint32_t)b[3] << 24;
+            memcpy((unsigned char *)&wire + i, &word, sizeof word);
+        }
+        style = &wire;
+    }
+    cui_bridge_status code = set(app->bridge, node->node, style);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+
 typedef cui_bridge_status (*kbd_stroke_fn)(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t,
                                            const char *, size_t, const char *, size_t);
 static kbd_stroke_fn kbd_stroke_symbol(void) {
@@ -3052,6 +3092,8 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setRadioMotion", set_radio_motion, 0);
     EXPORT("supportsRadioTabIndex", supports_radio_tab_index, 0);
     EXPORT("setRadioTabIndex", set_radio_tab_index, 0);
+    EXPORT("supportsKbdStyle", supports_kbd_style, 0);
+    EXPORT("setKbdStyle", set_kbd_style, 0);
     EXPORT("supportsKbdStroke", supports_kbd_stroke, 0);
     EXPORT("setKbdStroke", set_kbd_stroke, 0);
     EXPORT("supportsRadioTooltip", supports_radio_tooltip, 0);

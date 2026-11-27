@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 'use strict';
+const kbdStyleWire = require('./kbd-style.cjs');
 const path = require('node:path');
 const fs = require('node:fs');
 const packaged = path.join(__dirname, 'native', 'cui.node');
@@ -100,6 +101,7 @@ function requestsRadioMotion(node) {
 }
 const stepperFillUnavailable = 'Stepper Fill requires cui_bridge_set_stepper_fill';
 function preflightNodeOptions(app, node, insideDecoration = false, insideAttachmentSlot = false) {
+  if (node.kbdStyleValue && !app.supportsKbdStyle()) throw new Error('Kbd style requires cui_bridge_set_kbd_style_v1');
   if (node.kbdStrokeValue && !app.supportsKbdStroke()) throw new Error('Typed Kbd requires cui_bridge_set_kbd_stroke_v1');
   if (node.virtualListAxisValue === 'horizontal' && !app.supportsVirtualListAxis()) throw new Error('VirtualList axis unavailable');
   if (node.carouselAxisValue === 'vertical' && !app.supports_carousel_axis()) throw new Error('Carousel axis unavailable');
@@ -226,6 +228,17 @@ class Node {
     this.radioContentValue = false;
     this.radioTooltipValue = null;
     this.partShadowStyles=new Map(); this.shadowStyleValue = null; this.hoverValue = undefined; this.clickValue = undefined;
+  }
+  setKbdStyle(style = null) {
+    if (this.kind !== 34) throw new TypeError('setKbdStyle requires a Kbd');
+    const wire = kbdStyleWire(style);
+    this.owner?._alive();
+    if (this.owner && (wire || this.kbdStyleValue)) {
+      if (!this.owner.supportsKbdStyle()) throw new Error('Kbd style requires cui_bridge_set_kbd_style_v1');
+      native.setKbdStyle(this.owner.handle, this[NODE], wire);
+    }
+    this.kbdStyleValue = wire;
+    return this;
   }
   box_shadows(layers=[],radii=new CornerRadii()) {
     if(![1,2,3,4,11,12].includes(this.kind))throw new Error('unsupported shadow root');
@@ -1016,6 +1029,7 @@ class App {
         native.setRadioTabIndex(this.handle, node[NODE], true, node.radioTabIndexValue);
       if (node.radioContentValue) native.setRadioItemContent(this.handle, node[NODE], true);
       if (node.kbdStrokeValue) native.setKbdStroke(this.handle, node[NODE], ...node.kbdStrokeValue);
+      if (node.kbdStyleValue) native.setKbdStyle(this.handle, node[NODE], node.kbdStyleValue);
       if (node.radioTooltipValue) native.setRadioTooltip(this.handle, node[NODE], ...node.radioTooltipValue);
       if ([9,14].includes(node.kind)) native.setRange(this.handle,node[NODE],...node.rangeValue);
       if([42,43].includes(node.kind))native.setTotal(this.handle,node[NODE],node.totalValue);
@@ -1280,6 +1294,10 @@ class App {
     this._alive();
     return typeof native.supportsRadioItemContent === 'function' &&
       typeof native.setRadioItemContent === 'function' && native.supportsRadioItemContent();
+  }
+  supportsKbdStyle() {
+    this._alive();
+    return typeof native.supportsKbdStyle === 'function' && typeof native.setKbdStyle === 'function' && native.supportsKbdStyle();
   }
   supportsKbdStroke() {
     this._alive();

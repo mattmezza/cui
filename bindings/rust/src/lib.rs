@@ -5,6 +5,8 @@ pub use attachment::{
     AttachmentActions, AttachmentOptions, AttachmentSlot, AttachmentTextStyle,
     AttachmentTextWeight, AttachmentTypography,
 };
+mod kbd_style;
+pub use kbd_style::{KbdBorder, KbdGradientStop, KbdPadding, KbdStyle, KbdTextGradient, KbdWeight};
 mod kbd_stroke;
 pub use kbd_stroke::{KbdModifiers, KbdStrokeOptions};
 mod carousel;

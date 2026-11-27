@@ -750,7 +750,7 @@ add_test(NAME bridge_python_carousel_slots COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_carousel_slots.py)
 add_test(NAME bridge_python_kbd_stroke COMMAND ${CMAKE_COMMAND} -E env
- PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge> CUI_EXPECT_KBD_STROKE=1
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge> CUI_EXPECT_KBD_STROKE=1 CUI_EXPECT_KBD_STYLE=1
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_kbd_stroke.py)
 add_test(NAME bridge_python_keyed_data_table_example COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>

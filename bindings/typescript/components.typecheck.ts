@@ -192,3 +192,14 @@ c.kbdStroke('bad', 'K', {plain: 1});
 // @ts-expect-error option names use camelCase
 c.kbdStroke('bad', 'K', {mac_symbols: true});
 void hasTypedKbd;
+
+c.kbd('style', 'Ctrl+K').setKbdStyle({maxWidth:180,fill:true,wrap:true,paddingX:4,paddingY:2,
+  borderWidth:1,borderColor:0x334455ff,weight:'semibold',
+  textGradient:{stops:[{position:0,color:0xff0000ff},{position:1,color:0x0000ffff}]}}).setKbdStyle(null);
+c.kbdStroke('styled-stroke','K').setKbdStyle({textColor:0xff0000ff});
+// @ts-expect-error border is a complete group
+c.kbd().setKbdStyle({borderWidth:1});
+// @ts-expect-error paint alternatives are exclusive
+c.kbd().setKbdStyle({textColor:0,textGradient:{stops:[]}});
+// @ts-expect-error weight uses named values
+c.kbd().setKbdStyle({weight:3});

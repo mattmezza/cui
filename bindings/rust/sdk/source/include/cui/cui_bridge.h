@@ -1084,6 +1084,48 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_kbd_stroke_v1(cui_bridge_app *, 
                                                               const char *key, size_t key_bytes,
                                                               const char *accessible_name,
                                                               size_t name_bytes);
+enum {
+    CUI_BRIDGE_KBD_STYLE_MAX_WIDTH = 1u << 0,
+    CUI_BRIDGE_KBD_STYLE_FILL = 1u << 1,
+    CUI_BRIDGE_KBD_STYLE_WRAP = 1u << 2,
+    CUI_BRIDGE_KBD_STYLE_PADDING = 1u << 3,
+    CUI_BRIDGE_KBD_STYLE_RADIUS = 1u << 4,
+    CUI_BRIDGE_KBD_STYLE_BACKGROUND = 1u << 5,
+    CUI_BRIDGE_KBD_STYLE_BORDER = 1u << 6,
+    CUI_BRIDGE_KBD_STYLE_FONT_SIZE = 1u << 7,
+    CUI_BRIDGE_KBD_STYLE_LINE_HEIGHT = 1u << 8,
+    CUI_BRIDGE_KBD_STYLE_WEIGHT = 1u << 9,
+    CUI_BRIDGE_KBD_STYLE_ITALIC = 1u << 10,
+    CUI_BRIDGE_KBD_STYLE_MONOSPACE = 1u << 11,
+    CUI_BRIDGE_KBD_STYLE_TEXT_COLOR = 1u << 12,
+    CUI_BRIDGE_KBD_STYLE_TEXT_GRADIENT = 1u << 13
+};
+typedef struct {
+    float position;
+    uint32_t color_rgba;
+} cui_bridge_kbd_stop_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, fields, reserved;
+    uint32_t background_rgba, border_rgba, text_rgba, weight;
+    float max_width, padding_x, padding_y, radius, border_width, font_size, line_height;
+    uint32_t stop_count;
+    float x0, y0, x1, y1;
+    cui_bridge_kbd_stop_v1 stops[8];
+} cui_bridge_kbd_style_v1;
+/* Optional style on literal and typed Kbd. Exact size, schema 1, reserved 0.
+ * Values use logical pixels and numeric RGBA 0xRRGGBBAA. Fields select present
+ * values, including transparent colors or zero padding, border or radius.
+ * Dimensions are finite 0..4096. MAX_WIDTH must be positive. FILL grows
+ * within its parent, subject to the cap. WRAP fits height to the lines.
+ * FONT_SIZE is positive and <=512. LINE_HEIGHT zero uses natural metrics.
+ * Weights are NORMAL=0, MEDIUM=1, SEMIBOLD=2, BOLD=3.
+ * A block-anchored linear gradient takes 2..8 ordered stops and distinct
+ * endpoints, all normalized to [0,1]. It is exclusive with TEXT_COLOR.
+ * Plain typed hints ignore the style. The entire record is copied during the
+ * call. NULL or no fields restores defaults. Failure preserves the old style.
+ * Call between steps on the owner thread. Style changes emit no events. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_kbd_style_v1(cui_bridge_app *, cui_bridge_node,
+                                                             const cui_bridge_kbd_style_v1 *);
 /* State setters apply to matching component kinds only. Boolean values must be 0 or 1.
  * Number ranges must be finite with minimum < maximum and positive step.
  * Setting a range clamps the current value into it atomically. */

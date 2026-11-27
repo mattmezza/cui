@@ -190,8 +190,23 @@ if (status != CUI_BRIDGE_OK) {
 }
 ```
 
-See [the retained C quickstart](BINDING_BUILDERS.md) for app creation, layout,
-building and running. The default color comes from the current theme's text
+The [complete C file-sync example](../bindings/bridge/examples/spinner_status.c)
+adds the Spinner next to its status label when you click Start sync. Stop sync
+removes it. From the repository root, use a C11 compiler, CMake and Ninja.
+
+```sh
+cmake -S . -B build -G Ninja -DCUI_BUILD_BRIDGE=ON -DCUI_BUILD_NATIVE=OFF
+cmake --build build --target bridge_spinner_status_example
+./build/bridge_spinner_status_example
+```
+
+This runs a headless smoke check that clicks Start sync and Stop sync. To open
+a window, configure with `-DCUI_BUILD_NATIVE=ON` and provide an existing
+TrueType/OpenType font as the first argument. The native bridge links SDL3,
+FreeType and HarfBuzz through CMake. See the
+[compiler and dependency guide](BINDING_BUILDERS.md#dependencies-and-compiler).
+
+The default color comes from the current theme's text
 color. A custom RGBA value replaces it, including a fully transparent value.
 Use `CUI_BRIDGE_SPINNER_CUSTOM` with `pixels` and leave `rem_size` zero for a fixed
 size. Named sizes use `rem_size` and leave `pixels` zero. Rem zero selects
@@ -219,8 +234,62 @@ functions. Existing unconfigured Spinner builders keep their eight-dot ring,
 legacy visual size and Loading status. Configured nodes use the V1 size
 fields. Immediate C supports application paint and easing callbacks. The
 retained C route supports embedded catalog icons and two built-in easing curves.
-Raw SVG resources in this route, language facades, inherited Icon styling and
-broader host acceptance remain open. The
+Raw SVG resources in this route, inherited Icon styling and broader host
+acceptance remain open. The
 [headless software check](../tests/unit/test_bridge_spinner.c) verifies real
 rotation pixels, sizing, color, reduced motion, omission, failure and handle
 reuse.
+
+## Use Spinner from a language builder
+
+Opt into the rotating Icon builder. The examples place an indicator beside
+application content, then remove it when a button callback completes the
+simulated operation. Each runs headlessly by default and also accepts a font
+path for an SDL window.
+
+| Language | Opt-in factory | Run from the repository root |
+| --- | --- | --- |
+| Python | `rotating_spinner(key, SpinnerConfig(...))` | `PYTHONPATH=bindings/python CUI_BRIDGE_LIBRARY="$PWD/build/libcui_bridge.so" python bindings/bridge/examples/spinner_status.py` |
+| JavaScript | `rotating_spinner(key, options)` | `CUI_NODE_ADDON="$PWD/build-node/cui.node" node bindings/node/examples/spinner-status.cjs` |
+| TypeScript | `rotating_spinner(key, options)` | `CUI_NODE_ADDON="$PWD/build-node/cui.node" node bindings/typescript/examples/spinner_status.ts` |
+| Go | `cui.RotatingSpinner(key, config)` | `cd bindings/go && go run ./examples/spinner_loading` |
+| Rust | `app.rotating_spinner(parent, key, config)?` | `cd bindings/rust && cargo run --example spinner_loading` |
+
+Build the current C bridge or Node addon first using the
+[builder setup guide](BINDING_BUILDERS.md#dependencies-and-compiler). For native
+mode, build those libraries with SDL enabled and pass `--font PATH` in Python
+or `PATH` as a positional argument in Node and TypeScript. In Go, add
+`-tags cui_native` before the example directory and append `--font PATH`.
+In Rust, add `--features native` before `--example` and append `-- --font PATH`.
+
+```python
+from cui_bridge import SpinnerConfig, SpinnerEasing, SpinnerSize, rotating_spinner
+
+loading = rotating_spinner("sync-spinner", SpinnerConfig(
+    size=SpinnerSize.LARGE, rem_size=20, easing=SpinnerEasing.LINEAR,
+    rgba=0x3B82F6FF, icon="arrow-right",
+))
+# Add loading to your row, mount, then use loading.presentation() after a frame.
+```
+
+```js
+const loading = rotating_spinner('sync-spinner', {
+  size: 'large', remSize: 20, easing: 'linear', rgba: 0x3B82F6FF, icon: 'arrow-right'
+});
+// Add loading to your row, mount, then use loading.presentation() after a frame.
+```
+
+Python and Node use `get_config`, `configure` and `presentation` on the
+Spinner. Go uses `SpinnerConfig`, `ConfigureSpinner` and
+`SpinnerPresentation` on the node. Rust uses `spinner_config`,
+`configure_spinner` and `spinner_presentation` on the app. Each returns
+copied values. Start from `DefaultSpinnerConfig()` in Go or
+`SpinnerConfig::default()` in Rust for medium Loader defaults.
+
+Check `SupportsSpinnerPresentation()` in Go and
+`supports_spinner_presentation()` elsewhere before using the new presentation
+with a separately installed bridge. The probe checks the complete V1 export
+group and both record sizes. Existing providers keep the ordinary Spinner.
+The rotating constructor's configuration, including color, size and icon, is
+subject to V1 validation. The builders support catalog icons and the built-in
+quadratic and linear curves. Use immediate C for custom paint or easing.

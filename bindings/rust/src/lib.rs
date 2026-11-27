@@ -23,6 +23,7 @@ pub use radio_paint::{RadioPaint, RadioPaintLayer};
 mod shadows;
 mod skeleton_presentation;
 mod slider_model;
+mod spinner_presentation;
 mod stepper_fill;
 mod time_localized;
 mod virtual_list;
@@ -40,6 +41,7 @@ pub use slider_model::{
     SliderPhase, SliderPresentation, SliderReceipt, SliderReceiptInfo, SliderRequest,
     SliderRequestContext, SliderScale, SliderValue,
 };
+pub use spinner_presentation::{SpinnerConfig, SpinnerEasing, SpinnerPresentation, SpinnerSize};
 use std::{
     cell::RefCell,
     collections::HashMap,

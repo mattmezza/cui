@@ -155,6 +155,8 @@ class _API:
         bind_time_api(self, bind)
         from .skeleton_presentation import bind_api as bind_skeleton_api
         bind_skeleton_api(self, bind)
+        from .spinner_presentation import bind_api as bind_spinner_api
+        bind_spinner_api(self, bind)
         from .pagination_options import bind_api as bind_pagination_api
         bind_pagination_api(self, bind)
         from .rating_options import bind_api as bind_rating_api
@@ -2451,6 +2453,9 @@ class App:
                 validate(child, node, f"{path}/{index}", depth + 1, lineage + (node,),
                          radio_content or node._radio_content)
         validate(tree, None, "root", 0)
+        if any(isinstance(node, RotatingSpinner) for node, _, _ in order):
+            from .spinner_presentation import require_api
+            require_api(self)
         if any(isinstance(node, ResponsiveSkeleton) for node, _, _ in order):
             from .skeleton_presentation import require_api
             require_api(self)
@@ -2538,6 +2543,9 @@ class App:
                 if isinstance(node, LocalizedTimeField):
                     from .time_field_localized import mount_node as mount_time_node
                     mount_time_node(self, node)
+                if isinstance(node, RotatingSpinner):
+                    from .spinner_presentation import mount_node as mount_spinner_node
+                    mount_spinner_node(node)
                 if isinstance(node, ResponsiveSkeleton):
                     from .skeleton_presentation import mount_node as mount_skeleton_node
                     mount_skeleton_node(node)
@@ -3046,6 +3054,10 @@ class App:
         from .pagination_options import supported
         return supported(self)
 
+    def supports_spinner_presentation(self) -> bool:
+        from .spinner_presentation import supported
+        return supported(self)
+
     def supports_skeleton_presentation(self) -> bool:
         from .skeleton_presentation import supported
         return supported(self)
@@ -3287,3 +3299,8 @@ __all__ += ["AttachmentActionNotificationV1", "ComponentNotificationV1"]
 __all__ += ["CarouselSlotRole", "carousel_slot"]
 
 __all__ += ["kbd_stroke"]
+
+from .spinner_presentation import (SpinnerSize, SpinnerEasing, SpinnerConfig, SpinnerPresentation,
+                                   RotatingSpinner, rotating_spinner)
+from .spinner_presentation import __all__ as _spinner_exports
+__all__ += _spinner_exports

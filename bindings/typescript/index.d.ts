@@ -565,6 +565,7 @@ export const ResponsiveSkeleton: {new(key?: string, config?: SkeletonConfigInput
 export function responsive_skeleton(key?: string, config?: SkeletonConfigInput): ResponsiveSkeleton;
 export interface App {
   supports_skeleton_presentation(): boolean;
+  supports_spinner_presentation(): boolean;
   supports_pagination_custom_size(): boolean;
   supports_rating_options(): boolean;
   supports_pagination_options(): boolean;
@@ -914,3 +915,31 @@ export interface KbdStrokeOptions {
 /** Retained typed keyboard stroke. Requires the optional Kbd V1 bridge. */
 export function kbdStroke(key: string, strokeKey: string, options?: KbdStrokeOptions): Label;
 export interface App { supportsKbdStroke(): boolean; }
+
+export type SpinnerSize = 'custom' | 'xsmall' | 'small' | 'medium' | 'large';
+export type SpinnerEasing = 'quadratic' | 'linear';
+export interface SpinnerConfigInput {
+  size?: SpinnerSize;
+  pixels?: number;
+  remSize?: number;
+  duration?: number;
+  rgba?: number | null;
+  easing?: SpinnerEasing;
+  /** Embedded catalog key, empty selects Loader. */
+  icon?: string;
+  reducedMotion?: boolean;
+}
+export type SpinnerConfig = Readonly<Required<SpinnerConfigInput>>;
+export interface SpinnerPresentation {
+  readonly frameSequence: bigint;
+  readonly coreTime: number;
+  readonly nextWakeSeconds: number;
+  readonly phase: number;
+}
+export interface RotatingSpinner extends Node {
+  configure(config: SpinnerConfigInput): this;
+  get_config(): SpinnerConfig;
+  presentation(): SpinnerPresentation | undefined;
+}
+export const RotatingSpinner: {new(key?: string, config?: SpinnerConfigInput): RotatingSpinner};
+export function rotating_spinner(key?: string, config?: SpinnerConfigInput): RotatingSpinner;

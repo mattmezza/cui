@@ -926,6 +926,7 @@ const localizedTimes = require('./time-field-localized.cjs')(native, Node, NODE,
 const icons = require('./icon-resources.cjs')(native);
 const iconBadges = require('./icon-badge.cjs')(native, Node, NODE, icons, designSizes);
 containers.add(iconBadges.badgeKind);
+const spinners = require('./spinner-presentation.cjs')(native, Node, NODE);
 const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
 const paginationOptions = require('./pagination-options.cjs')(native, Node, NODE);
 const ratingOptions = require('./rating-options.cjs')(native, Node, NODE, icons, designSizes);
@@ -958,6 +959,7 @@ class App {
     preflightNodeOptions(this, root);
     preflightDataTables(this, root);
     skeletons.preflight(this, root);
+    spinners.preflight(this, root);
     paginationOptions.preflight(this, root);
     ratingOptions.preflight(this, root);
     disclosures.preflight(this, root);
@@ -1007,6 +1009,7 @@ class App {
       if(node.kind===55)native.setTime(this.handle,node[NODE],...node.timeValue);
       localizedTimes.mount(this,node);
       skeletons.mount(this, node);
+      spinners.mount(this, node);
       paginationOptions.mount(this, node);
       ratingOptions.mount(this, node);
       disclosures.mount(this, node);
@@ -1273,6 +1276,7 @@ class App {
   supports_attachment_preview() { return attachments.supports(this,true); }
   supports_rating_options() { return ratingOptions.supports(this); }
   supports_pagination_options() { return paginationOptions.supports(this); }
+  supports_spinner_presentation() { return spinners.supports(this); }
   supports_skeleton_presentation() { return skeletons.supports(this); }
   supports_localized_time_field(){return localizedTimes.supports(this);}
   enable_localized_time_fields(capacity=4096){return localizedTimes.enable(this,capacity);}
@@ -1327,3 +1331,5 @@ module.exports = {carousel_slot,RadioPaintLayer,radio_item:item,ShadowPart,BoxSh
 Object.assign(module.exports, sliderModels.exports);
 
 Object.assign(module.exports, localizedTimes.exports, skeletons.exports, icons.exports, iconBadges.exports);
+module.exports.RotatingSpinner = spinners.exports.RotatingSpinner;
+module.exports.rotating_spinner = spinners.exports.rotating_spinner;

@@ -1001,7 +1001,7 @@
       ],
       "state_ownership": "Immediate C caller owns persistent motion state, host clock and reduced-motion preference. Optional sizing and callback userdata are borrowed through submission. The retained C bridge copies configuration and owns the clock per node.",
       "interaction": "Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.",
-      "usage": "Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Use optional rem or custom-pixel sizing, a custom SVG painter or finite turns from custom easing. Retained C can opt an existing Spinner into a copied catalog icon, built-in easing, custom color and reduced motion.",
+      "usage": "Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Use optional rem or custom-pixel sizing, a custom SVG painter or finite turns from custom easing. Retained C and language builders can opt into a copied catalog icon, built-in easing, custom color and reduced motion.",
       "docs": [
         "docs/SPINNER.md",
         "docs/CONTENT.md"
@@ -1016,7 +1016,15 @@
       "additional_public_headers": [
         "include/cui/cui_bridge.h"
       ],
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "examples": [
+        "bindings/bridge/examples/spinner_status.c",
+        "bindings/bridge/examples/spinner_status.py",
+        "bindings/node/examples/spinner-status.cjs",
+        "bindings/typescript/examples/spinner_status.ts",
+        "bindings/go/examples/spinner_loading/main.go",
+        "bindings/rust/examples/spinner_loading.rs"
+      ]
     },
     {
       "api_symbols": [

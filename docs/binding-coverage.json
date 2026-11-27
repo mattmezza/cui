@@ -443,18 +443,7 @@
           "symbols": [
             "cui_spinner_ex"
           ],
-          "note": "Direct C exposes custom painting and easing callbacks. Language builders currently retain the legacy eight-dot Spinner."
-        },
-        {
-          "header": "include/cui/cui_bridge.h",
-          "languages": ["python", "javascript", "typescript", "go", "rust"],
-          "types": ["cui_bridge_spinner_config_v1", "cui_bridge_spinner_presentation_v1"],
-          "symbols": [
-            "cui_bridge_spinner_configure_v1",
-            "cui_bridge_spinner_get_config_v1",
-            "cui_bridge_spinner_get_presentation_v1"
-          ],
-          "note": "The retained C provider offers opt-in decorative catalog icons, custom color, named rem or fixed sizes, two easing curves and copied motion statistics. Foreign language facades remain open."
+          "note": "Python, JavaScript, TypeScript, Go and Rust expose optional retained Spinner V1 for catalog icons, copied settings and motion samples. Legacy builders remain usable with older providers. Arbitrary paint and easing callbacks remain immediate C, and retained raw SVG is unavailable."
         }
       ]
     },

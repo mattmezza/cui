@@ -235,6 +235,28 @@ endif()
 add_test(NAME node_skeleton_presentation COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/test/skeleton-presentation.test.cjs)
+add_test(NAME node_spinner_presentation COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/spinner-presentation.test.cjs)
+add_test(NAME node_spinner_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/spinner-status.cjs)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ foreach(kind LEGACY PARTIAL)
+  if(CUI_SPINNER_${kind}_LIBRARY)
+   string(TOLOWER ${kind} suffix)
+   set(target cui_node_spinner_${suffix})
+   add_library(${target} MODULE addon.c)
+   target_include_directories(${target} PRIVATE ${NODE_API_INCLUDE_DIR} ../../include)
+   target_link_libraries(${target} PRIVATE "${CUI_SPINNER_${kind}_LIBRARY}" m ${CMAKE_DL_LIBS})
+   target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+   set_target_properties(${target} PROPERTIES PREFIX "" SUFFIX ".node")
+   add_test(NAME node_spinner_${suffix} COMMAND ${CMAKE_COMMAND} -E env
+    CUI_NODE_ADDON=$<TARGET_FILE:${target}> CUI_EXPECT_SPINNER_UNSUPPORTED=1 ${NODE_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/spinner-presentation.test.cjs)
+  endif()
+ endforeach()
+endif()
 add_test(NAME node_skeleton_example COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/examples/skeleton-profile.cjs)

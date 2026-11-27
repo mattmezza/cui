@@ -52,6 +52,9 @@ profile UI that replaces loading placeholders with content. See the
 [JavaScript and TypeScript](NODE_SKELETON.md), [Go](GO_SKELETON.md) and
 [Rust](RUST_SKELETON.md) examples use the same composition.
 
+The [Spinner guide](SPINNER.md#use-spinner-from-a-language-builder) shows how
+to add a rotating catalog icon while a callback-driven operation is pending.
+
 The [live inbox example](#keep-a-python-datatables-scroll-position-during-updates)
 shows a keyed DataTable update from a callback.
 

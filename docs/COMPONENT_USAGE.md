@@ -498,21 +498,21 @@ API: `cui_shimmer_text`. [Public header](../include/cui/cui_status.h); [guide](S
 
 **Interaction:** Decorative presentation adds no action, focus or busy semantics. Optional easing runs synchronously during sampling; application loading semantics remain separate.
 
-**Usage:** Use cui_skeleton_present for full/fraction/flex sizing. The profile demo combines a fixed circle, fractional text bars and a full-width block. Retain independent motion, schedule the earliest absolute wake and replace placeholders with content when the application finishes loading. For fixed-size painting, use cui_skeleton_ex or cui_skeleton_with_palette.
+**Usage:** Use cui_skeleton_present for full/fraction/flex sizing. ThemeSet registry v2 imports an owned solid Skeleton palette. Explore profile, article-list and table-row recipes with a selectable base size and loading state. Download the shared C recipe header and copy the call for the selected layout. Retain independent motion, schedule the earliest absolute wake and replace placeholders with content when loading completes. For fixed-size painting, use cui_skeleton_ex or cui_skeleton_with_palette.
 
-API: `cui_skeleton`, `cui_loading_phase`, `cui_skeleton_options_default`, `cui_skeleton_ex`, `cui_loading_motion_sample`, `cui_skeleton_palette_from_theme`, `cui_skeleton_palette_preset_get`, `cui_skeleton_with_palette`, `cui_skeleton_presentation_default`, `cui_skeleton_present`. Callback: `cui_loading_ease_fn`. [Public header](../include/cui/cui_skeleton_presentation.h); [legacy header](../include/cui/cui_content.h); [palette header](../include/cui/cui_skeleton_palette.h); [guide](SKELETON_PALETTE.md); [retained C bridge](BRIDGE_SKELETON.md); [Python builder](PYTHON_SKELETON.md), [JavaScript and TypeScript builders](NODE_SKELETON.md), [Go builder](GO_SKELETON.md), [Rust builder](RUST_SKELETON.md).
+API: `cui_skeleton`, `cui_loading_phase`, `cui_skeleton_options_default`, `cui_skeleton_ex`, `cui_loading_motion_sample`, `cui_skeleton_palette_from_theme`, `cui_skeleton_palette_preset_get`, `cui_theme_registry_import_v2`, `cui_theme_host_update_v2`, `cui_skeleton_with_palette`, `cui_skeleton_presentation_default`, `cui_skeleton_present`, `cui_bridge_skeleton_versions`, `cui_bridge_skeleton_config_size_v1`, `cui_bridge_skeleton_presentation_size_v1`, `cui_bridge_skeleton_configure_v1`, `cui_bridge_skeleton_get_config_v1`, `cui_bridge_skeleton_get_presentation_v1`. Callback: `cui_loading_ease_fn`. [Public header](../include/cui/cui_skeleton_presentation.h); [legacy header](../include/cui/cui_content.h); [palette header](../include/cui/cui_skeleton_palette.h); [guide](SKELETON_PALETTE.md); [retained C bridge](BRIDGE_SKELETON.md); [Python builder](PYTHON_SKELETON.md), [JavaScript and TypeScript builders](NODE_SKELETON.md), [Go builder](GO_SKELETON.md), [Rust builder](RUST_SKELETON.md).
 
 ## Spinner
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns persistent motion state, the monotonic host clock and reduced-motion preference. Optional size descriptors and callback userdata are borrowed through submission.
+**State:** Immediate C caller owns persistent motion state, host clock and reduced-motion preference. Optional sizing and callback userdata are borrowed through submission. The retained C bridge copies configuration and owns the clock per node.
 
 **Interaction:** Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.
 
-**Usage:** Submit cui_spinner_ex each frame while loading and schedule result.next_wake_seconds; zero deadline means idle. Use a custom paint callback for another SVG icon. Optional cui_spinner_sizing preserves named rem versus custom pixels; finite eased turns may exceed [0,1], reduced motion evaluates ease(0), and nonfinite easing rejects atomically.
+**Usage:** Submit cui_spinner_ex while loading and schedule its next wake; zero means idle. Use optional rem or custom-pixel sizing, a custom SVG painter or finite turns from custom easing. Retained C and language builders can opt into a copied catalog icon, built-in easing, custom color and reduced motion.
 
-API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loading_phase`. [Public header](../include/cui/cui_content.h); [guide](SPINNER.md).
+API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loading_phase`, `cui_bridge_spinner_versions`, `cui_bridge_spinner_config_size_v1`, `cui_bridge_spinner_presentation_size_v1`, `cui_bridge_spinner_configure_v1`, `cui_bridge_spinner_get_config_v1`, `cui_bridge_spinner_get_presentation_v1`. [Public header](../include/cui/cui_content.h); [guide](SPINNER.md).
 
 ## Stepper
 

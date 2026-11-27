@@ -359,6 +359,7 @@ static cui_bridge_status go_part_query(cui_bridge_app *a,cui_bridge_node n,uint3
 #undef SHADOW_STATIC
 
 #include "skeleton_presentation_ffi.h"
+#include "spinner_presentation_ffi.h"
 #include "icon_resources_ffi.h"
 #include "icon_badge_ffi.h"
 
@@ -816,6 +817,7 @@ static int bridge_open(const char *path) {
 #undef STATIC_LOAD
  go_data_table_initialize();
  go_skeleton_initialize();
+ go_spinner_initialize();
  go_pagination_initialize();
  go_rating_initialize();
  go_radio_motion_initialize();
@@ -857,6 +859,7 @@ static int bridge_open(const char *path) {
  bridge_lib = lib;
  go_data_table_initialize();
  go_skeleton_initialize();
+ go_spinner_initialize();
  go_pagination_initialize();
  go_rating_initialize();
  go_radio_motion_initialize();
@@ -941,6 +944,7 @@ type Options struct {
 }
 type Node struct {
 	timeLocalized                        *TimeFieldConfig
+	spinnerConfig                        *SpinnerConfig
 	skeletonConfig                       *SkeletonConfig
 	paginationConfig                     *PaginationConfig
 	ratingConfig                         *RatingConfig
@@ -2120,6 +2124,7 @@ func (a *App) Mount(root *Node) error {
 	}
 	seen := map[*Node]bool{}
 	keys := map[string]bool{}
+	usesSpinner := false
 	usesResponsiveSkeleton := false
 	var visit func(*Node, *Node, int, bool, bool) error
 	visit = func(n, parent *Node, d int, content, slotContent bool) error {
@@ -2286,6 +2291,7 @@ func (a *App) Mount(root *Node) error {
 		if n.stepperFill && C.go_stepper_fill_supported() == 0 {
 			return ErrStepperFillUnavailable
 		}
+		usesSpinner = usesSpinner || n.spinnerConfig != nil
 		usesResponsiveSkeleton = usesResponsiveSkeleton || n.skeletonConfig != nil
 		if n.paginationCustomSize != 0 && C.go_pagination_custom_supported() == 0 {
 			return ErrPaginationCustomSizeUnavailable
@@ -2366,6 +2372,9 @@ func (a *App) Mount(root *Node) error {
 	if err := visit(root, nil, 1, false, false); err != nil {
 		return err
 	}
+	if usesSpinner && C.go_spinner_supported() == 0 {
+		return ErrSpinnerPresentationUnavailable
+	}
 	if usesResponsiveSkeleton && C.go_skeleton_supported() == 0 {
 		return ErrSkeletonPresentationUnavailable
 	}
@@ -2431,6 +2440,11 @@ func (a *App) Mount(root *Node) error {
 		if n.radioMotion {
 			if err := n.SetRadioMotion(true); err != nil {
 				return err
+			}
+		}
+		if n.spinnerConfig != nil {
+			if e := n.configureMountedSpinner(*n.spinnerConfig); e != nil {
+				return e
 			}
 		}
 		if n.skeletonConfig != nil {
@@ -3828,6 +3842,10 @@ func Marker(key, text string) *Node    { return &Node{kind: 38, key: key, text: 
 func Shimmer(key, text string) *Node   { return &Node{kind: 39, key: key, text: text} }
 func (n *Node) VisualSize(width, height float32) *Node {
 	if n.err != nil {
+		return n
+	}
+	if n.spinnerConfig != nil {
+		n.err = errors.New("use Spinner configuration to size a configured Spinner")
 		return n
 	}
 	if n.skeletonConfig != nil {
@@ -6526,4 +6544,108 @@ func (n *Node) setKbdStroke(c kbdStrokeConfig) error {
 	}
 	return result(C.go_kbd_stroke_set(n.app.ptr, n.handle, C.uint32_t(c.options.Modifiers),
 		flags, key, C.size_t(len(c.key)), name, C.size_t(len(c.options.AccessibleName))))
+}
+
+// SupportsSpinnerPresentation reports whether the active bridge exposes
+// all of rotating Spinner V1 with compatible record sizes.
+func (a *App) SupportsSpinnerPresentation() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_spinner_supported() != 0, nil
+}
+
+func (n *Node) configureMountedSpinner(c SpinnerConfig) error {
+	supported, err := n.app.SupportsSpinnerPresentation()
+	if err != nil {
+		return err
+	}
+	if !supported {
+		return ErrSpinnerPresentationUnavailable
+	}
+	var flags C.uint32_t
+	if c.CustomColor {
+		flags |= C.CUI_BRIDGE_SPINNER_CUSTOM_COLOR
+	}
+	if c.ReducedMotion {
+		flags |= C.CUI_BRIDGE_SPINNER_REDUCED_MOTION
+	}
+	r := C.cui_bridge_spinner_config_v1{
+		struct_size: C.sizeof_cui_bridge_spinner_config_v1, schema_version: C.CUI_BRIDGE_SPINNER_V1,
+		flags: flags, size: C.uint32_t(c.Size), pixels: C.float(c.Pixels), rem_size: C.float(c.RemSize),
+		duration: C.float(c.Duration), rgba: C.uint32_t(c.RGBA), easing: C.uint32_t(c.Easing),
+	}
+	for i, b := range []byte(c.Icon) {
+		r.icon[i] = C.char(b)
+	}
+	return result(C.go_spinner_configure(n.app.ptr, n.handle, &r))
+}
+
+// SpinnerConfig returns a copy of the authored rotating configuration.
+func (n *Node) SpinnerConfig() (SpinnerConfig, error) {
+	if n == nil || n.removed || n.spinnerConfig == nil {
+		return SpinnerConfig{}, errors.New("node has no rotating Spinner configuration")
+	}
+	if n.app == nil {
+		return *n.spinnerConfig, nil
+	}
+	if err := n.app.check(); err != nil {
+		return SpinnerConfig{}, err
+	}
+	r := C.cui_bridge_spinner_config_v1{
+		struct_size: C.sizeof_cui_bridge_spinner_config_v1, schema_version: C.CUI_BRIDGE_SPINNER_V1,
+	}
+	if err := result(C.go_spinner_get_config(n.app.ptr, n.handle, &r)); err != nil {
+		return SpinnerConfig{}, err
+	}
+	icon := make([]byte, 0, 64)
+	for _, b := range r.icon {
+		if b == 0 {
+			break
+		}
+		icon = append(icon, byte(b))
+	}
+	if len(icon) == 64 {
+		return SpinnerConfig{}, errors.New("unterminated Spinner icon")
+	}
+	c := SpinnerConfig{Size: SpinnerSize(r.size), Pixels: float32(r.pixels), RemSize: float32(r.rem_size), Duration: float32(r.duration), RGBA: uint32(r.rgba), Easing: SpinnerEasing(r.easing), Icon: string(icon), CustomColor: r.flags&C.CUI_BRIDGE_SPINNER_CUSTOM_COLOR != 0, ReducedMotion: r.flags&C.CUI_BRIDGE_SPINNER_REDUCED_MOTION != 0}
+	const knownFlags = C.CUI_BRIDGE_SPINNER_CUSTOM_COLOR | C.CUI_BRIDGE_SPINNER_REDUCED_MOTION
+	if r.struct_size != C.sizeof_cui_bridge_spinner_config_v1 ||
+		r.schema_version != C.CUI_BRIDGE_SPINNER_V1 || r.flags&^knownFlags != 0 || c.validate() != nil {
+		return SpinnerConfig{}, errors.New("invalid copied Spinner configuration")
+	}
+	return c, nil
+}
+
+// SpinnerPresentation reads the most recent sample from a mounted rotating
+// Spinner. The bool is false when no current sample is available.
+func (n *Node) SpinnerPresentation() (SpinnerPresentation, bool, error) {
+	if n == nil || n.app == nil || n.removed || n.spinnerConfig == nil {
+		return SpinnerPresentation{}, false, errors.New("presentation requires a mounted rotating Spinner")
+	}
+	if err := n.app.check(); err != nil {
+		return SpinnerPresentation{}, false, err
+	}
+	r := C.cui_bridge_spinner_presentation_v1{
+		struct_size: C.sizeof_cui_bridge_spinner_presentation_v1, schema_version: C.CUI_BRIDGE_SPINNER_V1,
+	}
+	code := C.go_spinner_get_presentation(n.app.ptr, n.handle, &r)
+	if code == C.CUI_BRIDGE_EMPTY {
+		return SpinnerPresentation{}, false, nil
+	}
+	if err := result(code); err != nil {
+		return SpinnerPresentation{}, false, err
+	}
+	p := SpinnerPresentation{
+		FrameSequence: uint64(r.frame_sequence), CoreTime: float64(r.core_time),
+		NextWakeSeconds: float64(r.next_wake_seconds), Phase: float32(r.phase),
+	}
+	if r.struct_size != C.sizeof_cui_bridge_spinner_presentation_v1 ||
+		r.schema_version != C.CUI_BRIDGE_SPINNER_V1 || r.reserved != 0 || p.FrameSequence == 0 ||
+		!(p.CoreTime >= 0) || math.IsInf(p.CoreTime, 0) ||
+		(p.NextWakeSeconds != 0 && (!(p.NextWakeSeconds > p.CoreTime) || math.IsInf(p.NextWakeSeconds, 0))) ||
+		!(p.Phase >= 0 && p.Phase <= 1) {
+		return SpinnerPresentation{}, false, errors.New("invalid copied Spinner presentation")
+	}
+	return p, true, nil
 }

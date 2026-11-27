@@ -547,10 +547,10 @@ copy its compilable C example. See `docs/RESIZABLE_BROWSER_REAUDIT.md`.
 
 For Spinner, read `docs/SPINNER.md`. Immediate C `cui_spinner_ex` supports
 decorative custom painting and finite easing turns, including reduced ease(0).
-Retained C can opt a Spinner into copied catalog icons, two easing curves, color,
-named/rem or fixed sizing and a wake deadline. Language builders retain the
-legacy eight-dot ring. Schedule only successful samples. Raw SVG and custom
-callbacks in retained Spinner remain unavailable.
+Retained C and Python, JS/TS, Go and Rust offer an opt-in rotating catalog icon
+with copied size, color, easing and motion samples. Probe Spinner V1 for older
+providers. Ordinary Spinner builders keep the legacy eight-dot ring. Schedule
+only successful samples. Retained raw SVG and custom callbacks remain unavailable.
 
 For hidden native windows, read `docs/BINDING_BUILDERS.md` section `Native window
 visibility` and the chosen Go/Rust guide. C SDL3 uses

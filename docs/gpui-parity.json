@@ -3457,7 +3457,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Decorative source-style SVG, selected finite-turn easing/reduced ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in software and actual WASM. Opt-in retained C adds copied catalog icons, custom color, two easing curves and motion samples. The caller owns announcements and scheduling. Inherited Icon style, retained raw SVG, language facades, broader custom-curve/mount cases and hardware/GPU acceptance remain open."
+        "Decorative source-style SVG, selected finite-turn easing/reduced ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in software and actual WASM. Retained C, Python, JS/TS, Go and Rust offer copied catalog icons and motion samples with two easing curves. The app owns announcements and scheduling. Inherited Icon style, retained raw SVG, broader custom-curve/mount cases and hardware/GPU acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3493,7 +3493,22 @@
         {
           "name": "opt-in retained C rotating catalog icon configuration",
           "status": "tested",
-          "evidence": ["tests/unit/test_bridge_spinner.c"]
+          "evidence": [
+            "tests/unit/test_bridge_spinner.c",
+            "bindings/bridge/examples/spinner_status.c"
+          ]
+        },
+        {
+          "name": "optional retained Spinner V1 across language builders",
+          "status": "tested",
+          "evidence": [
+            "bindings/python/test_spinner_presentation.py",
+            "bindings/node/test/spinner-presentation.test.cjs",
+            "bindings/node/test/spinner-presentation.types.ts",
+            "bindings/typescript/examples/spinner_status.ts",
+            "bindings/go/cui/spinner_presentation_test.go",
+            "bindings/rust/tests/spinner_presentation.rs"
+          ]
         }
       ],
       "upstream_doc": {

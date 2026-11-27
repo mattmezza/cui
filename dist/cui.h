@@ -8,7 +8,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define CUI_VERSION "0.1.0-alpha.14"
+#define CUI_VERSION "0.1.0-alpha.15"
 typedef uint64_t cui_id;
 typedef struct {
     const char *data;

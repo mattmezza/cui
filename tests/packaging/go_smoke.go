@@ -26,6 +26,18 @@ func main() {
 	if supported, err := app.SupportsStepperFill(); err != nil || !supported {
 		panic(fmt.Sprintf("installed bridge lacks Stepper Fill: %v", err))
 	}
+	if supported, err := app.SupportsStepperWrappedFill(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Stepper Wrapped Fill: %v", err))
+	}
+	if supported, err := app.SupportsVirtualListAxis(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks horizontal VirtualList: %v", err))
+	}
+	if supported, err := app.SupportsKbdStyle(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks Kbd styling: %v", err))
+	}
+	if supported, err := app.SupportsResponsiveNotifications(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks responsive notifications: %v", err))
+	}
 	if supported, err := app.SupportsVirtualListRows(); err != nil || !supported {
 		panic(fmt.Sprintf("installed bridge lacks VirtualList live rows: %v", err))
 	}

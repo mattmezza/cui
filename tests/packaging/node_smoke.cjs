@@ -15,6 +15,10 @@ assert.equal(app.supports_radio_tab_index(), true, 'installed bridge lacks Radio
 assert.equal(app.supports_radio_paint(), true, 'installed bridge lacks Radio paint');
 assert.equal(app.supports_rating_options(), true, 'installed bridge lacks Rating options');
 assert.equal(app.supports_stepper_fill(), true, 'installed bridge lacks Stepper Fill');
+assert(app.supports_stepper_wrapped_fill(), 'installed bridge lacks Stepper Wrapped Fill');
+assert(app.supportsVirtualListAxis(), 'installed bridge lacks horizontal VirtualList');
+assert(app.supportsKbdStyle(), 'installed bridge lacks Kbd styling');
+assert(app.supports_responsive_notifications(), 'installed bridge lacks responsive notifications');
 assert.equal(app.supports_disclosure_presentation(), true, 'installed bridge lacks disclosure presentation');
 assert.equal(app.supports_disclosure_heading(), true, 'installed bridge lacks disclosure headings');
 assert.equal(app.supports_disclosure_divider(), true, 'installed bridge lacks disclosure dividers');

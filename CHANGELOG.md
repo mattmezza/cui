@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0-alpha.15
+
+- Immediate C Root and retained C can opt into responsive notification cards.
+  Longer messages wrap, and the Close button has a dedicated area. Python,
+  JavaScript, TypeScript, Go and Rust expose the retained option. Immediate
+  Root also reports when a notification next needs to render.
+- Retained VirtualList supports horizontal rows with live projections, stable
+  keys and scrolling in C and all five language bindings.
+- Retained Kbd keycaps support responsive sizing, box and text styling, and
+  solid or gradient text in C and all five bindings.
+- Stepper can wrap titles and descriptions in equal horizontal lanes or
+  beside vertical indicators. The gallery offers **Wrap labels** as an
+  opt-in layout, and all five bindings can probe and use it.
+
 ## 0.1.0-alpha.14
 
 - Retained C, Python, JavaScript, TypeScript, Go and Rust can render a rotating

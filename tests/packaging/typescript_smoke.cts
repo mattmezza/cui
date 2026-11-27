@@ -1,6 +1,10 @@
 import {App, IconSource, button, carousel, column, item, kbdStroke, rotating_spinner,
   type KbdStrokeOptions, type SpinnerPresentation} from '@cui/native';
 const app = new App({backend:'headless',width:480,height:240});
+if (!app.supports_stepper_wrapped_fill() || !app.supportsVirtualListAxis() ||
+    !app.supportsKbdStyle() || !app.supports_responsive_notifications()) {
+  throw new Error('installed provider lacks an alpha.15 layout capability');
+}
 const save = button('save').label('Save').on_click(event => event.node.label('Saved'));
 const overview = item('overview', 'Overview').carousel_basis(0.5);
 const activity = item('activity', 'Activity').carousel_basis(0.5);

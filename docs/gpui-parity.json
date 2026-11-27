@@ -3636,7 +3636,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled requests preserve application-owned validation. Immediate C and the WASM gallery provide fixed connectors and non-centered fill, shared sizes, bitmap icons and indicator-local hover and capture feedback. The gallery changes orientation with available width and the design size. Retained builders provide fixed connectors, opt-in fill with explicit orientation and queued changes. Centered crossing geometry, intrinsic compression, arbitrary child styling, exact source typography and physical assistive technology remain open. See docs/STEPPER_NAVIGATION.md."
+        "Controlled requests preserve application-owned validation. Immediate C and the WASM gallery provide fixed connectors and non-centered fill, shared sizes, bitmap icons and indicator-local hover and capture feedback. The gallery changes orientation with available width and the design size. Immediate C, WASM and retained builders offer a separate Wrapped Fill layout. Retained builders provide fixed connectors, explicit orientation and queued changes. Centered crossing geometry, arbitrary child styling, exact source typography and physical assistive technology remain open. See docs/STEPPER_NAVIGATION.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3688,7 +3688,7 @@
             "docs/BINDING_BUILDERS.md"
           ],
           "limitations": [
-            "Bridge retains 64 Items and aggregate CHANGE. Immediate C provides controlled REQUEST callbacks and custom indicator palettes. Icons are copied host RGBA. Legacy mode is default; Fill requires the optional setter."
+            "Bridge retains 64 Items and aggregate CHANGE. Immediate C provides controlled REQUEST callbacks and custom indicator palettes. Icons are copied host RGBA. Legacy mode is default; Fill and Wrapped Fill have independent optional setters."
           ]
         },
         {
@@ -3700,6 +3700,21 @@
             "docs/STEPPER_NAVIGATION.md",
             "tests/web/test_stepper_visual_gallery.py",
             "web/modules/cui_stepper_usage.js"
+          ]
+        },
+        {
+          "name": "opt-in label wrapping within equal horizontal lanes or beside vertical indicators",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_stepper_presentation.c",
+            "tests/unit/test_bridge_stepper_visual.c",
+            "tests/web/test_stepper_visual_gallery.py",
+            "bindings/go/cui/native_test.go",
+            "bindings/rust/tests/builders.rs",
+            "bindings/python/test_extended_components.py",
+            "bindings/node/test/binding.test.cjs",
+            "bindings/typescript/components.typecheck.ts",
+            "docs/STEPPER_NAVIGATION.md"
           ]
         }
       ],

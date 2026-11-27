@@ -258,6 +258,31 @@ def main():
                 painted('Navigation requests: 8')
                 painted('Step 2 of 3')
                 snippets.append(page.locator('#snippet').inner_text())
+                change('stepper-icons', 0)
+                change('stepper-mode', 3)
+                change('stepper-axis', 0)
+                snippets.append(page.locator('#snippet').inner_text())
+                assert 'CUI_STEPPER_LAYOUT_WRAPPED_FILL' in snippets[-1]
+                first, middle, last = [page.evaluate(TARGET, n) for n in ('Details', 'Review', 'Finish')]
+                assert first['x'] < middle['x'] < last['x']
+                assert first['y'] == middle['y'] == last['y']
+                assert abs(middle['x']-first['x']-(last['x']-middle['x'])) < .1
+                preview_width = page.locator('#preview').evaluate('(c)=>c.clientWidth')
+                assert last['x'] + last['w'] <= preview_width
+                label_lines = [c for c in commands() if c['type'] == 2 and
+                               first['x'] <= c['x'] < middle['x'] and
+                               first['y'] <= c['y'] < first['y'] + first['h'] and
+                               c['text'] not in ('1', 'Details')]
+                assert ''.join(c['text'] for c in label_lines).strip() == 'Confirm before continuing'
+                assert len(label_lines) > 1 if touch else len(label_lines) == 1
+                assert all(c['x']+c['w'] <= middle['x']+.1 for c in label_lines)
+                click('Finish')
+                painted('Step 3 of 3')
+                click('Review')
+                painted('Step 2 of 3')
+                change('stepper-axis', 1)
+                first, middle = [page.evaluate(TARGET, n) for n in ('Details', 'Review')]
+                assert first['x'] == middle['x'] and first['y'] + first['h'] <= middle['y']
                 # Leave every route-owned choice nondefault before SPA navigation.
                 change('stepper-mode', 1)
                 change('stepper-axis', 0)
@@ -285,7 +310,7 @@ def main():
                 subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
                                 '-I'+str(args.source_root.resolve()/'include'), '-c', str(source),
                                 '-o', str(source.with_suffix('.o'))], check=True)
-        print('PASS: desktop DPR1/2 + touch390 DPR2 WASM Fill reflow, hover/capture pixels, validation, keyboard and touch, legacy layouts, route reset and compiled snippets')
+        print('PASS: desktop DPR1/2 + touch390 DPR2 WASM Fill and wrapped reflow, hover/capture pixels, validation, keyboard and touch, legacy layouts, route reset and compiled snippets')
     finally:
         server.shutdown()
         server.server_close()

@@ -46,7 +46,8 @@ typedef struct bridge_kbd_owned bridge_kbd_owned;
 typedef enum {
     BRIDGE_STEPPER_BUTTONS,
     BRIDGE_STEPPER_FIXED,
-    BRIDGE_STEPPER_FILL
+    BRIDGE_STEPPER_FILL,
+    BRIDGE_STEPPER_WRAPPED_FILL
 } bridge_stepper_layout;
 typedef struct {
     uint32_t generation;

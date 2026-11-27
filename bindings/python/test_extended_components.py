@@ -1,4 +1,5 @@
 """Headless interaction checks for surfaces, visuals, navigation and scrolling."""
+import os
 import unittest
 import cui_bridge as c
 
@@ -101,6 +102,56 @@ class Extended(unittest.TestCase):
                 self.assertIsNone(node._app)
                 node.stepper_visual()
                 app.mount(c.column().children(c.stepper("validation").stepper_fill().stepper_visual()))
+
+    def test_stepper_wrapped_fill(self):
+        from unittest.mock import patch
+        with c.App(width=800,height=800) as app:
+            expected = os.environ.get('CUI_EXPECT_STEPPER_WRAP', '1') == '1'
+            self.assertEqual(app.supports_stepper_wrapped_fill(), expected)
+            self.assertTrue(app.supports_stepper_fill())
+            if not expected:
+                node=c.stepper('missing').stepper_wrapped_fill()
+                with self.assertRaisesRegex(RuntimeError,'cui_bridge_set_stepper_wrapped_fill_v1'):
+                    app.mount(c.column().children(node))
+                self.assertIsNone(node._app)
+                app.mount(c.column().children(c.stepper('old').stepper_fill()))
+                app.step()
+                return
+            a,b=c.item('a','First step title with several words').detail('Description with enough text to wrap'),c.item('b','Second step title').detail('Second description')
+            node=c.stepper('fill').stepper_visual().stepper_wrapped_fill(width=360,height=64).children(a,b)
+            node.select(a)
+            events=[];node.on_change(events.append)
+            app.mount(c.column().children(node));app.step()
+            self.assertIs(node.selected(),a)
+            self.assertAlmostEqual(app.bounds(node)[2],360,delta=1)
+            self.press_rect(app,app.numeric_part_bounds(node,2));app.dispatch()
+            self.assertIs(node.selected(),b);self.assertEqual(len(events),1)
+            self.press_rect(app,app.numeric_part_bounds(node,2));app.dispatch()
+            self.assertEqual(len(events),1)
+            for density in ('md','xs','sm','lg'):
+                node.stepper_wrapped_fill(True,density,240,240);app.step()
+                self.assertGreater(app.numeric_part_bounds(node,2)[1],app.numeric_part_bounds(node,1)[1])
+            node.stepper_fill();app.step()
+            self.assertIsNone(node._stepper_wrapped_fill)
+            self.assertIs(node.selected(),b)
+            node.stepper_wrapped_fill();app.step()
+            node.stepper_visual(True,False);app.step()
+            self.assertIsNone(node._stepper_wrapped_fill)
+            with patch.object(app._api,'set_stepper_wrapped_fill_v1',None):
+                with self.assertRaisesRegex(RuntimeError,'cui_bridge_set_stepper_wrapped_fill_v1'):
+                    node.stepper_wrapped_fill()
+            self.assertIsNone(node._stepper_wrapped_fill)
+        for value in (-1,4097,float('nan'),float('inf'),True,'1'):
+            with self.assertRaises(ValueError):c.stepper("validation").stepper_wrapped_fill(width=value)
+        with c.App() as app:
+            node=c.stepper('missing').stepper_wrapped_fill().children(c.item('a','A'))
+            with patch.object(app._api,'set_stepper_wrapped_fill_v1',None):
+                self.assertFalse(app.supports_stepper_wrapped_fill())
+                with self.assertRaisesRegex(RuntimeError,'cui_bridge_set_stepper_wrapped_fill_v1'):
+                    app.mount(c.column().children(node))
+                self.assertIsNone(node._app)
+                node.stepper_visual()
+                app.mount(c.column().children(c.stepper("validation").stepper_wrapped_fill().stepper_visual()))
 
     def test_navigation(self):
         for name in ('list_view','menu','stepper'):

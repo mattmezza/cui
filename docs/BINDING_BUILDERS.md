@@ -847,7 +847,22 @@ the new provider. Python, JavaScript, TypeScript and Go reject unsupported
 settings before mounting the tree. Rust reports the error at the setter on the
 already-created node. A failed update preserves the C bridge configuration.
 
-The complete headless examples run with either layout. [Python](../bindings/python/examples/stepper_visual.py) · [JavaScript](../bindings/node/examples/stepper_visual.cjs) · [TypeScript](../bindings/typescript/examples/stepper_visual.ts) · [Go](../bindings/go/examples/stepper_visual/main.go) · [Rust](../bindings/rust/examples/stepper_visual.rs)
+Use Wrapped Fill to keep long Item labels readable inside horizontal lanes or
+beside each vertical indicator. It accepts the same four arguments. Leave height
+at zero to let rows grow when text wraps. This API is available independently
+through the optional `cui_bridge_set_stepper_wrapped_fill_v1` symbol.
+
+| Language | Capability probe | Apply wrapped fill |
+| --- | --- | --- |
+| Python, JavaScript, TypeScript | `app.supports_stepper_wrapped_fill()` | `steps.stepper_wrapped_fill()` |
+| Go | `app.SupportsStepperWrappedFill()` returns `(bool, error)` | `steps.StepperWrappedFill(false, cui.StepperMD, 0, 0)` |
+| Rust | `app.supports_stepper_wrapped_fill()` | `app.stepper_wrapped_fill(steps, false, StepperDensity::Md, 0., 0.)?` or the fluent builder method |
+
+Switching between the layout setters preserves the selected Item. User
+selection still produces a queued CHANGE. See the capability fallback in
+[Stepper navigation](STEPPER_NAVIGATION.md#foreign-builder-visual-authoring).
+
+The complete headless examples select the newest layout the provider supports. [Python](../bindings/python/examples/stepper_visual.py) · [JavaScript](../bindings/node/examples/stepper_visual.cjs) · [TypeScript](../bindings/typescript/examples/stepper_visual.ts) · [Go](../bindings/go/examples/stepper_visual/main.go) · [Rust](../bindings/rust/examples/stepper_visual.rs)
 
 Use the existing Item `image_rgba` method (Go `RGBA`, Rust `image_rgba`) to supply
 straight-alpha RGBA icons. Builders and bridge copy bytes; use white RGB for

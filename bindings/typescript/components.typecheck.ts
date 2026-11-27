@@ -203,3 +203,10 @@ c.kbd().setKbdStyle({borderWidth:1});
 c.kbd().setKbdStyle({textColor:0,textGradient:{stops:[]}});
 // @ts-expect-error weight uses named values
 c.kbd().setKbdStyle({weight:3});
+
+visualStepper().stepper_wrapped_fill().stepper_wrapped_fill(true, 'xs', 300, 120).stepper_fill().stepper_visual();
+const stepperWrappedFillSupported: boolean = app.supports_stepper_wrapped_fill();
+// @ts-expect-error invalid density
+visualStepper().stepper_wrapped_fill(false, 'huge');
+// @ts-expect-error dimensions are numeric
+visualStepper().stepper_wrapped_fill(false, 'md', '300');

@@ -499,7 +499,7 @@
           "symbols": [
             "cui_stepper_present"
           ],
-          "note": "The retained bridge and all five language builders expose opt-in fill, explicit orientation, logical extents and theme indicator feedback. The immediate C custom palette and synchronous controlled request handler remain outside the builders. Retained selection keeps queued change events."
+          "note": "The retained bridge and all five language builders expose opt-in Fill and Wrapped Fill, explicit orientation, logical extents and theme indicator feedback. Wrapped Fill has an independent provider probe. The immediate C custom palette and synchronous controlled request handler remain outside the builders. Retained selection keeps queued change events."
         }
       ]
     },

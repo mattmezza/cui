@@ -42,6 +42,44 @@ async function main() {
   assert.throws(()=>missingApp.mount(column().children(missing)),/cui_bridge_set_stepper_fill/);
   assert(!missing.owner);
   missingApp.mount(column().children(stepper().stepper_fill().stepper_visual()));missingApp.dispose();
+  {
+  const fillApp=new App({backend:'headless',width:800,height:800});
+  const expectedWrap=process.env.CUI_EXPECT_STEPPER_WRAP!=='0';
+  assert.equal(fillApp.supports_stepper_wrapped_fill(),expectedWrap);
+  assert.equal(fillApp.supports_stepper_fill(),true);
+  if(!expectedWrap){
+    const unavailable=stepper().stepper_wrapped_fill();
+    assert.throws(()=>fillApp.mount(column().children(unavailable)),/cui_bridge_set_stepper_wrapped_fill_v1/);
+    assert(!unavailable.owner);
+    fillApp.mount(column().children(stepper().stepper_fill()));fillApp.step();fillApp.dispose();
+  } else {
+  const fa=item('fa','First step title with several words').detail('Description with enough text to wrap'),fb=item('fb','Second step title').detail('Second description');
+  const fill=stepper('fill').stepper_visual().stepper_wrapped_fill(false,'md',360,64).children(fa,fb);
+  fill.select(fa);
+  const fillEvents=[];fill.on_change(e=>fillEvents.push(e));
+  fillApp.mount(column().children(fill));fillApp.step();
+  assert.equal(fill.selected(),fa);
+  assert(Math.abs(fill.bounds().width-360)<1);
+  part=fill.numeric_part_bounds(2);
+  for(let i=0;i<2;i++){fillApp.pointer('down',part.x+part.width/2,part.y+part.height/2).pointer('up',part.x+part.width/2,part.y+part.height/2);fillApp.step();}
+  assert.equal(fill.selected(),fb);assert.equal(fillEvents.length,1);
+  for(const density of ['md','xs','sm','lg']){fill.stepper_wrapped_fill(true,density,240,240);fillApp.step();assert(fill.numeric_part_bounds(2).y>fill.numeric_part_bounds(1).y);}
+  fill.stepper_fill();fillApp.step();assert.equal(fill.stepperWrappedFillValue,null);assert.equal(fill.selected(),fb);
+  fill.stepper_wrapped_fill();fillApp.step();
+  fill.stepper_visual();fillApp.step();assert.equal(fill.stepperWrappedFillValue,null);
+  const supportsFill=fillApp.supports_stepper_wrapped_fill;
+  fillApp.supports_stepper_wrapped_fill=()=>false;
+  assert.throws(()=>fill.stepper_wrapped_fill(),/cui_bridge_set_stepper_wrapped_fill_v1/);
+  assert.equal(fill.stepperWrappedFillValue,null);
+  fillApp.supports_stepper_wrapped_fill=supportsFill;fillApp.dispose();
+  for(const value of [-1,4097,NaN,Infinity,true,'1'])assert.throws(()=>stepper().stepper_wrapped_fill(false,'md',value));
+  const missingApp=new App({backend:'headless'});missingApp.supports_stepper_wrapped_fill=()=>false;
+  const missing=stepper().stepper_wrapped_fill();
+  assert.throws(()=>missingApp.mount(column().children(missing)),/cui_bridge_set_stepper_wrapped_fill_v1/);
+  assert(!missing.owner);
+  missingApp.mount(column().children(stepper().stepper_wrapped_fill().stepper_visual()));missingApp.dispose();
+  }
+  }
   const avatarApp = new App({width:600,height:400});
   const person = avatar('person','Ada Lovelace').design_size('md').identity_colors(true,4);
   const anonymous = avatar('anonymous').anonymous_icon(true,'user');

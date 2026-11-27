@@ -8,9 +8,13 @@ func main() {
 		panic(e)
 	}
 	defer a.Close()
-	first := cui.Item("first", "First").RGBA([]byte{255, 255, 255, 255}, 1, 1, 4)
-	steps := cui.Stepper("steps").StepperVisual(true, false, cui.StepperSM).DesignSize(cui.LG).Children(first, cui.Item("second", "Second"))
-	if supported, err := a.SupportsStepperFill(); err != nil {
+	first := cui.Item("first", "Set up your workspace").RGBA([]byte{255, 255, 255, 255}, 1, 1, 4)
+	steps := cui.Stepper("steps").StepperVisual(true, false, cui.StepperSM).DesignSize(cui.LG).Children(first, cui.Item("second", "Review your configuration"))
+	if supported, err := a.SupportsStepperWrappedFill(); err != nil {
+		panic(err)
+	} else if supported {
+		steps.StepperWrappedFill(false, cui.StepperSM, 360, 0)
+	} else if supported, err := a.SupportsStepperFill(); err != nil {
 		panic(err)
 	} else if supported {
 		steps.StepperFill(false, cui.StepperSM, 0, 0)

@@ -127,6 +127,51 @@ static void check_fill(cui_bridge_app *a, cui_bridge_node root, cui_bridge_node 
     assert(drain(a) == 0);
     a->width = 800;
 }
+static void check_wrapped_fill(cui_bridge_app *a, cui_bridge_node root, cui_bridge_node steps,
+                               cui_bridge_node first, cui_bridge_node second) {
+    assert(cui_bridge_set_stepper_wrapped_fill_v1(a, root, 0, 0, 0, 0) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_text(a, first, "International configuration") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_selected(a, steps, first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_stepper_wrapped_fill_v1(a, steps, 0, 0, 600, 0) == CUI_BRIDGE_OK);
+    (void)paint(a);
+    cui_bridge_rect wide, one, two;
+    assert(cui_bridge_numeric_part_bounds(a, steps, 1, &wide) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_stepper_wrapped_fill_v1(a, steps, 0, 0, 152, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_stepper_wrapped_fill_v1(a, steps, 0, 0, 0, NAN) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_stepper_wrapped_fill_v1(a, steps, 1, 4, 0, 0) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    (void)paint(a);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 1, &one) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 2, &two) == CUI_BRIDGE_OK);
+    assert(one.y == two.y && two.x == one.x + 76 && one.x + one.width <= two.x);
+    assert(one.height > wide.height);
+    assert(drain(a) == 0);
+    click(a, steps, 2);
+    cui_bridge_event_ex event;
+    char payload[8];
+    uint32_t required;
+    assert(cui_bridge_poll_event_ex(a, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_OK);
+    assert(event.type == CUI_BRIDGE_EVENT_CHANGE && event.node.slot == steps.slot);
+    cui_bridge_node selection;
+    assert(cui_bridge_get_selected(a, steps, &selection) == CUI_BRIDGE_OK);
+    assert(selection.slot == second.slot && drain(a) == 0);
+
+    assert(cui_bridge_set_stepper_wrapped_fill_v1(a, steps, 1, 0, 152, 0) == CUI_BRIDGE_OK);
+    (void)paint(a);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 1, &one) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 2, &two) == CUI_BRIDGE_OK);
+    assert(one.x == two.x && two.y >= one.y + one.height);
+    assert(cui_bridge_set_text(a, first, "First") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_stepper_fill(a, steps, 0, 0, 152, 0) == CUI_BRIDGE_OK);
+    (void)paint(a);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 1, &one) == CUI_BRIDGE_OK);
+    assert(cui_bridge_numeric_part_bounds(a, steps, 2, &two) == CUI_BRIDGE_OK);
+    assert(one.y == two.y && two.x > one.x + 76);
+    assert(cui_bridge_get_selected(a, steps, &selection) == CUI_BRIDGE_OK);
+    assert(selection.slot == second.slot && drain(a) == 0);
+}
 int main(void) {
     cui_bridge_options o = {.struct_size = sizeof o,
                             .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -250,6 +295,7 @@ int main(void) {
     assert(cui_bridge_set_image_rgba(a, first, pixels, 2, 2, 8, 16) == CUI_BRIDGE_OK);
     assert(a->nodes[first.slot].image_frame.revision == 2);
     check_fill(a, root, steps, first, second);
+    check_wrapped_fill(a, root, steps, first, second);
     assert(cui_bridge_set_stepper_visual(a, steps, 0, 1, 3) == CUI_BRIDGE_OK);
     cui_draw_list legacy = paint(a);
     for (size_t i = 0; i < legacy.count; i++)
@@ -264,6 +310,7 @@ int main(void) {
     assert(cui_bridge_set_image_rgba(a, wrong, pixels, 2, 2, 8, 16) == CUI_BRIDGE_INVALID_STATE);
     assert(cui_bridge_node_remove(a, steps) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_stepper_fill(a, steps, 1, 0, 200, 200) == CUI_BRIDGE_STALE_HANDLE);
+    assert(cui_bridge_set_stepper_wrapped_fill_v1(a, steps, 0, 0, 0, 0) == CUI_BRIDGE_STALE_HANDLE);
     cui_bridge_destroy(a);
     return 0;
 }

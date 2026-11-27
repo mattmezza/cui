@@ -71,14 +71,15 @@ function declarations produce matching paths only. `api SYMBOL --full` restores
 complete matching headers. `--declaration` explicitly selects the concise API view.
 No output is clipped or filtered by safety keywords.
 
-Use `cui_stepper_present` for fill connectors. Choose direction from the
-container width with `cui_responsive_query`. The request callback validates
-the next selection. Keep it in owner state and resubmit on the next frame.
-Retained builders provide fixed connectors and queued changes. Probe
-`supports_stepper_fill` (`SupportsStepperFill` in Go) before using Fill on an
-earlier bridge. Pass an explicit axis, width 0 to grow, and height 0 for
-intrinsic height. See the Stepper layouts in `docs/BINDING_BUILDERS.md`.
-See `docs/STEPPER_NAVIGATION.md`.
+Use `cui_stepper_present` for fill connectors. Choose direction from container
+width with `cui_responsive_query`. Choose `CUI_STEPPER_LAYOUT_WRAPPED_FILL` to
+wrap UTF-8 labels and descriptions in equal horizontal lanes or beside each
+vertical indicator. Pass width 0 to grow and height 0 for natural height.
+Keep accepted requests in owner state and resubmit on the next frame. Retained
+builders queue CHANGE. Probe `supports_stepper_wrapped_fill`
+(`SupportsStepperWrappedFill` in Go) separately from `supports_stepper_fill`
+before selecting a layout. See `docs/STEPPER_NAVIGATION.md` and
+`docs/BINDING_BUILDERS.md`.
 
 Use `cui_accordion_present` or `cui_collapsible_present` for immediate C.
 Pass `cui_disclosure_appearance` for inherited title tokens, state boxes and

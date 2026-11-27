@@ -414,6 +414,25 @@ static cui_bridge_status go_stepper_fill(cui_bridge_app *a, cui_bridge_node n, u
  return stepper_fill_set ? stepper_fill_set(a,n,vertical,density,width,height) : CUI_BRIDGE_INVALID_ARGUMENT;
 }
 
+// Optional symbol: admission of older providers remains unchanged.
+#if defined(CUI_GO_STATIC)
+extern cui_bridge_status cui_bridge_set_stepper_wrapped_fill_v1(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t, float, float);
+#pragma weak cui_bridge_set_stepper_wrapped_fill_v1
+#endif
+static cui_bridge_status (*stepper_wrapped_fill_set)(cui_bridge_app *, cui_bridge_node, uint32_t, uint32_t, float, float);
+static void go_stepper_wrapped_fill_initialize(void) {
+ if (bridge_lib) {
+  go_load_optional_symbol(&stepper_wrapped_fill_set, sizeof stepper_wrapped_fill_set, "cui_bridge_set_stepper_wrapped_fill_v1");
+ }
+#if defined(CUI_GO_STATIC)
+ else { stepper_wrapped_fill_set = cui_bridge_set_stepper_wrapped_fill_v1; }
+#endif
+}
+static int go_stepper_wrapped_fill_supported(void) { return stepper_wrapped_fill_set != NULL; }
+static cui_bridge_status go_stepper_wrapped_fill(cui_bridge_app *a, cui_bridge_node n, uint32_t vertical, uint32_t density, float width, float height) {
+ return stepper_wrapped_fill_set ? stepper_wrapped_fill_set(a,n,vertical,density,width,height) : CUI_BRIDGE_INVALID_ARGUMENT;
+}
+
 
 static cui_bridge_status (*radio_tooltip_set)(cui_bridge_app *, cui_bridge_node, const char *, uint32_t);
 static void go_radio_tooltip_initialize(void) {
@@ -861,6 +880,7 @@ static int bridge_open(const char *path) {
  go_radio_content_initialize();
  go_radio_tooltip_initialize();
  go_stepper_fill_initialize();
+ go_stepper_wrapped_fill_initialize();
  go_virtual_list_initialize();
  go_disclosure_initialize();
  go_attachment_initialize();
@@ -905,6 +925,7 @@ static int bridge_open(const char *path) {
  go_radio_content_initialize();
  go_radio_tooltip_initialize();
  go_stepper_fill_initialize();
+ go_stepper_wrapped_fill_initialize();
  go_virtual_list_initialize();
  go_disclosure_initialize();
  go_attachment_initialize();
@@ -1082,6 +1103,7 @@ type Node struct {
 
 	stepperVisual, stepperVertical, hasStepperVisual   bool
 	stepperFill                                        bool
+	stepperWrappedFill                                 bool
 	stepperFillWidth, stepperFillHeight                float32
 	stepperDensity                                     StepperDensity
 	designSize                                         int
@@ -1923,7 +1945,7 @@ func (n *Node) StepperVisual(enabled, vertical bool, density StepperDensity) *No
 		}
 	}
 	n.stepperVisual, n.stepperVertical, n.stepperDensity, n.hasStepperVisual = enabled, vertical, density, true
-	n.stepperFill = false
+	n.stepperFill, n.stepperWrappedFill = false, false
 	return n
 }
 
@@ -1967,7 +1989,54 @@ func (n *Node) StepperFill(vertical bool, density StepperDensity, width, height 
 			return n
 		}
 	}
-	n.stepperFill, n.hasStepperVisual = true, false
+	n.stepperFill, n.stepperWrappedFill, n.hasStepperVisual = true, false, false
+	n.stepperVertical, n.stepperDensity = vertical, density
+	n.stepperFillWidth, n.stepperFillHeight = width, height
+	return n
+}
+
+// ErrStepperWrappedFillUnavailable indicates that the selected provider lacks wrapped filled steppers.
+var ErrStepperWrappedFillUnavailable = errors.New("Stepper wrapped fill unavailable from bridge provider")
+
+// SupportsStepperWrappedFill independently probes wrapped Fill without affecting ordinary Fill.
+func (a *App) SupportsStepperWrappedFill() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	return C.go_stepper_wrapped_fill_supported() != 0, nil
+}
+
+// StepperWrappedFill wraps Title and description in equal horizontal lanes or beside vertical indicators.
+// Zero width grows with the parent; zero height fits the wrapped rows.
+// A subsequent StepperVisual call restores ordinary presentation.
+func (n *Node) StepperWrappedFill(vertical bool, density StepperDensity, width, height float32) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 44 || density > StepperLG || !(0 <= width && width <= 4096 && 0 <= height && height <= 4096) {
+		n.err = errors.New("invalid Stepper wrapped fill options")
+		return n
+	}
+	if n.app != nil {
+		supported, err := n.app.SupportsStepperWrappedFill()
+		if err != nil {
+			n.err = err
+			return n
+		}
+		if !supported {
+			n.err = ErrStepperWrappedFillUnavailable
+			return n
+		}
+		var axis C.uint32_t
+		if vertical {
+			axis = 1
+		}
+		if err := result(C.go_stepper_wrapped_fill(n.app.ptr, n.handle, axis, C.uint32_t(density), C.float(width), C.float(height))); err != nil {
+			n.err = err
+			return n
+		}
+	}
+	n.stepperWrappedFill, n.stepperFill, n.hasStepperVisual = true, false, false
 	n.stepperVertical, n.stepperDensity = vertical, density
 	n.stepperFillWidth, n.stepperFillHeight = width, height
 	return n
@@ -2334,6 +2403,9 @@ func (a *App) Mount(root *Node) error {
 		if n.radioMotion && C.go_radio_motion_supported() == 0 {
 			return ErrRadioMotionUnavailable
 		}
+		if n.stepperWrappedFill && C.go_stepper_wrapped_fill_supported() == 0 {
+			return ErrStepperWrappedFillUnavailable
+		}
 		if n.stepperFill && C.go_stepper_fill_supported() == 0 {
 			return ErrStepperFillUnavailable
 		}
@@ -2653,6 +2725,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.hasStepStatus {
 			if e := result(C.go_set_step_status(a.ptr, h, C.uint32_t(n.stepStatus))); e != nil {
+				return e
+			}
+		}
+		if n.stepperWrappedFill {
+			if e := n.StepperWrappedFill(n.stepperVertical, n.stepperDensity, n.stepperFillWidth, n.stepperFillHeight).err; e != nil {
 				return e
 			}
 		}

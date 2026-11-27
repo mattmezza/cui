@@ -24,12 +24,23 @@ static bool cui_stepper_indicator_prepaint(const cui_prepaint_info *info, const 
     return cui_prepaint_emit(writer, &c, false);
 }
 
+static void cui_stepper_present_text(cui_context *ui, cui_str text, float font, cui_color color,
+                                     bool wrapped) {
+    if (wrapped) {
+        if (text.length)
+            (void)cui_text_paragraph_colored_aligned(ui, text, font, color, 0, (cui_text_style){0},
+                                                     true, NULL, 0, CUI_TEXT_ALIGN_LEFT);
+    } else {
+        cui_text(ui, text, font, color);
+    }
+}
+
 cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, const cui_theme *t,
                                                   const cui_step *steps, size_t count,
                                                   size_t selected, cui_stepper_visual_options o,
                                                   cui_stepper_presentation_options p,
                                                   cui_stepper_navigation_handler handler) {
-    if (p.layout < CUI_STEPPER_LAYOUT_CONTENT || p.layout > CUI_STEPPER_LAYOUT_FILL ||
+    if (p.layout < CUI_STEPPER_LAYOUT_CONTENT || p.layout > CUI_STEPPER_LAYOUT_WRAPPED_FILL ||
         !isfinite(p.width) || !isfinite(p.height) || p.width < 0 || p.height < 0 ||
         (p.layout == CUI_STEPPER_LAYOUT_CONTENT && (p.width != 0 || p.height != 0)))
         return (cui_stepper_navigation_result){0};
@@ -44,6 +55,19 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
     for (size_t i = 0; o.icons && i < count; ++i)
         if (o.icons[i].present && !cui_bitmap_valid(o.icons[i].bitmap))
             return (cui_stepper_navigation_result){0};
+    bool wrapped = p.layout == CUI_STEPPER_LAYOUT_WRAPPED_FILL;
+    if (wrapped) {
+        if ((!steps && count) || !isfinite(t->font_size) || t->font_size <= 0)
+            return (cui_stepper_navigation_result){0};
+        for (size_t i = 0; i < count; ++i) {
+            cui_str title = steps[i].title, desc = steps[i].description;
+            if (!cui_text_line_source_valid(
+                    (cui_text_line_source){.paragraph = title, .byte_end = title.length}) ||
+                !cui_text_line_source_valid(
+                    (cui_text_line_source){.paragraph = desc, .byte_end = desc.length}))
+                return (cui_stepper_navigation_result){0};
+        }
+    }
     cui_stepper_navigation_result result =
         cui_base_stepper_navigation(ui, id, steps, count, selected, o.disabled, handler);
     if (!result.valid)
@@ -60,29 +84,42 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
     float font = o.design_size == CUI_DESIGN_INHERIT ? t->font_size : design.font_size;
     side *= scale;
     thickness *= scale;
-    bool fill = p.layout == CUI_STEPPER_LAYOUT_FILL;
+    bool fill = p.layout != CUI_STEPPER_LAYOUT_CONTENT;
     cui_stepper_indicator_palette colors =
         p.custom_palette
             ? p.palette
             : (cui_stepper_indicator_palette){t->secondary, t->secondary_hover,
                                               t->buttons[CUI_THEME_BUTTON_SECONDARY].active,
                                               t->secondary_foreground};
-    cui_begin_box(ui, id,
-                  (cui_box){.row = !o.vertical,
-                            .gap = fill ? 0 : gap,
-                            .width = fill ? (p.width > 0 ? p.width : -1) : 0,
-                            .height = fill ? p.height : 0,
-                            .align_y = fill && !o.vertical ? CUI_ALIGN_CENTER : CUI_ALIGN_START});
+    cui_begin_box(
+        ui, id,
+        (cui_box){.row = !o.vertical,
+                  .gap = fill ? 0 : gap,
+                  .width = fill ? (p.width > 0 ? p.width : -1) : 0,
+                  .height = fill ? p.height : 0,
+                  .align_y = fill && !wrapped && !o.vertical ? CUI_ALIGN_CENTER : CUI_ALIGN_START});
     for (size_t i = 0; i < count; ++i) {
         bool checked = i <= selected;
         cui_color foreground = checked ? t->on_primary : colors.foreground;
         cui_id trigger = cui_numeric_part_id(id, 1 + (unsigned)i);
-        if (fill)
-            cui_begin_box(
-                ui, cui_numeric_part_id(id, 2000 + (unsigned)i),
-                (cui_box){.width = !o.vertical ? (i + 1 < count ? -1 : 0) : -1,
-                          .height = o.vertical && p.height > 0 && i + 1 < count ? -1 : 0});
-        if (fill && i + 1 < count) {
+        bool has_next = i + 1 < count;
+        if (fill) {
+            cui_box lane = {.width = o.vertical || has_next ? -1 : 0,
+                            .height = o.vertical && p.height > 0 && has_next ? -1 : 0};
+            if (wrapped) {
+                if (!o.vertical) {
+                    lane.width = 1.0f / (float)count;
+                    lane.width_percent = true;
+                    lane.custom_padding = true;
+                    lane.padding_edges.right = has_next ? gap : 0;
+                } else if (has_next) {
+                    lane.custom_padding = true;
+                    lane.padding_edges.bottom = 16 * scale;
+                }
+            }
+            cui_begin_box(ui, cui_numeric_part_id(id, 2000 + (unsigned)i), lane);
+        }
+        if (fill && has_next) {
             cui_set_underlay_ex(ui,
                                 (cui_underlay_layout){
                                     .bounds = o.vertical ? (cui_rect){side / 2, side + 4 * scale,
@@ -93,10 +130,14 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
                                     .grow_height = o.vertical},
                                 i < selected ? t->primary : t->border, (cui_corner_radii){0});
         }
-        cui_begin_box(ui, trigger, (cui_box){.row = o.vertical, .gap = o.vertical ? gap * 2 : gap});
+        cui_begin_box(ui, trigger,
+                      (cui_box){.width = wrapped ? -1 : 0,
+                                .row = o.vertical,
+                                .gap = o.vertical ? gap * 2 : gap});
         float radius = t->radius == 0 ? 0 : side / 2;
         cui_begin_box(ui, cui_numeric_part_id(id, 1000 + (unsigned)i),
-                      (cui_box){.width = side,
+                      (cui_box){.width = wrapped && !o.vertical ? -1 : side,
+                                .max_width = wrapped && !o.vertical ? side : 0,
                                 .height = side,
                                 .radius = radius,
                                 .background = {0},
@@ -131,17 +172,18 @@ cui_stepper_navigation_result cui_stepper_present(cui_context *ui, cui_id id, co
             }
         }
         cui_end_box(ui);
-        cui_begin_box(ui, 0, (cui_box){.gap = gap});
-        cui_text(ui, steps[i].title, font, o.disabled || steps[i].disabled ? t->muted : t->text);
+        cui_begin_box(ui, 0, (cui_box){.width = wrapped ? -1 : 0, .gap = gap});
+        cui_stepper_present_text(ui, steps[i].title, font,
+                                 o.disabled || steps[i].disabled ? t->muted : t->text, wrapped);
         if (steps[i].description.length)
-            cui_text(ui, steps[i].description, font * .8f, t->muted);
+            cui_stepper_present_text(ui, steps[i].description, font * .8f, t->muted, wrapped);
         if (steps[i].status == CUI_STEP_ERROR)
-            cui_text(ui, cui_string("Error"), font * .8f, t->danger);
+            cui_stepper_present_text(ui, cui_string("Error"), font * .8f, t->danger, wrapped);
         cui_end_box(ui);
         cui_end_box(ui);
         if (fill)
             cui_end_box(ui);
-        if (!fill && i + 1 < count) {
+        if (!fill && has_next) {
             cui_begin_box(ui, 0,
                           (cui_box){.width = o.vertical ? side : 36 * scale,
                                     .height = o.vertical ? 20 * scale : side,

@@ -138,7 +138,8 @@ It lays out steps horizontally at the shared SM breakpoint and vertically
 below it. Larger design text increases the width needed for horizontal layout.
 Auto uses the current preview content width, so resizing keeps the active step
 and changes only layout. Choose Vertical or Horizontal to set the axis
-explicitly. Choose Fixed connectors for fixed spacers or Buttons for the
+explicitly. Choose **Wrap labels** for equal horizontal lanes and natural-height
+vertical rows. Choose Fixed connectors for fixed spacers or Buttons for the
 original rendering. Connector and icon settings appear only in the visual
 layouts. The design scale starts at Inherit. Leaving the story resets the
 controls and keeps the application-owned selection and validation.
@@ -154,17 +155,29 @@ icons use static RGBA bytes kept alive through renderer completion.
 Headless Chromium exercises Fill at desktop DPR1/2 and mobile DPR2. The checks
 cover reflow on resize and larger type, actual connector and hover/press pixels,
 request rejection, keyboard and touch selection, the fixed-layout variants and
-route reset. They compile the displayed snippets with strict C11 warnings.
-Centered crossing connectors, intrinsic text compression and native
+route reset. The wrapped layout keeps all three steps reachable in a horizontal
+row on the touch viewport. The checks compile the displayed snippets with strict
+C11 warnings. Centered crossing connectors, arbitrary child content and native
 assistive-technology acceptance remain open.
 
 ## Foreign builder visual authoring
 
-Python, JavaScript, TypeScript, Go and Rust offer fixed connectors and Fill.
-Retained C apps use `cui_bridge_set_stepper_fill` to choose a direction and
-optional extents. In a builder, first check `supports_stepper_fill`
-(`SupportsStepperFill` in Go) when deploying to earlier providers. See
-[binding builders](BINDING_BUILDERS.md#stepper-layouts).
+Python, JavaScript, TypeScript, Go and Rust offer fixed connectors, Fill and
+Wrapped Fill. Retained C uses `cui_bridge_set_stepper_wrapped_fill_v1` for
+wrapping, with the same options as `cui_bridge_set_stepper_fill`. Probe each
+capability independently when deploying to earlier providers. In Python, for
+example, choose a layout before mounting the tree:
+
+```python
+if app.supports_stepper_wrapped_fill():
+    steps.stepper_wrapped_fill(vertical=False, width=0)
+elif app.supports_stepper_fill():
+    steps.stepper_fill(vertical=True)
+else:
+    steps.stepper_visual(True, True, "md")
+```
+
+See [binding builders](BINDING_BUILDERS.md#stepper-layouts).
 
 These settings keep the bridge's selected Item and aggregate CHANGE semantics.
 Icons are copied from owned RGBA bytes, and groups allow up to 64 Items.
@@ -196,9 +209,18 @@ Horizontal fill centers unequal-height items on the root cross axis. Trigger
 buttons themselves stay intrinsic. Connectors are decorative zero-flow
 underlays inside their own items, clamped empty when space is insufficient.
 `CUI_STEPPER_LAYOUT_CONTENT` retains fixed spacer geometry and requires zero extents.
-Neither mode offers centered crossing connectors. All shared XS..9XL design sizes
-remain available; density selects source proportions. Intrinsic labels can still
-overflow an insufficient parent: no wrapping/compression parity is claimed.
+The intrinsic label layouts can overflow a narrow container. Use
+`CUI_STEPPER_LAYOUT_WRAPPED_FILL` when labels need to reflow. It divides the
+available width equally among horizontal steps, aligns indicators and connectors
+at the top, and wraps titles and descriptions. In a vertical Stepper, labels use
+the width alongside their indicator. Keep height at zero for rows to grow with
+their content, and pick the vertical orientation when the available width cannot
+comfortably hold every lane. The mode accepts valid UTF-8 and uses CUI's paragraph
+wrapping. Supply enough width for at least one grapheme in each text column.
+
+All shared XS..9XL design sizes remain available. Density selects indicator glyph
+and proportions. Centered crossing connectors and arbitrary child styling remain
+outside these layouts.
 
 Calling the new entry opts into secondary/secondary_hover/secondary_foreground
 unchecked indicators and theme-radius behavior (zero radius makes square

@@ -89,7 +89,7 @@ function stepperControl(id,label,options,value){
  for(const [v,text] of options){const option=document.createElement('option');option.value=v;option.textContent=text;input.append(option);}
  input.value=value;input.addEventListener('change',requestFrame);wrapper.append(input);stepperControls.append(wrapper,' ');return input;
 }
-stepperControl('mode','Layout',[[2,'Fill available space'],[1,'Fixed connectors'],[0,'Buttons']],2);
+stepperControl('mode','Layout',[[2,'Fill available space'],[3,'Wrap labels'],[1,'Fixed connectors'],[0,'Buttons']],2);
 stepperControl('axis','Orientation',[[2,'Auto'],[1,'Vertical'],[0,'Horizontal']],2);
 stepperControl('density','Source density',[[0,'MD (24px)'],[1,'XS (8px, no glyph)'],[2,'SM (18px)'],[3,'LG (32px)']],0);
 stepperControl('icons','Custom icons',[[0,'Ordinals'],[1,'RGBA bitmap masks']],0);

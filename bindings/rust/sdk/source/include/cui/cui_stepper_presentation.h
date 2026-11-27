@@ -5,7 +5,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-typedef enum { CUI_STEPPER_LAYOUT_CONTENT = 0, CUI_STEPPER_LAYOUT_FILL } cui_stepper_layout;
+typedef enum {
+    CUI_STEPPER_LAYOUT_CONTENT = 0,
+    CUI_STEPPER_LAYOUT_FILL,
+    CUI_STEPPER_LAYOUT_WRAPPED_FILL
+} cui_stepper_layout;
 typedef struct {
     cui_color normal, hover, pressed, foreground;
 } cui_stepper_indicator_palette;
@@ -18,8 +22,11 @@ typedef struct {
 /* Explicit opt-in presentation; old visual/navigation APIs remain unchanged.
  * CONTENT keeps fixed connector spacers and requires width=height=0. FILL uses
  * non-centered zero-flow connectors; width0 grows to available parent width,
- * height0 is intrinsic, positive finite extents are explicit. Invalid options
- * fail before Base registration/reduction; exactly one Base reducer is used.
+ * height0 is intrinsic, positive finite extents are explicit. WRAPPED_FILL has
+ * the same extent rules. It gives horizontal steps equal lanes, makes vertical
+ * labels use the width beside their indicator, and wraps valid UTF-8 labels
+ * and descriptions at the current lane width. Use height0 to fit wrapped rows.
+ * Invalid options fail before Base registration/reduction; one Base reducer is used.
  * Result.valid is argument preflight, not layout/resource-capacity proof.
  * Unchecked normal/hover/foreground use theme.secondary/secondary_hover/
  * secondary_foreground; pressed uses buttons[SECONDARY].active (CUI fallback,

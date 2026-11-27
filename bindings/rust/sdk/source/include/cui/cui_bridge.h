@@ -1563,6 +1563,15 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_stepper_visual(cui_bridge_app *,
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_stepper_fill(cui_bridge_app *, cui_bridge_node,
                                                              uint32_t vertical, uint32_t density,
                                                              float width, float height);
+/* Optional wrapped Fill with the same arguments and selection/event contract.
+ * Horizontal steps divide the current width equally. Vertical text wraps beside
+ * the indicator. Width 0 grows to the parent. Height 0 fits wrapped rows.
+ * Like Fill, this replaces the previous Stepper presentation. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_stepper_wrapped_fill_v1(cui_bridge_app *,
+                                                                        cui_bridge_node,
+                                                                        uint32_t vertical,
+                                                                        uint32_t density,
+                                                                        float width, float height);
 /* Copies a tightly packed or padded RGBA8 image (at most 16 MiB).
  * Also accepts Item children of Stepper as optional tinted visual icons.
  * Item icon bytes remain owned through replacement/removal; other parents reject. */

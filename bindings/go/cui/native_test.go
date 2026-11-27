@@ -2460,3 +2460,93 @@ func TestStepperFill(t *testing.T) {
 		}
 	}
 }
+
+func TestStepperWrappedFill(t *testing.T) {
+	for _, size := range []float32{-1, 4097, float32(math.NaN()), float32(math.Inf(1))} {
+		if Stepper("bad").StepperWrappedFill(false, StepperMD, size, 0).Err() == nil {
+			t.Fatal("invalid width accepted")
+		}
+		if Stepper("bad").StepperWrappedFill(false, StepperMD, 0, size).Err() == nil {
+			t.Fatal("invalid height accepted")
+		}
+	}
+	if Item("bad", "bad").StepperWrappedFill(false, StepperMD, 0, 0).Err() == nil {
+		t.Fatal("wrong kind accepted")
+	}
+	if Stepper("bad").StepperWrappedFill(false, StepperDensity(4), 0, 0).Err() == nil {
+		t.Fatal("invalid density accepted")
+	}
+
+	a := app(t)
+	supported, err := a.SupportsStepperWrappedFill()
+	check(t, err)
+	if expected := os.Getenv("CUI_EXPECT_STEPPER_WRAP"); expected != "" && supported != (expected == "1") {
+		t.Fatalf("unexpected Stepper Wrapped Fill availability: %v", supported)
+	}
+	first, second := Item("a", "A long step title that wraps across several lines"), Item("b", "Another long step title that wraps across several lines")
+	steps := Stepper("steps").StepperWrappedFill(false, StepperSM, 0, 0).DesignSize(LG).Children(first, second)
+	changes := 0
+	steps.OnChange(func(Event) { changes++ })
+	if !supported {
+		if err := a.Mount(Column("root").Children(steps)); err != ErrStepperWrappedFillUnavailable {
+			t.Fatalf("unavailable: %v", err)
+		}
+		if steps.app != nil {
+			t.Fatal("mount mutated before preflight")
+		}
+		oldFill, e := a.SupportsStepperFill()
+		check(t, e)
+		if oldFill {
+			steps.StepperFill(false, StepperSM, 0, 0)
+		} else {
+			steps.StepperVisual(true, false, StepperSM)
+		}
+	}
+	check(t, a.Mount(Column("root").Children(steps)))
+	check(t, a.Step(.016))
+	if supported {
+		wide, e := a.Bounds(steps)
+		check(t, e)
+		check(t, steps.StepperWrappedFill(false, StepperMD, 160, 0).Err())
+		check(t, a.Step(.016))
+		narrow, e := a.Bounds(steps)
+		check(t, e)
+		check(t, steps.StepperWrappedFill(false, StepperMD, 600, 0).Err())
+		check(t, a.Step(.016))
+		broad, e := a.Bounds(steps)
+		check(t, e)
+		if narrow.Width != 160 || narrow.Height <= broad.Height || narrow.Height <= wide.Height {
+			t.Fatalf("wrapped rows did not grow at narrow width: %v %v", narrow, broad)
+		}
+		check(t, steps.StepperWrappedFill(false, StepperMD, 160, 0).Err())
+		check(t, steps.StepperVisual(true, false, StepperMD).Err())
+		check(t, a.Step(.016))
+		fixed, e := a.Bounds(steps)
+		check(t, e)
+		if fixed.Width <= narrow.Width {
+			t.Fatalf("fixed layout did not replace bounded fill: fixed %v and fill %v", fixed, narrow)
+		}
+		check(t, steps.StepperWrappedFill(true, StepperLG, 320, 240).Err())
+		check(t, a.Step(.016))
+		vertical, e := a.Bounds(steps)
+		check(t, e)
+		one, e := a.NumericPartBounds(steps, 1)
+		check(t, e)
+		two, e := a.NumericPartBounds(steps, 2)
+		check(t, e)
+		if vertical.Width != 320 || vertical.Height != 240 || two.Y <= one.Y {
+			t.Fatalf("explicit vertical fill geometry: %v %v %v", vertical, one, two)
+		}
+		clickRect(t, a, two)
+		if changes != 0 {
+			t.Fatal("CHANGE dispatched during step")
+		}
+		_, e = a.Dispatch()
+		check(t, e)
+		selected, e := a.Selected(steps)
+		check(t, e)
+		if changes != 1 || selected != second {
+			t.Fatalf("new Fill selection and event count: %v %d", selected, changes)
+		}
+	}
+}

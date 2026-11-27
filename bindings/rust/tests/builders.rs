@@ -2342,3 +2342,81 @@ fn retained_kbd_style_optional_provider() {
     app.remove(node).unwrap();
     assert_eq!(app.reset_kbd_style(node).err(), Some(Error(4)));
 }
+
+#[test]
+fn stepper_wrapped_fill_authoring() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(800., 400.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let steps = app.child(root, Kind::Stepper, "steps").unwrap();
+    let first = app.child(steps, Kind::Item, "first").unwrap();
+    let second = app.child(steps, Kind::Item, "second").unwrap();
+    app.text(first, "A long step title that wraps across several lines")
+        .unwrap()
+        .text(second, "Another long step title that wraps across several lines")
+        .unwrap();
+    for invalid in [-1., 4097., f32::NAN, f32::INFINITY] {
+        assert_eq!(
+            app.stepper_wrapped_fill(steps, false, StepperDensity::Md, invalid, 0.).err(),
+            Some(Error(3))
+        );
+        assert_eq!(
+            app.stepper_wrapped_fill(steps, false, StepperDensity::Md, 0., invalid).err(),
+            Some(Error(3))
+        );
+    }
+    let supported = app.supports_stepper_wrapped_fill();
+    if let Ok(expected) = std::env::var("CUI_EXPECT_STEPPER_WRAP") {
+        assert_eq!(supported, expected == "1");
+    }
+    if supported {
+        app.stepper_wrapped_fill(steps, false, StepperDensity::Sm, 0., 0.)
+            .unwrap()
+            .design_size(steps, DesignSize::Lg)
+            .unwrap();
+        app.step(0.016).unwrap();
+        assert_eq!(app.bounds(steps).unwrap().width, 768.);
+        app.stepper_wrapped_fill(steps, false, StepperDensity::Md, 160., 0.).unwrap();
+        app.step(0.016).unwrap();
+        let narrow = app.bounds(steps).unwrap();
+        assert_eq!(narrow.width, 160.);
+        app.stepper_wrapped_fill(steps, false, StepperDensity::Md, 600., 0.).unwrap();
+        app.step(0.016).unwrap();
+        assert!(narrow.height > app.bounds(steps).unwrap().height);
+        app.stepper_wrapped_fill(steps, false, StepperDensity::Md, 160., 0.).unwrap();
+        app.stepper_visual(steps, true, false, StepperDensity::Md).unwrap();
+        app.step(0.016).unwrap();
+        assert!(app.bounds(steps).unwrap().width > narrow.width);
+        app.build_child(root, Kind::Stepper, "builder")
+            .unwrap().stepper_wrapped_fill(false, StepperDensity::Md, 0., 0.).unwrap();
+        app.stepper_wrapped_fill(steps, true, StepperDensity::Lg, 320., 240.).unwrap();
+        let changes = Rc::new(Cell::new(0));
+        let changed = changes.clone();
+        app.on_change(steps, move || changed.set(changed.get() + 1)).unwrap();
+        app.step(0.016).unwrap();
+        let bounds = app.bounds(steps).unwrap();
+        assert_eq!((bounds.width, bounds.height), (320., 240.));
+        let one = app.numeric_part_bounds(steps, 1).unwrap();
+        let two = app.numeric_part_bounds(steps, 2).unwrap();
+        assert!(two.y > one.y);
+        let (x, y) = (two.x + two.width / 2., two.y + two.height / 2.);
+        app.pointer(Phase::Down, x, y).unwrap();
+        app.pointer(Phase::Up, x, y).unwrap();
+        app.step(0.016).unwrap();
+        assert_eq!(changes.get(), 0);
+        app.dispatch().unwrap();
+        assert_eq!(app.selected(steps).unwrap(), Some(second));
+        assert_eq!(changes.get(), 1);
+    } else {
+        assert_eq!(
+            app.stepper_wrapped_fill(steps, false, StepperDensity::Md, 0., 0.).err(),
+            Some(Error::STEPPER_WRAPPED_FILL_UNAVAILABLE)
+        );
+        if app.supports_stepper_fill() {
+            app.stepper_fill(steps, false, StepperDensity::Md, 0., 0.).unwrap();
+        } else {
+            app.stepper_visual(steps, true, false, StepperDensity::Md).unwrap();
+        }
+    }
+    app.step(0.016).unwrap();
+}

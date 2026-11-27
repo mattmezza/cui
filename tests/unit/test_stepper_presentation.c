@@ -490,7 +490,101 @@ static void custom_press_and_capacity(void) {
     assert(cui_last_error(f.ui) == CUI_OK);
     cui_destroy(f.ui);
 }
+static const cui_step wrapped_steps[] = {
+    {.title = CUI_STR("International configuration"),
+     .description = CUI_STR("Choose account and notification preferences")},
+    {.title = CUI_STR("Review details")},
+    {.title = CUI_STR("Confirm"), .description = CUI_STR("One last check")},
+};
+
+static cui_draw_list wrapped_frame(fixture *f, float width) {
+    assert(cui_begin_frame(f->ui, width + 80, 500, .016f));
+    cui_begin_box(f->ui, 77, (cui_box){.width = width});
+    f->captured = f->selected;
+    assert(cui_stepper_present(f->ui, 10, &f->theme, wrapped_steps, 3, f->selected, f->visual,
+                               f->presentation, (cui_stepper_navigation_handler){request, f})
+               .valid);
+    cui_end_box(f->ui);
+    cui_draw_list draw = cui_end_frame(f->ui);
+    assert(cui_last_error(f->ui) == CUI_OK);
+    return draw;
+}
+
+static size_t wrapped_title_lines(cui_draw_list draw, cui_rect lane) {
+    cui_str title = wrapped_steps[0].title;
+    size_t lines = 0, bytes = 0;
+    for (size_t i = 0; i < draw.count; ++i) {
+        const cui_draw_command *cmd = &draw.commands[i];
+        if (cmd->type != CUI_DRAW_TEXT || cmd->text_source.paragraph.length != title.length ||
+            memcmp(cmd->text_source.paragraph.data, title.data, title.length))
+            continue;
+        assert(cmd->bounds.x >= lane.x - .1f &&
+               cmd->bounds.x + cmd->bounds.w <= lane.x + lane.w + .1f);
+        assert(cmd->bounds.y >= lane.y && cmd->bounds.y + cmd->bounds.h <= lane.y + lane.h + .1f);
+        bytes += cmd->text.length;
+        ++lines;
+    }
+    assert(bytes == title.length);
+    return lines;
+}
+
+static void wrapped_geometry_and_requests(void) {
+    fixture f = create();
+    f.presentation.layout = CUI_STEPPER_LAYOUT_WRAPPED_FILL;
+    cui_draw_list draw = wrapped_frame(&f, 720);
+    cui_rect wide = cui_bounds(f.ui, cui_numeric_part_id(10, 2000));
+    assert(wide.w == 240 && wrapped_title_lines(draw, wide) == 1);
+    draw = wrapped_frame(&f, 204);
+    cui_rect first = cui_bounds(f.ui, cui_numeric_part_id(10, 2000));
+    assert(first.w == 68 && first.h > wide.h && wrapped_title_lines(draw, first) > 1);
+    for (unsigned i = 0; i < 3; ++i) {
+        cui_rect lane = cui_bounds(f.ui, cui_numeric_part_id(10, 2000 + i));
+        cui_rect trigger = cui_bounds(f.ui, cui_numeric_part_id(10, 1 + i));
+        assert(lane.x == first.x + (float)i * 68 && lane.w == 68 && lane.y == first.y);
+        assert(trigger.x == lane.x && trigger.w > 0 && trigger.x + trigger.w <= lane.x + lane.w);
+    }
+    size_t connector = 0;
+    for (size_t i = 0; i < draw.count; ++i)
+        if (draw.commands[i].type == CUI_DRAW_RECT &&
+            same(draw.commands[i].color, f.theme.border)) {
+            cui_rect b = draw.commands[i].bounds;
+            assert(connector < 2 && b.y == first.y + 12);
+            assert(b.x == first.x + 28 + (float)connector * 68 && b.w == 36);
+            ++connector;
+        }
+    assert(connector == 2);
+    cui_rect last = cui_bounds(f.ui, cui_numeric_part_id(10, 3));
+    pointer(&f, CUI_EVENT_POINTER_DOWN, last.x + 10, last.y + 10);
+    pointer(&f, CUI_EVENT_POINTER_UP, last.x + 10, last.y + 10);
+    wrapped_frame(&f, 204);
+    assert(f.calls == 1 && f.selected == 2);
+    f.visual.vertical = true;
+    draw = wrapped_frame(&f, 144);
+    first = cui_bounds(f.ui, cui_numeric_part_id(10, 2000));
+    assert(first.w == 144 && wrapped_title_lines(draw, first) > 1);
+    cui_rect next = cui_bounds(f.ui, cui_numeric_part_id(10, 2001));
+    assert(next.x == first.x && next.y >= first.y + first.h - .1f);
+    cui_focus(f.ui, cui_numeric_part_id(10, 1));
+    assert(cui_queue_event(f.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    wrapped_frame(&f, 144);
+    assert(f.calls == 2 && f.selected == 0);
+    draw = wrapped_frame(&f, 412);
+    wide = cui_bounds(f.ui, cui_numeric_part_id(10, 2000));
+    assert(wide.h < first.h && wrapped_title_lines(draw, wide) == 1);
+
+    const cui_step invalid = {.title = CUI_STR("\xc0\x80")};
+    assert(cui_begin_frame(f.ui, 250, 500, .016f));
+    assert(!cui_stepper_present(f.ui, 10, &f.theme, &invalid, 1, 0, f.visual, f.presentation,
+                                (cui_stepper_navigation_handler){request, &f})
+                .valid);
+    assert(cui_end_frame(f.ui).count == 0);
+    size_t semantics;
+    (void)cui_semantics(f.ui, &semantics);
+    assert(!semantics && f.calls == 2);
+    cui_destroy(f.ui);
+}
 int main(void) {
+    wrapped_geometry_and_requests();
     unequal_height_alignment();
     multiple_requests();
     content_geometry_compatibility();

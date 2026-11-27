@@ -155,9 +155,11 @@ bool draw_save_button(cui_context *ui, cui_id id, const cui_theme *theme,
 In the Button gallery, choose **Variant focus**, **Outer focus ring** or
 **Classic focus**, then tab into the preview to inspect the variants. Retained
 builders select the same modes for individual Buttons, including named Dialog
-and Notification actions. Combining the new paint with ButtonGroup or the
-separate style-callback facades remains open.
-[Retained builder examples](BINDING_BUILDERS.md#choose-button-focus-paint)
+and Notification actions. Immediate C ButtonGroup uses the same modes through
+`cui_button_group_focus_ex`. The style-callback facades keep their existing
+focus phase.
+[Retained builder examples](BINDING_BUILDERS.md#choose-button-focus-paint) ·
+[ButtonGroup focus paint](BUTTON_GROUP.md#keyboard-focus-paint)
 Native assistive-technology and physical GPU validation remain open.
 
 The variant line placements follow the frozen Button and focus-helper sources.

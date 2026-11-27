@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_components.h"
+#include "cui/cui_button_styles.h"
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
@@ -61,9 +61,98 @@ static void pointer(cui_context *ui, cui_id id) {
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = x, .y = y}));
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = x, .y = y}));
 }
+static cui_draw_list focus_scene(cui_context *ui, const cui_theme *theme,
+                                 cui_button_group_style_workspace *w,
+                                 cui_button_group_styled_item *items, bool vertical,
+                                 cui_button_focus_mode mode) {
+    bool selected[3] = {true, false, false};
+    assert(cui_begin_frame(ui, 320, 220, .016f));
+    cui_begin_box(ui, 1, (cui_box){.width = 320, .height = 220, .padding = 16});
+    cui_button_group_result result;
+    assert(cui_button_group_focus_ex(
+        ui, 100, theme, items, selected, 3, w,
+        (cui_button_group_style_options){.behavior = {.vertical = vertical},
+                                         .override_variant = true,
+                                         .variant = CUI_BUTTON_OUTLINE},
+        mode, &result));
+    assert(result.valid);
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+
+static void focus_key(cui_context *ui, cui_key key) {
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = key}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = key}));
+}
+
+static void focus_paint(cui_button_group_style_workspace *w, bool vertical) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 128, .max_commands = 128});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    theme.focus = (cui_color){37, 104, 215, 255};
+    unsigned clicked = 0;
+    cui_button_group_styled_item items[] = {
+        {.id = 10, .label = {"One", 3}},
+        {.id = 11, .label = {"Two", 3}},
+        {.id = 12, .label = {"Three", 5}, .options = {.on_click = click, .action_user = &clicked}},
+    };
+    focus_scene(ui, &theme, w, items, vertical, CUI_BUTTON_FOCUS_LEGACY);
+    cui_rect boxes[3];
+    for (size_t i = 0; i < 3; ++i)
+        boxes[i] = cui_bounds(ui, items[i].id);
+
+    for (size_t i = 0; i < 3; ++i) {
+        focus_key(ui, CUI_KEY_TAB);
+        cui_draw_list draw = focus_scene(ui, &theme, w, items, vertical, CUI_BUTTON_FOCUS_VARIANT);
+        assert(cui_focused(ui) == items[i].id);
+        const cui_draw_command *edge = border(draw, boxes[i]);
+        assert(edge && edge->custom_border_edges && edge->color.r == theme.focus.r &&
+               edge->color.b == theme.focus.b);
+        assert(edge->border_edges.left == (vertical || i == 0 ? 1 : 0));
+        assert(edge->border_edges.top == (!vertical || i == 0 ? 1 : 0));
+        assert(edge->border_edges.right == 1 && edge->border_edges.bottom == 1);
+
+        cui_rect ring_bounds = {boxes[i].x - 3, boxes[i].y - 3, boxes[i].w + 6, boxes[i].h + 6};
+        assert(!border(draw, ring_bounds));
+        draw = focus_scene(ui, &theme, w, items, vertical, CUI_BUTTON_FOCUS_OUTER_RING);
+        const cui_draw_command *ring = border(draw, ring_bounds);
+        assert(ring && ring->stroke == 3 && ring->color.r == theme.focus.r &&
+               ring->color.b == theme.focus.b && ring->color.a == 127);
+        for (size_t j = 0; j < 3; ++j)
+            assert(border(draw, boxes[j])); /* Focus paint leaves all three frames in place. */
+
+        draw = focus_scene(ui, &theme, w, items, vertical, CUI_BUTTON_FOCUS_LEGACY);
+        edge = border(draw, boxes[i]);
+        assert(edge && edge->border_edges.right == 2 && edge->border_edges.bottom == 2);
+    }
+    focus_key(ui, CUI_KEY_ENTER);
+    focus_scene(ui, &theme, w, items, vertical, CUI_BUTTON_FOCUS_OUTER_RING);
+    assert(clicked == 1);
+    items[2].options.hide_focus_ring = true;
+    cui_draw_list hidden = focus_scene(ui, &theme, w, items, vertical, CUI_BUTTON_FOCUS_OUTER_RING);
+    assert(cui_focused(ui) == items[2].id);
+    const cui_draw_command *edge = border(hidden, boxes[2]);
+    assert(edge && edge->border_edges.right == 1 && edge->color.b != theme.focus.b);
+    assert(!border(hidden,
+                   (cui_rect){boxes[2].x - 3, boxes[2].y - 3, boxes[2].w + 6, boxes[2].h + 6}));
+
+    assert(cui_begin_frame(ui, 320, 220, .016f));
+    bool selected[3] = {true, false, false};
+    cui_button_group_result rejected = {.valid = true};
+    assert(!cui_button_group_focus_ex(ui, 100, &theme, items, selected, 3, w,
+                                      (cui_button_group_style_options){0},
+                                      (cui_button_focus_mode)99, &rejected));
+    assert(!rejected.valid && !cui_end_frame(ui).count && clicked == 1 && selected[0]);
+    cui_destroy(ui);
+}
+
 int main(void) {
     cui_button_group_style_workspace *w = calloc(1, sizeof *w);
     assert(w);
+    focus_paint(w, false);
+    focus_paint(w, true);
     cui_button_group_styled_item items[3] = {{.id = 10, .label = {"One", 3}},
                                              {.id = 11, .label = {"Two", 3}},
                                              {.id = 12, .label = {"Three", 5}}};

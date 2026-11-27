@@ -374,7 +374,9 @@ or an outer ring with the existing focus-visible policy. The generic
 named Dialog/Notification actions use `cui_bridge_set_button_focus_v1`.
 Probe provider support before opting in on a runtime-selected bridge. Read
 `docs/BINDING_BUILDERS.md#choose-button-focus-paint` for language methods and
-examples. ButtonGroup and style-callback integration remain open.
+examples. Immediate C joined groups use `cui_button_group_focus_ex`; see
+`docs/BUTTON_GROUP.md` for inherited clips and sibling paint order. Retained
+groups and style-callback integration remain open.
 
 Typed builder root shadows cover only Row, Column, Label, Button, Badge and
 Input. Read `docs/BRIDGE_SHADOWS.md` and the owning `include/cui/cui_bridge.h`

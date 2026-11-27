@@ -49,8 +49,10 @@ def main():
                         page.locator('#disabled').check()
                         expected = ['.design_size = CUI_DESIGN_LG', '.disabled = true']
                         if name == 'Button':
+                            page.locator('#button-focus').select_option('2')
                             expected += [f'.multiple = {str(mode == 2).lower()}',
-                                         f'.vertical = {str(mode == 3).lower()}']
+                                         f'.vertical = {str(mode == 3).lower()}',
+                                         'cui_button_group_focus_ex', 'CUI_BUTTON_FOCUS_OUTER_RING']
                         elif mode == 9:
                             expected += ['cui_regex_matcher(&view->session)', 'cui_regex_compile']
                         elif mode >= 7:

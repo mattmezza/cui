@@ -3,7 +3,7 @@ import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
 import {createCuiMeshRenderer} from "./modules/cui_mesh.js";
 import {paintGradientText} from "./modules/cui_text_paint.js";
-import {selectedUsage,paginationUsage,ratingUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage,radioStyledUsage,radioControlledUsage,disclosureHeadingUsage,carouselBasisUsage,iconTextDefaultsUsage} from "./modules/cui_usage.js";
+import {buttonFocusModes,selectedUsage,paginationUsage,ratingUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage,radioStyledUsage,radioControlledUsage,disclosureHeadingUsage,carouselBasisUsage,iconTextDefaultsUsage} from "./modules/cui_usage.js";
 import {resizableUsage} from "./modules/cui_resizable_usage.js";
 import {stepperUsage} from "./modules/cui_stepper_usage.js";
 import {spinnerUsage} from "./modules/cui_spinner_usage.js";
@@ -1135,7 +1135,6 @@ function render(){
   if(!['popover-mode','popover-trigger'].includes(input.id))input.disabled=$('popover-mode').value==='0';
  wasm.gallery_button_collection(Number($('button-collection').value));
  wasm.gallery_button_focus(Number(buttonFocusControl.value));
- buttonFocusControl.disabled=$('button-collection').value!=='0';
  wasm.gallery_input_mode(Number($('input-mode').value));
  wasm.gallery_disclosure_options(disclosureMode,Number($('disclosure-multiple').checked));
  wasm.gallery_image_options(Number($('image-state').value),Number($('image-fit').value),Number($('image-grayscale').checked),Number($('image-opacity').checked));
@@ -1272,9 +1271,10 @@ function render(){
  if(['Video','VideoPlayer'].includes(selected.name))videoHost.drain();
  if(selected.name==='Button'||selected.name==='Input'){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
+  const focusMode=Number(buttonFocusControl.value);
   const defaultUsage=selected.name==='Button'?snippets.Button.replace('CUI_BUTTON_FOCUS_VARIANT',
-      ['CUI_BUTTON_FOCUS_LEGACY','CUI_BUTTON_FOCUS_VARIANT','CUI_BUTTON_FOCUS_OUTER_RING'][Number(buttonFocusControl.value)]):snippets.Input;
-  $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||defaultUsage;
+      buttonFocusModes[focusMode]):snippets.Input;
+  $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked,focusMode)||defaultUsage;
  }
  if(selected.name==='Icon'){
   const followsText=iconLayoutControl.value==='4';

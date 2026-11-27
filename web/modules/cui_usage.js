@@ -367,7 +367,10 @@ bool workflow_draw(cui_context *ui, const char *key, const cui_theme *theme,
 }`;
 }
 
-export function selectedUsage(name, mode, size = 3, disabled = false) {
+export const buttonFocusModes = [
+ 'CUI_BUTTON_FOCUS_LEGACY', 'CUI_BUTTON_FOCUS_VARIANT', 'CUI_BUTTON_FOCUS_OUTER_RING',
+];
+export function selectedUsage(name, mode, size = 3, disabled = false, focusMode = 0) {
  const design = sizes[size] || 'CUI_DESIGN_BASE';
  if (name === 'Input' && mode === 9) return `#include <cui/cui_components.h>
 #include <cui/cui_regex.h>
@@ -450,7 +453,8 @@ cui_input_result draw_formatted_input(cui_context *ui, cui_id id,
  * Construct a single-line edit model; size workspace for final UTF-8 plus NUL.
  * Check result.error for configuration/capacity failures; Undo restores one edit. */`;
  if (name !== 'Button' || mode < 1 || mode > 3) return null;
- return `#include <cui/cui_components.h>
+ const focus = buttonFocusModes[focusMode] ?? buttonFocusModes[0];
+ return `#include <cui/cui_button_styles.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -487,7 +491,7 @@ bool draw_calendar_view(cui_context *ui, const cui_theme *theme,
         items[i].options.custom_cursor = true;
         items[i].options.cursor = CUI_CURSOR_POINTER;
     }
-    return cui_button_group_ex(ui, cui_id_from(ui, "calendar-view"), theme,
+    return cui_button_group_focus_ex(ui, cui_id_from(ui, "calendar-view"), theme,
         items, view->selected, 3, view->workspace,
         (cui_button_group_style_options){
             .behavior = {
@@ -499,7 +503,7 @@ bool draw_calendar_view(cui_context *ui, const cui_theme *theme,
             },
             .design_size = ${design},
             .override_variant = true, .variant = CUI_BUTTON_OUTLINE
-        }, NULL);
+        }, ${focus}, NULL);
 }
 
 /* After the last draw list is rendered, at application shutdown: */

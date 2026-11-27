@@ -123,6 +123,14 @@ typedef enum {
  * button and returns false. Legacy callers keep their existing focus paint. */
 bool cui_button_focus_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_button_options,
                          cui_button_focus_mode);
+/* Shared focus treatment for the joined children of cui_button_group_ex.
+ * Existing edge widths are preserved in opt-in modes. The outside band paints
+ * in sibling order and uses ancestor clipping. A one-child group uses the
+ * standalone treatment. Invalid mode returns false before submission. */
+bool cui_button_group_focus_ex(cui_context *, cui_id, const cui_theme *,
+                               const cui_button_group_styled_item *, bool *selected, size_t count,
+                               cui_button_group_style_workspace *, cui_button_group_style_options,
+                               cui_button_focus_mode, cui_button_group_result *);
 #ifdef __cplusplus
 }
 #endif

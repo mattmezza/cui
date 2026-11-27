@@ -5,7 +5,7 @@ ButtonGroup composes direct Button children into a joined horizontal or vertical
 The caller owns a Boolean selection array, stable nonzero child IDs, and a zero-initialized workspace. Keep these alive through submission. Allocate the bounded workspace once, rather than on a small thread stack; it supports at most 256 direct children and performs no heap allocation. On the tested 64-bit build the Base workspace is 18,016 bytes and the styled workspace is 212,584 bytes; sizes vary with ABI. Labels, icons, content callbacks and optional Button states retain their existing borrowed lifetimes. Do not reuse a workspace, submit another frame, or mutate descriptors/theme/Button states from its callbacks. Selection callbacks may update the selection array. Descriptor and theme snapshots prevent descriptor changes from affecting later events in that submission.
 
 ```c
-#include <cui/cui_components.h>
+#include <cui/cui_button_styles.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -27,11 +27,11 @@ static bool compose_group(cui_context *ui, const cui_theme *theme, app *a) {
         {.id = 102, .label = {"Week", 4}},
         {.id = 103, .label = {"Month", 5}},
     };
-    return cui_button_group_ex(ui, 100, theme, items, a->selected, 3, a->workspace,
+    return cui_button_group_focus_ex(ui, 100, theme, items, a->selected, 3, a->workspace,
         (cui_button_group_style_options){
             .behavior = {.on_change = select_requested, .change_user = a},
             .override_variant = true, .variant = CUI_BUTTON_OUTLINE,
-        }, NULL);
+        }, CUI_BUTTON_FOCUS_VARIANT, NULL);
 }
 /* Initialize: a.workspace = calloc(1, sizeof *a.workspace);
  * Compose inside a successful begin_frame/end_frame; free at shutdown. */
@@ -44,6 +44,28 @@ The default group callback policy matches the pinned source's pointer-only callb
 Group disabled, child disabled and child loading states combine with OR. This intentionally avoids the pinned source's builder-order-dependent disabled propagation. Loading retains its busy description and blocks activation. Cancelled input and blocked releases do not dispatch callbacks. Pointer focus, custom cursors, slots, tooltips and Button state options remain per child. Group size/variant overrides take precedence; group compact/outline flags enable those child options. The group owns its direct child boxes, orientation, zero inter-child gap and segmented shape. First/last outer corners survive, internal corners are square, and later children omit the shared left/top border. A single child preserves its own shape. There is no invented roving-focus or mandatory-selection requirement; ordinary Core Tab behavior applies.
 
 Under explicit or ancestor inert/layout-only scope, the styled API participates in layout and permitted paint without registering semantics, dispatching selection/hover callbacks, updating tooltip state, focusing or mutating the model or caller Button state. Custom content remains an application layout callback and must avoid side effects, as with ordinary Core layout-only composition. The staged Base API instead rejects suppressed scopes.
+
+## Keyboard focus paint
+
+Pass a `cui_button_focus_mode` to `cui_button_group_focus_ex` to set the focus
+treatment for the group. Variant focus tints the focused child's existing
+joined border at its ordinary width. A borderless child follows its Button
+variant's line treatment. Outer Ring adds a three-pixel band. It inherits
+ancestor clipping, and each child paints in group order, so later children
+can cover the part of a ring that crosses a join. Use Variant focus for a
+treatment contained by the joined border on an outlined group. One-child
+groups use the standalone appearance and each child can set
+`hide_focus_ring`. Classic focus, the policy used by `cui_button_group_ex`,
+uses the two-pixel focus border.
+[Button focus modes](BUTTON_STYLES.md#choose-how-keyboard-focus-appears)
+
+All modes use the same controlled selection, input handling and hit bounds.
+An invalid mode returns false and clears the optional result before registering
+the group. The Button gallery applies the focus selector to all collection
+layouts and includes the selected mode in the copied example. The grouped
+focus entry point is immediate C.
+
+## Base composition
 
 For Base composition, open the actual group box, call `cui_base_button_group_begin`, open each stable child box and call `cui_base_button_group_item` once, then call `cui_base_button_group_end` before closing the group. Missing/duplicate registration, stale frames, cross-context workspace reuse and reentrant dispatch reject without application callbacks. Partial Core registration is not rolled back; retain ordinary Core error handling. Reset abandoned workspaces before reuse, context recreation, or a complete 64-bit frame-sequence cycle.
 

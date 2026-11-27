@@ -2307,14 +2307,16 @@ static bool cui_button_group_style_valid(cui_button_options o) {
            (o.rounding != CUI_BUTTON_ROUNDED_CUSTOM || (isfinite(o.radius) && o.radius >= 0)) &&
            cui_button_shape_valid(o);
 }
-bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
-                         const cui_button_group_styled_item *items, bool *selected, size_t count,
-                         cui_button_group_style_workspace *w,
-                         cui_button_group_style_options options, cui_button_group_result *out) {
+bool cui_button_group_focus_ex(cui_context *ui, cui_id id, const cui_theme *theme,
+                               const cui_button_group_styled_item *items, bool *selected,
+                               size_t count, cui_button_group_style_workspace *w,
+                               cui_button_group_style_options options,
+                               cui_button_focus_mode focus_mode, cui_button_group_result *out) {
     if (out)
         *out = (cui_button_group_result){0};
-    if (!ui || !id || !theme || !w || !cui_frame_is_submitting(ui) || w->behavior.active ||
-        w->composing || count > CUI_BUTTON_GROUP_MAX_ITEMS || (count && (!items || !selected)) ||
+    if (focus_mode < CUI_BUTTON_FOCUS_LEGACY || focus_mode > CUI_BUTTON_FOCUS_OUTER_RING || !ui ||
+        !id || !theme || !w || !cui_frame_is_submitting(ui) || w->behavior.active || w->composing ||
+        count > CUI_BUTTON_GROUP_MAX_ITEMS || (count && (!items || !selected)) ||
         !isfinite(theme->font_size) || theme->font_size <= 0 || !isfinite(theme->radius) ||
         theme->radius < 0)
         return false;
@@ -2423,11 +2425,12 @@ bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
                                        .top_right = (vertical ? first : last) ? radius : 0,
                                        .bottom_left = (vertical ? last : first) ? radius : 0,
                                        .bottom_right = last ? radius : 0};
-                float width = w->behavior.interactions[i].focus_visible && !o.hide_focus_ring ? 2
-                              : o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK ||
-                                      o.variant == CUI_BUTTON_TEXT
-                                  ? 0
-                                  : 1;
+                bool borderless = o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK ||
+                                  o.variant == CUI_BUTTON_TEXT;
+                float width = borderless ? 0 : 1;
+                if (focus_mode == CUI_BUTTON_FOCUS_LEGACY &&
+                    w->behavior.interactions[i].focus_visible && !o.hide_focus_ring)
+                    width = 2;
                 o.custom_border_edges = true;
                 o.border_edges = (cui_border_edges){.left = (vertical || first) ? width : 0,
                                                     .top = (!vertical || first) ? width : 0,
@@ -2435,7 +2438,7 @@ bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
                                                     .bottom = width};
             }
             cui_button_paint_state(ui, child.id, t, child.label, o, w->behavior.interactions[i],
-                                   NULL, NULL, NULL, CUI_BUTTON_FOCUS_LEGACY);
+                                   NULL, NULL, NULL, focus_mode);
             if (!passive)
                 cui_button_tooltip(ui, child.id, t, o);
         }
@@ -2445,6 +2448,13 @@ bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
     if (out)
         *out = result;
     return result.valid;
+}
+bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
+                         const cui_button_group_styled_item *items, bool *selected, size_t count,
+                         cui_button_group_style_workspace *w,
+                         cui_button_group_style_options options, cui_button_group_result *out) {
+    return cui_button_group_focus_ex(ui, id, theme, items, selected, count, w, options,
+                                     CUI_BUTTON_FOCUS_LEGACY, out);
 }
 bool cui_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool disabled) {
     return cui_button_ex(ui, id, t, name, (cui_button_options){.disabled = disabled});

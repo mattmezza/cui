@@ -4885,7 +4885,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 items[i].options.custom_cursor = true;
                 items[i].options.cursor = CUI_CURSOR_POINTER;
             }
-            cui_button_group_ex(
+            cui_button_group_focus_ex(
                 ui, cui_id_from(ui, "button-collection"), &t, items, button_collection_selected, 3,
                 &button_collection_workspace,
                 (cui_button_group_style_options){
@@ -4900,7 +4900,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                     .design_size = design_size,
                     .override_variant = true,
                     .variant = CUI_BUTTON_OUTLINE},
-                NULL);
+                button_focus_mode, NULL);
             snprintf(label, sizeof label, "Selection callbacks: %u", button_collection_requests);
             cui_label(ui, &t, cui_string(label));
             break;

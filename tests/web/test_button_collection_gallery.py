@@ -104,8 +104,33 @@ def main():
                     corner = a.page.evaluate("""b=>{const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');const scale=canvas.width/canvas.getBoundingClientRect().width;const pixel=(x,y)=>Array.from(ctx.getImageData(Math.floor(x*scale),Math.floor(y*scale),1,1).data);return [pixel(b[0],b[1]),pixel(b[0]-2,b[1]-2)];}""", bounds[0])
                     assert corner[0][3] == 255 and corner[1][3] == 255
                     assert all(abs(corner[0][i]-corner[1][i]) <= 3 for i in range(3)), corner
+                    canvas = a.page.locator('canvas')
+                    assert a.page.locator('#button-focus').is_enabled()
+                    a.configure('button-focus', 1)
+                    a.page.evaluate('cuiGallery.exports.gallery_focus(0xffffffff); cuiGallery.render();')
+                    canvas.focus()
+                    a.page.keyboard.press('Tab')
+                    a.page.keyboard.press('Tab')
+                    a.page.wait_for_function('''b=>{const e=cuiGallery.exports;
+                      return Array.from({length:e.gallery_semantic_count()},(_,i)=>i).some(i=>
+                        e.gallery_semantic(i,7) && [1,2,3,4].every((f,j)=>
+                          Math.abs(e.gallery_semantic(i,f)-b[j])<.1));}''', arg=bounds[1])
+                    x, y, w, h = bounds[1]
+                    point = [x + w / 2, y - 2] if mode == 1 else [x - 2, y + h / 2]
+                    pixel = '''([x,y])=>{const c=document.querySelector('canvas'),s=c.width/c.clientWidth;
+                      return [...c.getContext('2d').getImageData(Math.floor(x*s),Math.floor(y*s),1,1).data];}'''
+                    before = a.page.evaluate(pixel, point)
+                    a.configure('button-focus', 2)
+                    assert a.page.evaluate(pixel, point) != before
+                    focused = a.target('Week', 1)['f']
+                    assert focused[7] and focused[1:5] == bounds[1]
+                    snippet = a.page.locator('#snippet').text_content()
+                    assert 'cui_button_group_focus_ex' in snippet and 'CUI_BUTTON_FOCUS_OUTER_RING' in snippet
+                    a.configure('button-focus', 0)
+                    assert a.page.evaluate(pixel, point) == before
                 assert not a.errors, a.errors
-                results.append({'width': width, 'status': 'verified', 'mouse_touch_keyboard_disabled_cancel_joins': True})
+                results.append({'width': width, 'status': 'verified',
+                                'mouse_touch_keyboard_disabled_cancel_joins': True, 'focus_paint': True})
                 a.page.close()
             browser.close()
     finally:

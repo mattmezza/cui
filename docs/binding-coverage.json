@@ -111,6 +111,12 @@
           "types": ["cui_button_surface_styles"],
           "symbols": ["cui_button_surface_ex", "cui_button_surface_paint_only"],
           "note": "Per-phase C style callbacks with owned shadow layers remain immediate C. The separate retained Button focus setter supports variant focus and the outside ring across all five builders."
+        },
+        {
+          "header": "include/cui/cui_button_styles.h",
+          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "symbols": ["cui_button_group_focus_ex"],
+          "note": "The joined controlled ButtonGroup focus route is immediate C. Retained focus support applies to individual Button nodes."
         }
       ]
     },

@@ -22,6 +22,7 @@ assert.equal(app.supportsVirtualListRows(), true, 'installed bridge lacks Virtua
 assert.equal(app.supports_carousel_basis(), true, 'installed bridge lacks fractional Carousel slides');
 assert.equal(app.supports_carousel_navigation(), true, 'installed bridge lacks Carousel navigation');
 assert.equal(app.supportsKbdStroke(), true, 'installed bridge lacks typed Kbd');
+assert(app.supports_spinner_presentation() && app.supports_spinner_icon_resource());
 const changes = [];
 const overview = cui.item('overview', 'Overview').carousel_basis(0.5);
 const activity = cui.item('activity', 'Activity').carousel_basis(0.5);
@@ -30,7 +31,20 @@ const slides = cui.carousel('slides').visual_size(240, 100).children(overview, a
   .on_change(event => changes.push(event.node));
 const hint = cui.kbdStroke('shortcut', 'ß', {modifiers:2, outline:true, accessibleName:'Save shortcut'});
 const reference = cui.kbdStroke('reference', 'sS', {modifiers:2, outline:true});
-app.mount(cui.column().children(widget, slides, hint, reference)); app.step();
+const loading = cui.rotating_spinner('loading', {easing:'linear'});
+app.mount(cui.column().children(widget, slides, hint, reference, loading));
+const artwork = app.icon_resource(cui.IconSource.svg(
+  '<svg viewBox="0 0 24 24"><path d="M12 2 L22 12 H12 Z"/></svg>'));
+loading.set_icon_resource(artwork);
+app.step();
+const first = loading.presentation();
+assert(first.nextWakeSeconds > first.coreTime);
+assert.deepEqual([loading.bounds().width, loading.bounds().height], [16, 16]);
+assert(artwork.bitmap().width > 0);
+app.step(.08);
+assert(loading.presentation().phase > first.phase);
+loading.set_icon_resource(null);
+artwork.close();
 const {width:hintWidth, height:hintHeight} = hint.bounds();
 assert(hintWidth > 0 && hintHeight > 0);
 assert.deepEqual([hintWidth, hintHeight], [reference.bounds().width, reference.bounds().height]);

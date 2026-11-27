@@ -15,6 +15,8 @@ fn main() -> Result<()> {
     assert!(app.supports_carousel_basis(), "installed bridge lacks fractional Carousel slides");
     assert!(app.supports_carousel_navigation(), "installed bridge lacks Carousel navigation");
     assert!(app.supports_kbd_stroke(), "installed bridge lacks typed Kbd");
+    assert!(app.supports_spinner_presentation(), "installed bridge lacks rotating Spinner");
+    assert!(app.supports_spinner_icon_resources(), "installed bridge lacks shared Spinner artwork");
     let root = app.build_root(Kind::Column,"root")?.finish();
     let clicked = Rc::new(Cell::new(0));
     let callback = clicked.clone();
@@ -35,6 +37,16 @@ fn main() -> Result<()> {
     };
     let hint = app.child_kbd_stroke(root, "shortcut", "ß", &shortcut_style)?;
     let reference = app.child_kbd_stroke(root, "reference", "sS", &shortcut_style)?;
+    let spinner = app.rotating_spinner(root, "spinner", SpinnerConfig::default())?;
+    let shared_spinner = app.rotating_spinner(root, "shared-spinner", SpinnerConfig::default())?;
+    let artwork = app.create_icon_resource(
+        &IconSource::svg(r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 2h20v8H2z"/></svg>"#),
+        IconLimits::default(),
+    )?;
+    for node in [spinner, shared_spinner] {
+        app.set_spinner_icon_resource(node, Some(artwork))?;
+        assert_eq!(app.spinner_icon_resource(node)?, Some(artwork));
+    }
     app.step(0.016)?;
     let expanded = app.bounds(hint)?;
     let expected = app.bounds(reference)?;
@@ -57,6 +69,19 @@ fn main() -> Result<()> {
     assert_eq!(changes.get(), None);
     assert_eq!(app.dispatch()?, 1);
     assert_eq!(changes.get(), Some(activity));
+    let first = app.spinner_presentation(spinner)?.expect("installed Spinner animation sample");
+    app.step(0.2)?;
+    let next = app.spinner_presentation(spinner)?.expect("installed Spinner animation sample");
+    let bounds = app.bounds(spinner)?;
+    assert!(bounds.width > 0. && bounds.height > 0.);
+    assert!(next.core_time > first.core_time);
+    assert_ne!(next.phase, first.phase);
+    assert!(app.release_icon_resource(artwork).is_err());
+    for node in [spinner, shared_spinner] {
+        app.set_spinner_icon_resource(node, None)?;
+        assert_eq!(app.spinner_icon_resource(node)?, None);
+    }
+    app.release_icon_resource(artwork)?;
     println!("installed Rust bridge smoke passed");
     Ok(())
 }

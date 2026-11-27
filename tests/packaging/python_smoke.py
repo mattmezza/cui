@@ -5,7 +5,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 import cui_bridge
-from cui_bridge import App, button, carousel, column, item, kbd_stroke, row
+from cui_bridge import (App, IconSource, SpinnerConfig, SpinnerEasing, button, carousel,
+                        column, item, kbd_stroke, rotating_spinner, row)
 assert not os.environ.get("CUI_BRIDGE_LIBRARY")
 assert not os.environ.get("PYTHONPATH")
 backend = os.environ.get("CUI_PACKAGE_SMOKE_BACKEND", "none")
@@ -28,6 +29,7 @@ with App(**kwargs) as app:
     assert app.supports_carousel_basis(), "installed bridge lacks fractional Carousel slides"
     assert app.supports_carousel_navigation(), "installed bridge lacks Carousel navigation"
     assert app.supports_kbd_stroke(), "installed bridge lacks typed Kbd"
+    assert app.supports_spinner_presentation() and app.supports_spinner_icon_resource()
     changes = []
     overview = item("overview", "Overview").carousel_basis(0.5)
     activity = item("activity", "Activity").carousel_basis(0.5)
@@ -36,8 +38,19 @@ with App(**kwargs) as app:
     slides.on_change(changes.append)
     hint = kbd_stroke("shortcut", "ß", modifiers=2, outline=True, accessible_name="Save shortcut")
     reference = kbd_stroke("reference", "sS", modifiers=2, outline=True)
-    app.mount(column().children(widget, slides, hint, reference))
+    loading = rotating_spinner("loading", SpinnerConfig(easing=SpinnerEasing.LINEAR))
+    app.mount(column().children(widget, slides, hint, reference, loading))
+    artwork = app.icon_resource(IconSource.svg(
+        '<svg viewBox="0 0 24 24"><path d="M12 2 L22 12 H12 Z"/></svg>'))
+    loading.set_icon_resource(artwork)
     app.step()
+    first = loading.presentation()
+    assert first is not None and first.next_wake_seconds > first.core_time
+    assert artwork.bitmap().width > 0 and tuple(app.bounds(loading)[2:]) == (16, 16)
+    app.step(.08)
+    assert loading.presentation().phase > first.phase
+    loading.set_icon_resource(None)
+    artwork.close()
     hint_width, hint_height = app.bounds(hint)[2:]
     assert hint_width > 0 and hint_height > 0
     assert (hint_width, hint_height) == tuple(app.bounds(reference)[2:])

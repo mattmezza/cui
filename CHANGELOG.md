@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0-alpha.14
+
+- Retained C, Python, JavaScript, TypeScript, Go and Rust can render a rotating
+  Spinner with a catalog icon or a shared SVG resource. Applications can set
+  size, color, built-in easing and reduced motion, and read the latest motion
+  sample. Existing Spinner builders still render their original indicator.
+- The Spinner gallery previews custom SVG artwork and provides the C code.
+- The Skeleton gallery demonstrates loading-to-content transitions for a
+  profile, article list and table. C ThemeSet registry V2 can import an owned
+  solid Skeleton color with secondary fallback.
+- The Badge gallery opens to a responsive support inbox with photo avatars,
+  notification icons, and nested unread and verification markers. The copied
+  C example is the same implementation that runs in the browser.
+
 ## 0.1.0-alpha.13
 
 - Command searches UTF-8 labels and keywords using Unicode 17 lowercase and

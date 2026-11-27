@@ -47,6 +47,14 @@ func main() {
 	if supported, err := app.SupportsKbdStroke(); err != nil || !supported {
 		panic(fmt.Sprintf("installed bridge lacks typed Kbd: %v", err))
 	}
+	if supported, err := app.SupportsSpinnerPresentation(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks rotating Spinner: %v", err))
+	}
+	if supported, err := app.SupportsSpinnerIconResources(); err != nil || !supported {
+		panic(fmt.Sprintf("installed bridge lacks shared Spinner artwork: %v", err))
+	}
+	spinner := cui.RotatingSpinner("spinner", cui.DefaultSpinnerConfig())
+	sharedSpinner := cui.RotatingSpinner("shared-spinner", cui.DefaultSpinnerConfig())
 	clicks := 0
 	button := cui.Button("save").Text("Save ✓").OnClick(func(cui.Event) { clicks++ })
 	overview := cui.Item("overview", "Overview").CarouselBasis(0.5)
@@ -58,8 +66,20 @@ func main() {
 	shortcutStyle := cui.KbdStrokeOptions{Modifiers: cui.KbdCtrl, Outline: true, AccessibleName: "Save shortcut"}
 	hint := cui.KbdStroke("shortcut", "ß", shortcutStyle)
 	reference := cui.KbdStroke("reference", "sS", shortcutStyle)
-	if err := app.Mount(cui.Column("root").Children(button, slides, hint, reference)); err != nil {
+	if err := app.Mount(cui.Column("root").Children(button, slides, hint, reference, spinner, sharedSpinner)); err != nil {
 		panic(err)
+	}
+	artwork, err := app.NewIconResource(cui.IconSVG(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 2h20v8H2z"/></svg>`), cui.IconLimits{})
+	if err != nil {
+		panic(err)
+	}
+	for _, node := range []*cui.Node{spinner, sharedSpinner} {
+		if err := node.SetSpinnerIconResource(artwork); err != nil {
+			panic(err)
+		}
+		if got, err := node.SpinnerIconResource(); err != nil || got == nil {
+			panic("installed Spinner lost shared artwork")
+		}
 	}
 	if err := app.Step(.016); err != nil {
 		panic(err)
@@ -101,6 +121,33 @@ func main() {
 	delivered, err = app.Dispatch()
 	if err != nil || delivered != 1 || len(changes) != 1 || changes[0].Selected != activity {
 		panic("installed Carousel change did not carry the next slide")
+	}
+	first, ok, err := spinner.SpinnerPresentation()
+	if err != nil || !ok {
+		panic("installed Spinner has no animation sample")
+	}
+	if err := app.Step(.2); err != nil {
+		panic(err)
+	}
+	next, ok, err := spinner.SpinnerPresentation()
+	spinnerBounds, boundsErr := app.Bounds(spinner)
+	if err != nil || !ok || boundsErr != nil || spinnerBounds.Width <= 0 || spinnerBounds.Height <= 0 ||
+		next.CoreTime <= first.CoreTime || next.Phase == first.Phase {
+		panic("installed Spinner did not lay out and rotate")
+	}
+	if artwork.Close() == nil {
+		panic("installed Spinner released attached artwork")
+	}
+	for _, node := range []*cui.Node{spinner, sharedSpinner} {
+		if err := node.SetSpinnerIconResource(nil); err != nil {
+			panic(err)
+		}
+		if got, err := node.SpinnerIconResource(); err != nil || got != nil {
+			panic("installed Spinner did not clear artwork")
+		}
+	}
+	if err := artwork.Close(); err != nil {
+		panic(err)
 	}
 	fmt.Println("installed Go bridge smoke passed")
 }

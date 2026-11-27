@@ -688,6 +688,16 @@ static void test_inline_content(void) {
     bad = spans[0];
     bad.token.id = cui_string(" \xc2\xa0");
     assert(!cui_edit_content_valid(invalid));
+    bad.token.id = cui_string("\xc2\xa0\xf0\x9f\x99\x82");
+    bad.token.label = cui_string("\xc3\x89mile");
+    assert(cui_edit_content_valid(invalid));
+    bad.token.id = (cui_str){"id\0suffix", 9};
+    assert(!cui_edit_content_valid(invalid));
+    bad.token.id = cui_string("id\xf0\x9f");
+    assert(!cui_edit_content_valid(invalid));
+    bad = spans[0];
+    bad.token.label = (cui_str){"label\0suffix", 12};
+    assert(!cui_edit_content_valid(invalid));
     const char *labels[] = {"", "bad\n", "\xc2\x85", "\xe2\x80\xa8", "\xe2\x80\xa9", "\xc0\x80"};
     for (size_t i = 0; i < sizeof labels / sizeof labels[0]; i++) {
         bad = spans[0];

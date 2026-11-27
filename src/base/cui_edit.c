@@ -3451,19 +3451,15 @@ bool cui_edit_valid_utf8(cui_str text) {
     return true;
 }
 static bool cui_edit_private_token_string(cui_str text, bool id) {
-    if (!text.length || !cui_edit_valid_utf8(text))
+    if (!text.length || !text.data)
         return false;
     bool nonwhite = false;
     for (size_t at = 0; at < text.length;) {
         size_t width;
+        uint32_t cp;
         const unsigned char *bytes = (const unsigned char *)text.data + at;
-        cui_edit_private_decode(bytes, text.length - at, &width);
-        uint32_t cp = bytes[0];
-        if (width > 1) {
-            cp &= width == 2 ? 31u : width == 3 ? 15u : 7u;
-            for (size_t i = 1; i < width; ++i)
-                cp = (cp << 6) | (bytes[i] & 63u);
-        }
+        if (!cui_utf8_decode(bytes, text.length - at, &width, &cp) || !cp)
+            return false;
         nonwhite |= !(cui_edit_private_word_property(cp) & 64u);
         if (!id && (cp < 32 || (cp >= 127 && cp <= 159) || cp == 0x2028 || cp == 0x2029))
             return false;
